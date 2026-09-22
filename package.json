@@ -1,0 +1,19 @@
+{
+  "name": "gn-encuestas",
+  "version": "1.0.0",
+  "description": "PWA para visualización y exportación de encuestas de Google Forms",
+  "main": "src/index.html",
+  "scripts": {
+    "build": "node scripts/gen-config.js",
+    "predev": "node scripts/gen-config.js",
+    "dev": "npx serve src -p 8080 -s",
+    "dev:open": "npx serve src -p 8080 -s --open",
+    "lint": "echo 'No hay linter configurado aún'"
+  },
+  "keywords": ["encuestas", "pwa", "google-forms", "pdf"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}

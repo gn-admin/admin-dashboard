@@ -1,0 +1,168 @@
+const App = {
+  currentPage: null,
+
+  init() {
+    this.registerServiceWorker();
+    this.initSidebarCollapse();
+    Auth.init();
+    Auth.onAuthChange(async user => {
+      if (user) await this.showDashboard();
+      else this.showLogin();
+    });
+    this.setupEventListeners();
+    window.addEventListener('hashchange', () => this.onHashChange());
+  },
+
+  registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  },
+
+  initSidebarCollapse() {
+    const collapsed = localStorage.getItem('gn_sidebar_collapsed') === 'true';
+    if (collapsed) {
+      document.getElementById('sidebar')?.classList.add('collapsed');
+      const btn = document.getElementById('sidebar-collapse-btn');
+      if (btn) btn.innerHTML = Icons.arrowRight;
+    }
+  },
+
+  async showDashboard() {
+    document.getElementById('login-view').classList.remove('active');
+    document.getElementById('dashboard-view').classList.add('active');
+    await Dashboard.init();
+    const hash = location.hash.replace('#', '') || 'dashboard';
+    this.navigateTo(hash);
+  },
+
+  showLogin() {
+    document.getElementById('dashboard-view').classList.remove('active');
+    document.getElementById('login-view').classList.add('active');
+  },
+
+  navigateTo(page) {
+    if (this.currentPage === page) return;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const target = document.getElementById('page-' + page);
+    if (target) {
+      target.classList.add('active');
+      this.currentPage = page;
+    }
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+    document.querySelectorAll('.bottom-nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+    const titles = {
+      dashboard: 'Dashboard',
+      'encuestas-perros': 'Pre-adopcion Perros',
+      'encuestas-gatos': 'Pre-adopcion Gatos',
+      'encuestas-acogida': 'Solicitudes de Acogida',
+      animales: 'Animales',
+      acogidas: 'Acogidas',
+      adopciones: 'Adopciones',
+      socios: 'Socios / Voluntarios',
+      blacklist: 'Lista Negra',
+      reportes: 'Reportes'
+    };
+    document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+    this.closeSidebar();
+    this.closeMasMenu();
+    Dashboard.loadPage(page);
+  },
+
+  onHashChange() {
+    const page = location.hash.replace('#', '') || 'dashboard';
+    this.navigateTo(page);
+  },
+
+  closeSidebar() {
+    document.getElementById('sidebar')?.classList.remove('open');
+    document.querySelector('.sidebar-overlay')?.classList.remove('active');
+  },
+
+  toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+    sidebar?.classList.toggle('open');
+    overlay?.classList.toggle('active');
+  },
+
+  toggleSidebarCollapse() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar?.classList.toggle('collapsed');
+    const isCollapsed = sidebar?.classList.contains('collapsed');
+    localStorage.setItem('gn_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    const btn = document.getElementById('sidebar-collapse-btn');
+    if (btn) btn.innerHTML = isCollapsed ? Icons.arrowRight : Icons.sidebarCollapse;
+  },
+
+  toggleMasMenu() {
+    const popup = document.getElementById('mas-menu-popup');
+    const overlay = document.getElementById('mas-menu-overlay');
+    const isOpen = popup?.style.display === 'block';
+    if (isOpen) { this.closeMasMenu(); }
+    else { popup.style.display = 'block'; overlay?.classList.add('active'); }
+  },
+
+  closeMasMenu() {
+    const popup = document.getElementById('mas-menu-popup');
+    const overlay = document.getElementById('mas-menu-overlay');
+    if (popup) popup.style.display = 'none';
+    overlay?.classList.remove('active');
+  },
+
+  setupEventListeners() {
+    document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('login-submit-btn');
+      const errorEl = document.getElementById('login-error');
+      errorEl.classList.remove('active');
+      btn.classList.add('loading');
+      btn.disabled = true;
+      try { await Auth.loginWithEmail(email, password); }
+      catch (err) { errorEl.textContent = err.message || 'Error al iniciar sesion'; errorEl.classList.add('active'); }
+      finally { btn.classList.remove('loading'); btn.disabled = false; }
+    });
+
+    document.getElementById('logout-btn')?.addEventListener('click', () => Auth.logout());
+    document.getElementById('mobile-logout-btn')?.addEventListener('click', () => Auth.logout());
+    document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
+    document.getElementById('sidebar-collapse-btn')?.addEventListener('click', () => this.toggleSidebarCollapse());
+
+    document.querySelectorAll('.sidebar-link[data-page]').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        location.hash = link.dataset.page;
+      });
+    });
+
+    document.querySelectorAll('.bottom-nav-item[data-page]').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        location.hash = link.dataset.page;
+      });
+    });
+
+    document.getElementById('mas-menu-toggle')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.toggleMasMenu();
+    });
+
+    document.getElementById('mas-menu-overlay')?.addEventListener('click', () => this.closeMasMenu());
+
+    document.querySelectorAll('.mas-menu-item[data-page]').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.closeMasMenu();
+        location.hash = item.dataset.page;
+      });
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('sidebar-overlay')) this.closeSidebar();
+    });
+  }
+};
+
+document.addEventListener('DOMContentLoaded', () => App.init());

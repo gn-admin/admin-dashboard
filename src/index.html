@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0A431E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="GN-Admin - Panel de administracion - Grupo Nebak">
+  <title>GN-Admin | Grupo Nebak</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <div id="login-view" class="view active">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-logo-wrapper">
+            <img src="/assets/icons/logo-nebak.jpg" alt="Grupo Nebak" class="login-logo-img">
+          </div>
+          <h1>Grupo Nebak</h1>
+          <p>Panel de administracion</p>
+        </div>
+        <form id="login-form" class="login-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <div class="input-with-icon">
+              <span class="input-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+              <input type="email" id="email" placeholder="tu@email.com" required autocomplete="email">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="password">Contrasena</label>
+            <div class="input-with-icon">
+              <span class="input-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+              <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+          </div>
+          <div id="login-error" class="error-message"></div>
+          <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">
+            <span class="btn-text">Iniciar sesion</span>
+            <span class="spinner" style="display:none"></span>
+          </button>
+        </form>
+        <div class="login-mode-badge" id="mode-badge"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard-view" class="view">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <img src="/assets/icons/logo-nebak.jpg" alt="Nebak" class="sidebar-logo-img">
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-name">GN-Admin</span>
+          <span class="sidebar-brand-sub">Grupo Nebak</span>
+        </div>
+        <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Colapsar menu"></button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="sidebar-link" data-page="dashboard" data-tooltip="Dashboard" href="#dashboard">
+          <span class="sidebar-link-icon"></span>
+          <span class="sidebar-link-text">Dashboard</span>
+        </a>
+
+        <div class="sidebar-section">
+          <span class="sidebar-section-title">Encuestas</span>
+          <a class="sidebar-link" data-page="encuestas-perros" data-tooltip="Pre-adopcion Perros" href="#encuestas-perros">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Pre-adopcion Perros</span>
+          </a>
+          <a class="sidebar-link" data-page="encuestas-gatos" data-tooltip="Pre-adopcion Gatos" href="#encuestas-gatos">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Pre-adopcion Gatos</span>
+          </a>
+          <a class="sidebar-link" data-page="encuestas-acogida" data-tooltip="Solicitudes Acogida" href="#encuestas-acogida">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Solicitudes de Acogida</span>
+          </a>
+        </div>
+
+        <div class="sidebar-section">
+          <span class="sidebar-section-title">Gestion</span>
+          <a class="sidebar-link" data-page="animales" data-tooltip="Animales" href="#animales">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Animales</span>
+          </a>
+          <a class="sidebar-link" data-page="acogidas" data-tooltip="Acogidas" href="#acogidas">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Acogidas</span>
+          </a>
+          <a class="sidebar-link" data-page="adopciones" data-tooltip="Adopciones" href="#adopciones">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Adopciones</span>
+          </a>
+          <a class="sidebar-link" data-page="socios" data-tooltip="Socios" href="#socios">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Socios / Voluntarios</span>
+          </a>
+        </div>
+
+        <div class="sidebar-section">
+          <span class="sidebar-section-title">Herramientas</span>
+          <a class="sidebar-link" data-page="blacklist" data-tooltip="Lista Negra" href="#blacklist">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Lista Negra</span>
+          </a>
+          <a class="sidebar-link" data-page="reportes" data-tooltip="Reportes" href="#reportes">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Reportes</span>
+          </a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="sidebar-user-avatar" id="sidebar-avatar">GN</div>
+          <div class="sidebar-user-info">
+            <span class="user-name" id="sidebar-user-name">Grupo Nebak</span>
+            <span class="user-role" id="sidebar-user-role">Admin</span>
+          </div>
+        </div>
+        <button id="logout-btn" class="sidebar-logout" title="Cerrar sesion">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="logout-text">Cerrar sesion</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="sidebar-toggle" class="btn-icon sidebar-toggle-btn"></button>
+          <h1 id="page-title" class="topbar-title">Dashboard</h1>
+        </div>
+        <div class="topbar-right">
+          <span class="topbar-user-name" id="topbar-user-name"></span>
+          <button id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="main-content" id="main-content">
+        <div id="page-dashboard" class="page active"></div>
+        <div id="page-encuestas-perros" class="page"></div>
+        <div id="page-encuestas-gatos" class="page"></div>
+        <div id="page-encuestas-acogida" class="page"></div>
+        <div id="page-animales" class="page"></div>
+        <div id="page-acogidas" class="page"></div>
+        <div id="page-adopciones" class="page"></div>
+        <div id="page-socios" class="page"></div>
+        <div id="page-blacklist" class="page"></div>
+        <div id="page-reportes" class="page"></div>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav">
+      <a class="bottom-nav-item active" data-page="dashboard" href="#dashboard">
+        <span class="bottom-nav-icon"></span>
+        <span class="bottom-nav-label">Inicio</span>
+      </a>
+      <a class="bottom-nav-item" data-page="encuestas-perros" href="#encuestas-perros">
+        <span class="bottom-nav-icon"></span>
+        <span class="bottom-nav-label">Perros</span>
+      </a>
+      <a class="bottom-nav-item" data-page="encuestas-gatos" href="#encuestas-gatos">
+        <span class="bottom-nav-icon"></span>
+        <span class="bottom-nav-label">Gatos</span>
+      </a>
+      <a class="bottom-nav-item" data-page="animales" href="#animales">
+        <span class="bottom-nav-icon"></span>
+        <span class="bottom-nav-label">Animales</span>
+      </a>
+      <a class="bottom-nav-item" id="mas-menu-toggle" href="javascript:void(0)">
+        <span class="bottom-nav-icon" id="mas-menu-icon"></span>
+        <span class="bottom-nav-label">Mas</span>
+      </a>
+    </nav>
+
+    <div class="mas-menu-overlay" id="mas-menu-overlay"></div>
+    <div class="mas-menu-popup" id="mas-menu-popup" style="display:none">
+      <a class="mas-menu-item" data-page="acogidas" href="#acogidas">
+        <span class="mas-menu-icon" id="mas-icon-acogidas"></span>Acogidas
+      </a>
+      <a class="mas-menu-item" data-page="adopciones" href="#adopciones">
+        <span class="mas-menu-icon" id="mas-icon-adopciones"></span>Adopciones
+      </a>
+      <a class="mas-menu-item" data-page="socios" href="#socios">
+        <span class="mas-menu-icon" id="mas-icon-socios"></span>Socios
+      </a>
+      <a class="mas-menu-item" data-page="reportes" href="#reportes">
+        <span class="mas-menu-icon" id="mas-icon-reportes"></span>Reportes
+      </a>
+      <a class="mas-menu-item" data-page="blacklist" href="#blacklist">
+        <span class="mas-menu-icon" id="mas-icon-blacklist"></span>Lista Negra
+      </a>
+    </div>
+  </div>
+
+  <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
+  <div id="error-message" class="toast-error"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/carnet-generator.js"></script>
+  <script src="/js/pdf-export.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    document.getElementById('mode-badge').textContent = CONFIG.MODE === 'local' ? 'Modo Desarrollo' : '';
+  </script>
+</body>
+</html>
