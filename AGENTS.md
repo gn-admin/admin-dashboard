@@ -11,17 +11,18 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - `node scripts/gen-config.js` — script de generación: no editar `src/js/config.js` ni `apps-script/Config.gs` a mano, se regeneran.
 
 ## Reglas importantes
-- **Nunca subir datos sensibles**: `.env` (valores reales), `src/js/config.js` y `apps-script/Config.gs` (generados) están en `.gitignore`. Para GitHub Pages, las variables se añaden como Repository secrets/variables y el workflow `.github/workflows/deploy.yml` las inyecta.
+- **Nunca subir datos sensibles**: `.env` (valores reales), `src/js/config.js` y `apps-script/Config.gs` (generados) están en `.gitignore`. Para GitHub Pages, las variables se añaden como Repository secrets y el workflow `.github/workflows/deploy.yml` las inyecta (`secrets.X || vars.X`). **El repo es PÚBLICO**: usar siempre Secrets (encriptados), nunca Variables planas.
 - **Estados y notas usan clave compuesta `survey_id::id`** (los ids `resp_N` colisionan entre encuestas). `handleSetEstado`/`handleSetNota` deben hacer match por `response_id` Y `survey_id`.
 - **CORS POST**: Apps Script no responde preflights con `application/json`. Enviar siempre `Content-Type: text/plain;charset=utf-8` (véase `src/js/api.js`); el backend hace `JSON.parse(e.postData.contents)`.
 - **Apps Script responde HTTP 200 con campo `error`**: api.js lanza por `data.error`, no por status.
-- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v17`.
+- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v18`.
+- **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
 
 ## Arquitectura
 - Frontend: `src/index.html` + `src/js/*` (config, auth, api, dashboard, pdf-export, carnet-generator, icons) + `src/sw.js` + `src/css/styles.css`. Router por hash en `src/js/app.js`.
-- Backend: `apps-script/Code.gs`, `Config.gs` (generado), `Auth.gs` (JWT Firebase), `DataFilter.gs`, `PdfService.gs`.
-- Despliegue: GitHub Pages (workflow), rama `main`.
+- Backend: `apps-script/Code.gs`, `Config.gs` (generado), `Auth.gs` (JWT Firebase), `DataFilter.gs`, `PdfService.gs` — **solo local, no versionado** (`.gitignore`); se usa para desplegar el backend.
+- Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`, `enablement: true`), rama `main`.
 
 ## Estado actual resumido
-Backend funcional; frontend terminado salvo pendientes anotados en `PROGRESO.md` (redespliegue del fix de aislamiento en Apps Script, SW v17, `resp_9`, `ALLOWED_ORIGINS` con la URL real de Pages).
+**Desplegado y funcionando** en `https://gn-admin.github.io/admin-dashboard/`. Frontend con rutas relativas; SW `v18`. Solo quedan pendientes de despliegue de backend (fix de aislamiento de estados/notas y `ALLOWED_ORIGINS` con `https://gn-admin.github.io`) y mejoras anotadas en `PROGRESO.md`. A partir de aquí se trabajan **mejoras de front y back**, sin tocar la lógica de negocio.
