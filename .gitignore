@@ -26,7 +26,9 @@ build/
 
 # Configuración generada (contiene valores reales de producción)
 src/js/config.js
-apps-script/Config.gs
+
+# Backend Apps Script (no se versiona; solo se usa para desplegar)
+apps-script/
 
 # Temporary
 *.tmp
