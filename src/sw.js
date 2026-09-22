@@ -1,17 +1,17 @@
-const CACHE_NAME = 'gn-encuestas-v17';
+const CACHE_NAME = 'gn-encuestas-v18';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/styles.css',
-  '/js/config.js',
-  '/js/icons.js',
-  '/js/auth.js',
-  '/js/api.js',
-  '/js/dashboard.js',
-  '/js/carnet-generator.js',
-  '/js/pdf-export.js',
-  '/js/app.js',
-  '/manifest.webmanifest'
+  './',
+  './index.html',
+  './css/styles.css',
+  './js/config.js',
+  './js/icons.js',
+  './js/auth.js',
+  './js/api.js',
+  './js/dashboard.js',
+  './js/carnet-generator.js',
+  './js/pdf-export.js',
+  './js/app.js',
+  './manifest.webmanifest'
 ];
 
 // Install: cache assets estáticos
