@@ -127,6 +127,9 @@ const backendConfig = `var CONFIG = {
     socios: { sheetId: '${env('SHEET_SOCIOS_ID')}', sheetName: 'Socios' },
     blacklist: { sheetId: '${env('SHEET_BLACKLIST_ID')}', sheetName: 'Blacklist' },
     actividad: { sheetId: '${env('SHEET_ACTIVIDAD_ID')}', sheetName: 'Actividad' },
+    candidaturas: { sheetId: '${env('SHEET_CANDIDATURAS_ID')}', sheetName: 'Candidaturas' },
+    acogidas: { sheetId: '${env('SHEET_ACOGIDAS_ID')}', sheetName: 'Acogidas' },
+    contratos: { sheetId: '${env('SHEET_CONTRATOS_ID')}', sheetName: 'Contratos' },
 ${sheetsBlock()}
   }
 };

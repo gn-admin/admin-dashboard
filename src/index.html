@@ -94,9 +94,17 @@
             <span class="sidebar-link-icon"></span>
             <span class="sidebar-link-text">Animales</span>
           </a>
-          <a class="sidebar-link" data-page="acogidas" data-tooltip="Acogidas" href="#acogidas">
+          <a class="sidebar-link" data-page="acogidas" data-tooltip="Familias de Acogida" href="#acogidas">
             <span class="sidebar-link-icon"></span>
-            <span class="sidebar-link-text">Acogidas</span>
+            <span class="sidebar-link-text">Familias de acogida</span>
+          </a>
+          <a class="sidebar-link" data-page="acogidas-activas" data-tooltip="Acogidas Activas" href="#acogidas-activas">
+            <span class="sidebar-link-icon"></span>
+            <span class="sidebar-link-text">Acogidas activas</span>
+          </a>
+          <a class="sidebar-link" data-tooltip="Procesos" href="javascript:void(0)" onclick="App.closeSidebar();Dashboard.showProcessos()">
+            <span class="sidebar-link-icon" id="sidebar-icon-procesos"></span>
+            <span class="sidebar-link-text">Procesos</span>
           </a>
           <a class="sidebar-link" data-page="adopciones" data-tooltip="Adopciones" href="#adopciones">
             <span class="sidebar-link-icon"></span>
@@ -158,6 +166,7 @@
         <div id="page-encuestas-acogida" class="page"></div>
         <div id="page-animales" class="page"></div>
         <div id="page-acogidas" class="page"></div>
+        <div id="page-acogidas-activas" class="page"></div>
         <div id="page-adopciones" class="page"></div>
         <div id="page-socios" class="page"></div>
         <div id="page-blacklist" class="page"></div>
@@ -187,7 +196,13 @@
     <div class="mas-menu-overlay" id="mas-menu-overlay"></div>
     <div class="mas-menu-popup" id="mas-menu-popup" style="display:none">
       <a class="mas-menu-item" data-page="acogidas" href="#acogidas">
-        <span class="mas-menu-icon" id="mas-icon-acogidas"></span>Acogidas
+        <span class="mas-menu-icon" id="mas-icon-acogidas"></span>Familias de acogida
+      </a>
+      <a class="mas-menu-item" data-page="acogidas-activas" href="#acogidas-activas">
+        <span class="mas-menu-icon" id="mas-icon-acogidas-activas"></span>Acogidas activas
+      </a>
+      <a class="mas-menu-item" href="javascript:void(0)" onclick="App.closeMasMenu();Dashboard.showProcessos()">
+        <span class="mas-menu-icon" id="mas-icon-procesos"></span>Procesos
       </a>
       <a class="mas-menu-item" data-page="adopciones" href="#adopciones">
         <span class="mas-menu-icon" id="mas-icon-adopciones"></span>Adopciones
@@ -201,6 +216,30 @@
       <a class="mas-menu-item" data-page="blacklist" href="#blacklist">
         <span class="mas-menu-icon" id="mas-icon-blacklist"></span>Lista Negra
       </a>
+    </div>
+
+    <div class="modal-overlay" id="procesos-modal" style="display:none">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Procesos</h3>
+          <button class="btn-icon modal-close" title="Cerrar" onclick="Dashboard.closeProcessos()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="procesos-content"></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="contrato-modal" style="display:none">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Contrato de adopcion</h3>
+          <button class="btn-icon modal-close" title="Cerrar" onclick="Dashboard.closeContratoForm()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="contrato-content"></div>
+      </div>
     </div>
   </div>
 

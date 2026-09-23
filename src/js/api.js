@@ -57,6 +57,24 @@ const API = {
   async updateAdopcion(id, data) { return this._post('update-adopcion', { id, ...data }); },
   async deleteAdopcion(id) { return this._post('delete-adopcion', { id }); },
 
+  // Candidaturas (CRUD)
+  async getCandidaturas() { return this._get('candidaturas'); },
+  async createCandidatura(data) { return this._post('candidaturas', data); },
+  async updateCandidatura(id, data) { return this._post('update-candidatura', { id, ...data }); },
+  async deleteCandidatura(id) { return this._post('delete-candidatura', { id }); },
+
+  // Acogidas activas (CRUD)
+  async getAcogidas() { return this._get('acogidas'); },
+  async createAcogida(data) { return this._post('acogidas', data); },
+  async updateAcogida(id, data) { return this._post('update-acogida', { id, ...data }); },
+  async deleteAcogida(id) { return this._post('delete-acogida', { id }); },
+
+  // Contratos (CRUD)
+  async getContratos() { return this._get('contratos'); },
+  async createContrato(data) { return this._post('contratos', data); },
+  async updateContrato(id, data) { return this._post('update-contrato', { id, ...data }); },
+  async deleteContrato(id) { return this._post('delete-contrato', { id }); },
+
   // Socios (CRUD)
   async getSocios() { return this._get('socios'); },
   async createSocio(data) { return this._post('socios', data); },

@@ -1,7 +1,7 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [],
-  _currentAnimalFilter: 'all', _currentFosterFilter: 'all',
+  _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
   async init() {
@@ -14,6 +14,11 @@ const Dashboard = {
       await this._loadSurveys();
       await this.loadEstados();
       await this.loadNotas();
+      await Promise.all([
+        this._loadListBestEffort('candidaturas', () => API.getCandidaturas()),
+        this._loadListBestEffort('acogidas', () => API.getAcogidas()),
+        this._loadListBestEffort('contratos', () => API.getContratos())
+      ]);
     } catch (err) {
       console.error('Error init:', err);
       this.showSnackbar('No se pudieron cargar los datos iniciales', 'error');
@@ -34,6 +39,7 @@ const Dashboard = {
       'encuestas-acogida': () => this.renderEncuesta(el, 'pre-acogida'),
       animales: () => this.renderAnimales(el),
       acogidas: () => this.renderAcogidas(el),
+      'acogidas-activas': () => this.renderAcogidasActivas(el),
       adopciones: () => this.renderAdopciones(el),
       socios: () => this.renderSocios(el),
       blacklist: () => this.renderBlacklist(el),
@@ -60,13 +66,16 @@ const Dashboard = {
     set('sidebar-collapse-btn', Icons.sidebarCollapse);
     set('mas-menu-icon', Icons.menu);
     set('mas-icon-acogidas', Icons.home);
+    set('mas-icon-acogidas-activas', Icons.home);
+    set('mas-icon-procesos', Icons.activity);
+    set('sidebar-icon-procesos', Icons.activity);
     set('mas-icon-adopciones', Icons.heart);
     set('mas-icon-socios', Icons.users);
     set('mas-icon-reportes', Icons.barChart);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -93,10 +102,16 @@ const Dashboard = {
 
   loadLocal() {
     try { this.blacklist = JSON.parse(localStorage.getItem('gn_blacklist') || '[]'); } catch { this.blacklist = []; }
+    try { this.candidaturas = JSON.parse(localStorage.getItem('gn_candidaturas') || '[]'); } catch { this.candidaturas = []; }
+    try { this.contratos = JSON.parse(localStorage.getItem('gn_contratos') || '[]'); } catch { this.contratos = []; }
+    try { this.acogidas = JSON.parse(localStorage.getItem('gn_acogidas') || '[]'); } catch { this.acogidas = []; }
   },
 
   saveLocal() {
     localStorage.setItem('gn_blacklist', JSON.stringify(this.blacklist));
+    localStorage.setItem('gn_candidaturas', JSON.stringify(this.candidaturas || []));
+    localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || []));
+    localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
   },
 
   async loadEstados(force) {
@@ -153,14 +168,33 @@ const Dashboard = {
     if (this._loading[key]) return this._loading[key];
     this._loading[key] = (async () => {
       const res = await apiFn();
-      this[key] = res.data || [];
+      const remote = res.data || [];
+      const ids = new Set(remote.map(r => r.id));
+      const localOnly = (this[key] || []).filter(l => l && l.id && !ids.has(l.id));
+      this[key] = remote.concat(localOnly);
       this._loaded[key] = true;
       return this[key];
     })();
     try { return await this._loading[key]; } finally { this._loading[key] = null; }
   },
 
+  async _loadListBestEffort(key, apiFn) {
+    try { await this._loadList(key, apiFn); } catch (err) { console.warn('Load local-only:', key, err); }
+  },
+
   getEstado(id, surveyId) { return this.states[(surveyId || '') + '::' + id] || 'pendiente'; },
+
+  estadoMap: {
+    pendiente: { label: 'Pendiente', cls: '' },
+    en_proceso: { label: 'En proceso', cls: 'en_proceso' },
+    aprobada: { label: 'Aprobada', cls: 'aprobada' },
+    finalizada: { label: 'Finalizada', cls: 'finalizada' },
+    descartada: { label: 'Descartada', cls: 'descartada' }
+  },
+
+  _estadoLabel(e) { return (this.estadoMap[e] || { label: e }).label; },
+
+  _estadoCls(e) { return (this.estadoMap[e] || { cls: '' }).cls || e; },
 
   _syncCard(surveyId, id) {
     const card = document.querySelector(`.response-card[data-card="${surveyId}::${id}"]`);
@@ -168,8 +202,8 @@ const Dashboard = {
     const badge = card.querySelector('.estado-badge');
     if (!badge) return;
     const e = this.getEstado(id, surveyId);
-    badge.className = 'estado-badge ' + e;
-    badge.textContent = ({ pendiente: 'Pendiente', en_proceso: 'En proceso', descartada: 'Descartada' })[e] || e;
+    badge.className = 'estado-badge ' + this._estadoCls(e);
+    badge.textContent = this._estadoLabel(e);
   },
 
   async setEstado(id, estado, surveyId) {
@@ -187,6 +221,75 @@ const Dashboard = {
       this.showSnackbar('No se pudo guardar el estado', 'error');
     } finally {
       this.hideLoading();
+    }
+  },
+
+  // ==================== CANDIDATURAS / FLUJO COMPLETO ====================
+
+  _candidaturasDe(surveyId, id) {
+    const key = surveyId + '::' + id;
+    return (this.candidaturas || []).filter(c => c.solicitud_id === key);
+  },
+
+  _crearCandidatura(surveyId, id, tipo) {
+    const r = (this.responses[surveyId] || []).find(x => x.id === id);
+    const cand = {
+      id: 'cand_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      solicitud_id: surveyId + '::' + id,
+      survey_id: surveyId,
+      response_id: id,
+      tipo: tipo,
+      nombre: (r?.nombre || '') + (r?.apellidos ? ' ' + r.apellidos : ''),
+      email: r?.email || '',
+      animal_id: null,
+      familia_id: null,
+      estado: 'en_lista',
+      fecha: new Date().toISOString()
+    };
+    this.candidaturas.push(cand);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createCandidatura(cand));
+    return cand;
+  },
+
+  async aprobarEncuesta(surveyId, id) {
+    const tipo = surveyId === 'pre-acogida' ? 'acogida' : 'adopcion';
+    await this.setEstado(id, 'aprobada', surveyId);
+    if (!this._candidaturasDe(surveyId, id).length) this._crearCandidatura(surveyId, id, tipo);
+    if (surveyId === 'pre-acogida') await this._autoFamiliaDeEncuesta(surveyId, id);
+    this.viewDetail(surveyId, id);
+    this.showSnackbar('Solicitud aprobada. Candidatura en espera.', 'success');
+  },
+
+  async _autoFamiliaDeEncuesta(surveyId, id) {
+    if (!this._loaded.familias) await this._loadList('familias', () => API.getFamilias());
+    const r = (this.responses[surveyId] || []).find(x => x.id === id);
+    if (!r) return null;
+    const email = (r.email || '').toLowerCase().trim();
+    const nombre = ((r.nombre || '') + ' ' + (r.apellidos || '')).trim();
+    const exists = this.familias.find(f => (f.email || '').toLowerCase().trim() && f.email.toLowerCase().trim() === email) || this.familias.find(f => (f.nombre || '').toLowerCase().trim() === nombre.toLowerCase().trim());
+    if (exists) return exists;
+    const data = {
+      nombre: nombre || (r.nombre || 'Persona'),
+      email: r.email || '',
+      telefono: r.telefono || '',
+      ubicacion: r.ciudad || r.domicilio || '',
+      especialidad: '',
+      max_capacity: 1,
+      notas: 'Auto-registrada desde encuesta pre-acogida ' + r.id,
+      capacidad: 'Libre',
+      animales_actuales: 0,
+      origen: 'encuesta'
+    };
+    try {
+      const res = await API.createFamilia(data);
+      if (res && res.data) this.familias.push(res.data);
+      return res && res.data;
+    } catch (err) {
+      const fallback = { ...data, id: 'fam_' + Date.now().toString(36), fecha_registro: new Date().toISOString().slice(0, 10) };
+      this.familias.push(fallback);
+      this.showSnackbar('Familia registrada localmente (backend sin hoja)', 'error');
+      return fallback;
     }
   },
 
@@ -431,7 +534,7 @@ const Dashboard = {
     this._shown[surveyId] = 20;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
         <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button class="btn btn-primary btn-sm" onclick="Dashboard.exportSurvey('${surveyId}')">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
@@ -477,7 +580,7 @@ const Dashboard = {
 
   _renderResponseCards(responses, surveyId) {
     if(!responses.length) return '<div class="empty-state"><div class="empty-state-icon">'+Icons.clipboard+'</div><p>No hay solicitudes</p></div>';
-    return responses.map(r=>{const i=(r.nombre?.[0]||'')+(r.apellidos?.[0]||'');const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'';const e=this.getEstado(r.id, surveyId);const l={pendiente:'Pendiente',en_proceso:'En proceso',descartada:'Descartada'};return`<div class="response-card" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${r.nombre||''} ${r.apellidos||''} <span class="estado-badge ${e}">${l[e]}</span></div><div class="response-email">${r.email||''}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
+    return responses.map(r=>{const i=(r.nombre?.[0]||'')+(r.apellidos?.[0]||'');const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${r.nombre||''} ${r.apellidos||''} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${r.email||''}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
   viewDetail(surveyId, responseId) {
@@ -488,17 +591,185 @@ const Dashboard = {
     const note=this.notes[surveyId+'::'+r.id]||'';
     const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};
     const pageId=pageMap[surveyId]||surveyId;
+    const cands=this._candidaturasDe(surveyId, responseId);
+    const candCls={en_lista:'',elegido:'aprobada',descartado:'descartada'};
+    const actionButtons = e==='descartada'
+      ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.check} Restaurar</button>`
+      : e==='aprobada'
+        ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} Reabrir</button>
+           <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`
+        : e==='en_proceso'
+          ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.aprobarEncuesta('${surveyId}','${r.id}')">${Icons.checkCircle} Aprobar</button>
+             <button class="btn btn-sm" onclick="Dashboard.setEstado('${r.id}','pendiente','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} Pendiente</button>
+             <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} En proceso</button>
+             <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`;
+    const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._animalName(c.animal_id)} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${new Date(c.fecha).toLocaleDateString('es-ES')}</div></div>`).join('')}</div>` : '';
     this._showDetail(pageId, `${r.nombre} ${r.apellidos}`, `
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
-        <button class="btn btn-sm ${e==='en_proceso'?'btn-outline-green':'btn-primary'}" onclick="Dashboard.cycleEstado('${surveyId}','${r.id}')">${Icons.arrowRight} ${e==='pendiente'?'En proceso':e==='en_proceso'?'Pendiente':'Restaurar'}</button>
-        ${e!=='descartada'?`<button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`:''}
+        ${actionButtons}
       </div>
+      ${e==='aprobada'?`<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Solicitud aprobada: pendiente de asignación de animal.</span></div>`:''}
       ${sections.map(s=>`<div class="detail-section"><div class="detail-section-title">${s.title}</div>${s.fields.map(f=>`<div class="detail-field"><div class="detail-question">${f.label}</div><div class="detail-answer">${f.value??'—'}</div></div>`).join('')}</div>`).join('')}
+      ${candHtml}
       <div class="notes-section"><div class="detail-section-title"><span>${Icons.pencil} Notas</span><button class="btn btn-primary btn-sm" onclick="Dashboard.saveNote('${r.id}','${surveyId}')">Guardar</button></div><textarea id="note-${r.id}" placeholder="Escribe una nota...">${note}</textarea></div>`);
   },
 
-  async cycleEstado(surveyId, id) { const a=this.getEstado(id, surveyId); await this.setEstado(id,a==='pendiente'?'en_proceso':'pendiente',surveyId); this.viewDetail(surveyId,id); },
+  _animalName(id) { const a=this.animales.find(x=>x.id===id); return a?a.nombre:'(sin animal)'; },
+
+  // ==================== PROCESOS (CANDIDATURAS → CASOS) ====================
+
+  async showProcessos() {
+    await Promise.all([
+      this._loadList('animales', () => API.getAnimales()),
+      this._loadList('familias', () => API.getFamilias()),
+      this._loadList('adopciones', () => API.getAdopciones())
+    ]);
+    const el = document.getElementById('procesos-modal');
+    const body = document.getElementById('procesos-content');
+    if (!el || !body) return;
+    el.style.display = 'flex';
+    const pend = (this.candidaturas || []).filter(c => c.estado === 'en_lista');
+    const elegidos = (this.candidaturas || []).filter(c => c.estado === 'elegido');
+    if (!pend.length) {
+      body.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${Icons.checkCircle}</div><h3>Sin candidaturas pendientes</h3><p>Aprobadas de encuestas apareceran aqui para asignarles un animal.</p></div>`;
+      el.style.display = 'flex';
+      this.injectIcons();
+      return;
+    }
+    const disp = this.animales.filter(a => a.estado === 'disponible');
+    const fams = this.familias.filter(f => (f.capacidad || 'Libre') !== 'Ocupada');
+    body.innerHTML = `
+      <div class="alert-item info" style="margin-bottom:14px">${Icons.users} <span>${pend.length} candidaturas en lista · ${elegidos.length} ya asignadas</span></div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+      ${pend.map(c => {
+        const selId = 'asg-animal-' + c.id;
+        const famSelId = 'asg-familia-' + c.id;
+        const needsFam = c.tipo === 'acogida';
+        const famOptions = fams.length ? fams.map(f=>`<option value="${f.id}" ${c.familia_id===f.id?'selected':''}>${this._esc(f.nombre)}${f.ubicacion?' · '+this._esc(f.ubicacion):''}</option>`).join('') : `<option value="">(Sin familias libres)</option>`;
+        return `<div class="response-card" style="padding:4px 0">
+          <div class="response-card-header" style="padding-bottom:4px">
+            <div class="response-avatar" style="background:var(--primary-lighter);color:var(--primary-hover)">${(c.nombre||'?').charAt(0)}</div>
+            <div class="response-info">
+              <div class="response-name">${this._esc(c.nombre)} <span class="estado-badge aprobada">${c.tipo==='acogida'?'Acogida':'Adopci&oacute;n'}</span></div>
+              <div class="response-email">${this._esc(c.email)}</div>
+            </div>
+          </div>
+          <div class="detail-field" style="padding:2px 12px"><div class="detail-question">Animal disponible</div>
+            <select id="${selId}" class="form-input">${disp.length ? disp.map(a=>`<option value="${a.id}">${this._esc(a.nombre)} (${this._esc(a.especie)} · ${this._esc(a.raza)})</option>`).join('') : `<option value="">(Sin animales disponibles)</option>`}</select>
+          </div>
+          ${needsFam ? `<div class="detail-field" style="padding:2px 12px"><div class="detail-question">Familia de acogida</div><select id="${famSelId}" class="form-input">${famOptions}</select></div>` : ''}
+          <div style="padding:0 12px 10px;border-top:1px solid var(--gray-100);margin-top:6px"><button class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} onclick="Dashboard.asignarCandidatura('${c.id}')">${Icons.checkCircle} Asignar animal</button></div>
+        </div>`;
+      }).join('')}
+      </div>`;
+    el.style.display = 'flex';
+    this.injectIcons();
+  },
+
+  closeProcessos() {
+    const el = document.getElementById('procesos-modal');
+    if (el) el.style.display = 'none';
+  },
+
+  async asignarCandidatura(candId) {
+    const c = (this.candidaturas || []).find(x => x.id === candId);
+    if (!c) return;
+    const animalSel = document.getElementById('asg-animal-' + candId);
+    const a = animalSel ? this.animales.find(x => x.id === animalSel.value) : null;
+    if (!a) { this.showSnackbar('Selecciona un animal', 'error'); return; }
+    let familiaId = null;
+    if (c.tipo === 'acogida') {
+      const fs = document.getElementById('asg-familia-' + candId);
+      familiaId = fs ? fs.value : c.familia_id;
+      if (!familiaId) { this.showSnackbar('Selecciona una familia de acogida', 'error'); return; }
+    }
+    const ok = await this._crearCasoDesdeCandidatura(c, a, familiaId);
+    if (!ok) return;
+    c.animal_id = a.id;
+    c.familia_id = familiaId;
+    c.estado = 'elegido';
+    this.saveLocal();
+    await this._updateLocalYApi('candidaturas', c);
+    this.showProcessos();
+    this.showSnackbar('Candidato asignado. Caso creado.', 'success');
+  },
+
+  async _crearCasoDesdeCandidatura(c, a, familiaId) {
+    const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (c.tipo === 'acogida') {
+      const fam = this.familias.find(f => f.id === familiaId);
+      if (!fam) { this.showSnackbar('Familia no encontrada', 'error'); return false; }
+      const caso = {
+        id: 'acg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        animal_id: a.id,
+        familia_id: familiaId,
+        animal: a.nombre + (a.raza ? ' (' + a.raza + ')' : ''),
+        familia: fam.nombre,
+        fase: 'entrega',
+        estado: 'activa',
+        inicio: hoy,
+        solicitud_id: c.solicitud_id,
+        notas: 'Desde candidatura ' + c.nombre
+      };
+      this.acogidas.push(caso);
+      this.saveLocal();
+      this._apiCreateRow(() => API.createAcogida(caso));
+      a.estado = 'en_acogida';
+      a.acogida_familia = familiaId;
+      await this._updateLocalYApi('animales', a);
+      if (fam.capacidad !== 'Ocupada') {
+        fam.capacidad = 'Ocupada';
+        fam.animales_actuales = (fam.animales_actuales || 0) + 1;
+        if (fam.max_capacity && fam.animales_actuales >= parseInt(fam.max_capacity, 10)) fam.capacidad = 'Ocupada';
+        await this._updateLocalYApi('familias', fam);
+      }
+      return true;
+    }
+    const adopcion = {
+      animal: a.nombre + (a.raza ? ' (' + a.raza + ')' : ''),
+      adoptante: c.nombre || c.email || 'Candidato',
+      email: c.email || '',
+      telefono: '',
+      fase: 'Revision',
+      estado: 'Candidato elegido',
+      notas: 'Desde candidatura ' + c.solicitud_id,
+      fecha: hoy,
+      solicitud_id: c.solicitud_id,
+      animal_id: a.id
+    };
+    try {
+      const res = await API.createAdopcion(adopcion);
+      if (res.data) this.adopciones.push(res.data);
+      else this._pushLocal('adopciones', { ...adopcion, id: 'adp_' + Date.now().toString(36) });
+    } catch (err) {
+      this._pushLocal('adopciones', { ...adopcion, id: 'adp_' + Date.now().toString(36) });
+    }
+    return true;
+  },
+
+  async _updateLocalYApi(col, item) {
+    try {
+      if (col === 'animales') await API.updateAnimal(item.id, item);
+      if (col === 'familias') await API.updateFamilia(item.id, item);
+      if (col === 'candidaturas') await API.updateCandidatura(item.id, item);
+      if (col === 'acogidas') await API.updateAcogida(item.id, item);
+      if (col === 'contratos') await API.updateContrato(item.id, item);
+    } catch (err) { /* local mirrors only */ }
+  },
+
+  async _apiCreateRow(apiFn) {
+    try { await apiFn(); } catch (err) { console.warn('API create fallback local:', err); }
+  },
+
+  _pushLocal(col, row) {
+    if (col === 'adopciones') this.adopciones.push(row);
+    if (col === 'candidaturas') this.candidaturas.push(row);
+    if (col === 'acogidas') this.acogidas.push(row);
+    if (col === 'contratos') this.contratos.push(row);
+  },
+
   async saveNote(id, surveyId) {
     const ta = document.getElementById('note-' + id);
     if (!ta) return;
@@ -565,17 +836,26 @@ const Dashboard = {
       this._loadList('familias', () => API.getFamilias())
     ]);
     const filter = this._currentAnimalFilter;
-    const filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
+    const especie = this._currentEspecieFilter;
+    let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
+    if (especie!=='all') filtered = especie==='otro' ? filtered.filter(a=>!['Perro','Gato'].includes(a.especie)) : filtered.filter(a=>(a.especie||'')===especie);
     const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length};
+    const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
         <div class="filters-bar"><div class="filter-row">
           <select onchange="Dashboard._currentAnimalFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
             <option value="en_acogida" ${filter==='en_acogida'?'selected':''}>En acogida (${counts.en_acogida})</option>
             <option value="adoptado" ${filter==='adoptado'?'selected':''}>Adoptados (${counts.adoptado})</option>
+          </select>
+          <select onchange="Dashboard._currentEspecieFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
+            <option value="all" ${especie==='all'?'selected':''}>Especie: Todas</option>
+            <option value="Perro" ${especie==='Perro'?'selected':''}>Perros (${nPerros})</option>
+            <option value="Gato" ${especie==='Gato'?'selected':''}>Gatos (${nGatos})</option>
+            <option value="otro" ${especie==='otro'?'selected':''}>Otros (${nOtro})</option>
           </select>
         </div></div>
         <div id="animales-form-container"></div>
@@ -586,30 +866,97 @@ const Dashboard = {
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
               <div class="animal-card-status ${a.estado}">${a.estado==='disponible'?'Disponible':a.estado==='en_acogida'?'En acogida':'Adoptado'}</div>
+              ${a.grupo_id?`<div class="animal-group-badge">${Icons.users} ${this._esc(a.grupo||a.grupo_id)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
           </div>`).join('')}</div>
       </div>
       <div class="page-detail-container"></div>`;
   },
 
+  _grupoSize(gid) { return (this.animales||[]).filter(x=>x.grupo_id===gid).length; },
+
   showAnimalForm(data) {
     const isEdit = !!data;
+    const especies = ['Perro', 'Gato'];
+    const custom = data?.especie && !especies.includes(data.especie) ? data.especie : null;
+    const especieOpts = especies.map(s=>`<option value="${s}" ${data?.especie===s?'selected':''}>${s}</option>`).join('') + (custom ? `<option value="${custom}" selected>${custom}</option>` : '') + (custom ? '' : `<option value="__otro__">Otro...</option>`);
+    const grupos = [...new Set(this.animales.map(a => a.grupo || a.grupo_id).filter(Boolean))];
+    const grupoVal = data?.grupo || data?.grupo_id || '';
     this._renderForm('animales', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Animal</h3><form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${data?.nombre||''}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required><option value="Perro" ${data?.especie==='Perro'?'selected':''}>Perro</option><option value="Gato" ${data?.especie==='Gato'?'selected':''}>Gato</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${data?.nombre||''}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${data?.raza||''}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${data?.edad||''}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${data?.peso||''}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${grupoVal}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${data?.microchip||''}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${data?.descripcion||''}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
   },
 
+  _toggleEspecieOtra(val) {
+    const el = document.getElementById('an-especie-otra');
+    if (el) el.style.display = val === '__otro__' ? 'block' : 'none';
+  },
+
+  showCamadaForm() {
+    this._renderForm('animales', `<div class="form-card" style="margin-bottom:16px"><h3>Alta de camada</h3><form onsubmit="Dashboard.saveCamada(event)">
+      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
+      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required><option value="Perro">Perro</option><option value="Gato">Gato</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label>Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
+      <div class="form-row"><div class="form-group"><label>Sexo *</label><select id="cm-sexo"><option value="Macho">Macho</option><option value="Hembra">Hembra</option></select></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="cm-obl" checked> Grupo obligatorio</label></div></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Crear camada</button></div>
+    </form></div>`);
+  },
+
+  async saveCamada(e) {
+    e.preventDefault();
+    const grupo = document.getElementById('cm-grupo').value.trim();
+    const base = document.getElementById('cm-base').value.trim();
+    const cantidad = parseInt(document.getElementById('cm-cantidad').value, 10) || 1;
+    const especie = document.getElementById('cm-especie').value;
+    const raza = document.getElementById('cm-raza').value.trim();
+    const edad = document.getElementById('cm-edad').value.trim();
+    const sexo = document.getElementById('cm-sexo').value;
+    const obl = document.getElementById('cm-obl').checked;
+    if (!grupo || !base) { this.showSnackbar('Completa grupo y nombre base', 'error'); return; }
+    const grupo_id = 'gpo_' + Date.now().toString(36);
+    this.showLoading();
+    try {
+      for (let i = 1; i <= cantidad; i++) {
+        const nombre = cantidad > 1 ? base + ' ' + this._romano(i) : base;
+        const row = { nombre, especie, raza, edad, sexo, estado: 'disponible', grupo_id, grupo, grupo_obligatorio: obl, descripcion: 'Camada: ' + grupo, esterilizada: false, vacunas: 'Pendientes', microchip: '', fecha_ingreso: new Date().toISOString().slice(0, 10) };
+        try {
+          const res = await API.createAnimal(row);
+          if (res && res.data) this.animales.push(res.data);
+          else this.animales.push({ ...row, id: 'ani_' + Date.now().toString(36) + i });
+        } catch (err) {
+          this.animales.push({ ...row, id: 'ani_' + Date.now().toString(36) + i });
+        }
+      }
+    } finally { this.hideLoading(); }
+    this.cancelForm('animales');
+    this.renderAnimales(document.getElementById('page-animales'));
+    this.showSnackbar('Camada ' + grupo + ' creada (' + cantidad + ' animales)', 'success');
+  },
+
+  _romano(n) {
+    const r = [[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+    let s = ''; let x = n;
+    r.forEach(([v, l]) => { while (x >= v) { s += l; x -= v; } });
+    return s;
+  },
+
   async saveAnimal(e, isEdit, id) {
     e.preventDefault();
     const existing = isEdit ? this.animales.find(a => a.id === id) : null;
+    let especie = document.getElementById('an-especie').value;
+    if (especie === '__otro__') especie = document.getElementById('an-especie-otra').value.trim() || especie;
+    const gv = document.getElementById('an-grupo').value.trim();
+    let grupo_id = existing?.grupo_id || (gv ? 'gpo_' + Date.now().toString(36) : '');
+    if (existing && gv && gv === existing.grupo) grupo_id = existing.grupo_id;
     const data = {
       nombre: document.getElementById('an-nombre').value.trim(),
-      especie: document.getElementById('an-especie').value,
+      especie,
       raza: document.getElementById('an-raza').value.trim(),
       edad: document.getElementById('an-edad').value.trim(),
       peso: document.getElementById('an-peso').value.trim(),
@@ -617,6 +964,9 @@ const Dashboard = {
       estado: document.getElementById('an-estado').value,
       microchip: document.getElementById('an-microchip').value.trim(),
       descripcion: document.getElementById('an-descripcion').value.trim(),
+      grupo_id: gv ? grupo_id : '',
+      grupo: gv ? gv : '',
+      grupo_obligatorio: document.getElementById('an-grupo-obl').checked,
       esterilizada: existing?.esterilizada || false,
       vacunas: existing?.vacunas || 'Pendientes',
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
@@ -644,6 +994,7 @@ const Dashboard = {
     const a = this.animales.find(x=>x.id===id);
     if(!a) return;
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
+    const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
     this._showDetail('animales', a.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm(${JSON.stringify(a).replace(/"/g,'&quot;')})">${Icons.pencil} Editar</button>
@@ -656,8 +1007,10 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Peso</div><div class="detail-answer">${this._esc(a.peso)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)}</div></div>
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="animal-card-status ${a.estado}">${a.estado==='disponible'?'Disponible':a.estado==='en_acogida'?'En acogida':'Adoptado'}</span></div></div>
+        <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}</div></div>
         <div class="detail-field"><div class="detail-question">Descripcion</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
       </div>
+      ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div>${siblings.map(x=>`<div class="detail-field"><div class="detail-question">${this._esc(x.nombre)}</div><div class="detail-answer">${this._esc(x.especie)} &middot; ${this._esc(x.raza)} &middot; ${this._esc(x.edad||'')} &middot; <span class="animal-card-status ${x.estado}">${x.estado==='disponible'?'Disponible':x.estado==='en_acogida'?'En acogida':'Adoptado'}</span></div></div>`).join('')}</div>`:''}
       ${foster?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Familia Acogedora</div>
         <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(foster.nombre)}</div></div>
         <div class="detail-field"><div class="detail-question">Ubicacion</div><div class="detail-answer">${this._esc(foster.ubicacion)}</div></div>
@@ -791,6 +1144,81 @@ const Dashboard = {
     this.showSnackbar('Familia eliminada', 'success');
   },
 
+  // ==================== ACOGIDAS ACTIVAS ====================
+  async renderAcogidasActivas(el) {
+    await Promise.all([
+      this._loadList('animales', () => API.getAnimales()),
+      this._loadList('familias', () => API.getFamilias())
+    ]);
+    const casos = (this.acogidas || []).slice().reverse();
+    const fases = ['entrega', 'en_casa', 'finalizada'];
+    const faseLabel = { entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' };
+    const faseCls = { entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' };
+    el.innerHTML = `
+      <div class="page-list-container">
+        <div class="list-header"><span class="response-count">${casos.length} casos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showProcessos()">${Icons.users} Procesos</button></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-body">
+          <div style="display:flex;gap:4px;overflow-x:auto;padding-bottom:8px">${fases.map(ff => {
+            const n = casos.filter(c => c.fase === ff).length;
+            return `<div style="flex:1;min-width:80px;text-align:center;padding:8px 4px;border-radius:8px;background:${n ? 'var(--primary-lighter)' : 'var(--gray-50)'}">
+              <div style="font-size:1.2rem;font-weight:800;color:${n ? 'var(--primary-hover)' : 'var(--gray-300)'}">${n}</div>
+              <div style="font-size:0.65rem;color:var(--gray-500);margin-top:2px">${faseLabel[ff]}</div>
+            </div>`;
+          }).join('')}</div>
+        </div></div>
+        <div class="response-list">${casos.length ? casos.map(c => `
+          <div class="response-card">
+            <div class="response-card-header">
+              <div class="response-avatar" style="background:var(--primary-lighter);color:var(--primary-hover)">${Icons.home}</div>
+              <div class="response-info">
+                <div class="response-name">${this._esc(c.animal)} <span class="estado-badge ${faseCls[c.fase] || ''}">${faseLabel[c.fase] || c.fase}</span></div>
+                <div class="response-email">${this._esc(c.familia)} &middot; desde ${this._esc(c.inicio || '')}</div>
+              </div>
+              <div class="response-date">${c.estado}</div>
+            </div>
+            <div style="padding:0 16px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
+              ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
+              ${c.notas ? `<span style="color:var(--gray-400);font-size:0.75rem">${this._esc(c.notas)}</span>` : ''}
+            </div>
+          </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde Procesos.</p></div>`}
+        </div>
+      </div>
+      <div class="page-detail-container"></div>`;
+  },
+
+  async avanzarFaseAcogida(id) {
+    const c = (this.acogidas || []).find(x => x.id === id);
+    if (!c) return;
+    const order = { entrega: 'en_casa', en_casa: 'finalizada' };
+    c.fase = order[c.fase] || c.fase;
+    if (c.fase === 'finalizada') {
+      c.estado = 'finalizada';
+      c.fin = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+      const a = this.animales.find(x => x.id === c.animal_id);
+      if (a) {
+        a.estado = 'disponible';
+        a.acogida_familia = '';
+        this._updateLocalYApi('animales', a);
+      }
+      const fam = this.familias.find(x => x.id === c.familia_id);
+      if (fam) {
+        fam.capacidad = 'Libre';
+        fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
+        this._updateLocalYApi('familias', fam);
+      }
+      if (c.solicitud_id && c.solicitud_id.includes('::')) {
+        const [sid, rid] = c.solicitud_id.split('::');
+        await this.setEstado(rid, 'finalizada', sid);
+      }
+      this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
+    } else {
+      this.showSnackbar('Fase actualizada', 'success');
+    }
+    this.saveLocal();
+    this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+  },
+
   // ==================== ADOPCIONES CRUD ====================
   async renderAdopciones(el) {
     await this._loadList('adopciones', () => API.getAdopciones());
@@ -869,6 +1297,18 @@ const Dashboard = {
     if(!p) return;
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const currentIdx = fases.indexOf(p.fase);
+    const contrato = this._contratoDeAdopcion(p.id);
+    const contratoHtml = p.fase === 'Contrato' ? `
+      <div class="detail-section"><div class="detail-section-title">${Icons.pencil} Contrato de adopcion</div>
+        ${contrato ? `
+          <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Contrato firmado</span></div></div>
+          <div class="detail-field"><div class="detail-question">Fecha firma</div><div class="detail-answer">${this._esc(contrato.fecha)||'—'}</div></div>
+          <div class="detail-field"><div class="detail-question">Firmante 1</div><div class="detail-answer">${this._esc(contrato.f1_nombre)||'—'} (${this._esc(contrato.f1_rol)||'Titular'})</div></div>
+          ${contrato.f2_nombre ? `<div class="detail-field"><div class="detail-question">Firmante 2</div><div class="detail-answer">${this._esc(contrato.f2_nombre)} (${this._esc(contrato.f2_rol)||'Segundo firmante'})</div></div>` : ''}
+          <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar PDF</button><button class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button></div>`
+        : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma del adoptante.</div></div>
+          <div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showContratoForm('${p.id}')">${Icons.pencil} Firmar contrato</button></div>`}
+      </div>` : '';
     this._showDetail('adopciones', p.animal, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionForm(${JSON.stringify(p).replace(/"/g,'&quot;')})">${Icons.pencil} Editar</button>
@@ -878,6 +1318,7 @@ const Dashboard = {
       <div class="detail-section"><div class="detail-section-title">Pipeline de Adopcion</div>
         <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:0.7rem;font-weight:600">${f}</div>`).join('')}</div>
       </div>
+      ${contratoHtml}
       <div class="detail-section"><div class="detail-section-title">Detalles</div>
         <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${this._esc(p.animal)}</div></div>
         <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
@@ -912,6 +1353,145 @@ const Dashboard = {
     this._hideDetail('adopciones');
     this.renderAdopciones(document.getElementById('page-adopciones'));
     this.showSnackbar('Adopcion eliminada', 'success');
+  },
+
+  // ==================== CONTRATOS DE ADOPCION ====================
+  _contratoDeAdopcion(adopcionId) {
+    return (this.contratos || []).find(c => c.adopcion_id === adopcionId);
+  },
+
+  showContratoForm(adopcionId) {
+    const p = this.adopciones.find(x => x.id === adopcionId);
+    if (!p) return;
+    const modal = document.getElementById('contrato-modal');
+    const body = document.getElementById('contrato-content');
+    if (!modal || !body) return;
+    const roles1 = ['El adoptante', 'Titular', 'Tutor', 'Representante'];
+    const roles2 = ['Mayor de edad', 'Tutor del menor', 'Contacto responsable', 'Persona de avanzada edad'];
+    body.innerHTML = `
+      <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Contrato para <b>${this._esc(p.animal)}</b>.</span></div>
+      <form onsubmit="Dashboard.guardarContrato(event,'${adopcionId}')">
+        <div class="form-row"><div class="form-group"><label>Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ciudad</label><input type="text" id="ct-ciudad" placeholder="Localidad del contrato"></div></div>
+
+        <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Firmante 1 · Titular</div>
+          <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" placeholder="12345678A"></div></div>
+          <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f1-email" value="${this._esc(p.email || '')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="f1-telefono" value="${this._esc(p.telefono || '')}"></div></div>
+          <div class="form-row"><div class="form-group"><label>Rol</label><select id="f1-rol">${roles1.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div><div class="form-group"></div></div>
+          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 1</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:#fff;touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
+        </div>
+
+        <div class="detail-section"><div class="detail-section-title">Firmante 2 · Segundo firmante (opcional)</div>
+          <div class="form-row"><div class="form-group"><label>Nombre completo</label><input type="text" id="f2-nombre" placeholder="Menor con tutor o persona que respalda"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
+          <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
+          <div class="form-row"><div class="form-group"><label>Rol</label><select id="f2-rol">${roles2.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div><div class="form-group"></div></div>
+          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 2</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:#fff;touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div>
+        </div>
+
+        <div class="form-actions" style="padding-top:12px"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeContratoForm()">Cancelar</button><button type="submit" class="btn btn-primary">Firmar y guardar</button></div>
+      </form>`;
+    modal.style.display = 'flex';
+    this._setupFirmaCanvas('f1-firma');
+    this._setupFirmaCanvas('f2-firma');
+  },
+
+  _setupFirmaCanvas(canvasId) {
+    const cv = document.getElementById(canvasId);
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    let drawing = false;
+    const pos = (e) => {
+      const r = cv.getBoundingClientRect();
+      const xRatio = cv.width / (r.width || 1);
+      const yRatio = cv.height / (r.height || 1);
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: (cx - r.left) * xRatio, y: (cy - r.top) * yRatio };
+    };
+    const start = (e) => { e.preventDefault(); drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+    const move = (e) => { if (!drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = '#191919'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); };
+    const stop = () => { drawing = false; ctx.beginPath(); };
+    cv.addEventListener('mousedown', start);
+    cv.addEventListener('mousemove', move);
+    cv.addEventListener('mouseup', stop);
+    cv.addEventListener('mouseleave', stop);
+    cv.addEventListener('touchstart', start, { passive: false });
+    cv.addEventListener('touchmove', move, { passive: false });
+    cv.addEventListener('touchend', stop);
+  },
+
+  _clearFirmaCanvas(canvasId) {
+    const cv = document.getElementById(canvasId);
+    if (!cv) return;
+    cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  },
+
+  closeContratoForm() {
+    const el = document.getElementById('contrato-modal');
+    if (el) el.style.display = 'none';
+  },
+
+  async guardarContrato(e, adopcionId) {
+    e.preventDefault();
+    const p = this.adopciones.find(x => x.id === adopcionId);
+    if (!p) return;
+    const firma = (id) => { const cv = document.getElementById(id); return cv ? cv.toDataURL('image/png') : ''; };
+    const c = {
+      id: 'ctr_' + Date.now().toString(36),
+      adopcion_id: adopcionId,
+      animal: p.animal,
+      animal_id: p.animal_id || null,
+      fecha: document.getElementById('ct-fecha').value || new Date().toISOString().slice(0, 10),
+      ciudad: document.getElementById('ct-ciudad').value.trim(),
+      f1_nombre: document.getElementById('f1-nombre').value.trim(),
+      f1_dni: document.getElementById('f1-dni').value.trim(),
+      f1_email: document.getElementById('f1-email').value.trim(),
+      f1_telefono: document.getElementById('f1-telefono').value.trim(),
+      f1_rol: document.getElementById('f1-rol').value,
+      f1_firma: firma('f1-firma'),
+      f2_nombre: document.getElementById('f2-nombre').value.trim(),
+      f2_dni: document.getElementById('f2-dni').value.trim(),
+      f2_email: document.getElementById('f2-email').value.trim(),
+      f2_telefono: document.getElementById('f2-telefono').value.trim(),
+      f2_rol: document.getElementById('f2-rol').value,
+      f2_firma: firma('f2-firma'),
+      estado: 'firmado',
+      creado: new Date().toISOString()
+    };
+    const a = p.animal_id ? this.animales.find(x => x.id === p.animal_id) : null;
+    if (a) { c.especie = a.especie; c.raza = a.raza; c.edad = a.edad; }
+    this.contratos.push(c);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createContrato(c));
+    if (p) {
+      p.estado = 'Contrato firmado';
+      p.estado_firma = 'firmado';
+      try { await API.updateAdopcion(adopcionId, { estado: 'Contrato firmado', estado_firma: 'firmado' }); } catch (err) { /* local only */ }
+    }
+    this.closeContratoForm();
+    this.viewAdopcion(adopcionId);
+    this.showSnackbar('Contrato firmado y guardado', 'success');
+  },
+
+  descargarContrato(adopcionId) {
+    const c = this._contratoDeAdopcion(adopcionId);
+    if (!c) { this.showSnackbar('No hay contrato firmado', 'error'); return; }
+    PdfExport.exportContracto(c);
+  },
+
+  async anularContrato(adopcionId) {
+    if (!this._confirm('Anular la firma del contrato?')) return;
+    const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
+    this.contratos = (this.contratos || []).filter(x => x.adopcion_id !== adopcionId);
+    this.saveLocal();
+    if (c) { try { await API.deleteContrato(c.id); } catch (err) { /* local only */ } }
+    const p = this.adopciones.find(x => x.id === adopcionId);
+    if (p) {
+      p.estado = 'Fase: Contrato';
+      p.estado_firma = '';
+      try { await API.updateAdopcion(adopcionId, { estado: 'Fase: Contrato', estado_firma: '' }); } catch (err) { /* local only */ }
+    }
+    this.viewAdopcion(adopcionId);
+    this.showSnackbar('Firma anulada', 'success');
   },
 
   // ==================== SOCIOS CRUD ====================

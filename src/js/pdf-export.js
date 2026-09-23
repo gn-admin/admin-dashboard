@@ -102,6 +102,107 @@ const PdfExport = {
     </body></html>`;
   },
 
+  exportContracto(c) {
+    const content = this._buildContracto(c);
+    this._openPrintWindow(content, `Contrato-Adopcion-${c.adopcion_id || 'signed'}.pdf`);
+  },
+
+  _buildContracto(c) {
+    const fecha = c.fecha
+      ? new Date(c.fecha + (c.fecha.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
+      : new Date().toLocaleDateString('es-ES');
+    const fimg = (f) => (f && String(f).startsWith('data:') ? `<img class="firma-img" src="${f}" alt="Firma">` : '<div class="firma-fallback">[Sin firma]</div>');
+    const f1Nombre = c.f1_nombre || c.adoptante || '[adoptante]';
+    const f1Dni = c.f1_dni || '—';
+    const f2Presente = c.f2_nombre || (c.f2_firma && String(c.f2_firma).startsWith('data:'));
+
+    const firma2Block = f2Presente
+      ? `<div class="signature">
+          <div class="sig-label">Firmante 2 &middot; ${c.f2_rol || ''}</div>
+          ${fimg(c.f2_firma)}
+          <div class="sig-line">${c.f2_nombre || 'Firma del firmante 2'} &middot; DNI ${c.f2_dni || ''}</div>
+        </div>`
+      : `<div class="signature">
+          <div class="sig-label">Por Grupo Nebak</div>
+          <div class="firma-fallback">[Firma de la entidad]</div>
+          <div class="sig-line">Asociacion Grupo Nebak</div>
+        </div>`;
+
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Contrato de Adopcion</title>
+      <style>
+        @page{size:A4;margin:2cm}
+        body{font:11pt/1.6 Arial,sans-serif;color:#191919;padding:0;margin:0}
+        .header{display:flex;align-items:center;gap:16px;padding-bottom:16px;border-bottom:3px solid #1FC95B;margin-bottom:24px}
+        .logo{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B}
+        .title{font-size:16pt;font-weight:800;color:#191919}
+        .sub{font-size:9pt;color:#757575}
+        h2{font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid #e8eaed}
+        .grid{display:flex;flex-wrap:wrap;gap:4px 24px;font-size:10pt}
+        .grid>div{width:45%}
+        .label{font-size:8pt;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.3px}
+        .clausula{margin-bottom:10px;font-size:10pt;text-align:justify}
+        .clausula b{color:#191919}
+        .signatures{display:flex;gap:48px;margin-top:48px}
+        .signature{flex:1}
+        .sig-label{font-size:9pt;color:#757575;margin-bottom:4px}
+        .firma-img{height:70px;object-fit:contain}
+        .sig-line{border-top:1px solid #191919;margin-top:8px;padding-top:6px;font-size:9pt;font-weight:600}
+        .firma-fallback{height:70px;display:flex;align-items:center;color:#999;font-style:italic}
+        .footer{text-align:center;margin-top:40px;padding-top:10px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
+      </style></head><body>
+      <div class="header">
+        <img src="https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg" class="logo" alt="Grupo Nebak">
+        <div><div class="title">Contrato de Adopcion</div><div class="sub">Asociacion Grupo Nebak &middot; Expediente ${c.adopcion_id || c.id || ''}</div></div>
+      </div>
+
+      <p>En <b>${c.ciudad || '[ciudad]'}</b>, a <b>${fecha}</b>, entre la <b>Asociacion Grupo Nebak</b> (en adelante, "la entidad") y <b>${f1Nombre}</b> con DNI <b>${f1Dni}</b>, en calidad de <b>${c.f1_rol || 'adoptante'}</b>, se formaliza el presente contrato de adopcion responsable del animal:</p>
+
+      <h2>1. Animal adoptado</h2>
+      <div class="grid">
+        <div><div class="label">Animal</div>${c.animal || '—'}</div>
+        <div><div class="label">Especie</div>${c.especie || '—'}</div>
+        <div><div class="label">Raza</div>${c.raza || '—'}</div>
+        <div><div class="label">Edad</div>${c.edad || '—'}</div>
+      </div>
+
+      <h2>2. Firmante 1 · ${c.f1_rol || 'Titular'}</h2>
+      <div class="grid">
+        <div><div class="label">Nombre</div>${f1Nombre}</div>
+        <div><div class="label">DNI</div>${f1Dni}</div>
+        <div><div class="label">Email</div>${c.f1_email || '—'}</div>
+        <div><div class="label">Telefono</div>${c.f1_telefono || '—'}</div>
+      </div>
+
+      ${f2Presente ? `<h2>3. Firmante 2 · ${c.f2_rol || 'Segundo firmante'}</h2>
+      <div class="grid">
+        <div><div class="label">Nombre</div>${c.f2_nombre || '—'}</div>
+        <div><div class="label">DNI</div>${c.f2_dni || '—'}</div>
+        <div><div class="label">Email</div>${c.f2_email || '—'}</div>
+        <div><div class="label">Telefono</div>${c.f2_telefono || '—'}</div>
+      </div>
+
+      <h2>4. Compromisos del adoptante</h2>` : '<h2>3. Compromisos del adoptante</h2>'}
+      <div class="clausula">a) Proporcionar al animal cuidados adecuados: alimentacion, acceso al veterinario, atencion y cariño, en un entorno seguro.</div>
+      <div class="clausula">b) No ceder, vender ni regalar el animal a terceros sin consentimiento de la entidad. En caso de no poder continuar con el cuidado, la entidad se hará cargo de nuevo del animal.</div>
+      <div class="clausula">c) Permitir el seguimiento por parte de la entidad durante el periodo posterior a la adopcion.</div>
+      <div class="clausula">d) Mantener al animal identificado (microchip) y al dia en vacunaciones y desparasitaciones.</div>
+      <div class="clausula">e) Asumir los gastos derivados del cuidado y la manutencion del animal.</div>
+
+      <h2>${f2Presente ? '5' : '4'}. Firmas</h2>
+      <div class="signatures">
+        <div class="signature">
+          <div class="sig-label">Firmante 1 · ${c.f1_rol || 'Titular'}</div>
+          ${fimg(c.f1_firma)}
+          <div class="sig-line">${f1Nombre} &middot; DNI ${f1Dni}</div>
+        </div>
+        ${firma2Block}
+      </div>
+
+      <div class="footer">Generado por GN-Admin · Grupo Nebak · ${new Date().toLocaleDateString('es-ES')}</div>
+    </body></html>`;
+  },
+
   _label(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   },

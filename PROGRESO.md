@@ -27,10 +27,20 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Hojas: `Estados` (response_id|survey_id|estado|fecha) y `Notas` (response_id|survey_id|nota|fecha) — IDs en `.env`.
 
 ## Pendientes
-1. **Backend aislamiento (Code.gs):** fix de `handleSetEstado`/`handleSetNota` (match por `response_id` + `survey_id`) aplicado en local pero **hay que redeplegarlo en Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar → la URL no cambia). Hasta entonces, cambiar estado en ids compartidos no persiste bien.
-2. **ALLOWED_ORIGINS** del backend: usar la URL real de Pages `https://gn-admin.github.io` en `.env` (`APPS_SCRIPT_ALLOWED_ORIGINS`) y re-desplegar backend (o bastaría `"*"` — el backend responde 200 a cualquier origen, ver CORS abajo).
-3. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
-4. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
+1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local ya incluye el fix de `handleSetEstado`/`handleSetNota` (match `response_id`+`survey_id`), los endpoints CRUD de `candidaturas`/`acogidas`/`contratos`, y `appendToSheet` alineado por cabecera (crea solo las columnas que falten: `grupo*`, `f1_firma`, etc.). `Config.gs` ya contiene las 3 hojas (`SHEET_CANDIDATURAS_ID`, `SHEET_CONTRATOS_ID`, `SHEET_ACOGIDAS_ID`).
+2. **ALLOWED_ORIGINS** del backend: confirmar `APPS_SCRIPT_ALLOWED_ORIGINS` con la URL real `https://gn-admin.github.io` en `.env` (renovar con `npm run build`); el backend responde 200 a cualquier origen (CORS abajo), así que es defensa extra.
+3. **Falta crear las hojas con cabeceras y dar permisos a la API:** si las spreadsheets `Candidaturas`, `Acogidas`, `Contratos` están vacías o sin cabecera, `appendToSheet` las crea automáticamente con la primera fila (columnas de la fila escrita). Recomendado crear cabeceras manuales (listadas abajo) para legibilidad. La cuenta de servicio Apps Script debe tener acceso de edición a las 3 spreadsheets (compartir con la cuenta del proyecto).
+4. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
+5. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
+6. **Verificación en localhost** del bloque actual antes de desplegar front (navegación, modal procesos, firma de contrato, alta de camada).
+
+## Hojas persistentes (candidaturas/acogidas/contratos)
+- Columnas `Candidaturas`: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`.
+- Columnas `Acogidas`: `id, animal_id, familia_id, animal, familia, fase, estado, inicio, solicitud_id, notas`.
+- Columnas `Contratos`: `id, adopcion_id, animal, animal_id, fecha, ciudad, estado, creado, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`.
+4. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
+5. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
+6. **Verificación en localhost** del bloque actual antes de desplegar front (navegación, modal procesos, firma de contrato, alta de camada).
 
 ## CORS / POST
 - Apps Script responde siempre HTTP 200 con `error`; `api.js` lanza por `data.error`.
@@ -45,9 +55,15 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Dashboard: stats principales excluyen descartadas.
 - Estado de una solicitud: **loader** durante el POST y **revert del estado** si hay error (con snackbar); la tarjeta del listado se actualiza al instante (`_syncCard` + `data-card`).
 - **Rutas relativas** en `index.html`, `sw.js`, `manifest.webmanifest` y registro de SW — necesario porque GitHub Pages sirve bajo `/admin-dashboard/`.
+- **Estados `aprobada`/`finalizada`:** Aprobar una encuesta crea una candidatura (`en_lista`) y autoregistra la familia de acogida (pre-acogida); los listados filtran por estos estados.
+- **Modal Procesos:** candidaturas en lista → asignación de animal disponible (+ familia libre en acogidas) → crea caso de acogida (`entrega → en_casa → finalizada`) o adopción (fase `Revision`).
+- **Acogidas activas:** nueva página con pipeline de casos; al finalizar devuelve el animal a `disponible` y la familia a `Libre`.
+- **Ficha animal:** especie extensible, campos `grupo_id`/`grupo`/`grupo_obligatorio`, badge de grupo en tarjetas, filtro por especie y **alta de camada** (bulk con API o fallback local).
+- **Contratos de adopción:** en la fase `Contrato` se firma en canvas con **dos firmantes** (f1 titular con rol `El adoptante`/Titular/Tutor/Representante; f2 opcional: mayor de edad, tutor del menor, contacto responsable, persona de avanzada edad), ciudad + fecha, y se exporta PDF formal (`PdfExport.exportContracto`). Columnas de hoja `Contratos`: `id, adopcion_id, animal, fecha, ciudad, estado, creado, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`.
+- Datos locales de respaldo (`gn_candidaturas`, `gn_contratos`, `gn_acogidas`) hasta que el backend tenga hojas/endpoints.
 
 ## Service worker
-- Estado actual: **`gn-encuestas-v20`** (rutas relativas, mejoras responsive, hub encuestas móvil con tarjetas).
+- Estado actual: **`gn-encuestas-v21`** (procesos, acogidas activas, camadas/especie, contratos con firma).
 - Regla: al tocar `src/js/dashboard.js`, `api.js` u otros assets, **subir CACHE_NAME** en `src/sw.js`.
 
 ## Configuración / despliegue
