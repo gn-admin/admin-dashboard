@@ -15,7 +15,8 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Estados y notas usan clave compuesta `survey_id::id`** (los ids `resp_N` colisionan entre encuestas). `handleSetEstado`/`handleSetNota` deben hacer match por `response_id` Y `survey_id`.
 - **CORS POST**: Apps Script no responde preflights con `application/json`. Enviar siempre `Content-Type: text/plain;charset=utf-8` (véase `src/js/api.js`); el backend hace `JSON.parse(e.postData.contents)`.
 - **Apps Script responde HTTP 200 con campo `error`**: api.js lanza por `data.error`, no por status.
-- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v19`.
+- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v20`.
+- **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
 
@@ -25,4 +26,4 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`, `enablement: true`), rama `main`.
 
 ## Estado actual resumido
-**Desplegado y funcionando** en `https://gn-admin.github.io/admin-dashboard/`. Frontend con rutas relativas; SW `v19`. Solo quedan pendientes de despliegue de backend (fix de aislamiento de estados/notas y `ALLOWED_ORIGINS` con `https://gn-admin.github.io`) y mejoras anotadas en `PROGRESO.md`. A partir de aquí se trabajan **mejoras de front y back**, sin tocar la lógica de negocio.
+**Desplegado y funcionando** en `https://gn-admin.github.io/admin-dashboard/`. Frontend con rutas relativas; SW `v20`. Solo quedan pendientes de despliegue de backend (fix de aislamiento de estados/notas y `ALLOWED_ORIGINS` con `https://gn-admin.github.io`) y mejoras anotadas en `PROGRESO.md`. A partir de aquí se trabajan **mejoras de front y back**, sin tocar la lógica de negocio.

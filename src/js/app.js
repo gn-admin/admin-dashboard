@@ -55,6 +55,7 @@ const App = {
     document.querySelectorAll('.bottom-nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
     const titles = {
       dashboard: 'Dashboard',
+      encuestas: 'Encuestas',
       'encuestas-perros': 'Pre-adopcion Perros',
       'encuestas-gatos': 'Pre-adopcion Gatos',
       'encuestas-acogida': 'Solicitudes de Acogida',

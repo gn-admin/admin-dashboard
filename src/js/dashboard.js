@@ -28,6 +28,7 @@ const Dashboard = {
     const token = ++this._pageToken;
     const pages = {
       dashboard: () => this.renderDashboardHome(el),
+      encuestas: () => this.renderEncuestasHub(el),
       'encuestas-perros': () => this.renderEncuesta(el, 'pre-adopcion-perros'),
       'encuestas-gatos': () => this.renderEncuesta(el, 'pre-adopcion-gatos'),
       'encuestas-acogida': () => this.renderEncuesta(el, 'pre-acogida'),
@@ -71,7 +72,7 @@ const Dashboard = {
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
       const p = el.closest('.bottom-nav-item')?.dataset.page;
       if (!p) return;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, animales: Icons.heart, blacklist: Icons.ban };
+      const m = { dashboard: Icons.dashboard, encuestas: Icons.clipboard, animales: Icons.heart, blacklist: Icons.ban };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.input-icon').forEach((el, i) => { el.innerHTML = i === 0 ? Icons.mail : Icons.lock; });
@@ -390,6 +391,39 @@ const Dashboard = {
   },
 
   // ==================== ENCUESTAS ====================
+  async renderEncuestasHub(el) {
+    await this._loadSurveys();
+    await Promise.all([
+      this._loadResponses('pre-adopcion-perros'),
+      this._loadResponses('pre-adopcion-gatos'),
+      this._loadResponses('pre-acogida'),
+      this.loadEstados()
+    ]);
+    const defs = [
+      { surveyId: 'pre-adopcion-perros', page: 'encuestas-perros', icon: Icons.dog, title: 'Pre-adopción Perros' },
+      { surveyId: 'pre-adopcion-gatos', page: 'encuestas-gatos', icon: Icons.cat, title: 'Pre-adopción Gatos' },
+      { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' }
+    ];
+    const cards = defs.map(d => {
+      const list = this.responses[d.surveyId] || [];
+      const activas = list.filter(r => this.getEstado(r.id, d.surveyId) !== 'descartada');
+      const pendientes = activas.filter(r => this.getEstado(r.id, d.surveyId) === 'pendiente').length;
+      const enProceso = activas.filter(r => this.getEstado(r.id, d.surveyId) === 'en_proceso').length;
+      const ultima = list.reduce((max, r) => ((r.fecha_creacion||'') > (max||'') ? r.fecha_creacion : max), '');
+      const fecha = ultima ? new Date(ultima).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+      return `<a class="hub-card" onclick="location.hash='${d.page}'">
+        <div class="hub-card-icon">${d.icon}</div>
+        <div class="hub-card-body">
+          <div class="hub-card-title">${d.title}</div>
+          <div class="hub-card-meta">${pendientes} pendientes · ${enProceso} en proceso</div>
+          ${fecha ? `<div class="hub-card-date">Última: ${fecha}</div>` : ''}
+        </div>
+        <span class="hub-card-chevron">${Icons.chevronRight}</span>
+      </a>`;
+    }).join('');
+    el.innerHTML = `<div class="page-list-container"><div class="hub-grid">${cards}</div></div>`;
+  },
+
   async renderEncuesta(el, surveyId) {
     await this._loadSurveys();
     await Promise.all([this._loadResponses(surveyId), this.loadEstados()]);
