@@ -456,7 +456,7 @@ const Dashboard = {
     });
     const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
     const max = Math.max(...buckets.map(b => b.count), 1);
-    return `<div class="bar-chart">${buckets.map(b=>{const h=(b.count/max*130);return`<div class="bar-chart-col"><div class="bar-chart-bar" style="height:${h}px${b.key===curKey?';background:var(--primary-hover)':''}"><span class="bar-tooltip">${b.label}: ${b.count}</span></div><span class="bar-chart-label">${b.label}</span></div>`;}).join('')}</div>`;
+    return `<div class="bar-chart">${buckets.map(b=>{const h=(b.count/max*120);return`<div class="bar-chart-col"><div class="bar-chart-value">${b.count}</div><div class="bar-chart-bar" style="height:${h}px${b.key===curKey?';background:var(--primary-hover)':''}"><span class="bar-tooltip">${b.label}: ${b.count}</span></div><span class="bar-chart-label">${b.label}</span></div>`;}).join('')}</div>`;
   },
 
   _buildDonutChart(perros, gatos, acogida) {
@@ -624,24 +624,137 @@ const Dashboard = {
 
   // ==================== GUIA DE PROCESOS / PERFIL / ASIGNACION ====================
 
-  showTutorial() {
+  showTutorial(tab) {
     const el = document.getElementById('tutorial-modal');
     const body = document.getElementById('tutorial-content');
     if (!el || !body) return;
-    const step = (n, t, d) => `<div style="display:flex;gap:12px;align-items:flex-start"><div style="flex:none;width:28px;height:28px;border-radius:50%;background:var(--primary-lighter);color:var(--primary-hover);font-weight:800;font-size:0.9rem;display:flex;align-items:center;justify-content:center">${n}</div><div style="flex:1"><div style="font-weight:700;color:var(--gray-900);margin-bottom:2px">${t}</div><div style="color:var(--gray-500);font-size:0.85rem;line-height:1.45">${d}</div></div></div>`;
-    body.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:16px">
-        ${step(1, '1. Llega la solicitud', 'Cada encuesta (pre-adopcion de perros/gatos o acogida) alimenta su listado. El estado inicial de toda solicitud es <b>Pendiente</b>.')}
-        ${step(2, '2. Revisa y decide', 'Abre la solicitud desde el listado y pasala a <b>En proceso</b> mientras la valoras. Cuando termines marca <b>Aprobar</b> o <b>Descartar</b>. Puedes dejar notas por persona.')}
-        ${step(3, '3. Aprobacion = candidatura', 'Al aprobar se crea la candidatura automaticamente. En acogida se toma o se crea la familia acogedora a partir de los datos de la encuesta (maximo 1 animal). Si la solicitud vuelve a <b>Pendiente</b> o se descarta, deja de contar como aprobada y ya no podra asignarsele animal.')}
-        ${step(4, '4. Asigna animal (y familia)', 'En la ficha de la solicitud aprobada elige el animal disponible y, si es acogida, la familia de acogida. Al asignar se crea el caso y la solicitud queda en estado <span class="estado-badge aprobada" style="font-size:0.7rem">elegida</span>.')}
-        ${step(5, '5. Acogida activa', 'El caso se controla desde <b>Acogidas activas</b>: <b>Entrega &rarr; En casa &rarr; Finalizada</b>. Al finalizar, el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b>.')}
-        ${step(6, '6. Adopcion formalizada', 'Para una adopcion, gestiona el <b>Contrato de adopcion</b> desde la lista de Adopciones: firmante 1 (obligatorio), firmante 2 (opcional, por defecto Grupo Nebak), fecha y ciudad, y descarga el PDF.')}
-      </div>
-      <div class="alert-item info" style="margin-top:16px">${Icons.clipboard} <span>Los estados y notas se guardan por solicitud (identificador <code>encuesta::id</code>) y los cambios son reversibles en cualquier momento desde el detalle.</span></div>`;
+    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', estados: 'Estados y consejos' };
+    if (!tab) tab = this._tutorialTabActive || 'general';
+    this._tutorialTabActive = tab;
+    const tabbar = `<div class="tutorial-tabs">${Object.keys(tabs).map(t=>`<button class="tutorial-tab${t===tab?' active':''}" onclick="Dashboard.showTutorial('${t}')">${tabs[t]}</button>`).join('')}</div>`;
+    const panels = {
+      general: this._tutorialGeneral(),
+      adopcion: this._tutorialAdopcion(),
+      acogida: this._tutorialAcogida(),
+      estados: this._tutorialEstados()
+    };
+    body.innerHTML = tabbar + `<div class="tutorial-panel">` + panels[tab] + `</div>`;
     el.style.display = 'flex';
     body.scrollTop = 0;
     this.injectIcons();
+  },
+
+  _flowDiagram(nodes, accent) {
+    const X = 14, W = 300, H = 56, GAP = 26, NUM = 12, TOP = 16;
+    const h = TOP + nodes.length * (H + GAP) + 4;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 328 ${h}" role="img" aria-label="Diagrama del flujo de procesos">`;
+    nodes.forEach((n, i) => {
+      const y = TOP + i * (H + GAP);
+      const cy = y + H / 2;
+      const cx = X + NUM + 10;
+      const branch = i >= 3;
+      s += `<rect x="${X}" y="${y}" width="${W}" height="${H}" rx="12" fill="#ffffff" stroke="${branch ? accent : '#d1d5db'}" stroke-width="1.5"/>`;
+      s += `<circle cx="${X + NUM + 4}" cy="${cy}" r="${NUM}" fill="${branch ? accent : '#9ca3af'}"/><text x="${X + NUM + 4}" y="${cy + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">${i + 1}</text>`;
+      s += `<text x="${cx}" y="${cy - 1}" font-size="13.5" font-weight="700" fill="#1f2937">${n[0]}</text>`;
+      if (n[1]) s += `<text x="${cx}" y="${cy + 15}" font-size="10.5" fill="#6b7280">${n[1]}</text>`;
+      if (i < nodes.length - 1) {
+        const y1 = y + H, y2 = y1 + GAP;
+        s += `<line x1="${X + W / 2}" y1="${y1}" x2="${X + W / 2}" y2="${y2}" stroke="#cbd5e1" stroke-width="2"/>`;
+        s += `<path d="M ${X + W / 2 - 5} ${y2 - 5} L ${X + W / 2} ${y2} L ${X + W / 2 + 5} ${y2 - 5}" fill="none" stroke="#cbd5e1" stroke-width="2"/>`;
+      }
+    });
+    return s + '</svg>';
+  },
+
+  _guideStep(icon, title, text, loc, green) {
+    const bg = green ? '#e8faf0' : '#ebf5fb';
+    const fg = green ? '#16a34a' : '#2563eb';
+    return `<div class="guide-step"><div class="guide-step-icon" style="background:${bg};color:${fg}">${icon}</div><div class="guide-step-body"><h4>${title}</h4><p>${text}</p>${loc ? `<span class="guide-step-loc">${Icons.mapPin} ${loc}</span>` : ''}</div></div>`;
+  },
+
+  _jumpTo(page) {
+    this.closeTutorial();
+    this.closeProfile();
+    location.hash = '#' + page;
+  },
+
+  _tutorialGeneral() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Solicitud llega', 'pre-adopcion perros / gatos / acogida'],
+        ['Revisa y toma notas', 'Pendiente → En proceso'],
+        ['Aprueba o descarta', 'Aprobar crea la candidatura'],
+        ['Asigna animal (y familia)', 'desde la ficha de la solicitud'],
+        ['Proceso activo', 'acogida en curso o contrato de adopcion'],
+        ['Cierre', 'adoptado / familia libre']
+      ], '#1FC95B')}</div>
+      <div class="guide-note">${Icons.info} <span>La barra de estado del detalle te deja mover la solicitud hacia delante y hacia atras en cualquier momento: <b>Pendiente</b>, <b>En proceso</b>, <b>Aprobar</b> y <b>Descartar</b>.</span></div>
+      <div class="guide-cols">
+        <div class="guide-card"><div class="guide-card-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora (maximo 1 animal). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y formalizarlo con el <b>Contrato de adopcion</b> (firma + PDF) desde Adopciones.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
+      </div>`;
+  },
+
+  _tutorialAdopcion() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Solicitud llega', 'encuesta pre-adopcion'],
+        ['Revisa y toma notas', 'Pendiente → En proceso'],
+        ['Aprueba o descarta', 'Aprobar crea la candidatura'],
+        ['Asigna un animal', 'estado → Elegida'],
+        ['Contrato de adopcion', 'firma + PDF'],
+        ['Adoptado', 'animal fuera de disponibles']
+      ], '#16a34a')}</div>
+      ${this._guideStep(Icons.dog, '1. La solicitud llega', 'Cada persona que completa la encuesta de pre-adopcion (perros o gatos) aparece en su listado con estado <b>Pendiente</b>. Todo se gestiona desde el detalle de la persona (pulsando sobre ella).', 'Encuestas > Perros / Gatos', true)}
+      ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'En el detalle puedes leer sus respuestas, dejar una <b>nota</b> y pasarla a <b>En proceso</b> mientras la valoras. Usa el buscador y los filtros para ordenar la lista (pendientes, aprobadas, etc.).', 'Detalle: botones Nota y En proceso', true)}
+      ${this._guideStep(Icons.checkCircle, '3. Aprueba o descarta', 'Cuando termines pulsa <b>Aprobar</b>: se crea su candidatura automaticamente y pasa a la lista de aprobados. Con <b>Descartar</b> se aparta. <br><b>Importante:</b> si la solicitud vuelve a Pendiente (o se descarta), deja de ser candidata y ya no podra asignarsele animal.', 'Detalle: botones Aprobar / Descartar', true)}
+      ${this._guideStep(Icons.paw, '4. Asigna el animal', 'Reabre el detalle de la persona ya aprobada: veras el bloque <b>Asignar animal</b>. Elige un animal disponible y guarda. El estado pasa a <b>Elegida</b> y se crea el caso en Adopciones.', 'Ficha de la solicitud aprobada', true)}
+      ${this._guideStep(Icons.fileText, '5. Contrato de adopcion', 'Entra en <b>Adopciones</b>, abre el caso y pulsa <b>Nuevo contrato</b>: firmante 1 obligatorio (firma dibujada en pantalla), firmante 2 opcional (por defecto Grupo Nebak), fecha y ciudad. Descarga el <b>PDF</b> y guarda.', 'Adopciones > caso', true)}
+      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces.', 'Adopciones', true)}`;
+  },
+
+  _tutorialAcogida() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Solicitud llega', 'encuesta pre-acogida'],
+        ['Revisa y toma notas', 'Pendiente → En proceso'],
+        ['Aprueba: crea la familia', 'maximo 1 animal'],
+        ['Asigna animal y familia', 'estado → Elegida'],
+        ['Seguimiento del caso', 'Entrega → En casa → Finalizada'],
+        ['Cierre', 'animal Disponible, familia Libre']
+      ], '#2563eb')}</div>
+      ${this._guideStep(Icons.home, '1. La solicitud llega', 'Cada persona que completa la encuesta de <b>pre-acogida</b> aparece en el listado con estado <b>Pendiente</b>.', 'Encuestas > Acogida', false)}
+      ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'Abre el detalle, lee sus respuestas, deja <b>notas</b> y marca <b>En proceso</b> mientras la valoras.', 'Detalle: botones Nota y En proceso', false)}
+      ${this._guideStep(Icons.checkCircle, '3. Aprueba (crea la familia)', 'Al aprobar se crea la <b>familia acogedora</b> a partir de los datos de la encuesta (<b>maximo 1 animal por familia</b>) y la candidatura de la persona. Si ya existe coincidira automaticamente.', 'Detalle: boton Aprobar', false)}
+      ${this._guideStep(Icons.paw, '4. Asigna animal y familia', 'En el detalle de la persona aprobada usa el bloque <b>Asignar animal</b>: elige el animal disponible y confirma la familia acogedora (verde = libre). El estado pasa a <b>Elegida</b> y se crea el caso.', 'Ficha de la solicitud aprobada', false)}
+      ${this._guideStep(Icons.clock, '5. Seguimiento del caso', 'El caso se controla en <b>Acogidas activas</b> con los botones de fase: <b>Entrega → En casa → Finalizada</b>.', 'Acogidas activas', false)}
+      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al marcar <b>Finalizada</b> el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b>, lista para otra acogida.', 'Acogidas activas', false)}`;
+  },
+
+  _tutorialEstados() {
+    const estados = [
+      ['pendiente', 'Pendiente', 'Acaba de llegar o se ha vuelto a desmarcar. Aun no se asigna nada.'],
+      ['en_proceso', 'En proceso', 'Se esta valorando: se revisan respuestas y se dejan notas.'],
+      ['aprobada', 'Aprobada', 'Candidata: desde su ficha se le puede asignar animal (y familia en acogida).'],
+      ['descartada', 'Descartada', 'Apartada del proceso. No cuenta en el total activo.'],
+      ['elegida', 'Elegida', 'Tiene animal asignado y un caso abierto (adopcion o acogida).']
+    ];
+    return `
+      <div class="guide-note">${Icons.info} <span>Los estados se guardan <b>por solicitud</b> y se muestran siempre como etiqueta de color junto a cada persona. Cambiar de estado es <b>reversible</b> en cualquier momento.</span></div>
+      <h4 class="guide-subtitle">Que significa cada estado</h4>
+      <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>
+      <h4 class="guide-subtitle">Donde esta cada cosa</h4>
+      <div class="guide-index">
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase (Entrega → En casa → Finalizada).</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
+      </div>`;
   },
 
   closeTutorial() {
