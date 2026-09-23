@@ -645,16 +645,17 @@ const Dashboard = {
   },
 
   _flowDiagram(nodes, accent) {
-    const X = 14, W = 300, H = 56, GAP = 26, NUM = 12, TOP = 16;
+    const X = 16, W = 312, H = 54, GAP = 24, NUM = 13, TOP = 14;
     const h = TOP + nodes.length * (H + GAP) + 4;
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 328 ${h}" role="img" aria-label="Diagrama del flujo de procesos">`;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${X + W + X} ${h}" role="img" aria-label="Diagrama del flujo de procesos">`;
     nodes.forEach((n, i) => {
       const y = TOP + i * (H + GAP);
       const cy = y + H / 2;
-      const cx = X + NUM + 10;
+      const cxNum = X + NUM + 4;
+      const cx = cxNum + NUM + 12;
       const branch = i >= 3;
       s += `<rect x="${X}" y="${y}" width="${W}" height="${H}" rx="12" fill="#ffffff" stroke="${branch ? accent : '#d1d5db'}" stroke-width="1.5"/>`;
-      s += `<circle cx="${X + NUM + 4}" cy="${cy}" r="${NUM}" fill="${branch ? accent : '#9ca3af'}"/><text x="${X + NUM + 4}" y="${cy + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">${i + 1}</text>`;
+      s += `<circle cx="${cxNum}" cy="${cy}" r="${NUM}" fill="${branch ? accent : '#9ca3af'}"/><text x="${cxNum}" y="${cy + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">${i + 1}</text>`;
       s += `<text x="${cx}" y="${cy - 1}" font-size="13.5" font-weight="700" fill="#1f2937">${n[0]}</text>`;
       if (n[1]) s += `<text x="${cx}" y="${cy + 15}" font-size="10.5" fill="#6b7280">${n[1]}</text>`;
       if (i < nodes.length - 1) {

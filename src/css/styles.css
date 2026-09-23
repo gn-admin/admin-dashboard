@@ -1705,11 +1705,14 @@ body {
   background: #f8fafc;
   border: 1px solid var(--gray-100);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: center;
 }
 
 .guide-diagram svg {
   width: 100%;
+  max-width: 400px;
   height: auto;
   display: block;
 }
