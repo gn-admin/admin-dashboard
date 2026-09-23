@@ -47,7 +47,7 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - **Rutas relativas** en `index.html`, `sw.js`, `manifest.webmanifest` y registro de SW — necesario porque GitHub Pages sirve bajo `/admin-dashboard/`.
 
 ## Service worker
-- Estado actual: **`gn-encuestas-v18`** (rutas relativas).
+- Estado actual: **`gn-encuestas-v19`** (rutas relativas, mejoras responsive).
 - Regla: al tocar `src/js/dashboard.js`, `api.js` u otros assets, **subir CACHE_NAME** en `src/sw.js`.
 
 ## Configuración / despliegue

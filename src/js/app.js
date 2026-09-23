@@ -20,7 +20,9 @@ const App = {
   },
 
   initSidebarCollapse() {
-    const collapsed = localStorage.getItem('gn_sidebar_collapsed') === 'true';
+    const stored = localStorage.getItem('gn_sidebar_collapsed');
+    const isTablet = window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches;
+    const collapsed = stored === 'true' || (stored === null && isTablet);
     if (collapsed) {
       document.getElementById('sidebar')?.classList.add('collapsed');
       const btn = document.getElementById('sidebar-collapse-btn');

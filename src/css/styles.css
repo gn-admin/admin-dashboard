@@ -2019,6 +2019,44 @@ body {
     padding: 12px;
   }
 
+  .btn,
+  .btn-sm,
+  .btn-full {
+    min-height: 44px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .stat-card-value {
+    font-size: 1.3rem;
+  }
+
+  .data-table {
+    font-size: 0.78rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+  }
+
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mas-menu-popup {
+    left: 8px;
+    right: 8px;
+    min-width: 0;
+  }
+
   .filters-bar {
     gap: 10px;
   }
@@ -2069,6 +2107,13 @@ body {
   .detail-actions {
     flex-wrap: wrap;
     width: 100%;
+  }
+}
+
+/* ===== RESPONSIVE MOBILE GRANDE (2 columnas) ===== */
+@media (min-width: 400px) and (max-width: 767px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -2158,6 +2203,29 @@ body {
 
   .sidebar.collapsed ~ .main-wrapper {
     margin-left: var(--sidebar-collapsed-width);
+  }
+}
+
+/* ===== RESPONSIVE TABLET ESPECIFICO (768-1023) ===== */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .main-content {
+    padding: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .animal-grid {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  }
+
+  .response-list {
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   }
 }
 
