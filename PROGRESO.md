@@ -27,12 +27,11 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Hojas: `Estados` (response_id|survey_id|estado|fecha) y `Notas` (response_id|survey_id|nota|fecha) — IDs en `.env`.
 
 ## Pendientes
-1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local ya incluye el fix de `handleSetEstado`/`handleSetNota` (match `response_id`+`survey_id`), los endpoints CRUD de `candidaturas`/`acogidas`/`contratos`, y `appendToSheet` alineado por cabecera (crea solo las columnas que falten: `grupo*`, `f1_firma`, etc.). `Config.gs` ya contiene las 3 hojas (`SHEET_CANDIDATURAS_ID`, `SHEET_CONTRATOS_ID`, `SHEET_ACOGIDAS_ID`).
-2. **ALLOWED_ORIGINS** del backend: confirmar `APPS_SCRIPT_ALLOWED_ORIGINS` con la URL real `https://gn-admin.github.io` en `.env` (renovar con `npm run build`); el backend responde 200 a cualquier origen (CORS abajo), así que es defensa extra.
-3. **Falta crear las hojas con cabeceras y dar permisos a la API:** si las spreadsheets `Candidaturas`, `Acogidas`, `Contratos` están vacías o sin cabecera, `appendToSheet` las crea automáticamente con la primera fila (columnas de la fila escrita). Recomendado crear cabeceras manuales (listadas abajo) para legibilidad. La cuenta de servicio Apps Script debe tener acceso de edición a las 3 spreadsheets (compartir con la cuenta del proyecto).
+1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local ya incluye el fix de `handleSetEstado`/`handleSetNota`, los CRUD de `candidaturas`/`acogidas`/`contratos` y `appendToSheet` alineado por cabecera. `Config.gs` regenerado con `SHEET_NOTAS_ID` corregido (44 chars; antes llegaba pegado a `SHEET_CANDITURAS_ID=...` y rompía `notas`) y `APPS_SCRIPT_ALLOWED_ORIGINS` ya apunta a `https://gn-admin.github.io`.
+2. **Desplegar el front** (push a `main`): la sección "Procesos" ya no existe — la asignación de animal/familia se hace en la ficha de la solicitud aprobada; se añadió el modal "Guía de procesos" (botón `?` en topbar tablet/desktop, y accesible desde el perfil móvil y Acogidas activas), el botón de perfil en el topbar móvil (oculta título y email), y estados vacíos en listados (animales/familias/adopciones/socios/encuestas). SW `v23`.
+3. **Dar permisos a la API** sobre las 3 spreadsheets (`Candidaturas`, `Acogidas`, `Contratos`) y (opcional) crear cabeceras manuales (columnas listadas abajo) para legibilidad.
 4. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
 5. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
-6. **Verificación en localhost** del bloque actual antes de desplegar front (navegación, modal procesos, firma de contrato, alta de camada).
 
 ## Hojas persistentes (candidaturas/acogidas/contratos)
 - Columnas `Candidaturas`: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`.
