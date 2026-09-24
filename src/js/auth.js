@@ -23,6 +23,10 @@ const Auth = {
     await this._ensureSDK();
     const result = await firebase.auth().signInWithEmailAndPassword(email, password);
     const fbUser = result.user;
+    if (!fbUser.emailVerified) {
+      await firebase.auth().signOut();
+      throw new Error('Verifica tu correo electronico antes de acceder. Revisa tu bandeja de entrada o pide al administrador que lo verifique.');
+    }
     this.currentUser = {
       uid: fbUser.uid,
       email: fbUser.email,
@@ -35,6 +39,7 @@ const Auth = {
   async logout() {
     await firebase.auth().signOut();
     this.currentUser = null;
+    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad'].forEach(k => localStorage.removeItem(k));
     this._notifyListeners();
   },
 

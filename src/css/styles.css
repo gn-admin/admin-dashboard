@@ -1966,6 +1966,11 @@ body {
   color: var(--info);
 }
 
+.animal-card-status.en_adopcion {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .animal-card-status.adoptado {
   background: var(--warning-light);
   color: var(--warning);

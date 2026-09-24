@@ -94,6 +94,8 @@ const backendConfig = `var CONFIG = {
   FIREBASE_API_KEY: '${env('FIREBASE_API_KEY')}',
   ALLOWED_ORIGINS: ${env('APPS_SCRIPT_ALLOWED_ORIGINS', '["https://tusuario.github.io","http://localhost:8080","http://localhost:3000"]')},
   RATE_LIMIT: 100,
+  REQUIRE_EMAIL_VERIFIED: ${env('APPS_SCRIPT_REQUIRE_EMAIL_VERIFIED', 'true') === 'false' ? 'false' : 'true'},
+  ALLOW_ORIGIN_EMPTY: ${env('APPS_SCRIPT_ALLOW_ORIGIN_EMPTY', 'false') === 'true' ? 'true' : 'false'},
   ROLES: { ADMIN: 'admin', USER: 'usuario' },
 
   surveys: {

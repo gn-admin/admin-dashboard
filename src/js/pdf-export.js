@@ -14,6 +14,11 @@ const PdfExport = {
     this._openPrintWindow(content, `Informe-${survey?.id || 'encuesta'}.pdf`);
   },
 
+  _esc(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  },
+
   _buildSingleReport(row, survey) {
     const date = row.fecha_creacion
       ? new Date(row.fecha_creacion).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -23,11 +28,11 @@ const PdfExport = {
 
     const sectionsHtml = sections.map(s => `
       <div class="section">
-        <div class="section-title">${s.title}</div>
+        <div class="section-title">${this._esc(s.title)}</div>
         ${s.fields.map(f => `
           <div class="field">
-            <div class="question">${f.label}</div>
-            <div class="answer">${f.value ?? '—'}</div>
+            <div class="question">${this._esc(f.label)}</div>
+            <div class="answer">${f.value == null ? '—' : this._esc(f.value)}</div>
           </div>
         `).join('')}
       </div>
@@ -55,8 +60,8 @@ const PdfExport = {
         <img src="https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg" class="report-logo" alt="Grupo Nebak">
         <div class="avatar">${(row.nombre?.[0]||'')+(row.apellidos?.[0]||'')}</div>
         <div>
-          <div class="name">${row.nombre} ${row.apellidos}</div>
-          <div class="meta">${row.email} · ${date}</div>
+          <div class="name">${this._esc(row.nombre)} ${this._esc(row.apellidos)}</div>
+          <div class="meta">${this._esc(row.email)} · ${date}</div>
           ${survey ? `<span class="badge">${survey.name}</span>` : ''}
         </div>
       </div>
@@ -96,7 +101,7 @@ const PdfExport = {
       <table><thead><tr>
         ${headers.map(h => `<th>${this._label(h)}</th>`).join('')}
       </tr></thead><tbody>
-        ${responses.map(row => `<tr>${headers.map(h => `<td>${row[h]??'—'}</td>`).join('')}</tr>`).join('')}
+        ${responses.map(row => `<tr>${headers.map(h => `<td>${row[h] == null ? '—' : this._esc(row[h])}</td>`).join('')}</tr>`).join('')}
       </tbody></table>
       <div class="footer">GN-Encuestas · Grupo Nebak · Documento confidencial</div>
     </body></html>`;
@@ -112,15 +117,15 @@ const PdfExport = {
       ? new Date(c.fecha + (c.fecha.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
       : new Date().toLocaleDateString('es-ES');
     const fimg = (f) => (f && String(f).startsWith('data:') ? `<img class="firma-img" src="${f}" alt="Firma">` : '<div class="firma-fallback">[Sin firma]</div>');
-    const f1Nombre = c.f1_nombre || c.adoptante || '[adoptante]';
-    const f1Dni = c.f1_dni || '—';
+    const f1Nombre = this._esc(c.f1_nombre || c.adoptante || '[adoptante]');
+    const f1Dni = this._esc(c.f1_dni || '—');
     const f2Presente = c.f2_nombre || (c.f2_firma && String(c.f2_firma).startsWith('data:'));
 
     const firma2Block = f2Presente
       ? `<div class="signature">
           <div class="sig-label">Firmante 2 &middot; ${c.f2_rol || ''}</div>
           ${fimg(c.f2_firma)}
-          <div class="sig-line">${c.f2_nombre || 'Firma del firmante 2'} &middot; DNI ${c.f2_dni || ''}</div>
+          <div class="sig-line">${this._esc(c.f2_nombre || 'Firma del firmante 2')} &middot; DNI ${this._esc(c.f2_dni || '')}</div>
         </div>`
       : `<div class="signature">
           <div class="sig-label">Por Grupo Nebak</div>
@@ -156,30 +161,30 @@ const PdfExport = {
         <div><div class="title">Contrato de Adopcion</div><div class="sub">Asociacion Grupo Nebak &middot; Expediente ${c.adopcion_id || c.id || ''}</div></div>
       </div>
 
-      <p>En <b>${c.ciudad || '[ciudad]'}</b>, a <b>${fecha}</b>, entre la <b>Asociacion Grupo Nebak</b> (en adelante, "la entidad") y <b>${f1Nombre}</b> con DNI <b>${f1Dni}</b>, en calidad de <b>${c.f1_rol || 'adoptante'}</b>, se formaliza el presente contrato de adopcion responsable del animal:</p>
+      <p>En <b>${this._esc(c.ciudad || '[ciudad]')}</b>, a <b>${fecha}</b>, entre la <b>Asociacion Grupo Nebak</b> (en adelante, "la entidad") y <b>${f1Nombre}</b> con DNI <b>${f1Dni}</b>, en calidad de <b>${this._esc(c.f1_rol || 'adoptante')}</b>, se formaliza el presente contrato de adopcion responsable del animal:</p>
 
       <h2>1. Animal adoptado</h2>
       <div class="grid">
-        <div><div class="label">Animal</div>${c.animal || '—'}</div>
-        <div><div class="label">Especie</div>${c.especie || '—'}</div>
-        <div><div class="label">Raza</div>${c.raza || '—'}</div>
-        <div><div class="label">Edad</div>${c.edad || '—'}</div>
+        <div><div class="label">Animal</div>${this._esc(c.animal || '—')}</div>
+        <div><div class="label">Especie</div>${this._esc(c.especie || '—')}</div>
+        <div><div class="label">Raza</div>${this._esc(c.raza || '—')}</div>
+        <div><div class="label">Edad</div>${this._esc(c.edad || '—')}</div>
       </div>
 
-      <h2>2. Firmante 1 · ${c.f1_rol || 'Titular'}</h2>
+      <h2>2. Firmante 1 · ${this._esc(c.f1_rol || 'Titular')}</h2>
       <div class="grid">
         <div><div class="label">Nombre</div>${f1Nombre}</div>
         <div><div class="label">DNI</div>${f1Dni}</div>
-        <div><div class="label">Email</div>${c.f1_email || '—'}</div>
-        <div><div class="label">Telefono</div>${c.f1_telefono || '—'}</div>
+        <div><div class="label">Email</div>${this._esc(c.f1_email || '—')}</div>
+        <div><div class="label">Telefono</div>${this._esc(c.f1_telefono || '—')}</div>
       </div>
 
-      ${f2Presente ? `<h2>3. Firmante 2 · ${c.f2_rol || 'Segundo firmante'}</h2>
+      ${f2Presente ? `<h2>3. Firmante 2 · ${this._esc(c.f2_rol || 'Segundo firmante')}</h2>
       <div class="grid">
-        <div><div class="label">Nombre</div>${c.f2_nombre || '—'}</div>
-        <div><div class="label">DNI</div>${c.f2_dni || '—'}</div>
-        <div><div class="label">Email</div>${c.f2_email || '—'}</div>
-        <div><div class="label">Telefono</div>${c.f2_telefono || '—'}</div>
+        <div><div class="label">Nombre</div>${this._esc(c.f2_nombre || '—')}</div>
+        <div><div class="label">DNI</div>${this._esc(c.f2_dni || '—')}</div>
+        <div><div class="label">Email</div>${this._esc(c.f2_email || '—')}</div>
+        <div><div class="label">Telefono</div>${this._esc(c.f2_telefono || '—')}</div>
       </div>
 
       <h2>4. Compromisos del adoptante</h2>` : '<h2>3. Compromisos del adoptante</h2>'}

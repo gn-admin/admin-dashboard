@@ -81,8 +81,15 @@ const API = {
   async updateSocio(id, data) { return this._post('update-socio', { id, ...data }); },
   async deleteSocio(id) { return this._post('delete-socio', { id }); },
 
+  // Blacklist (CRUD)
+  async getBlacklist() { return this._get('blacklist'); },
+  async createBlacklist(data) { return this._post('blacklist', data); },
+  async updateBlacklist(id, data) { return this._post('update-blacklist', { id, ...data }); },
+  async deleteBlacklist(id) { return this._post('delete-blacklist', { id }); },
+
   // Actividad
   async getActividad() { return this._get('actividad'); },
+  async createActividad(data) { return this._post('actividad', data); },
 
   // Estados y notas encuestas
   async getEstados() { return this._get('estados'); },

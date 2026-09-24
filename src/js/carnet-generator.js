@@ -8,7 +8,7 @@ const CarnetGenerator = {
     return `GN-${prefix}-${year}-${random}`;
   },
 
-  generateCarnet(socio, options = {}) {
+  async generateCarnet(socio, options = {}) {
     const width = options.width || 640;
     const height = options.height || 400;
     const canvas = document.createElement('canvas');
@@ -56,7 +56,7 @@ const CarnetGenerator = {
     ctx.clip();
     if (socio.foto) {
       const img = new Image();
-      img.src = socio.foto;
+      await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; img.src = socio.foto; });
       ctx.drawImage(img, fotoX, fotoY, fotoSize, fotoSize);
     } else {
       ctx.fillStyle = '#e8faf0';
@@ -133,33 +133,42 @@ const CarnetGenerator = {
     return canvas;
   },
 
-  downloadCarnet(socio) {
-    const canvas = this.generateCarnet(socio);
+  async downloadCarnet(socio) {
+    const canvas = await this.generateCarnet(socio);
     const link = document.createElement('a');
     link.download = `carnet-${(socio.nombre||'socio').replace(/\s+/g,'-')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   },
 
-  showCarnetModal(socio) {
-    const canvas = this.generateCarnet(socio, { width: 640, height: 400 });
+  async showCarnetModal(socio) {
+    const canvas = await this.generateCarnet(socio, { width: 640, height: 400 });
     const dataUrl = canvas.toDataURL('image/png');
+    this._sociosCache = this._sociosCache || {};
+    this._sociosCache[socio.id] = socio;
+    const nombreSeguro = String(socio.nombre || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const modal = document.createElement('div');
     modal.className = 'modal-overlay active';
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
     modal.innerHTML = `
       <div style="background:#fff;border-radius:16px;padding:24px;max-width:700px;width:90%;text-align:center;position:relative">
         <button onclick="this.closest('.modal-overlay').remove()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#666">&times;</button>
-        <h3 style="margin:0 0 16px;color:#191919">Carnet de ${socio.nombre}</h3>
+        <h3 style="margin:0 0 16px;color:#191919">Carnet de ${nombreSeguro}</h3>
         <img src="${dataUrl}" style="max-width:100%;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15)" />
         <div style="margin-top:16px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="CarnetGenerator.downloadCarnet(${JSON.stringify(socio).replace(/"/g,'&quot;')})">${Icons.download} Descargar PNG</button>
+          <button class="btn btn-primary" onclick="CarnetGenerator.downloadCarnetById('${String(socio.id || '').replace(/'/g, '').replace(/"/g, '&quot;')}')">${Icons.download} Descargar PNG</button>
           <button class="btn btn-outline-green" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  },
+
+  downloadCarnetById(id) {
+    const socio = this._sociosCache && this._sociosCache[id];
+    if (!socio) return;
+    this.downloadCarnet(socio);
   },
 
   _roundRect(ctx, x, y, w, h, r) {

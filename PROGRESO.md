@@ -27,23 +27,21 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Hojas: `Estados` (response_id|survey_id|estado|fecha) y `Notas` (response_id|survey_id|nota|fecha) — IDs en `.env`.
 
 ## Pendientes
-1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local ya incluye el fix de `handleSetEstado`/`handleSetNota`, los CRUD de `candidaturas`/`acogidas`/`contratos` y `appendToSheet` alineado por cabecera. `Config.gs` regenerado con `SHEET_NOTAS_ID` corregido (44 chars; antes llegaba pegado a `SHEET_CANDITURAS_ID=...` y rompía `notas`) y `APPS_SCRIPT_ALLOWED_ORIGINS` ya apunta a `https://gn-admin.github.io`.
-2. **Desplegar el front** (push a `main`): la sección "Procesos" ya no existe — la asignación de animal/familia se hace en la ficha de la solicitud aprobada; se añadió el modal "Guía de procesos" (botón `?` en topbar tablet/desktop, y accesible desde el perfil móvil y Acogidas activas), el botón de perfil en el topbar móvil (oculta título y email), y estados vacíos en listados (animales/familias/adopciones/socios/encuestas). SW `v23`.
-3. **Dar permisos a la API** sobre las 3 spreadsheets (`Candidaturas`, `Acogidas`, `Contratos`) y (opcional) crear cabeceras manuales (columnas listadas abajo) para legibilidad.
-4. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
-5. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
+1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local incluye el fix de `handleSetEstado`/`handleSetNota` (match por `response_id` + `survey_id`), CRUD de `candidaturas`/`acogidas`/`contratos`, `appendToSheet`/`updateSheetRow` alineados por cabecera (este último añade columnas nuevas), **POST `actividad`** (log de acciones), **blacklist con id estable** (`bl_<fila>` si no hay columna `id`; `update-blacklist`/`delete-blacklist`), **CORS por coincidencia exacta** (sin substrings; `''`/`null` se rechazan salvo `ALLOW_ORIGIN_EMPTY:true`; se permiten `http(s)://localhost:*` y `http(s)://127.0.0.1:*` para dev) y **`REQUIRE_EMAIL_VERIFIED`** (rechaza tokens de usuarios con email sin verificar; `true` por defecto). `Config.gs` regenerado con `SHEET_NOTAS_ID` corregido (44 chars) y `APPS_SCRIPT_ALLOWED_ORIGINS` apuntando a `https://gn-admin.github.io` (+ localhost).
+2. **Desplegar el front** (push a `main`): SW `v26` con fixes de seguridad (escapado XSS en listados/detalle/PDF), botones de edición por id (sin `JSON.stringify` inline), reserva de animal (`en_adopcion`) al asignar candidatura y `adoptado` al firmar contrato (con liberación al anular/eliminar), limpieza de huérfanos al borrar animal/familia, blacklist sincronizada con la API (antes solo local), log de actividad en acciones clave, firma/foto con downscale, export/gráfico que excluyen descartadas y logout que limpia localStorage.
+3. **Verificación de emails:** al activar `REQUIRE_EMAIL_VERIFIED` los usuarios dados de alta a mano en Firebase con email sin verificar quedarán bloqueados hasta verificar (o se desactiva el flag en `.env` + redeploy). Revisar `Auth.gs`.
+4. **Dar permisos a la API** sobre las 3 spreadsheets (`Candidaturas`, `Acogidas`, `Contratos`) y (opcional) crear cabeceras manuales (columnas listadas abajo) para legibilidad.
+5. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
+6. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
 
 ## Hojas persistentes (candidaturas/acogidas/contratos)
 - Columnas `Candidaturas`: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`.
 - Columnas `Acogidas`: `id, animal_id, familia_id, animal, familia, fase, estado, inicio, solicitud_id, notas`.
 - Columnas `Contratos`: `id, adopcion_id, animal, animal_id, fecha, ciudad, estado, creado, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`.
-4. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
-5. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
-6. **Verificación en localhost** del bloque actual antes de desplegar front (navegación, modal procesos, firma de contrato, alta de camada).
 
 ## CORS / POST
 - Apps Script responde siempre HTTP 200 con `error`; `api.js` lanza por `data.error`.
-- CORS descartado: todos los orígenes devuelven 200 con `Access-Control-Allow-Origin: *`; `isOriginAllowed` admite `''`/`null`.
+- CORS: `isOriginAllowed` hace **coincidencia exacta** contra `CONFIG.ALLOWED_ORIGINS` (ya no por substring). Orígenes vacíos/`null` se rechazan salvo `ALLOW_ORIGIN_EMPTY:true`. `http(s)://localhost:*` y `http(s)://127.0.0.1:*` se permiten para desarrollo.
 - POST desde navegador: preflight con `application/json` NO funciona en Apps Script → `api.js` envía `Content-Type: text/plain;charset=utf-8` (petición simple, sin preflight). El backend hace `JSON.parse(e.postData.contents)`.
 - `api.js` incluye un reintento (800 ms) ante fallos de red.
 - SW: branch API con network-first y fallback a caché / `Response.error()` si no hay.
@@ -62,7 +60,7 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Datos locales de respaldo (`gn_candidaturas`, `gn_contratos`, `gn_acogidas`) hasta que el backend tenga hojas/endpoints.
 
 ## Service worker
-- Estado actual: **`gn-encuestas-v21`** (procesos, acogidas activas, camadas/especie, contratos con firma).
+- Estado actual: **`gn-encuestas-v26`** (fixes de seguridad y estados de animal vía frontend).
 - Regla: al tocar `src/js/dashboard.js`, `api.js` u otros assets, **subir CACHE_NAME** en `src/sw.js`.
 
 ## Configuración / despliegue
