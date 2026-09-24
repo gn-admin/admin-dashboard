@@ -1154,19 +1154,37 @@ const Dashboard = {
       esterilizada: existing?.esterilizada || false,
       vacunas: existing?.vacunas || 'Pendientes',
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
-      foto: null
+      foto_drive_id: existing?.foto_drive_id || '',
+      foto_url: existing?.foto_url || '',
+      foto: existing?.foto || ''
     };
     const fotoUrlInput = document.getElementById('an-foto-url');
-    if (fotoUrlInput && fotoUrlInput.value.trim()) data.foto = fotoUrlInput.value.trim();
-    else {
-      const fotoInput = document.getElementById('an-foto');
-      if (fotoInput && fotoInput.files && fotoInput.files[0]) {
-        data.foto = await new Promise(resolve => {
-          const r = new FileReader();
-          r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, 400, 300, 0.78));
-          r.readAsDataURL(fotoInput.files[0]);
-        });
-      } else if (existing?.foto) data.foto = existing.foto;
+    const fotoInput = document.getElementById('an-foto');
+    let fotoBase64 = null;
+    if (fotoInput && fotoInput.files && fotoInput.files[0]) {
+      fotoBase64 = await new Promise(resolve => {
+        const r = new FileReader();
+        r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, 800, 600, 0.78));
+        r.readAsDataURL(fotoInput.files[0]);
+      });
+    } else if (fotoUrlInput && fotoUrlInput.value.trim()) {
+      data.foto_url = fotoUrlInput.value.trim();
+      data.foto = fotoUrlInput.value.trim();
+    } else if (existing?.foto) {
+      data.foto = existing.foto;
+    }
+
+    if (fotoBase64) {
+      try {
+        const up = await API.uploadFotoAnimal(fotoBase64, `animal_${data.nombre.replace(/\s+/g,'_')}_${Date.now()}.jpg`, 'image/jpeg');
+        if (up.data && up.data.fileId) {
+          data.foto_drive_id = up.data.fileId;
+          data.foto_url = up.data.webViewLink || up.data.webContentLink;
+          data.foto = up.data.webViewLink || up.data.webContentLink;
+        }
+      } catch (err) {
+        this.showSnackbar('Foto guardada en Drive falló, se usa URL local: ' + this._errMsg(err), 'warning');
+      }
     }
     try {
       if (isEdit) {

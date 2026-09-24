@@ -87,6 +87,11 @@ const API = {
   async updateBlacklist(id, data) { return this._post('update-blacklist', { id, ...data }); },
   async deleteBlacklist(id) { return this._post('delete-blacklist', { id }); },
 
+  // Foto animal a Drive
+  async uploadFotoAnimal(base64, nombre, mimeType) {
+    return this._post('upload-foto-animal', { foto_base64: base64, nombre, mime_type: mimeType });
+  },
+
   // Actividad
   async getActividad() { return this._get('actividad'); },
   async createActividad(data) { return this._post('actividad', data); },
