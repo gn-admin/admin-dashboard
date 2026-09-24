@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gn-encuestas-v26';
+const CACHE_NAME = 'gn-encuestas-v27';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -45,6 +45,14 @@ self.addEventListener('fetch', event => {
         caches.match(event.request).then(m => m || Response.error())
       )
     );
+    return;
+  }
+
+  // CDN de terceros (Firebase/gstatic): network-first, NUNCA cachear.
+  // Si firebase-app se cacheara pero firebase-auth no, `firebase` existe
+  // pero `firebase.auth` no -> error "firebase.auth is not a function".
+  if (url.hostname.endsWith('gstatic.com') || url.pathname.includes('/firebasejs/')) {
+    event.respondWith(fetch(event.request));
     return;
   }
 

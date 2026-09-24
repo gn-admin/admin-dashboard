@@ -74,7 +74,12 @@ const Auth = {
 
   _loadFirebaseSDK() {
     return new Promise((resolve, reject) => {
-      if (window.firebase) {
+      const sdkReady = () =>
+        window.firebase &&
+        typeof window.firebase.initializeApp === 'function' &&
+        typeof window.firebase.auth === 'function';
+
+      if (sdkReady()) {
         resolve();
         return;
       }
@@ -84,17 +89,44 @@ const Auth = {
         'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'
       ];
 
-      let loaded = 0;
-      scripts.forEach(src => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => {
-          loaded++;
-          if (loaded === scripts.length) resolve();
+      let attempts = 0;
+      const load = () => {
+        window.__fbAuthLoading = true;
+        const nonce = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const tags = [];
+        let done = false;
+        const finish = (ok) => {
+          if (done) return;
+          done = true;
+          window.__fbAuthLoading = false;
+          if (ok && sdkReady()) resolve();
+          else if (attempts < 2) { attempts++; setTimeout(load, 600 + attempts * 400); }
+          else reject(new Error('No se pudo cargar el SDK de Firebase (app/auth)'));
         };
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
+
+        scripts.forEach(src => {
+          const script = document.createElement('script');
+          script.src = src + (src.includes('?') ? '&' : '?') + 'v=' + nonce;
+          script.onload = () => { if (sdkReady()) finish(true); };
+          script.onerror = () => finish(false);
+          tags.push(script);
+          document.head.appendChild(script);
+        });
+
+        // Timeout de seguridad por si un script se queda colgado
+        setTimeout(() => finish(false), 15000);
+      };
+
+      if (window.__fbAuthLoading) {
+        // Ya hay una carga en curso: esperar a que termine
+        const interval = setInterval(() => {
+          if (sdkReady()) { clearInterval(interval); resolve(); }
+          else if (!window.__fbAuthLoading) { clearInterval(interval); load(); }
+        }, 400);
+        return;
+      }
+
+      load();
     });
   }
 };

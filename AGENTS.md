@@ -15,7 +15,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Estados y notas usan clave compuesta `survey_id::id`** (los ids `resp_N` colisionan entre encuestas). `handleSetEstado`/`handleSetNota` deben hacer match por `response_id` Y `survey_id`.
 - **CORS POST**: Apps Script no responde preflights con `application/json`. Enviar siempre `Content-Type: text/plain;charset=utf-8` (véase `src/js/api.js`); el backend hace `JSON.parse(e.postData.contents)`.
 - **Apps Script responde HTTP 200 con campo `error`**: api.js lanza por `data.error`, no por status.
-- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v26`.
+- **Service worker**: al tocar `src/js/dashboard.js`, `api.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v27`.
 - **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
