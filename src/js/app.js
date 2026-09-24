@@ -131,6 +131,25 @@ const App = {
 
     document.getElementById('logout-btn')?.addEventListener('click', () => Auth.logout());
     document.getElementById('mobile-logout-btn')?.addEventListener('click', () => Auth.logout());
+
+    document.getElementById('password-toggle')?.addEventListener('click', () => {
+      const input = document.getElementById('password');
+      const btn = document.getElementById('password-toggle');
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn?.setAttribute('title', show ? 'Ocultar contrasena' : 'Mostrar contrasena');
+      btn?.setAttribute('aria-label', show ? 'Ocultar contrasena' : 'Mostrar contrasena');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.getElementById('confirm-modal')?.style.display === 'flex') { Dashboard.cancelConfirm(false); return; }
+      if (document.getElementById('contrato-modal')?.style.display === 'flex') { Dashboard.closeContratoForm(); return; }
+      if (document.getElementById('profile-modal')?.style.display === 'flex') { Dashboard.closeProfile(); return; }
+      if (document.getElementById('tutorial-modal')?.style.display === 'flex') { Dashboard.closeTutorial(); return; }
+      this.closeMasMenu();
+    });
     document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
     document.getElementById('sidebar-collapse-btn')?.addEventListener('click', () => this.toggleSidebarCollapse());
 

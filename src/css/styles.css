@@ -217,6 +217,29 @@ body {
   padding-left: 42px !important;
 }
 
+.input-with-icon input#password {
+  padding-right: 42px !important;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  display: flex;
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.password-toggle:hover {
+  color: var(--primary);
+  background: var(--gray-50);
+}
+
 .input-with-icon:focus-within .input-icon {
   color: var(--primary);
 }

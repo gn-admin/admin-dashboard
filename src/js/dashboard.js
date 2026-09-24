@@ -309,7 +309,38 @@ const Dashboard = {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   },
 
-  _confirm(msg) { return window.confirm(msg); },
+  _confirm(msg, title) {
+    return new Promise(resolve => {
+      const modal = document.getElementById('confirm-modal');
+      if (!modal) { resolve(window.confirm(msg)); return; }
+      const titleEl = document.getElementById('confirm-title');
+      const msgEl = document.getElementById('confirm-message');
+      const ok = document.getElementById('confirm-ok');
+      const cancel = document.getElementById('confirm-cancel');
+      if (titleEl) titleEl.textContent = title || 'Confirmar';
+      if (msgEl) msgEl.textContent = msg;
+      modal._resolve = resolve;
+      if (ok) ok.onclick = () => this._closeConfirm(true);
+      if (cancel) cancel.onclick = () => this._closeConfirm(false);
+      modal.onclick = (e) => { if (e.target === modal) this._closeConfirm(false); };
+      modal.style.display = 'flex';
+    });
+  },
+
+  _closeConfirm(val) {
+    const modal = document.getElementById('confirm-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    const r = modal._resolve; modal._resolve = null;
+    const ok = document.getElementById('confirm-ok');
+    const cancel = document.getElementById('confirm-cancel');
+    if (ok) ok.onclick = null;
+    if (cancel) cancel.onclick = null;
+    modal.onclick = null;
+    if (r) r(val === true);
+  },
+
+  cancelConfirm(val) { this._closeConfirm(val === true); },
 
   cancelForm(pageId) {
     const page = document.getElementById('page-' + pageId);
@@ -1253,7 +1284,7 @@ const Dashboard = {
   },
 
   async deleteAnimal(id) {
-    if (!this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.')) return;
+    if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
     try { await API.deleteAnimal(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.animal_id === id);
@@ -1385,7 +1416,7 @@ const Dashboard = {
   },
 
   async deleteFamilia(id) {
-    if (!this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.')) return;
+    if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
     try { await API.deleteFamilia(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
@@ -1613,7 +1644,7 @@ const Dashboard = {
   },
 
   async deleteAdopcion(id) {
-    if (!this._confirm('Eliminar esta adopcion permanentemente?')) return;
+    if (!(await this._confirm('Eliminar esta adopcion permanentemente?'))) return;
     const target = this.adopciones.find(a => a.id === id);
     try { await API.deleteAdopcion(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
@@ -1770,7 +1801,7 @@ const Dashboard = {
   },
 
   async anularContrato(adopcionId) {
-    if (!this._confirm('Anular la firma del contrato?')) return;
+    if (!(await this._confirm('Anular la firma del contrato?'))) return;
     const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
     this.contratos = this.contratos.filter(x => x.id !== c.id);
     this.saveLocal();
@@ -1958,7 +1989,7 @@ const Dashboard = {
   },
 
   async deleteSocio(id) {
-    if (!this._confirm('Eliminar este socio permanentemente?')) return;
+    if (!(await this._confirm('Eliminar este socio permanentemente?'))) return;
     try { await API.deleteSocio(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     this.socios = this.socios.filter(s => s.id !== id);
@@ -2029,7 +2060,7 @@ const Dashboard = {
   },
 
   async removeBlacklistItem(id) {
-    if (!this._confirm('Eliminar esta persona de la lista negra?')) return;
+    if (!(await this._confirm('Eliminar esta persona de la lista negra?'))) return;
     const idx = (this.blacklist || []).findIndex(b => String(b.id) === String(id));
     const target = idx >= 0 ? this.blacklist[idx] : this.blacklist[Number(id)];
     if (!target) return;
@@ -2098,7 +2129,7 @@ const Dashboard = {
 
   showSnackbar(msg, type = 'error') {
     const el = document.getElementById('error-message');
-    if (!el) { window.alert(msg); return; }
+    if (!el) { console.error(msg); return; }
     el.textContent = msg;
     el.className = 'toast-error toast-' + type;
     el.classList.remove('active');

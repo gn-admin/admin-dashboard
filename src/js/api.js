@@ -37,7 +37,6 @@ const API = {
   async getSurveys() { return this._get('surveys'); },
   async getResponses(surveyId) { return this._get('responses', { id: surveyId }); },
   async getUserProfile() { return this._get('user-profile'); },
-  async generatePdf(data) { return this._post('generate-pdf', data); },
 
   // Animales (CRUD)
   async getAnimales() { return this._get('animales'); },
