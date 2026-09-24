@@ -418,6 +418,7 @@ const Dashboard = {
       </div>
       ${contentHTML}`;
     this.injectIcons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
   _hideDetail(pageId) {
@@ -1353,7 +1354,7 @@ const Dashboard = {
 
   viewAnimal(id) {
     const a = this._byId(this.animales, id);
-    if(!a) return;
+    if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
     this._showDetail('animales', a.nombre, `
@@ -1501,7 +1502,7 @@ const Dashboard = {
 
   viewFosterFamily(id) {
     const f = this._byId(this.familias, id);
-    if(!f) return;
+    if(!f) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'error'); return; }
     const animalesEnAcogida = this.animales.filter(a => a.acogida_familia === id);
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -1718,7 +1719,7 @@ const Dashboard = {
 
   viewAdopcion(id) {
     const p = this._byId(this.adopciones, id);
-    if(!p) return;
+    if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const currentIdx = fases.indexOf(p.fase);
     const contrato = this._contratoDeAdopcion(p.id);
@@ -2090,8 +2091,8 @@ const Dashboard = {
 
   viewSocio(id) {
     const s = this._byId(this.socios, id);
-    if(!s) return;
-    const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
+    if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioFormById('${s.id}')">${Icons.pencil} Editar</button>
