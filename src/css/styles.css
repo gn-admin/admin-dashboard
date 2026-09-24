@@ -738,6 +738,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
   z-index: 100;
 }
 
@@ -776,6 +777,17 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.pending-sync-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--warning);
+  background: var(--warning-light);
+  border: 1px solid var(--warning);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
 }
 
 .topbar-user-name {

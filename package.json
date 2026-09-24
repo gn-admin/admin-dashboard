@@ -8,6 +8,7 @@
     "predev": "node scripts/gen-config.js",
     "dev": "npx serve src -p 8080 -s",
     "dev:open": "npx serve src -p 8080 -s --open",
+    "test": "node --test tests/*.test.js",
     "lint": "echo 'No hay linter configurado aún'"
   },
   "keywords": ["encuestas", "pwa", "google-forms", "pdf"],

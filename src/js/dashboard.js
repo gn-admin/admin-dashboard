@@ -19,6 +19,12 @@ const Dashboard = {
         this._loadListBestEffort('acogidas', () => API.getAcogidas()),
         this._loadListBestEffort('contratos', () => API.getContratos())
       ]);
+      this._renderPendingBadge();
+      this.flushPendingOps();
+      if (!this._onlineHook) {
+        this._onlineHook = true;
+        window.addEventListener('online', () => { this.flushPendingOps(); });
+      }
     } catch (err) {
       console.error('Error init:', err);
       this.showSnackbar('No se pudieron cargar los datos iniciales', 'error');
@@ -260,7 +266,7 @@ const Dashboard = {
     };
     this.candidaturas.push(cand);
     this.saveLocal();
-    this._apiCreateRow(() => API.createCandidatura(cand));
+    this._apiCreateRow(() => API.createCandidatura(cand), { m: 'createCandidatura', a: [cand] });
     return cand;
   },
 
@@ -336,6 +342,7 @@ const Dashboard = {
       if (cancel) cancel.onclick = () => this._closeConfirm(false);
       modal.onclick = (e) => { if (e.target === modal) this._closeConfirm(false); };
       modal.style.display = 'flex';
+      this._focusModal(modal);
     });
   },
 
@@ -353,6 +360,13 @@ const Dashboard = {
   },
 
   cancelConfirm(val) { this._closeConfirm(val === true); },
+
+  _focusModal(modal) {
+    if (!modal) return;
+    const btn = modal.querySelector('.modal-box button:not([disabled])');
+    if (!btn) return;
+    try { btn.focus({ preventScroll: true }); } catch (err) { try { btn.focus(); } catch (e2) {} }
+  },
 
   cancelForm(pageId) {
     const page = document.getElementById('page-' + pageId);
@@ -862,6 +876,7 @@ const Dashboard = {
     body.innerHTML = html;
     modal.style.display = 'flex';
     this.injectIcons();
+    this._focusModal(modal);
   },
 
   closeInfoModal() {
@@ -878,6 +893,7 @@ const Dashboard = {
     body.innerHTML = html;
     modal.style.display = 'flex';
     this.injectIcons();
+    this._focusModal(modal);
   },
 
   closeFormModal() {
@@ -1009,7 +1025,7 @@ const Dashboard = {
       };
       this.acogidas.push(caso);
       this.saveLocal();
-      this._apiCreateRow(() => API.createAcogida(caso));
+      this._apiCreateRow(() => API.createAcogida(caso), { m: 'createAcogida', a: [caso] });
       a.estado = 'en_acogida';
       a.acogida_familia = familiaId;
       await this._updateLocalYApi('animales', a);
@@ -1041,6 +1057,7 @@ const Dashboard = {
     } catch (err) {
       adopcionId = 'adp_' + Date.now().toString(36);
       this._pushLocal('adopciones', { ...adopcion, id: adopcionId });
+      this._enqueueOp({ m: 'createAdopcion', a: [{ ...adopcion, id: adopcionId }] });
     }
     if (adopcionId) {
       const localRow = this.adopciones.find(x => x.id === adopcionId);
@@ -1053,24 +1070,68 @@ const Dashboard = {
   },
 
   async _updateLocalYApi(col, item) {
-    try {
-      if (col === 'animales') await API.updateAnimal(item.id, item);
-      if (col === 'familias') await API.updateFamilia(item.id, item);
-      if (col === 'candidaturas') await API.updateCandidatura(item.id, item);
-      if (col === 'acogidas') await API.updateAcogida(item.id, item);
-      if (col === 'contratos') await API.updateContrato(item.id, item);
-    } catch (err) { /* local mirrors only */ }
+    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato' };
+    const m = map[col];
+    if (!m) return;
+    try { await API[m](item.id, item); }
+    catch (err) { this._enqueueOp({ m, a: [item.id, item] }); }
   },
 
-  async _apiCreateRow(apiFn) {
-    try { await apiFn(); } catch (err) { console.warn('API create fallback local:', err); }
+  async _apiCreateRow(apiFn, op) {
+    try { await apiFn(); }
+    catch (err) {
+      console.warn('API create fallback local:', err);
+      if (op) this._enqueueOp(op);
+    }
+  },
+
+  // Cola de operaciones pendientes (offline): se reintenta al volver la red.
+  // El backend hace upsert por id, asi reintentar nunca duplica filas.
+  _queueOps() {
+    try { return JSON.parse(localStorage.getItem('gn_pending_ops') || '[]'); } catch { return []; }
+  },
+
+  _enqueueOp(op) {
+    if (!op || !op.m) return;
+    const q = this._queueOps();
+    q.push({ m: op.m, a: op.a || [], ts: Date.now() });
+    try { localStorage.setItem('gn_pending_ops', JSON.stringify(q.slice(-200))); } catch {}
+    this._renderPendingBadge();
+  },
+
+  async flushPendingOps() {
+    const q = this._queueOps();
+    if (!q.length) return 0;
+    const rest = [];
+    let done = 0;
+    for (const op of q) {
+      try {
+        const fn = API[op.m];
+        if (typeof fn !== 'function') continue;
+        await fn.apply(API, op.a || []);
+        done++;
+      } catch (err) { rest.push(op); }
+    }
+    try { localStorage.setItem('gn_pending_ops', JSON.stringify(rest)); } catch {}
+    this._renderPendingBadge();
+    if (done) this.showSnackbar('Sincronizadas ' + done + ' operaciones pendientes', 'success');
+    return done;
+  },
+
+  _renderPendingBadge() {
+    let n = 0;
+    try { n = this._queueOps().length; } catch {}
+    document.querySelectorAll('.pending-sync-badge').forEach(el => {
+      el.style.display = n ? '' : 'none';
+      el.textContent = n ? n + ' pendientes' : '';
+    });
   },
 
   _regLog(tipo, detalle) {
     const row = { id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), fecha: new Date().toISOString(), usuario: Auth.currentUser?.email || 'admin', tipo: tipo, detalle: detalle };
     (this.actividad || []).unshift(row);
     this.saveLocal();
-    this._apiCreateRow(() => API.createActividad(row));
+    this._apiCreateRow(() => API.createActividad(row), { m: 'createActividad', a: [row] });
   },
 
   _pushLocal(col, row) {
@@ -1394,7 +1455,7 @@ const Dashboard = {
     const casos = this.acogidas.filter(x => x.animal_id === id);
     if (casos.length) {
       this.acogidas = this.acogidas.filter(x => x.animal_id !== id);
-      casos.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id));
+      casos.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
         if (c.familia_id) {
           const fam = this.familias.find(f => f.id === c.familia_id);
           if (fam) {
@@ -1406,9 +1467,9 @@ const Dashboard = {
       });
     }
     const cands = this.candidaturas.filter(x => x.animal_id === id);
-    if (cands.length) { this.candidaturas = this.candidaturas.filter(x => x.animal_id !== id); cands.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteCandidatura(c.id)); }); }
+    if (cands.length) { this.candidaturas = this.candidaturas.filter(x => x.animal_id !== id); cands.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteCandidatura(c.id), { m: 'deleteCandidatura', a: [c.id] }); }); }
     const adps = this.adopciones.filter(x => x.animal_id === id);
-    if (adps.length) { this.adopciones = this.adopciones.filter(x => x.animal_id !== id); adps.forEach(p => { if (p.id) this._apiCreateRow(() => API.deleteAdopcion(p.id)); }); }
+    if (adps.length) { this.adopciones = this.adopciones.filter(x => x.animal_id !== id); adps.forEach(p => { if (p.id) this._apiCreateRow(() => API.deleteAdopcion(p.id), { m: 'deleteAdopcion', a: [p.id] }); }); }
     this.animales = this.animales.filter(a => a.id !== id);
     this.saveLocal();
     this._hideDetail('animales');
@@ -1531,7 +1592,7 @@ const Dashboard = {
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
     if (casos.length) {
       casos.forEach(c => {
-        if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id));
+        if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
         const a = this.animales.find(x => x.id === c.animal_id);
         if (a && a.estado === 'en_acogida' && a.acogida_familia === id) {
           a.estado = 'disponible';
@@ -1922,7 +1983,7 @@ const Dashboard = {
     if (a) { c.especie = a.especie; c.raza = a.raza; c.edad = a.edad; }
     this.contratos.push(c);
     this.saveLocal();
-    this._apiCreateRow(() => API.createContrato(c));
+    this._apiCreateRow(() => API.createContrato(c), { m: 'createContrato', a: [c] });
     if (p) {
       p.estado = 'Contrato firmado';
       p.estado_firma = 'firmado';

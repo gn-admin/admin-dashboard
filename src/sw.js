@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v40';
+﻿const CACHE_NAME = 'gn-encuestas-v41';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,10 @@ const STATIC_ASSETS = [
   './js/carnet-generator.js',
   './js/pdf-export.js',
   './js/app.js',
-  './manifest.webmanifest'
+  './manifest.webmanifest',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
+  './assets/icons/logo-nebak.jpg'
 ];
 
 // Install: cache assets estÃ¡ticos

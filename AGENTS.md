@@ -9,6 +9,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - `npm run dev` — genera config (`.env` → `src/js/config.js` y `apps-script/Config.gs`) y sirve en `http://localhost:8080`.
 - `npm run build` — regenera la config manualmente (`node scripts/gen-config.js`).
 - `node scripts/gen-config.js` — script de generación: no editar `src/js/config.js` ni `apps-script/Config.gs` a mano, se regeneran.
+- `npm test` (`node --test tests/*.test.js`) — unitarios de lógica pura del front, sin dependencias.
 
 ## Reglas importantes
 - **Nunca subir datos sensibles**: `.env` (valores reales), `src/js/config.js` y `apps-script/Config.gs` (generados) están en `.gitignore`. Para GitHub Pages, las variables se añaden como Repository secrets y el workflow `.github/workflows/deploy.yml` las inyecta (`secrets.X || vars.X`). **El repo es PÚBLICO**: usar siempre Secrets (encriptados), nunca Variables planas.
@@ -19,6 +20,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
+- **Sync offline**: escrituras que fallan se encolan (`gn_pending_ops`) y se reintentan al volver la red (`flushPendingOps` en init + evento `online`, badge `.pending-sync-badge`); el backend hace **upsert por `id` en `appendToSheet`** para no duplicar. `RATE_LIMIT` se aplica (fail-open, ventana 60s por token).
 - **Borrado de adopción con rollback**: `delete-adopcion` usa `deleteAdopcionCascade` (backend) + espejo en `Dashboard.deleteAdopcion` (front): animal→`disponible` (solo si lo reservó ese caso), solicitud `aprobada`→`en_proceso` (vía `solicitud_id`=`survey::resp`), candidatura→`en_lista` sin animal. El caso enlaza su cuestionario con `Dashboard.viewCuestionarioModal` (modal `info-modal`, solo lectura + PDF/salto a Encuestas).
 
 ## Arquitectura
