@@ -1812,14 +1812,14 @@ const Dashboard = {
           <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" placeholder="12345678A"></div></div>
           <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f1-email" value="${this._esc(p.email || '')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="f1-telefono" value="${this._esc(p.telefono || '')}"></div></div>
           <div class="form-row"><div class="form-group"><label>Rol</label><select id="f1-rol">${roles1.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div><div class="form-group"></div></div>
-          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 1</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:#fff;touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
+          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 1</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
         </div>
 
         <div class="detail-section"><div class="detail-section-title">Firmante 2 · Segundo firmante (opcional)</div>
           <div class="form-row"><div class="form-group"><label>Nombre completo</label><input type="text" id="f2-nombre" placeholder="Menor con tutor o persona que respalda"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
           <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
           <div class="form-row"><div class="form-group"><label>Rol</label><select id="f2-rol">${roles2.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div><div class="form-group"></div></div>
-          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 2</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:#fff;touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div>
+          <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 2</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div>
         </div>
 
         <div class="form-actions" style="padding-top:12px"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeContratoForm()">Cancelar</button><button type="submit" class="btn btn-primary">Firmar y guardar</button></div>
@@ -1978,7 +1978,7 @@ const Dashboard = {
       <div class="form-group"><label>Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'so-foto-preview')"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Area *</label><select id="so-area" required><option value="">Seleccionar area...</option><option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Cuidado de acogida" ${data?.area==='Cuidado de acogida'?'selected':''}>Cuidado de acogida</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option></select></div></div>
-      ${data?.carnet_id ? `<div class="form-group"><label>ID Carnet</label><input type="text" value="${this._esc(data.carnet_id)}" readonly style="background:#f5f5f5;font-family:monospace"></div>` : ''}
+      ${data?.carnet_id ? `<div class="form-group"><label>ID Carnet</label><input type="text" value="${this._esc(data.carnet_id)}" readonly style="background:var(--gray-100);font-family:monospace"></div>` : ''}
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('socios')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
   },
@@ -2081,7 +2081,7 @@ const Dashboard = {
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioFormById('${s.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteSocio('${s.id}')">${Icons.trash} Eliminar</button>
         <button class="btn btn-sm ${s.activo?'btn-outline-green':'btn-primary'}" onclick="Dashboard.toggleSocio('${s.id}')">${s.activo?'Desactivar':'Activar'}</button>
-        <button class="btn btn-sm" style="background:#191919;color:#fff" onclick="Dashboard.showCarnet('${s.id}')">${Icons.download} Ver Carnet</button>
+        <button class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" onclick="Dashboard.showCarnet('${s.id}')">${Icons.download} Ver Carnet</button>
       </div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
         <div>${fotoHtml}</div>

@@ -334,6 +334,28 @@ body {
   background: var(--danger-hover);
 }
 
+/* Feedback tactil al pulsar */
+.btn:active:not(:disabled),
+.btn-icon:active,
+.bottom-nav-item:active,
+.quick-action-btn:active,
+.hub-card:active {
+  transform: scale(0.97);
+}
+
+/* Foco visible por teclado */
+.btn:focus-visible,
+.btn-icon:focus-visible,
+.sidebar-link:focus-visible,
+.bottom-nav-item:focus-visible,
+.mas-menu-item:focus-visible,
+.tutorial-tab:focus-visible,
+.password-toggle:focus-visible,
+.guide-index-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .btn-google {
   background: var(--white);
   color: var(--gray-700);
@@ -1353,6 +1375,7 @@ body {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  flex-wrap: wrap;
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--gray-100);
@@ -1425,7 +1448,7 @@ body {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  background: #191919;
+  background: var(--black);
   color: var(--white);
   padding: 12px 20px;
   border-radius: 10px;
@@ -1619,6 +1642,11 @@ body {
 }
 
 /* ===== MODAL ===== */
+@keyframes modalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1628,6 +1656,7 @@ body {
   align-items: flex-end;
   justify-content: center;
   padding: 0;
+  animation: modalFade 0.2s ease-out;
 }
 
 .modal-box {
@@ -1715,7 +1744,7 @@ body {
 
 .tutorial-tab.active {
   background: var(--primary);
-  color: #fff;
+  color: var(--white);
 }
 
 .tutorial-panel {
@@ -2411,10 +2440,6 @@ body {
     transform: translateX(0) !important;
   }
 
-  .sidebar-overlay {
-    display: none !important;
-  }
-
   .bottom-nav {
     display: flex !important;
   }
@@ -2577,6 +2602,17 @@ body {
   .detail-actions {
     flex-wrap: wrap;
     width: 100%;
+  }
+}
+
+/* ===== TOAST POR ENCIMA DEL BOTTOM-NAV EN MOVIL ===== */
+@media (max-width: 767px) {
+  .toast-error {
+    bottom: calc(var(--bottomnav-height) + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+
+  .modal-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -2770,6 +2806,18 @@ body {
   }
 }
 
+/* ===== MOVIMIENTO REDUCIDO (accesibilidad) ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ===== PRINT ===== */
 @media print {
   .sidebar,
@@ -2778,6 +2826,7 @@ body {
   .sidebar-overlay,
   .mas-menu-overlay,
   .mas-menu-popup,
+  .modal-overlay,
   .loading-overlay {
     display: none !important;
   }
