@@ -1165,6 +1165,33 @@ const Dashboard = {
     if (row) PdfExport.exportSingleResponse(row, survey);
   },
 
+  // Formatea fechas de Forms/Sheets (ISO, Date o "D/M/YYYY [hh:mm]").
+  // Conservador: lo que no es fecha inequivoca se devuelve tal cual
+  // (un "2024" suelto o un microchip no se tocan). Vacio -> "—".
+  _fmtFecha(v) {
+    if (v === undefined || v === null || v === '') return '—';
+    if (v instanceof Date) return isNaN(v.getTime()) ? '—' : this._fechaCorta(v, v.getHours() || v.getMinutes() ? true : false);
+    const s = String(v).trim();
+    if (!s) return '—';
+    let d = null, conHora = false;
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) {
+      d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+      conHora = !!m[4];
+    } else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/))) {
+      d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+      conHora = !!m[4];
+    }
+    if (!d || isNaN(d.getTime())) return s;
+    return this._fechaCorta(d, conHora);
+  },
+
+  _fechaCorta(d, conHora) {
+    const f = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (!conHora) return f;
+    return f + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  },
+
   _buildSections(row, sid) {
     const f = (l, v) => (v !== undefined && v !== null && v !== '') ? { label: l, value: v } : null;
     const s = [];
@@ -1176,7 +1203,7 @@ const Dashboard = {
       f('Domicilio', row.domicilio),
       f('Ciudad', row.ciudad),
       f('Codigo postal', row.codigo_postal),
-      f('Fecha de nacimiento', row.fecha_nacimiento)
+      f('Fecha de nacimiento', row.fecha_nacimiento ? this._fmtFecha(row.fecha_nacimiento) : null)
     ].filter(Boolean);
     if (personal.length) s.push({ title: 'Datos personales', fields: personal });
 
@@ -1195,7 +1222,7 @@ const Dashboard = {
       if (excl.has(k)) return;
       const val = row[k];
       if (val === undefined || val === null || val === '') return;
-      questions.push(f(k, String(val).replace(/^(-?\d+)\.0+$/, '$1')));
+      questions.push(f(k, this._fmtFecha(String(val).replace(/^(-?\d+)\.0+$/, '$1'))));
     });
     if (questions.length) s.push({ title: 'Cuestionario', fields: questions });
     return s;

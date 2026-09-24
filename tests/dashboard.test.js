@@ -122,3 +122,40 @@ describe('estados y etiquetas', () => {
     Dashboard.states = {};
   });
 });
+
+describe('_fmtFecha: fechas legibles, resto intacto', () => {
+  it('ISO con hora -> fecha + hora', () => {
+    const r = Dashboard._fmtFecha('2026-09-24T10:30:00.000Z');
+    assert.match(r, /2026/);
+    assert.match(r, /24/);
+  });
+
+  it('ISO solo fecha -> sin hora', () => {
+    const r = Dashboard._fmtFecha('2026-09-24');
+    assert.match(r, /2026/);
+    assert.doesNotMatch(r, /:/);
+  });
+
+  it('timestamp es-ES de Forms -> legible', () => {
+    const r = Dashboard._fmtFecha('24/09/2026 10:30:00');
+    assert.match(r, /2026/);
+    assert.match(r, /10:30/);
+  });
+
+  it('objeto Date -> legible', () => {
+    const r = Dashboard._fmtFecha(new Date(2026, 8, 24, 10, 30));
+    assert.match(r, /2026/);
+  });
+
+  it('vacio -> raya', () => {
+    assert.equal(Dashboard._fmtFecha(''), '—');
+    assert.equal(Dashboard._fmtFecha(null), '—');
+    assert.equal(Dashboard._fmtFecha(undefined), '—');
+  });
+
+  it('no-fechas intactas (anio suelto, microchip, texto)', () => {
+    assert.equal(Dashboard._fmtFecha('2024'), '2024');
+    assert.equal(Dashboard._fmtFecha('123456789012345'), '123456789012345');
+    assert.equal(Dashboard._fmtFecha('Mestizo'), 'Mestizo');
+  });
+});
