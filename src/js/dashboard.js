@@ -868,6 +868,22 @@ const Dashboard = {
     if (modal) modal.style.display = 'none';
   },
 
+  showFormModal(title, html) {
+    const modal = document.getElementById('form-modal');
+    const titleEl = document.getElementById('form-title');
+    const body = document.getElementById('form-body');
+    if (!modal || !body) return;
+    if (titleEl) titleEl.textContent = title || 'Formulario';
+    body.innerHTML = html;
+    modal.style.display = 'flex';
+    this.injectIcons();
+  },
+
+  closeFormModal() {
+    const modal = document.getElementById('form-modal');
+    if (modal) modal.style.display = 'none';
+  },
+
   async viewCuestionarioModal(surveyId, responseId) {
     this.showLoading();
     try {
@@ -1189,7 +1205,7 @@ const Dashboard = {
     const especieOpts = especies.map(s=>`<option value="${s}" ${data?.especie===s?'selected':''}>${s}</option>`).join('') + (custom ? `<option value="${this._esc(custom)}" selected>${this._esc(custom)}</option>` : '') + (custom ? '' : `<option value="__otro__">Otro...</option>`);
     const grupos = [...new Set(this.animales.map(a => a.grupo || a.grupo_id).filter(Boolean))];
     const grupoVal = data?.grupo || data?.grupo_id || '';
-    this._renderForm('animales', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Animal</h3><form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
+    this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
@@ -1197,8 +1213,8 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
-      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
-    </form></div>`);
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+    </form>`);
   },
 
   showAnimalFormById(id) {
@@ -1214,13 +1230,13 @@ const Dashboard = {
   },
 
   showCamadaForm() {
-    this._renderForm('animales', `<div class="form-card" style="margin-bottom:16px"><h3>Alta de camada</h3><form onsubmit="Dashboard.saveCamada(event)">
+    this.showFormModal('Alta de camada', `<form onsubmit="Dashboard.saveCamada(event)">
       <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
       <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required><option value="Perro">Perro</option><option value="Gato">Gato</option></select></div></div>
       <div class="form-row"><div class="form-group"><label>Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label>Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
       <div class="form-row"><div class="form-group"><label>Sexo *</label><select id="cm-sexo"><option value="Macho">Macho</option><option value="Hembra">Hembra</option></select></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="cm-obl" checked> Grupo obligatorio</label></div></div>
-      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Crear camada</button></div>
-    </form></div>`);
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Crear camada</button></div>
+    </form>`);
   },
 
   async saveCamada(e) {
@@ -1249,7 +1265,7 @@ const Dashboard = {
         }
       }
     } finally { this.hideLoading(); }
-    this.cancelForm('animales');
+    this.closeFormModal();
     this.renderAnimales(document.getElementById('page-animales'));
     this.showSnackbar('Camada ' + grupo + ' creada (' + cantidad + ' animales)', 'success');
   },
@@ -1329,7 +1345,7 @@ const Dashboard = {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
       return;
     }
-    this.cancelForm('animales');
+    this.closeFormModal();
     if (isEdit) this.viewAnimal(id);
     else this.renderAnimales(document.getElementById('page-animales'));
     this.showSnackbar(isEdit ? 'Animal actualizado' : 'Animal creado', 'success');
