@@ -101,10 +101,11 @@ const Dashboard = {
   },
 
   loadLocal() {
-    try { this.blacklist = JSON.parse(localStorage.getItem('gn_blacklist') || '[]'); } catch { this.blacklist = []; }
-    try { this.candidaturas = JSON.parse(localStorage.getItem('gn_candidaturas') || '[]'); } catch { this.candidaturas = []; }
-    try { this.contratos = JSON.parse(localStorage.getItem('gn_contratos') || '[]'); } catch { this.contratos = []; }
-    try { this.acogidas = JSON.parse(localStorage.getItem('gn_acogidas') || '[]'); } catch { this.acogidas = []; }
+    const norm = (arr) => (arr || []).map(x => (x && x.id !== undefined && x.id !== null) ? { ...x, id: String(x.id) } : x);
+    try { this.blacklist = norm(JSON.parse(localStorage.getItem('gn_blacklist') || '[]')); } catch { this.blacklist = []; }
+    try { this.candidaturas = norm(JSON.parse(localStorage.getItem('gn_candidaturas') || '[]')); } catch { this.candidaturas = []; }
+    try { this.contratos = norm(JSON.parse(localStorage.getItem('gn_contratos') || '[]')); } catch { this.contratos = []; }
+    try { this.acogidas = norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')); } catch { this.acogidas = []; }
   },
 
   saveLocal() {
@@ -112,6 +113,15 @@ const Dashboard = {
     localStorage.setItem('gn_candidaturas', JSON.stringify(this.candidaturas || []));
     localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || []));
     localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
+  },
+
+  // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
+  // DOM siempre strings). Las filas SIN id nunca coinciden: asi un registro
+  // fantasma no abre un form vacio haciendose pasar por edicion.
+  _byId(list, id) {
+    if (id === undefined || id === null || id === '') return null;
+    const want = String(id);
+    return (list || []).find(x => x && x.id !== undefined && x.id !== null && x.id !== '' && String(x.id) === want) || null;
   },
 
   async loadEstados(force) {
@@ -168,10 +178,12 @@ const Dashboard = {
     if (this._loading[key]) return this._loading[key];
     this._loading[key] = (async () => {
       const res = await apiFn();
-      const remote = res.data || [];
+      const remote = (res.data || []).map(r => (r && r.id !== undefined && r.id !== null) ? { ...r, id: String(r.id) } : r);
       const ids = new Set(remote.map(r => r.id));
       const localOnly = (this[key] || []).filter(l => l && l.id && !ids.has(l.id));
       this[key] = remote.concat(localOnly);
+      const sinId = (this[key] || []).filter(r => !r || r.id === undefined || r.id === null || r.id === '');
+      if (sinId.length) console.warn('Registros sin id en ' + key + ': ' + sinId.length + ' (no se pueden editar; revisa la cabecera id en la hoja)');
       this._loaded[key] = true;
       return this[key];
     })();
@@ -1189,7 +1201,12 @@ const Dashboard = {
     </form></div>`);
   },
 
-  showAnimalFormById(id) { this.showAnimalForm(id ? this.animales.find(x => x.id === id) : null); },
+  showAnimalFormById(id) {
+    if (!id) { this.showAnimalForm(null); return; }
+    const data = this._byId(this.animales, id);
+    if (!data) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    this.showAnimalForm(data);
+  },
 
   _toggleEspecieOtra(val) {
     const el = document.getElementById('an-especie-otra');
@@ -1246,7 +1263,7 @@ const Dashboard = {
 
   async saveAnimal(e, isEdit, id) {
     e.preventDefault();
-    const existing = isEdit ? this.animales.find(a => a.id === id) : null;
+    const existing = isEdit ? this._byId(this.animales, id) : null;
     let especie = document.getElementById('an-especie').value;
     if (especie === '__otro__') especie = document.getElementById('an-especie-otra').value.trim() || especie;
     const gv = document.getElementById('an-grupo').value.trim();
@@ -1303,7 +1320,7 @@ const Dashboard = {
     try {
       if (isEdit) {
         await API.updateAnimal(id, data);
-        const item = this.animales.find(a => a.id === id); if (item) Object.assign(item, data);
+        const item = this._byId(this.animales, id); if (item) Object.assign(item, data);
       } else {
         const res = await API.createAnimal(data);
         if (res.data) this.animales.push(res.data);
@@ -1319,7 +1336,7 @@ const Dashboard = {
   },
 
   viewAnimal(id) {
-    const a = this.animales.find(x=>x.id===id);
+    const a = this._byId(this.animales, id);
     if(!a) return;
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
@@ -1427,11 +1444,16 @@ const Dashboard = {
     </form></div>`);
   },
 
-  showFamiliaFormById(id) { this.showFamiliaForm(id ? this.familias.find(x => x.id === id) : null); },
+  showFamiliaFormById(id) {
+    if (!id) { this.showFamiliaForm(null); return; }
+    const data = this._byId(this.familias, id);
+    if (!data) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'error'); return; }
+    this.showFamiliaForm(data);
+  },
 
   async saveFamilia(e, isEdit, id) {
     e.preventDefault();
-    const existing = isEdit ? this.familias.find(f => f.id === id) : null;
+    const existing = isEdit ? this._byId(this.familias, id) : null;
     const data = {
       nombre: document.getElementById('fa-nombre').value.trim(),
       email: document.getElementById('fa-email').value.trim(),
@@ -1462,7 +1484,7 @@ const Dashboard = {
   },
 
   viewFosterFamily(id) {
-    const f = this.familias.find(x=>x.id===id);
+    const f = this._byId(this.familias, id);
     if(!f) return;
     const animalesEnAcogida = this.animales.filter(a => a.acogida_familia === id);
     this._showDetail('acogidas', f.nombre, `
@@ -1553,7 +1575,7 @@ const Dashboard = {
   },
 
   async avanzarFaseAcogida(id) {
-    const c = (this.acogidas || []).find(x => x.id === id);
+    const c = this._byId(this.acogidas, id);
     if (!c) return;
     const order = { entrega: 'en_casa', en_casa: 'finalizada' };
     c.fase = order[c.fase] || c.fase;
@@ -1629,7 +1651,12 @@ const Dashboard = {
     </form></div>`);
   },
 
-  showAdopcionFormById(id) { this.showAdopcionForm(id ? this.adopciones.find(x => x.id === id) : null); },
+  showAdopcionFormById(id) {
+    if (!id) { this.showAdopcionForm(null); return; }
+    const data = this._byId(this.adopciones, id);
+    if (!data) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    this.showAdopcionForm(data);
+  },
 
   async saveAdopcion(e, isEdit, id) {
     e.preventDefault();
@@ -1645,7 +1672,7 @@ const Dashboard = {
     try {
       if (isEdit) {
         await API.updateAdopcion(id, data);
-        const item = this.adopciones.find(a => a.id === id); if (item) Object.assign(item, data);
+        const item = this._byId(this.adopciones, id); if (item) Object.assign(item, data);
       } else {
         const res = await API.createAdopcion(data);
         if (res.data) this.adopciones.push(res.data);
@@ -1674,7 +1701,7 @@ const Dashboard = {
   },
 
   viewAdopcion(id) {
-    const p = this.adopciones.find(x=>x.id===id);
+    const p = this._byId(this.adopciones, id);
     if(!p) return;
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const currentIdx = fases.indexOf(p.fase);
@@ -1715,7 +1742,7 @@ const Dashboard = {
   },
 
   async avanzarFase(id) {
-    const p = this.adopciones.find(a => a.id === id);
+    const p = this._byId(this.adopciones, id);
     if (!p) return;
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const idx = fases.indexOf(p.fase);
@@ -1730,7 +1757,7 @@ const Dashboard = {
 
   async deleteAdopcion(id) {
     if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
-    const target = this.adopciones.find(a => a.id === id);
+    const target = this._byId(this.adopciones, id);
     try { await API.deleteAdopcion(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const c = this._contratoDeAdopcion(id);
@@ -1956,7 +1983,12 @@ const Dashboard = {
     </form></div>`);
   },
 
-  showSocioFormById(id) { this.showSocioForm(id ? this.socios.find(x => x.id === id) : null); },
+  showSocioFormById(id) {
+    if (!id) { this.showSocioForm(null); return; }
+    const data = this._byId(this.socios, id);
+    if (!data) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    this.showSocioForm(data);
+  },
 
   _previewFoto(input, previewId) {
     const preview = document.getElementById(previewId);
@@ -2004,7 +2036,7 @@ const Dashboard = {
       });
       data.foto = await this._downscaleImage(raw, 128, 128);
     } else if (isEdit) {
-      const existing = this.socios.find(s => s.id === id);
+      const existing = this._byId(this.socios, id);
       data.foto = existing?.foto || null;
     }
     // Carnet ID
@@ -2015,7 +2047,7 @@ const Dashboard = {
       data.horas_mes = 0;
       data.ultima_actividad = new Date().toISOString().slice(0,10);
     } else {
-      const existing = this.socios.find(s => s.id === id);
+      const existing = this._byId(this.socios, id);
       data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.area);
       data.activo = existing?.activo ?? true;
       data.fecha_registro = existing?.fecha_registro || new Date().toISOString().slice(0,10);
@@ -2025,7 +2057,7 @@ const Dashboard = {
     try {
       if (isEdit) {
         await API.updateSocio(id, data);
-        const item = this.socios.find(s => s.id === id); if (item) Object.assign(item, data);
+        const item = this._byId(this.socios, id); if (item) Object.assign(item, data);
       } else {
         const res = await API.createSocio(data);
         if (res.data) this.socios.push(res.data);
@@ -2041,7 +2073,7 @@ const Dashboard = {
   },
 
   viewSocio(id) {
-    const s = this.socios.find(x=>x.id===id);
+    const s = this._byId(this.socios, id);
     if(!s) return;
     const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
     this._showDetail('socios', s.nombre, `
@@ -2072,13 +2104,13 @@ const Dashboard = {
   },
 
   showCarnet(id) {
-    const s = this.socios.find(x => x.id === id);
+    const s = this._byId(this.socios, id);
     if (!s) return;
     CarnetGenerator.showCarnetModal(s);
   },
 
   async toggleSocio(id) {
-    const s = this.socios.find(x => x.id === id);
+    const s = this._byId(this.socios, id);
     if (!s) return;
     const newActivo = !s.activo;
     try { await API.updateSocio(id, { activo: newActivo }); }
