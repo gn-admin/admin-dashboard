@@ -159,3 +159,58 @@ describe('_fmtFecha: fechas legibles, resto intacto', () => {
     assert.equal(Dashboard._fmtFecha('Mestizo'), 'Mestizo');
   });
 });
+
+describe('_atencionItems: pendientes mas antiguos primero', () => {
+  it('filtra descartadas/aprobadas y ordena por fecha', () => {
+    Dashboard.surveys = [{ id: 's1', name: 'S1' }];
+    Dashboard.responses = {
+      s1: [
+        { id: 'nueva', fecha_creacion: '2026-09-20' },
+        { id: 'vieja', fecha_creacion: '2026-09-01' },
+        { id: 'aprob', fecha_creacion: '2026-08-01' },
+        { id: 'desc', fecha_creacion: '2026-07-01' }
+      ]
+    };
+    Dashboard.states = {
+      's1::nueva': 'pendiente',
+      's1::vieja': 'en_proceso',
+      's1::aprob': 'aprobada',
+      's1::desc': 'descartada'
+    };
+    const items = Dashboard._atencionItems(10);
+    assert.deepEqual(items.map(r => r.id), ['vieja', 'nueva']);
+    assert.equal(items[0]._estado, 'en_proceso');
+    Dashboard.surveys = [];
+    Dashboard.responses = {};
+    Dashboard.states = {};
+  });
+
+  it('respeta el limite', () => {
+    Dashboard.surveys = [{ id: 's1', name: 'S1' }];
+    Dashboard.responses = {
+      s1: [
+        { id: 'a', fecha_creacion: '2026-09-01' },
+        { id: 'b', fecha_creacion: '2026-09-02' }
+      ]
+    };
+    Dashboard.states = {};
+    assert.equal(Dashboard._atencionItems(1).length, 1);
+    Dashboard.surveys = [];
+    Dashboard.responses = {};
+    Dashboard.states = {};
+  });
+});
+
+describe('_diasEspera', () => {
+  it('vacio o invalido -> raya', () => {
+    assert.equal(Dashboard._diasEspera(''), '—');
+    assert.equal(Dashboard._diasEspera(null), '—');
+    assert.equal(Dashboard._diasEspera('no-fecha'), '—');
+  });
+
+  it('fecha reciente -> hoy o dias', () => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    assert.equal(Dashboard._diasEspera(hoy), 'hoy');
+    assert.match(Dashboard._diasEspera('2020-01-01'), /días/);
+  });
+});

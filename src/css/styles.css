@@ -338,7 +338,6 @@ body {
 .btn:active:not(:disabled),
 .btn-icon:active,
 .bottom-nav-item:active,
-.quick-action-btn:active,
 .hub-card:active {
   transform: scale(0.97);
 }
@@ -2298,53 +2297,7 @@ body {
 }
 
 .progress-bar-fill.orange {
-  background: #f57c00;
-}
-
-/* ===== QUICK ACTIONS ===== */
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.quick-action-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px 8px;
-  background: var(--white);
-  border: 1.5px solid var(--gray-200);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  color: var(--gray-700);
-}
-
-.quick-action-btn:hover {
-  border-color: var(--primary);
-  background: var(--primary-lighter);
-  color: var(--primary-dark);
-}
-
-.quick-action-btn .action-icon,
-.quick-action-btn > svg {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-}
-
-.quick-action-btn .action-label,
-.quick-action-btn > span {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-align: center;
+  background: var(--warning);
 }
 
 /* ===== HUB ENCUESTAS ===== */

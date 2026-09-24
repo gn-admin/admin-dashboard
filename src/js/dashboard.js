@@ -480,14 +480,7 @@ const Dashboard = {
       </div>
       <div class="dashboard-grid" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:24px;">
         <div class="card"><div class="card-header"><h3>Actividad Reciente</h3></div><div class="timeline">${this._buildTimeline()}</div></div>
-        <div class="card"><div class="card-header"><h3>Acciones Rapidas</h3></div><div class="quick-actions">
-          <a class="quick-action-btn" href="#encuestas-perros">${Icons.dog}<span>Perros</span></a>
-          <a class="quick-action-btn" href="#encuestas-gatos">${Icons.cat}<span>Gatos</span></a>
-          <a class="quick-action-btn" href="#animales">${Icons.heart}<span>Animales</span></a>
-          <a class="quick-action-btn" href="#acogidas">${Icons.home}<span>Acogidas</span></a>
-          <a class="quick-action-btn" href="#adopciones">${Icons.calendar}<span>Adopciones</span></a>
-          <a class="quick-action-btn" href="#blacklist">${Icons.ban}<span>Lista Negra</span></a>
-        </div></div>
+        <div class="card"><div class="card-header"><h3>Requieren atención</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th>Espera</th></tr></thead><tbody>${this._atencionRows()}</tbody></table></div></div>
       </div>
       <div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Solicitudes Recientes</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${this._recentRows()}</tbody></table></div></div>
       <div class="card"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">
@@ -556,6 +549,32 @@ const Dashboard = {
     this.surveys.forEach(s => (this.responses[s.id]||[]).forEach(r => all.push({...r,_survey:s.name,_surveyId:s.id})));
     all.sort((a,b)=>(b.fecha_creacion||'').localeCompare(a.fecha_creacion||''));
     return all.slice(0,5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}):'';const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" onclick="location.hash='${page}'"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
+  },
+
+  // Pendientes/en_proceso mas antiguos (descartadas y resto fuera).
+  _atencionItems(max) {
+    const all = [];
+    (this.surveys || []).forEach(s => (this.responses[s.id] || []).forEach(r => {
+      const e = this.getEstado(r.id, s.id);
+      if (e !== 'pendiente' && e !== 'en_proceso') return;
+      all.push({ ...r, _survey: s.name, _surveyId: s.id, _estado: e });
+    }));
+    all.sort((a, b) => (a.fecha_creacion || '').localeCompare(b.fecha_creacion || ''));
+    return all.slice(0, max || 5);
+  },
+
+  _diasEspera(fecha) {
+    if (!fecha) return '—';
+    const t = new Date(String(fecha).replace(' ', 'T')).getTime();
+    if (isNaN(t)) return '—';
+    const d = Math.floor((Date.now() - t) / 86400000);
+    return d <= 0 ? 'hoy' : (d === 1 ? '1 día' : d + ' días');
+  },
+
+  _atencionRows() {
+    const items = this._atencionItems(5);
+    if (!items.length) return `<tr><td colspan="3" style="text-align:center;color:var(--gray-400);padding:16px">Todo al día, sin pendientes</td></tr>`;
+    return items.map(r => `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${r._surveyId}','${r.id}')"><td>${this._esc(r.nombre || '')} ${this._esc(r.apellidos || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(r._survey)}</div></td><td><span class="estado-badge ${this._estadoCls(r._estado)}">${this._estadoLabel(r._estado)}</span></td><td>${this._diasEspera(r.fecha_creacion)}</td></tr>`).join('');
   },
 
   // ==================== ENCUESTAS ====================
