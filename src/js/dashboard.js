@@ -1041,7 +1041,7 @@ const Dashboard = {
         <div id="animales-form-container"></div>
         <div class="animal-grid">${filtered.length ? filtered.map(a=>`
           <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
-            <div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:Icons.cat}</div>
+            ${a.foto ? `<div class="animal-card-img"><img src="${this._esc(a.foto)}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:Icons.cat}</div>`}
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
@@ -1067,7 +1067,9 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFotoAnimal(this)"><div id="an-foto-preview">${data?.foto ? `<img src="${this._esc(data.foto)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
+      <div class="form-row"><div class="form-group"><label>Foto principal</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${data?.foto ? `<img src="${this._esc(data.foto)}" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Si no la subes aqui, puedes colocar el archivo en <code>src/assets/animales/</code> y referenciar su ruta en el campo Foto (URL) del carnet.</p></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
@@ -1152,8 +1154,20 @@ const Dashboard = {
       esterilizada: existing?.esterilizada || false,
       vacunas: existing?.vacunas || 'Pendientes',
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
-      foto: existing?.foto || null
+      foto: null
     };
+    const fotoUrlInput = document.getElementById('an-foto-url');
+    if (fotoUrlInput && fotoUrlInput.value.trim()) data.foto = fotoUrlInput.value.trim();
+    else {
+      const fotoInput = document.getElementById('an-foto');
+      if (fotoInput && fotoInput.files && fotoInput.files[0]) {
+        data.foto = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, 400, 300, 0.78));
+          r.readAsDataURL(fotoInput.files[0]);
+        });
+      } else if (existing?.foto) data.foto = existing.foto;
+    }
     try {
       if (isEdit) {
         await API.updateAnimal(id, data);

@@ -23,10 +23,6 @@ const Auth = {
     await this._ensureSDK();
     const result = await firebase.auth().signInWithEmailAndPassword(email, password);
     const fbUser = result.user;
-    if (!fbUser.emailVerified) {
-      await firebase.auth().signOut();
-      throw new Error('Verifica tu correo electronico antes de acceder. Revisa tu bandeja de entrada o pide al administrador que lo verifique.');
-    }
     this.currentUser = {
       uid: fbUser.uid,
       email: fbUser.email,
