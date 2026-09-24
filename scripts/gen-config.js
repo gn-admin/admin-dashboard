@@ -96,6 +96,7 @@ const backendConfig = `var CONFIG = {
   RATE_LIMIT: 100,
   REQUIRE_EMAIL_VERIFIED: ${env('APPS_SCRIPT_REQUIRE_EMAIL_VERIFIED', 'false') === 'true' ? 'true' : 'false'},
   ALLOW_ORIGIN_EMPTY: ${env('APPS_SCRIPT_ALLOW_ORIGIN_EMPTY', 'false') === 'true' ? 'true' : 'false'},
+  DRIVE_FOTOS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FOTOS_FOLDER_ID', '')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario' },
 
   surveys: {

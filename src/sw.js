@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gn-encuestas-v30';
+﻿const CACHE_NAME = 'gn-encuestas-v31';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,7 @@ const STATIC_ASSETS = [
   './manifest.webmanifest'
 ];
 
-// Install: cache assets estáticos
+// Install: cache assets estÃ¡ticos
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -34,7 +34,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch: cache-first para assets estáticos, network-first para API
+// Fetch: cache-first para assets estÃ¡ticos, network-first para API
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -56,7 +56,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Assets estáticos: cache-first
+  // Assets estÃ¡ticos: cache-first
   event.respondWith(
     caches.match(event.request)
       .then(cached => {
