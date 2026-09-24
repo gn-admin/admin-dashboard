@@ -345,6 +345,8 @@ const Dashboard = {
       return;
     }
     if (detailContainer && detailContainer.classList.contains('active')) {
+      const prevForm = detailContainer.querySelector('.form-card');
+      if (prevForm) prevForm.remove();
       const backBtn = detailContainer.querySelector('.detail-actions');
       if (backBtn) backBtn.insertAdjacentHTML('afterend', html);
       else detailContainer.insertAdjacentHTML('afterbegin', html);
@@ -1041,7 +1043,7 @@ const Dashboard = {
         <div id="animales-form-container"></div>
         <div class="animal-grid">${filtered.length ? filtered.map(a=>`
           <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
-            ${a.foto ? `<div class="animal-card-img"><img src="${this._esc(a.foto)}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:Icons.cat}</div>`}
+            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:Icons.cat}</div>`}
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
@@ -1055,6 +1057,18 @@ const Dashboard = {
 
   _grupoSize(gid) { return (this.animales||[]).filter(x=>x.grupo_id===gid).length; },
 
+  // Foto principal normalizada para <img>: admite thumbnail, fileId de Drive,
+  // enlaces file/d/... o uc?...id=... (fotos antiguas) y rutas/URLs directas.
+  _fotoSrc(a) {
+    if (!a) return '';
+    if (a.foto_drive_id) return 'https://drive.google.com/thumbnail?id=' + a.foto_drive_id + '&sz=w800';
+    const raw = String(a.foto || a.foto_url || '');
+    if (!raw) return '';
+    const m = raw.match(/[?&]id=([A-Za-z0-9_-]+)/) || raw.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w800';
+    return raw;
+  },
+
   showAnimalForm(data) {
     const isEdit = !!data;
     const especies = ['Perro', 'Gato'];
@@ -1067,9 +1081,8 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
-      <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFotoAnimal(this)"><div id="an-foto-preview">${data?.foto ? `<img src="${this._esc(data.foto)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
+      <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
-      <div class="form-row"><div class="form-group"><label>Foto principal</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${data?.foto ? `<img src="${this._esc(data.foto)}" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Si no la subes aqui, puedes colocar el archivo en <code>src/assets/animales/</code> y referenciar su ruta en el campo Foto (URL) del carnet.</p></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('animales')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
@@ -1180,7 +1193,7 @@ const Dashboard = {
         if (up.data && up.data.fileId) {
           data.foto_drive_id = up.data.fileId;
           data.foto_url = up.data.webViewLink || up.data.webContentLink;
-          data.foto = up.data.webViewLink || up.data.webContentLink;
+          data.foto = 'https://drive.google.com/thumbnail?id=' + up.data.fileId + '&sz=w800';
         }
       } catch (err) {
         this.showSnackbar('Foto guardada en Drive falló, se usa URL local: ' + this._errMsg(err), 'warning');
@@ -1214,6 +1227,7 @@ const Dashboard = {
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
+      ${this._fotoSrc(a) ? `<div style="margin-bottom:16px"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:160px;height:160px;border-radius:12px;object-fit:cover;border:2px solid var(--primary)"></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
         <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
