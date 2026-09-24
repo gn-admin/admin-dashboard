@@ -754,14 +754,17 @@ const Dashboard = {
         ['Aprueba o descarta', 'Aprobar crea la candidatura'],
         ['Asigna un animal', 'estado → Elegida'],
         ['Contrato de adopcion', 'firma + PDF'],
-        ['Adoptado', 'animal fuera de disponibles']
+        ['Adoptado', 'animal fuera de disponibles'],
+        ['Caso eliminado', 'animal Disponible · solicitud En proceso']
       ], '#16a34a')}</div>
       ${this._guideStep(Icons.dog, '1. La solicitud llega', 'Cada persona que completa la encuesta de pre-adopcion (perros o gatos) aparece en su listado con estado <b>Pendiente</b>. Todo se gestiona desde el detalle de la persona (pulsando sobre ella).', 'Encuestas > Perros / Gatos', true)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'En el detalle puedes leer sus respuestas, dejar una <b>nota</b> y pasarla a <b>En proceso</b> mientras la valoras. Usa el buscador y los filtros para ordenar la lista (pendientes, aprobadas, etc.).', 'Detalle: botones Nota y En proceso', true)}
       ${this._guideStep(Icons.checkCircle, '3. Aprueba o descarta', 'Cuando termines pulsa <b>Aprobar</b>: se crea su candidatura automaticamente y pasa a la lista de aprobados. Con <b>Descartar</b> se aparta. <br><b>Importante:</b> si la solicitud vuelve a Pendiente (o se descarta), deja de ser candidata y ya no podra asignarsele animal.', 'Detalle: botones Aprobar / Descartar', true)}
       ${this._guideStep(Icons.paw, '4. Asigna el animal', 'Reabre el detalle de la persona ya aprobada: veras el bloque <b>Asignar animal</b>. Elige un animal disponible y guarda. El estado pasa a <b>Elegida</b> y se crea el caso en Adopciones.', 'Ficha de la solicitud aprobada', true)}
       ${this._guideStep(Icons.fileText, '5. Contrato de adopcion', 'Entra en <b>Adopciones</b>, abre el caso y pulsa <b>Nuevo contrato</b>: firmante 1 obligatorio (firma dibujada en pantalla), firmante 2 opcional (por defecto Grupo Nebak), fecha y ciudad. Descarga el <b>PDF</b> y guarda.', 'Adopciones > caso', true)}
-      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces.', 'Adopciones', true)}`;
+      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces.', 'Adopciones', true)}
+      ${this._guideStep(Icons.eye, '7. Ver el cuestionario desde el caso', 'En el detalle del caso, el bloque <b>Solicitud de origen</b> tiene el boton <b>Ver cuestionario</b>: abre las respuestas tal cual se ven en Encuestas, con opcion a PDF o a saltar a su ficha.', 'Adopciones > caso', true)}
+      ${this._guideStep(Icons.trash, '8. Anular un caso', 'Con <b>Eliminar</b> se borra el caso (y su contrato si lo hay) con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa de Aprobada a <b>En proceso</b> y la candidatura se libera. Puedes reasignar desde cero.', 'Adopciones > caso > Eliminar', false)}`;
   },
 
   _tutorialAcogida() {
@@ -835,6 +838,69 @@ const Dashboard = {
   closeProfile() {
     const el = document.getElementById('profile-modal');
     if (el) el.style.display = 'none';
+  },
+
+  showInfoModal(title, html) {
+    const modal = document.getElementById('info-modal');
+    const titleEl = document.getElementById('info-title');
+    const body = document.getElementById('info-body');
+    if (!modal || !body) return;
+    if (titleEl) titleEl.textContent = title || 'Detalle';
+    body.innerHTML = html;
+    modal.style.display = 'flex';
+    this.injectIcons();
+  },
+
+  closeInfoModal() {
+    const modal = document.getElementById('info-modal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  async viewCuestionarioModal(surveyId, responseId) {
+    this.showLoading();
+    try {
+      await Promise.all([
+        this._loadResponses(surveyId),
+        this.loadEstados(),
+        this.loadNotas(),
+        this._loadListBestEffort('animales', () => API.getAnimales())
+      ]);
+    } catch (err) {
+      this.hideLoading();
+      this.showSnackbar('No se pudo cargar el cuestionario: ' + this._errMsg(err), 'error');
+      return;
+    }
+    this.hideLoading();
+    const r = (this.responses[surveyId] || []).find(x => String(x.id) === String(responseId));
+    if (!r) { this.showSnackbar('Cuestionario no encontrado', 'error'); return; }
+    const sections = this._buildSections(r, surveyId);
+    const e = this.getEstado(r.id, surveyId);
+    const note = this.notes[surveyId + '::' + r.id] || '';
+    const surveyName = ((this.surveys || []).find(s => s.id === surveyId) || {}).name || surveyId;
+    this.showInfoModal('Cuestionario · ' + surveyName, `
+      <div class="detail-field"><div class="detail-question">Solicitante</div><div class="detail-answer">${this._esc(((r.nombre || '') + ' ' + (r.apellidos || '')).trim())} · ${this._esc(r.email || '')}</div></div>
+      <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span></div></div>
+      ${sections.map(s => `<div class="detail-section"><div class="detail-section-title">${s.title}</div>${s.fields.map(f => `<div class="detail-field"><div class="detail-question">${f.label}</div><div class="detail-answer">${f.value ?? '—'}</div></div>`).join('')}</div>`).join('')}
+      ${note ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><div class="detail-answer">${this._esc(note)}</div></div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
+        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.openCuestionarioEnPagina('${surveyId}','${r.id}')">${Icons.arrowRight} Abrir en Encuestas</button>
+      </div>`);
+  },
+
+  openCuestionarioEnPagina(surveyId, responseId) {
+    this.closeInfoModal();
+    const page = this._encuestaPage(surveyId);
+    if (location.hash === '#' + page) { this.viewDetail(surveyId, responseId); return; }
+    location.hash = page;
+    const iv = setInterval(() => {
+      const el = document.getElementById('page-' + page);
+      if (el && el.querySelector('.response-list')) {
+        clearInterval(iv);
+        this.viewDetail(surveyId, responseId);
+      }
+    }, 150);
+    setTimeout(() => clearInterval(iv), 6000);
   },
 
   async _renderAssignForm(surveyId, responseId) {
@@ -1594,12 +1660,26 @@ const Dashboard = {
     this.showSnackbar(isEdit ? 'Adopcion actualizada' : 'Adopcion creada', 'success');
   },
 
+  // solicitud_id tiene forma "surveyId::responseId" (viene de la candidatura).
+  _parseSolicitud(solicitudId) {
+    if (!solicitudId || String(solicitudId).indexOf('::') === -1) return null;
+    const parts = String(solicitudId).split('::');
+    const surveyId = parts[0], responseId = parts.slice(1).join('::');
+    if (!surveyId || !responseId) return null;
+    return { surveyId, responseId };
+  },
+
+  _encuestaPage(surveyId) {
+    return { 'pre-adopcion-perros': 'encuestas-perros', 'pre-adopcion-gatos': 'encuestas-gatos', 'pre-acogida': 'encuestas-acogida' }[surveyId] || 'encuestas';
+  },
+
   viewAdopcion(id) {
     const p = this.adopciones.find(x=>x.id===id);
     if(!p) return;
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const currentIdx = fases.indexOf(p.fase);
     const contrato = this._contratoDeAdopcion(p.id);
+    const sol = this._parseSolicitud(p.solicitud_id);
     const contratoHtml = p.fase === 'Contrato' ? `
       <div class="detail-section"><div class="detail-section-title">${Icons.pencil} Contrato de adopcion</div>
         ${contrato ? `
@@ -1617,6 +1697,7 @@ const Dashboard = {
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar</button>
         ${currentIdx < fases.length-1?`<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFase('${p.id}')">${Icons.arrowRight} Avanzar fase</button>`:''}
       </div>
+      ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Pipeline de Adopcion</div>
         <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:0.7rem;font-weight:600">${f}</div>`).join('')}</div>
       </div>
@@ -1648,23 +1729,38 @@ const Dashboard = {
   },
 
   async deleteAdopcion(id) {
-    if (!(await this._confirm('Eliminar esta adopcion permanentemente?'))) return;
+    if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
     const target = this.adopciones.find(a => a.id === id);
     try { await API.deleteAdopcion(id); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const c = this._contratoDeAdopcion(id);
     if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
+    // Espejo local del rollback (el backend ya lo aplico en las hojas):
     const a = target && target.animal_id ? this.animales.find(x => x.id === target.animal_id) : null;
-    if (a && (a.estado === 'en_adopcion' || a.estado === 'adoptado') && a.adopcion_id === id) {
+    if (a && (a.estado === 'en_adopcion' || a.estado === 'adoptado') && (!a.adopcion_id || a.adopcion_id === id)) {
       a.estado = 'disponible';
       a.adopcion_id = '';
       await this._updateLocalYApi('animales', a);
+    }
+    const sol = this._parseSolicitud(target && target.solicitud_id);
+    if (sol && this.getEstado(sol.responseId, sol.surveyId) === 'aprobada') {
+      await this.setEstado(sol.responseId, 'en_proceso', sol.surveyId);
+    }
+    if (sol) {
+      (this.candidaturas || []).forEach(cand => {
+        if (cand.solicitud_id === (sol.surveyId + '::' + sol.responseId) && cand.animal_id) {
+          cand.estado = 'en_lista';
+          cand.animal_id = '';
+          this._updateLocalYApi('candidaturas', cand);
+        }
+      });
+      this.saveLocal();
     }
     this.adopciones = this.adopciones.filter(x => x.id !== id);
     this.saveLocal();
     this._hideDetail('adopciones');
     this.renderAdopciones(document.getElementById('page-adopciones'));
-    this.showSnackbar('Adopcion eliminada y animal liberado', 'success');
+    this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
   },
 
   // ==================== CONTRATOS DE ADOPCION ====================

@@ -19,6 +19,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
+- **Borrado de adopción con rollback**: `delete-adopcion` usa `deleteAdopcionCascade` (backend) + espejo en `Dashboard.deleteAdopcion` (front): animal→`disponible` (solo si lo reservó ese caso), solicitud `aprobada`→`en_proceso` (vía `solicitud_id`=`survey::resp`), candidatura→`en_lista` sin animal. El caso enlaza su cuestionario con `Dashboard.viewCuestionarioModal` (modal `info-modal`, solo lectura + PDF/salto a Encuestas).
 
 ## Arquitectura
 - Frontend: `src/index.html` + `src/js/*` (config, auth, api, dashboard, pdf-export, carnet-generator, icons) + `src/sw.js` + `src/css/styles.css`. Router por hash en `src/js/app.js`.

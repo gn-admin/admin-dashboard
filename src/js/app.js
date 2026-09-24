@@ -146,6 +146,7 @@ const App = {
       if (e.key !== 'Escape') return;
       if (document.getElementById('confirm-modal')?.style.display === 'flex') { Dashboard.cancelConfirm(false); return; }
       if (document.getElementById('contrato-modal')?.style.display === 'flex') { Dashboard.closeContratoForm(); return; }
+      if (document.getElementById('info-modal')?.style.display === 'flex') { Dashboard.closeInfoModal(); return; }
       if (document.getElementById('profile-modal')?.style.display === 'flex') { Dashboard.closeProfile(); return; }
       if (document.getElementById('tutorial-modal')?.style.display === 'flex') { Dashboard.closeTutorial(); return; }
       this.closeMasMenu();

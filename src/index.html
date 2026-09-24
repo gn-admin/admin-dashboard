@@ -265,6 +265,17 @@
         <div class="modal-body" id="contrato-content"></div>
       </div>
     </div>
+    <div class="modal-overlay" id="info-modal" style="display:none">
+      <div class="modal-box modal-box--wide">
+        <div class="modal-header">
+          <h3 id="info-title">Detalle</h3>
+          <button class="btn-icon modal-close" title="Cerrar" onclick="Dashboard.closeInfoModal()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" id="info-body"></div>
+      </div>
+    </div>
   </div>
 
   <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
