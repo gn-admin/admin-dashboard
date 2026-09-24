@@ -364,6 +364,10 @@ const Dashboard = {
   _renderForm(pageId, html) {
     const page = document.getElementById('page-' + pageId);
     if (!page) return;
+    // Higiene central (todas las entidades CRUD): nunca puede haber dos
+    // forms visibles a la vez. Purga restos de forms/containers previos.
+    page.querySelectorAll('.form-card').forEach(f => f.remove());
+    page.querySelectorAll('[id$="-form-container"]').forEach(fc => { fc.innerHTML = ''; });
     const listContainer = page.querySelector('.page-list-container');
     const detailContainer = page.querySelector('.page-detail-container');
     if (listContainer && !listContainer.classList.contains('hidden')) {
