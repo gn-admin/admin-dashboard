@@ -80,6 +80,30 @@ const API = {
   async updateContrato(id, data) { const r = await this._post('update-contrato', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteContrato(id) { return this._post('delete-contrato', { id }); },
 
+  // Gastos veterinarios (CRUD)
+  async getGastos() { return this._get('gastos'); },
+  async createGasto(data) { return this._post('gastos', data); },
+  async updateGasto(id, data) { const r = await this._post('update-gasto', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
+  async deleteGasto(id) { return this._post('delete-gasto', { id }); },
+
+  // Recordatorios (CRUD)
+  async getRecordatorios() { return this._get('recordatorios'); },
+  async createRecordatorio(data) { return this._post('recordatorios', data); },
+  async updateRecordatorio(id, data) { const r = await this._post('update-recordatorio', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
+  async deleteRecordatorio(id) { return this._post('delete-recordatorio', { id }); },
+
+  // Donaciones (CRUD)
+  async getDonaciones() { return this._get('donaciones'); },
+  async createDonacion(data) { return this._post('donaciones', data); },
+  async updateDonacion(id, data) { const r = await this._post('update-donacion', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
+  async deleteDonacion(id) { return this._post('delete-donacion', { id }); },
+
+  // Seguimientos post-adopcion (CRUD)
+  async getSeguimientos() { return this._get('seguimientos'); },
+  async createSeguimiento(data) { return this._post('seguimientos', data); },
+  async updateSeguimiento(id, data) { const r = await this._post('update-seguimiento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
+  async deleteSeguimiento(id) { return this._post('delete-seguimiento', { id }); },
+
   // Socios (CRUD)
   async getSocios() { return this._get('socios'); },
   async createSocio(data) { return this._post('socios', data); },

@@ -139,6 +139,10 @@ const backendConfig = `var CONFIG = {
     acogidas: { sheetId: '${env('SHEET_ACOGIDAS_ID')}', sheetName: 'Acogidas' },
     contratos: { sheetId: '${env('SHEET_CONTRATOS_ID')}', sheetName: 'Contratos' },
     apadrinamientos: { sheetId: '${env('SHEET_APADRINAMIENTOS_ID')}', sheetName: 'Apadrinamientos' },
+    gastos: { sheetId: '${env('SHEET_GASTOS_ID')}', sheetName: 'Gastos' },
+    recordatorios: { sheetId: '${env('SHEET_RECORDATORIOS_ID')}', sheetName: 'Recordatorios' },
+    donaciones: { sheetId: '${env('SHEET_DONACIONES_ID')}', sheetName: 'Donaciones' },
+    seguimientos: { sheetId: '${env('SHEET_SEGUIMIENTOS_ID')}', sheetName: 'Seguimientos' },
 ${sheetsBlock()}
   }
 };

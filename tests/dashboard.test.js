@@ -304,6 +304,27 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_totalGastos/_totalDonaciones: suman importes', () => {
+  it('suma con coma decimal e ignora vacios', () => {
+    assert.equal(Dashboard._totalGastos([{ importe: '10' }, { importe: '5,5' }, { importe: '' }]), 15.5);
+    assert.equal(Dashboard._totalDonaciones([{ importe: '20' }, { importe: 'x' }]), 20);
+    assert.equal(Dashboard._totalGastos([]), 0);
+  });
+});
+
+describe('_diasHasta/_estadoRecordatorio', () => {
+  it('pasado/hoy/futuro/hecho', () => {
+    assert.equal(Dashboard._diasHasta('2000-01-01') < 0, true);
+    assert.equal(Dashboard._diasHasta('2999-01-01') > 100, true);
+    assert.equal(Dashboard._diasHasta(''), null);
+    assert.deepEqual(Dashboard._estadoRecordatorio({ hecho: true }), { label: 'Hecho', cls: 'aprobada' });
+    assert.equal(Dashboard._estadoRecordatorio({ fecha: '2000-01-01' }).label, 'Vencido');
+    const hoy = new Date();
+    const iso = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0') + '-' + String(hoy.getDate()).padStart(2, '0');
+    assert.equal(Dashboard._estadoRecordatorio({ fecha: iso }).label, 'Hoy');
+  });
+});
+
 describe('_esApadrinable: check + estado', () => {
   it('solo con check y disponible/en_acogida', () => {
     assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'disponible' }), true);

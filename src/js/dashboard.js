@@ -1,6 +1,7 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
+  gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [],
   // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
   APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
@@ -21,7 +22,7 @@ const Dashboard = {
       this.userProfile = user;
       this.updateUserUI();
       // Preloads no bloqueantes; cada pantalla/ficha asegura lo suyo al abrirse.
-      this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'apadrinamientos']);
+      this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos']);
       this._renderPendingBadge();
       this.flushPendingOps();
       if (!this._onlineHook) {
@@ -43,6 +44,10 @@ const Dashboard = {
       acogidas: () => API.getAcogidas(),
       contratos: () => API.getContratos(),
       apadrinamientos: () => API.getApadrinamientos(),
+      gastos: () => API.getGastos(),
+      recordatorios: () => API.getRecordatorios(),
+      donaciones: () => API.getDonaciones(),
+      seguimientos: () => API.getSeguimientos(),
       animales: () => API.getAnimales(),
       familias: () => API.getFamilias(),
       adopciones: () => API.getAdopciones(),
@@ -71,6 +76,7 @@ const Dashboard = {
       blacklist: () => this.renderBlacklist(el),
       reportes: () => this.renderReportes(el),
       redes: () => this.renderRedes(el),
+      donaciones: () => this.renderDonaciones(el),
     };
     el.innerHTML = `<div class="page-loader"><div class="spinner"></div><p>Cargando...</p></div>`;
     try {
@@ -100,10 +106,11 @@ const Dashboard = {
     set('mas-icon-socios', Icons.users);
     set('mas-icon-reportes', Icons.barChart);
     set('mas-icon-redes', Icons.heart);
+    set('mas-icon-donaciones', Icons.heart);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart, donaciones: Icons.heart };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -136,6 +143,11 @@ const Dashboard = {
     try { this.acogidas = norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')); } catch { this.acogidas = []; }
     try { this.publicaciones = norm(JSON.parse(localStorage.getItem('gn_publicaciones') || '[]')); } catch { this.publicaciones = []; }
     try { this.apadrinamientos = norm(JSON.parse(localStorage.getItem('gn_apadrinamientos') || '[]')); } catch { this.apadrinamientos = []; }
+    try { this.gastos = norm(JSON.parse(localStorage.getItem('gn_gastos') || '[]')); } catch { this.gastos = []; }
+    try { this.recordatorios = norm(JSON.parse(localStorage.getItem('gn_recordatorios') || '[]')); } catch { this.recordatorios = []; }
+    try { this.donaciones = norm(JSON.parse(localStorage.getItem('gn_donaciones') || '[]')); } catch { this.donaciones = []; }
+    try { this.seguimientos = norm(JSON.parse(localStorage.getItem('gn_seguimientos') || '[]')); } catch { this.seguimientos = []; }
+    try { this.documentos = JSON.parse(localStorage.getItem('gn_documentos') || '[]'); } catch { this.documentos = []; }
   },
 
   saveLocal() {
@@ -145,6 +157,11 @@ const Dashboard = {
     localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
     localStorage.setItem('gn_publicaciones', JSON.stringify(this.publicaciones || []));
     localStorage.setItem('gn_apadrinamientos', JSON.stringify(this.apadrinamientos || []));
+    localStorage.setItem('gn_gastos', JSON.stringify(this.gastos || []));
+    localStorage.setItem('gn_recordatorios', JSON.stringify(this.recordatorios || []));
+    localStorage.setItem('gn_donaciones', JSON.stringify(this.donaciones || []));
+    localStorage.setItem('gn_seguimientos', JSON.stringify(this.seguimientos || []));
+    localStorage.setItem('gn_documentos', JSON.stringify(this.documentos || []));
   },
 
   // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
@@ -529,6 +546,7 @@ const Dashboard = {
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('familias', () => API.getFamilias()),
       this._loadList('actividad', () => API.getActividad()),
+      this._loadList('recordatorios', () => API.getRecordatorios()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
     ]);
   },
@@ -562,6 +580,7 @@ const Dashboard = {
         <div class="card"><div class="card-header"><h3>Actividad Reciente</h3></div><div class="timeline">${this._buildTimeline()}</div></div>
         <div class="card"><div class="card-header"><h3>Requieren atención</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th>Espera</th></tr></thead><tbody>${this._atencionRows()}</tbody></table></div></div>
       </div>
+      ${this._recordatoriosWidget()}
       <div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Solicitudes Recientes</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${this._recentRows()}</tbody></table></div></div>
       <div class="card"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">
         ${pendientes?`<div class="alert-item warning">${Icons.alertTriangle}<span>${pendientes} solicitudes pendientes</span></div>`:''}
@@ -614,8 +633,8 @@ const Dashboard = {
       ];
       return staticItems.map(item=>`<div class="timeline-item"><div class="timeline-dot-wrap"><div class="timeline-dot ${item.color}"></div><div class="timeline-line"></div></div><div class="timeline-content"><div class="timeline-text">${item.text}</div><div class="timeline-time">${item.time}</div></div></div>`).join('');
     }
-    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange', acogida:'blue', adopcion:'orange', contrato:'green', blacklist:'red', candidatura:'blue', socio:'green' };
-    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio', acogida:'Caso de acogida', adopcion:'Caso de adopcion', contrato:'Contrato', blacklist:'Lista negra', candidatura:'Candidatura', socio:'Socio' };
+    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange', acogida:'blue', adopcion:'orange', contrato:'green', blacklist:'red', candidatura:'blue', socio:'green', gasto:'orange', donacion:'green', seguimiento:'blue' };
+    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio', acogida:'Caso de acogida', adopcion:'Caso de adopcion', contrato:'Contrato', blacklist:'Lista negra', candidatura:'Candidatura', socio:'Socio', gasto:'Gasto veterinario', donacion:'Donacion', seguimiento:'Seguimiento' };
     return this.actividad.slice(0, 5).map(item => {
       const t = new Date(item.fecha);
       const diff = Math.floor((Date.now() - t.getTime()) / 60000);
@@ -655,6 +674,101 @@ const Dashboard = {
     const items = this._atencionItems(5);
     if (!items.length) return `<tr><td colspan="3" style="text-align:center;color:var(--gray-400);padding:16px">Todo al día, sin pendientes</td></tr>`;
     return items.map(r => `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${r._surveyId}','${r.id}')"><td>${this._esc(r.nombre || '')} ${this._esc(r.apellidos || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(r._survey)}</div></td><td><span class="estado-badge ${this._estadoCls(r._estado)}">${this._estadoLabel(r._estado)}</span></td><td>${this._diasEspera(r.fecha_creacion)}</td></tr>`).join('');
+  },
+
+  // ==================== RECORDATORIOS ====================
+  _diasHasta(fecha) {
+    if (!fecha) return null;
+    const m = String(fecha).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const t = new Date(+m[1], +m[2] - 1, +m[3]);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return Math.round((t - hoy) / 86400000);
+  },
+
+  _estadoRecordatorio(r) {
+    if (!r) return { label: '—', cls: '' };
+    if (r.hecho) return { label: 'Hecho', cls: 'aprobada' };
+    const d = this._diasHasta(r.fecha);
+    if (d === null) return { label: 'Sin fecha', cls: '' };
+    if (d < 0) return { label: 'Vencido', cls: 'descartada' };
+    if (d === 0) return { label: 'Hoy', cls: 'en_proceso' };
+    return { label: 'En ' + d + (d === 1 ? ' día' : ' días'), cls: '' };
+  },
+
+  _proximosRecordatorios(max) {
+    return (this.recordatorios || [])
+      .filter(r => !r.hecho)
+      .slice()
+      .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
+      .slice(0, max || 5);
+  },
+
+  _recordatoriosWidget() {
+    const items = this._proximosRecordatorios(5);
+    const rows = items.length
+      ? items.map(r => {
+        const e = this._estadoRecordatorio(r);
+        return `<div class="detail-field"><div class="detail-question">${this._esc(r.titulo || 'Recordatorio')}<div style="font-size:.72rem;color:var(--gray-500)">${r.fecha ? this._fmtFecha(r.fecha) : 'Sin fecha'}</div></div><div class="detail-answer"><span class="estado-badge ${e.cls}">${e.label}</span><div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(r.id)}')">${Icons.check} Hecho</button><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteRecordatorio('${this._esc(r.id)}')">${Icons.trash}</button></div></div></div>`;
+      }).join('')
+      : `<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin vencimientos</div>`;
+    return `<div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Próximos vencimientos</h3><button class="btn btn-primary btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Nuevo</button></div><div class="card-body">${rows}</div></div>`;
+  },
+
+  showRecordatorioForm() {
+    this.showFormModal('Nuevo recordatorio', `
+      <form onsubmit="Dashboard.saveRecordatorio(event)">
+      <div class="form-group"><label>Título *</label><input type="text" id="rc-titulo" required placeholder="Ej: Vacuna anual Luna"></div>
+      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="rc-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
+      <div class="form-group"><label>Nota</label><input type="text" id="rc-nota" placeholder="Opcional"></div></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  async saveRecordatorio(e) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const titulo = document.getElementById('rc-titulo').value.trim();
+    const fecha = document.getElementById('rc-fecha').value;
+    if (!titulo || !fecha) { this.showSnackbar('Completa título y fecha', 'warning'); finGuardar(); return; }
+    const row = {
+      id: 'rec_' + Date.now().toString(36),
+      titulo,
+      fecha,
+      notas: document.getElementById('rc-nota').value.trim(),
+      hecho: false,
+      creado: new Date().toISOString()
+    };
+    this.recordatorios.push(row);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createRecordatorio(row), { m: 'createRecordatorio', a: [row] });
+    finGuardar();
+    this.closeFormModal();
+    this.renderDashboardHome(document.getElementById('page-dashboard'));
+    this.showSnackbar('Recordatorio guardado', 'success');
+  },
+
+  async toggleRecordatorio(id) {
+    const r = this._byId(this.recordatorios, id);
+    if (!r) return;
+    r.hecho = !r.hecho;
+    this.saveLocal();
+    await this._updateLocalYApi('recordatorios', r);
+    this.renderDashboardHome(document.getElementById('page-dashboard'));
+  },
+
+  async deleteRecordatorio(id) {
+    if (!(await this._confirm('Eliminar este recordatorio?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteRecordatorio(id);
+      this._assertDeleted(res, 'El recordatorio');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    this.recordatorios = (this.recordatorios || []).filter(x => x.id !== id);
+    this.saveLocal();
+    this.renderDashboardHome(document.getElementById('page-dashboard'));
+    this.showSnackbar('Recordatorio eliminado', 'success');
   },
 
   // ==================== ENCUESTAS ====================
@@ -989,6 +1103,7 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
@@ -1225,7 +1340,7 @@ const Dashboard = {
   },
 
   async _updateLocalYApi(col, item) {
-    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato', apadrinamientos: 'updateApadrinamiento' };
+    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato', apadrinamientos: 'updateApadrinamiento', gastos: 'updateGasto', recordatorios: 'updateRecordatorio', donaciones: 'updateDonacion', seguimientos: 'updateSeguimiento' };
     const m = map[col];
     if (!m) return;
     try { await API[m](item.id, item); }
@@ -1754,6 +1869,132 @@ const Dashboard = {
     return `<div class="detail-section"><div class="detail-section-title">${Icons.paw} Apadrina a</div>${items}${list.length ? `<div class="detail-field"><div class="detail-question">Total</div><div class="detail-answer">${total} €/mes</div></div>` : ''}</div>`;
   },
 
+  // ==================== GASTOS VETERINARIOS ====================
+  _gastosDe(animalId) {
+    return (this.gastos || []).filter(x => String(x.animal_id) === String(animalId));
+  },
+
+  _totalGastos(list) {
+    return (list || []).reduce((s, g) => s + (parseFloat(String(g.importe).replace(',', '.')) || 0), 0);
+  },
+
+  _gastosFicha(animalId) {
+    const list = this._gastosDe(animalId);
+    const total = this._totalGastos(list);
+    const rows = list.length
+      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._esc(g.importe || '0')} € <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.activity} Gastos veterinarios${list.length ? ` · Total ${total.toFixed(2)} €` : ''}</div>${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div></div>`;
+  },
+
+  showGastoForm(animalId) {
+    const a = this._byId(this.animales, animalId);
+    if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
+    this.showFormModal('Nuevo gasto · ' + a.nombre, `
+      <form onsubmit="Dashboard.saveGasto(event,'${a.id}')">
+      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="gs-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
+      <div class="form-group"><label>Importe (€) *</label><input type="text" id="gs-importe" required placeholder="Ej: 45.50" inputmode="decimal"></div></div>
+      <div class="form-group"><label>Concepto *</label><input type="text" id="gs-concepto" required placeholder="Ej: Vacuna rabia"></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  async saveGasto(e, animalId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const a = this._byId(this.animales, animalId);
+    if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    const concepto = document.getElementById('gs-concepto').value.trim();
+    const importe = document.getElementById('gs-importe').value.trim().replace(',', '.');
+    if (!concepto || isNaN(parseFloat(importe))) { this.showSnackbar('Completa concepto e importe válido', 'warning'); finGuardar(); return; }
+    const row = {
+      id: 'gst_' + Date.now().toString(36),
+      animal_id: a.id,
+      animal: a.nombre,
+      fecha: document.getElementById('gs-fecha').value || new Date().toISOString().slice(0, 10),
+      concepto,
+      importe
+    };
+    this.gastos.push(row);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createGasto(row), { m: 'createGasto', a: [row] });
+    this._regLog('gasto', 'Gasto ' + concepto + ' (' + importe + ' €) en ' + a.nombre, 'gasto', row.id);
+    finGuardar();
+    this.closeFormModal();
+    this.viewAnimal(animalId);
+    this.showSnackbar('Gasto guardado', 'success');
+  },
+
+  async deleteGasto(id) {
+    const g = this._byId(this.gastos, id);
+    if (!(await this._confirm('Eliminar este gasto?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteGasto(id);
+      this._assertDeleted(res, 'El gasto');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    this.gastos = (this.gastos || []).filter(x => x.id !== id);
+    this.saveLocal();
+    if (g) this.viewAnimal(g.animal_id);
+    this.showSnackbar('Gasto eliminado', 'success');
+  },
+
+  // ==================== DOCUMENTOS (dummy local: referencias sin fichero) ====================
+  _documentosDe(animalId) {
+    return (this.documentos || []).filter(x => String(x.animal_id) === String(animalId));
+  },
+
+  _documentosFicha(animalId) {
+    const list = this._documentosDe(animalId);
+    const rows = list.length
+      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.fileText} Documentos <span class="estado-badge en_proceso">Simulado</span></div>${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir referencia</button></div></div>`;
+  },
+
+  showDocumentoForm(animalId) {
+    const a = this._byId(this.animales, animalId);
+    if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
+    this.showFormModal('Referencia de documento · ' + a.nombre, `
+      <form onsubmit="Dashboard.saveDocumento(event,'${a.id}')">
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
+      <div class="form-group"><label>Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
+      <div class="alert-item info" style="margin-bottom:12px">${Icons.info} <span>Referencia local: el fichero seguira en Drive o papel.</span></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  saveDocumento(e, animalId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const a = this._byId(this.animales, animalId);
+    if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    const nombre = document.getElementById('dc-nombre').value.trim();
+    if (!nombre) { this.showSnackbar('Indica el nombre del documento', 'warning'); finGuardar(); return; }
+    this.documentos.push({
+      id: 'doc_' + Date.now().toString(36),
+      animal_id: a.id,
+      animal: a.nombre,
+      nombre,
+      tipo: document.getElementById('dc-tipo').value,
+      fecha: new Date().toISOString().slice(0, 10)
+    });
+    this.saveLocal();
+    finGuardar();
+    this.closeFormModal();
+    this.viewAnimal(animalId);
+    this.showSnackbar('Referencia guardada (simulada)', 'success');
+  },
+
+  deleteDocumento(id) {
+    const d = this._byId(this.documentos, id);
+    this.documentos = (this.documentos || []).filter(x => x.id !== id);
+    this.saveLocal();
+    if (d) this.viewAnimal(d.animal_id);
+    this.showSnackbar('Referencia eliminada', 'success');
+  },
+
   // ==================== ANIMALES CRUD ====================
   async renderAnimales(el) {
     await Promise.all([
@@ -2013,7 +2254,7 @@ const Dashboard = {
   },
 
   async viewAnimal(id) {
-    await this._ensureListas(['apadrinamientos']);
+    await this._ensureListas(['apadrinamientos', 'gastos']);
     const a = this._byId(this.animales, id);
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
@@ -2026,6 +2267,8 @@ const Dashboard = {
       ${this._publicacionesFicha(a.id)}
       ${this._fotoSrc(a) ? `<div style="margin-bottom:16px"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:160px;height:160px;border-radius:12px;object-fit:cover;border:2px solid var(--primary)"></div>` : ''}
       ${this._apadrinamientosFicha(a.id)}
+      ${this._gastosFicha(a.id)}
+      ${this._documentosFicha(a.id)}
       <div class="detail-section"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
         <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
@@ -2489,7 +2732,7 @@ const Dashboard = {
   },
 
   async viewAdopcion(id) {
-    await this._ensureListas(['contratos']);
+    await this._ensureListas(['contratos', 'seguimientos']);
     const p = this._byId(this.adopciones, id);
     if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
@@ -2519,6 +2762,7 @@ const Dashboard = {
         <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:0.7rem;font-weight:600">${f}</div>`).join('')}</div>
       </div>
       ${contratoHtml}
+      ${this._seguimientosFicha(p.id)}
       <div class="detail-section"><div class="detail-section-title">Detalles</div>
         <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${p.animal_id ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal)}</a>` : this._esc(p.animal)}</div></div>
         <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
@@ -2561,6 +2805,66 @@ const Dashboard = {
     p.fase = newFase;
     p.estado = `Fase: ${newFase}`;
     this.viewAdopcion(id);
+  },
+
+  _seguimientosFicha(adopcionId) {
+    const list = (this.seguimientos || []).filter(x => String(x.adopcion_id) === String(adopcionId));
+    const rows = list.length
+      ? list.slice().reverse().map(s => `<div class="detail-field"><div class="detail-question">${s.fecha ? this._fmtFecha(s.fecha) : '—'} · ${this._esc(s.tipo || 'Seguimiento')}</div><div class="detail-answer">${this._esc(s.nota || '—')}<div style="margin-top:6px"><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteSeguimiento('${this._esc(s.id)}')">${Icons.trash}</button></div></div></div>`).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin seguimientos todavia</div></div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.calendar} Seguimiento post-adopcion</div>${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showSeguimientoForm('${adopcionId}')">${Icons.plus} Nuevo seguimiento</button></div></div>`;
+  },
+
+  showSeguimientoForm(adopcionId) {
+    const p = this._byId(this.adopciones, adopcionId);
+    if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
+    this.showFormModal('Nuevo seguimiento', `
+      <form onsubmit="Dashboard.saveSeguimiento(event,'${p.id}')">
+      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="sg-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
+      <div class="form-group"><label>Tipo *</label><select id="sg-tipo" required><option value="Llamada">Llamada</option><option value="Visita">Visita</option><option value="Email">Email</option><option value="Otro">Otro</option></select></div></div>
+      <div class="form-group"><label>Nota *</label><textarea id="sg-nota" rows="3" required placeholder="Como esta el animal, acuerdos..."></textarea></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  async saveSeguimiento(e, adopcionId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const p = this._byId(this.adopciones, adopcionId);
+    if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    const nota = document.getElementById('sg-nota').value.trim();
+    if (!nota) { this.showSnackbar('Escribe la nota del seguimiento', 'warning'); finGuardar(); return; }
+    const row = {
+      id: 'seg_' + Date.now().toString(36),
+      adopcion_id: p.id,
+      adoptante: p.adoptante || '',
+      animal: p.animal || '',
+      fecha: document.getElementById('sg-fecha').value || new Date().toISOString().slice(0, 10),
+      tipo: document.getElementById('sg-tipo').value,
+      nota
+    };
+    this.seguimientos.push(row);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createSeguimiento(row), { m: 'createSeguimiento', a: [row] });
+    this._regLog('seguimiento', 'Seguimiento (' + row.tipo + ') en adopcion de ' + (p.animal || ''), 'seguimiento', row.id);
+    finGuardar();
+    this.closeFormModal();
+    this.viewAdopcion(adopcionId);
+    this.showSnackbar('Seguimiento guardado', 'success');
+  },
+
+  async deleteSeguimiento(id) {
+    const s = this._byId(this.seguimientos, id);
+    if (!(await this._confirm('Eliminar este seguimiento?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteSeguimiento(id);
+      this._assertDeleted(res, 'El seguimiento');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    this.seguimientos = (this.seguimientos || []).filter(x => x.id !== id);
+    this.saveLocal();
+    if (s) this.viewAdopcion(s.adopcion_id);
+    this.showSnackbar('Seguimiento eliminado', 'success');
   },
 
   async deleteAdopcion(id) {
@@ -3027,6 +3331,73 @@ const Dashboard = {
     this.saveLocal();
     const lc=document.getElementById('blacklist-list-container'); if(lc) lc.innerHTML=this._renderBlacklistCards();
     this.showSnackbar('Eliminado de la lista negra', 'success');
+  },
+
+  // ==================== DONACIONES ====================
+  _totalDonaciones(list) {
+    return (list || []).reduce((s, d) => s + (parseFloat(String(d.importe).replace(',', '.')) || 0), 0);
+  },
+
+  async renderDonaciones(el) {
+    await this._loadList('donaciones', () => API.getDonaciones());
+    const total = this._totalDonaciones(this.donaciones);
+    const items = (this.donaciones || []).slice().reverse();
+    el.innerHTML = `
+      <div class="page-list-container">
+        <div class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
+        </div>
+        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showDonacionForm()">${Icons.plus} Nueva</button></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._esc(d.importe || '0')} €</td><td><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteDonacion('${this._esc(d.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+      </div>
+      <div class="page-detail-container"></div>`;
+  },
+
+  showDonacionForm() {
+    this.showFormModal('Nueva donacion', `
+      <form onsubmit="Dashboard.saveDonacion(event)">
+      <div class="form-row"><div class="form-group"><label>Donante *</label><input type="text" id="dn-donante" required placeholder="Nombre o Anonimo"></div>
+      <div class="form-group"><label>Importe (€) *</label><input type="text" id="dn-importe" required placeholder="Ej: 50" inputmode="decimal"></div></div>
+      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="dn-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
+      <div class="form-group"><label>Notas</label><input type="text" id="dn-notas" placeholder="Opcional"></div></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  async saveDonacion(e) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const donante = document.getElementById('dn-donante').value.trim();
+    const importe = document.getElementById('dn-importe').value.trim().replace(',', '.');
+    if (!donante || isNaN(parseFloat(importe))) { this.showSnackbar('Completa donante e importe válido', 'warning'); finGuardar(); return; }
+    const row = {
+      id: 'don_' + Date.now().toString(36),
+      donante,
+      importe,
+      fecha: document.getElementById('dn-fecha').value || new Date().toISOString().slice(0, 10),
+      notas: document.getElementById('dn-notas').value.trim()
+    };
+    this.donaciones.push(row);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createDonacion(row), { m: 'createDonacion', a: [row] });
+    this._regLog('donacion', 'Donacion de ' + donante + ' (' + importe + ' €)', 'donacion', row.id);
+    finGuardar();
+    this.closeFormModal();
+    this.renderDonaciones(document.getElementById('page-donaciones'));
+    this.showSnackbar('Donacion guardada', 'success');
+  },
+
+  async deleteDonacion(id) {
+    if (!(await this._confirm('Eliminar esta donacion?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteDonacion(id);
+      this._assertDeleted(res, 'La donacion');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    this.donaciones = (this.donaciones || []).filter(x => x.id !== id);
+    this.saveLocal();
+    this.renderDonaciones(document.getElementById('page-donaciones'));
+    this.showSnackbar('Donacion eliminada', 'success');
   },
 
   // ==================== REPORTES ====================
