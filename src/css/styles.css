@@ -474,6 +474,25 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.25) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.25);
+  border-radius: 999px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.4);
 }
 
 .sidebar-section {
@@ -1673,6 +1692,21 @@ body {
 .modal-body {
   padding: 16px 20px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-300) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 999px;
 }
 
 @media (min-width: 768px) {
@@ -2474,6 +2508,11 @@ body {
     min-width: 0;
   }
 
+  /* Reportes fuera del menu movil (sigue accesible por URL directa) */
+  .mas-menu-item[data-page="reportes"] {
+    display: none;
+  }
+
   .filters-bar {
     gap: 10px;
   }
@@ -2737,6 +2776,26 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===== COMPACTO EN ALTURAS CORTAS (tablet apaisada / pantallas bajas): evita el scroll del menu ===== */
+@media (max-height: 720px) {
+  .sidebar-header {
+    padding: 10px 16px;
+    min-height: 56px;
+  }
+
+  .sidebar-section-title {
+    padding: 6px 12px 2px;
+  }
+
+  .sidebar-link {
+    padding: 7px 12px;
+  }
+
+  .sidebar-section {
+    margin-bottom: 4px;
   }
 }
 
