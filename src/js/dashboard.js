@@ -922,14 +922,15 @@ const Dashboard = {
     if (!tab) {
       body.innerHTML = this._tutorialMenu();
     } else {
-      const titles = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', estados: 'Estados y consejos' };
+      const titles = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', gestion: 'Gestion diaria', estados: 'Estados y consejos' };
       const panels = {
         general: this._tutorialGeneral(),
         adopcion: this._tutorialAdopcion(),
         acogida: this._tutorialAcogida(),
-        redes: this._tutorialRedes(),
-        apadrinamiento: this._tutorialApadrinamiento(),
-        estados: this._tutorialEstados()
+      redes: this._tutorialRedes(),
+      apadrinamiento: this._tutorialApadrinamiento(),
+      gestion: this._tutorialGestion(),
+      estados: this._tutorialEstados()
       };
       body.innerHTML = `<button class="btn btn-outline-green btn-sm tutorial-back" onclick="Dashboard.showTutorial()">${Icons.arrowLeft} Todas las guías</button><h3 class="tutorial-guide-title">${titles[tab] || ''}</h3><div class="tutorial-panel">${panels[tab] || ''}</div>`;
     }
@@ -945,6 +946,7 @@ const Dashboard = {
       ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, '#ebf5fb', '#2563eb'],
       ['redes', 'Redes sociales', 'Plantillas y publicaciones.', Icons.clipboard, '#fce4ec', '#e91e63'],
       ['apadrinamiento', 'Apadrinamiento', 'Padrinos, aportes e historial.', Icons.paw, '#f3e8ff', '#7c3aed'],
+      ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, '#ebf5fb', '#2563eb'],
       ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, '#e8faf0', '#16a34a']
     ];
     return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
@@ -1074,6 +1076,22 @@ const Dashboard = {
       ${this._guideStep(Icons.users, '2. Socio o externo', 'Al apadrinar elige un <b>socio existente</b> o crea un <b>externo</b> (nombre + contacto + aporte €/mes). Un animal puede tener varios padrinos a la vez.', 'Ficha animal > Apadrinamientos', true)}
       ${this._guideStep(Icons.checkCircle, '3. Seguimiento', 'La ficha suma el total mensual. En la ficha del socio veras "Apadrina a" con su historial.', 'Fichas', true)}
       ${this._guideStep(Icons.trash, '4. Finalizar o convertir', '<b>Finalizar</b> cierra el apadrinamiento (queda en historial). Un externo se <b>convierte a socio</b> con un toque, enlazando su historial.', 'Ficha animal', false)}`;
+  },
+
+  _tutorialGestion() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Gasto veterinario', 'ficha del animal'],
+        ['Vencimiento', 'widget + aviso'],
+        ['Donacion', 'pantalla Donaciones'],
+        ['Socio / voluntario', 'cuota + carnet'],
+        ['Documento', 'referencia en ficha']
+      ], '#2563eb')}</div>
+      ${this._guideStep(Icons.activity, '1. Gastos veterinarios', 'En la ficha del animal, seccion <b>Gastos</b>: fecha, concepto e importe, con total acumulado.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.calendar, '2. Vencimientos', 'El widget del dashboard avisa (Vencido/Hoy/En N dias). Marca <b>Hecho</b> o elimina desde ahi mismo.', 'Dashboard', false)}
+      ${this._guideStep(Icons.heart, '3. Donaciones', 'Pantalla propia con total, alta y baja. Cada donacion queda en su hoja.', 'Donaciones', false)}
+      ${this._guideStep(Icons.users, '4. Socios y voluntarios', 'Perfiles <b>Socio</b>, <b>Voluntario</b> o <b>Ambos</b> (la cuota solo aplica a socios). El carnet cambia de color por perfil.', 'Socios', false)}
+      ${this._guideStep(Icons.fileText, '5. Documentos', 'Referencias locales (cartilla, vacunas, analiticas) en la ficha del animal, marcadas como simuladas hasta archivar en Drive.', 'Animales > ficha', false)}`;
   },
 
   _tutorialEstados() {
@@ -1987,8 +2005,9 @@ const Dashboard = {
     this.showSnackbar('Referencia guardada (simulada)', 'success');
   },
 
-  deleteDocumento(id) {
+  async deleteDocumento(id) {
     const d = this._byId(this.documentos, id);
+    if (!(await this._confirm('Eliminar esta referencia?', 'Eliminar'))) return;
     this.documentos = (this.documentos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (d) this.viewAnimal(d.animal_id);
