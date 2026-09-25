@@ -1494,9 +1494,18 @@ const Dashboard = {
       </div>`);
   },
 
+  // El backend devuelve {success:false} si la fila no existe (p. ej. id no
+  // sincronizado con la hoja). Sin este chequeo el borrado parecia OK en
+  // pantalla pero el registro reaparecia al recargar.
+  _assertDeleted(res, what) {
+    if (res && res.success === false) {
+      throw new Error((what || 'El registro') + ' no existe en la hoja (id sin sincronizar). Revisa la hoja o recarga.');
+    }
+  },
+
   async deleteAnimal(id) {
     if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
-    try { await API.deleteAnimal(id); }
+    try { const res = await API.deleteAnimal(id); this._assertDeleted(res, 'El animal'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.animal_id === id);
     if (casos.length) {
@@ -1633,7 +1642,7 @@ const Dashboard = {
 
   async deleteFamilia(id) {
     if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
-    try { await API.deleteFamilia(id); }
+    try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
     if (casos.length) {
@@ -1882,12 +1891,12 @@ const Dashboard = {
   async deleteAdopcion(id) {
     if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
     const target = this._byId(this.adopciones, id);
-    try { await API.deleteAdopcion(id); }
+    try { const res = await API.deleteAdopcion(id); this._assertDeleted(res, 'El caso'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const c = this._contratoDeAdopcion(id);
     if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
     // Espejo local del rollback (el backend ya lo aplico en las hojas):
-    const a = target && target.animal_id ? this.animales.find(x => x.id === target.animal_id) : null;
+    const a = target && target.animal_id ? this._byId(this.animales, target.animal_id) : null;
     if (a && (a.estado === 'en_adopcion' || a.estado === 'adoptado') && (!a.adopcion_id || a.adopcion_id === id)) {
       a.estado = 'disponible';
       a.adopcion_id = '';
@@ -2246,7 +2255,7 @@ const Dashboard = {
 
   async deleteSocio(id) {
     if (!(await this._confirm('Eliminar este socio permanentemente?'))) return;
-    try { await API.deleteSocio(id); }
+    try { const res = await API.deleteSocio(id); this._assertDeleted(res, 'El socio'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     this.socios = this.socios.filter(s => s.id !== id);
     this._hideDetail('socios');

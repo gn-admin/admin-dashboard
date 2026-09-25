@@ -214,3 +214,15 @@ describe('_diasEspera', () => {
     assert.match(Dashboard._diasEspera('2020-01-01'), /días/);
   });
 });
+
+describe('_assertDeleted: borrado fantasma nunca silencioso', () => {
+  it('no lanza si success true o sin campo', () => {
+    assert.doesNotThrow(() => Dashboard._assertDeleted({ success: true }, 'El animal'));
+    assert.doesNotThrow(() => Dashboard._assertDeleted({}, 'El animal'));
+    assert.doesNotThrow(() => Dashboard._assertDeleted(null, 'El animal'));
+  });
+
+  it('lanza si success es false', () => {
+    assert.throws(() => Dashboard._assertDeleted({ success: false }, 'El animal'), /no existe en la hoja/);
+  });
+});
