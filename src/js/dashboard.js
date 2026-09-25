@@ -1,9 +1,8 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
-  // Apadrinamientos en dummy local hasta desplegar el backend nuevo
-  // (endpoints apadrinamientos/*). Al pegar Code.gs, poner a true.
-  APADRINAMIENTOS_REMOTE: false,
+  // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
+  APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
