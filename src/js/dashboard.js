@@ -1,7 +1,7 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [],
-  _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all',
+  _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
   async init() {
@@ -1615,6 +1615,16 @@ const Dashboard = {
     if (el) el.style.display = val === '__otro__' ? 'block' : 'none';
   },
 
+  _toggleCuota() {
+    const t = document.getElementById('so-tipo');
+    const w = document.getElementById('so-cuota-wrap');
+    if (w) w.style.display = t && (t.value === 'Socio' || t.value === 'Ambos') ? '' : 'none';
+  },
+
+  _tipoBadgeCls(t) {
+    return t === 'Socio' ? 'aprobada' : (t === 'Voluntario' ? 'en_proceso' : 'finalizada');
+  },
+
   showCamadaForm() {
     this.showFormModal('Alta de camada', `<form onsubmit="Dashboard.saveCamada(event)">
       <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
@@ -2448,6 +2458,10 @@ const Dashboard = {
     await this._loadList('socios', () => API.getSocios());
     const activos = this.socios.filter(s=>s.activo).length;
     const areas = [...new Set(this.socios.map(s=>s.area))];
+    const esSocio = s => s.tipo === 'Socio' || s.tipo === 'Ambos';
+    const esVol = s => s.tipo === 'Voluntario' || s.tipo === 'Ambos';
+    const tipoF = this._currentSocioTipoFilter || 'all';
+    const visibles = tipoF === 'Socio' ? this.socios.filter(esSocio) : (tipoF === 'Voluntario' ? this.socios.filter(esVol) : this.socios);
     el.innerHTML = `
       <div class="page-list-container">
         <div class="stats-grid" style="margin-bottom:16px">
@@ -2455,11 +2469,18 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${this.socios.length} socios</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count">${visibles.length} registros</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
+      <div class="filters-bar"><div class="filter-row">
+        <select onchange="Dashboard._currentSocioTipoFilter=this.value;Dashboard.renderSocios(document.getElementById('page-socios'))">
+          <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
+          <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
+          <option value="Voluntario" ${tipoF==='Voluntario'?'selected':''}>Voluntarios (${this.socios.filter(s=>s.tipo==='Voluntario'||s.tipo==='Ambos').length})</option>
+        </select>
+      </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Area</th><th>Estado</th></tr></thead>
-        <tbody>${this.socios.length ? this.socios.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td>${this._esc(s.area)}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -2471,6 +2492,7 @@ const Dashboard = {
     this._renderForm('socios', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Socio</h3><form onsubmit="Dashboard.saveSocio(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-group"><label>Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'so-foto-preview')"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
+      <div class="form-row"><div class="form-group"><label>Tipo *</label><select id="so-tipo" required onchange="Dashboard._toggleCuota()"><option value="">Seleccionar...</option><option value="Socio" ${data?.tipo==='Socio'?'selected':''}>Solo socio (cuota)</option><option value="Voluntario" ${data?.tipo==='Voluntario'?'selected':''}>Solo voluntario (colabora)</option><option value="Ambos" ${data?.tipo==='Ambos'?'selected':''}>Ambos</option></select></div><div class="form-group" id="so-cuota-wrap" style="${(data?.tipo==='Socio'||data?.tipo==='Ambos')?'':'display:none'}"><label>Cuota (€/año)</label><input type="text" id="so-cuota" value="${this._esc(data?.cuota||'')}" placeholder="Ej: 30"></div></div>
       <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Area *</label><select id="so-area" required><option value="">Seleccionar area...</option><option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Cuidado de acogida" ${data?.area==='Cuidado de acogida'?'selected':''}>Cuidado de acogida</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option></select></div></div>
       ${data?.carnet_id ? `<div class="form-group"><label>ID Carnet</label><input type="text" value="${this._esc(data.carnet_id)}" readonly style="background:var(--gray-100);font-family:monospace"></div>` : ''}
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('socios')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
@@ -2520,6 +2542,8 @@ const Dashboard = {
       nombre: document.getElementById('so-nombre').value.trim(),
       email: document.getElementById('so-email').value.trim(),
       telefono: document.getElementById('so-telefono').value.trim(),
+      tipo: document.getElementById('so-tipo').value,
+      cuota: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-cuota').value.trim() : '',
       area: document.getElementById('so-area').value
     };
     // Foto
@@ -2589,6 +2613,8 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
             <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${s.telefono||'—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
+            ${(s.tipo==='Socio'||s.tipo==='Ambos')?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div>`:''}
             <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${s.area}</div></div>
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></div></div>
             <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${s.fecha_registro||'—'}</div></div>

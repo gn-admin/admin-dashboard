@@ -304,6 +304,15 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_tipoBadgeCls: tres perfiles', () => {
+  it('mapea cada perfil', () => {
+    assert.equal(Dashboard._tipoBadgeCls('Socio'), 'aprobada');
+    assert.equal(Dashboard._tipoBadgeCls('Voluntario'), 'en_proceso');
+    assert.equal(Dashboard._tipoBadgeCls('Ambos'), 'finalizada');
+    assert.equal(Dashboard._tipoBadgeCls(''), 'finalizada');
+  });
+});
+
 describe('_anioFecha + _restantes2025', () => {
   it('extrae anio de ISO, es-ES e invalido', () => {
     assert.equal(Dashboard._anioFecha('2025-03-14T10:00:00.000Z'), 2025);

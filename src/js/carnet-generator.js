@@ -21,8 +21,10 @@ const CarnetGenerator = {
     this._roundRect(ctx, 0, 0, width, height, 16);
     ctx.fill();
 
-    // Barra superior verde
-    ctx.fillStyle = '#1FC95B';
+    // Banda superior segun perfil: Socio (verde), Voluntariado (azul), Ambos (morado)
+    const perfil = socio.tipo === 'Ambos' ? 'SOCIO + VOLUNTARIADO' : (socio.tipo === 'Voluntario' ? 'VOLUNTARIADO' : 'SOCIO');
+    const perfilColor = socio.tipo === 'Ambos' ? '#7c3aed' : (socio.tipo === 'Voluntario' ? '#2563eb' : '#1FC95B');
+    ctx.fillStyle = perfilColor;
     ctx.fillRect(0, 0, width, 70);
 
     // Logo texto
@@ -44,6 +46,16 @@ const CarnetGenerator = {
     ctx.font = 'bold 11px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(badge, width - badgeW/2 - 16, 39);
+
+    // Sello de perfil a la izquierda del de activo
+    ctx.font = 'bold 11px Inter, Arial, sans-serif';
+    const pw = ctx.measureText(perfil).width + 16;
+    const px = width - badgeW - 16 - 8 - pw;
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    this._roundRect(ctx, px, 20, pw, 28, 14);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(perfil, px + pw/2, 39);
 
     // Foto del socio (circular)
     const fotoSize = 100;
@@ -85,8 +97,9 @@ const CarnetGenerator = {
     ctx.font = '13px Inter, Arial, sans-serif';
     ctx.fillStyle = '#666666';
     ctx.fillText('Area: ' + (socio.area || 'Sin asignar'), infoX, 140);
-    ctx.fillText('Email: ' + (socio.email || ''), infoX, 160);
-    ctx.fillText('Telefono: ' + (socio.telefono || ''), infoX, 180);
+    ctx.fillText('Tipo: ' + (socio.tipo || 'Sin definir'), infoX, 160);
+    ctx.fillText('Email: ' + (socio.email || ''), infoX, 180);
+    ctx.fillText('Telefono: ' + (socio.telefono || ''), infoX, 200);
 
     // QR Code
     const qrSize = 120;
