@@ -1362,7 +1362,8 @@ const Dashboard = {
     const obl = document.getElementById('cm-obl').checked;
     if (!grupo || !base) { this.showSnackbar('Completa grupo y nombre base', 'warning'); return; }
     const grupo_id = 'gpo_' + Date.now().toString(36);
-    this.showLoading();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     try {
       for (let i = 1; i <= cantidad; i++) {
         const nombre = cantidad > 1 ? base + ' ' + this._romano(i) : base;
@@ -1375,7 +1376,7 @@ const Dashboard = {
           this.animales.push({ ...row, id: 'ani_' + Date.now().toString(36) + i });
         }
       }
-    } finally { this.hideLoading(); }
+    } finally { finGuardar(); }
     this.closeFormModal();
     this.renderAnimales(document.getElementById('page-animales'));
     this.showSnackbar('Camada ' + grupo + ' creada (' + cantidad + ' animales)', 'success');
@@ -1390,6 +1391,8 @@ const Dashboard = {
 
   async saveAnimal(e, isEdit, id) {
     e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const existing = isEdit ? this._byId(this.animales, id) : null;
     let especie = document.getElementById('an-especie').value;
     if (especie === '__otro__') especie = document.getElementById('an-especie-otra').value.trim() || especie;
@@ -1423,6 +1426,7 @@ const Dashboard = {
       fotoBase64 = await new Promise(resolve => {
         const r = new FileReader();
         r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, 800, 600, 0.78));
+        r.onerror = () => resolve(null);
         r.readAsDataURL(fotoInput.files[0]);
       });
     } else if (fotoUrlInput && fotoUrlInput.value.trim()) {
@@ -1455,8 +1459,10 @@ const Dashboard = {
       }
     } catch (err) {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      finGuardar();
       return;
     }
+    finGuardar();
     this.closeFormModal();
     if (isEdit) this.viewAnimal(id);
     else this.renderAnimales(document.getElementById('page-animales'));
@@ -1590,6 +1596,8 @@ const Dashboard = {
 
   async saveFamilia(e, isEdit, id) {
     e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const existing = isEdit ? this._byId(this.familias, id) : null;
     const data = {
       nombre: document.getElementById('fa-nombre').value.trim(),
@@ -1612,8 +1620,10 @@ const Dashboard = {
       }
     } catch (err) {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      finGuardar();
       return;
     }
+    finGuardar();
     this.cancelForm('acogidas');
     if (isEdit) this.viewFosterFamily(id);
     else this.renderAcogidas(document.getElementById('page-acogidas'));
@@ -1827,6 +1837,8 @@ const Dashboard = {
 
   async saveAdopcion(e, isEdit, id) {
     e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const data = {
       animal: document.getElementById('ad-animal').value.trim(),
       adoptante: document.getElementById('ad-adoptante').value.trim(),
@@ -1846,8 +1858,10 @@ const Dashboard = {
       }
     } catch (err) {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      finGuardar();
       return;
     }
+    finGuardar();
     this.cancelForm('adopciones');
     if (isEdit) this.viewAdopcion(id);
     else this.renderAdopciones(document.getElementById('page-adopciones'));
@@ -2096,6 +2110,8 @@ const Dashboard = {
       creado: new Date().toISOString()
     };
     if (!c.f1_firma) { this.showSnackbar('Falta la firma del firmante 1: dibujala en el recuadro', 'warning'); return; }
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const a = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     if (a) { c.especie = a.especie; c.raza = a.raza; c.edad = a.edad; }
     this.contratos.push(c);
@@ -2113,6 +2129,7 @@ const Dashboard = {
     this.closeContratoForm();
     this.viewAdopcion(adopcionId);
     this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''));
+    finGuardar();
     this.showSnackbar('Contrato firmado y guardado', 'success');
   },
 
@@ -2215,6 +2232,8 @@ const Dashboard = {
 
   async saveSocio(e, isEdit, id) {
     e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const data = {
       nombre: document.getElementById('so-nombre').value.trim(),
       email: document.getElementById('so-email').value.trim(),
@@ -2227,6 +2246,7 @@ const Dashboard = {
       const raw = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (ev) => resolve(ev.target.result);
+        reader.onerror = () => resolve(null);
         reader.readAsDataURL(fotoInput.files[0]);
       });
       data.foto = await this._downscaleImage(raw, 128, 128);
@@ -2259,8 +2279,10 @@ const Dashboard = {
       }
     } catch (err) {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      finGuardar();
       return;
     }
+    finGuardar();
     this.cancelForm('socios');
     if (isEdit) this.viewSocio(id);
     else this.renderSocios(document.getElementById('page-socios'));
@@ -2363,6 +2385,8 @@ const Dashboard = {
 
   async saveBlacklistItem(e, id) {
     e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const prev = id ? (this.blacklist || []).find(b => String(b.id) === String(id)) || this.blacklist[Number(id)] : null;
     const item = {
       id: prev ? prev.id : ('bl_' + Date.now().toString(36)),
@@ -2376,7 +2400,8 @@ const Dashboard = {
       fecha: prev ? prev.fecha : new Date().toISOString()
     };
     try { await (id ? API.updateBlacklist(item.id, item) : API.createBlacklist(item)); }
-    catch (err) { this.showSnackbar(this._errMsg(err), 'error'); return; }
+    catch (err) { this.showSnackbar(this._errMsg(err), 'error'); finGuardar(); return; }
+    finGuardar();
     if (id) { const i = (this.blacklist || []).findIndex(b => String(b.id) === String(item.id)); if (i >= 0) this.blacklist[i] = item; }
     else { this.blacklist.push(item); }
     this.saveLocal();
@@ -2442,6 +2467,25 @@ const Dashboard = {
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-gatos')">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-acogida')">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
       </div></div>`;
+  },
+
+  // Anti-doble-clic en Guardar: deshabilita el boton, pone "Guardando..."
+  // y muestra el overlay (con spinner). Devuelve liberador, o null si el
+  // form ya esta en curso (segundo submit por Enter) -> el llamante retorna.
+  _guardando(form) {
+    if (form && form.dataset && form.dataset.guardando === '1') return null;
+    const btn = form ? form.querySelector('button[type="submit"]') : null;
+    const prev = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Guardando...'; }
+    if (form && form.dataset) form.dataset.guardando = '1';
+    this.showLoading();
+    let done = false;
+    return () => {
+      if (done) return; done = true;
+      if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = prev; }
+      if (form && form.dataset) delete form.dataset.guardando;
+      this.hideLoading();
+    };
   },
 
   showLoading() { document.getElementById('loading')?.classList.add('active'); },
