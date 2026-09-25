@@ -1638,7 +1638,7 @@ const Dashboard = {
           <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" style="width:32px;height:32px;border-radius:50%;object-fit:cover">
           <div><div style="font-weight:700;font-size:.85rem">grupo_nebak</div><div style="font-size:.72rem;color:var(--gray-500)">Publicidad · Simulado</div></div>
         </div>
-        ${foto ? `<img src="${this._esc(foto)}" alt="" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block">` : `<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-400);font-size:.85rem">Sin foto</div>`}
+        ${foto ? `<img src="${this._esc(foto)}" alt="" style="width:100%;aspect-ratio:1/1;min-height:240px;object-fit:cover;display:block">` : `<div style="aspect-ratio:1/1;min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-400);font-size:.85rem">Sin foto</div>`}
         <div style="padding:10px 12px;font-size:.85rem;white-space:pre-wrap">${this._esc(cab)}${txt.split('\n').filter(l => l.trim()).length > 1 ? ' <span style="color:var(--gray-500)">...más</span>' : ''}</div>
         <div style="padding:0 12px 10px;font-size:.72rem;color:var(--gray-400)">Vista previa aproximada · ${this._esc((a && a.nombre) || '')}</div>
       </div>`;
