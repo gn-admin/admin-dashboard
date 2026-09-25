@@ -303,3 +303,10 @@ describe('_dummyPermalink', () => {
     assert.equal(Dashboard._dummyPermalink('pub_mn123abc'), 'https://www.instagram.com/p/mn123abc/');
   });
 });
+
+describe('_ensureListas: nunca lanza', () => {
+  it('claves desconocidas se ignoran', async () => {
+    await Dashboard._ensureListas(['nope', null]);
+    await Dashboard._ensureListas();
+  });
+});

@@ -1,21 +1,29 @@
 const Auth = {
   currentUser: null,
   _listeners: [],
+  _resolved: false,
 
   init() {
     this._loadFirebaseSDK().then(() => {
       firebase.initializeApp(CONFIG.firebase);
       firebase.auth().onAuthStateChanged(user => {
+        this._resolved = true;
         this.currentUser = user ? {
           uid: user.uid,
           email: user.email,
           name: user.displayName || user.email,
           role: null
         } : null;
+        try {
+          if (user) localStorage.setItem('gn_session', '1');
+          else localStorage.removeItem('gn_session');
+        } catch {}
         this._notifyListeners();
       });
     }).catch(err => {
       console.error('Error cargando Firebase SDK:', err);
+      this._resolved = true;
+      this._notifyListeners();
     });
   },
 
@@ -29,12 +37,14 @@ const Auth = {
       name: fbUser.displayName || fbUser.email,
       role: null
     };
+    try { localStorage.setItem('gn_session', '1'); } catch {}
     return this.currentUser;
   },
 
   async logout() {
     await firebase.auth().signOut();
     this.currentUser = null;
+    try { localStorage.removeItem('gn_session'); } catch {}
     ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad','gn_publicaciones'].forEach(k => localStorage.removeItem(k));
     this._notifyListeners();
   },

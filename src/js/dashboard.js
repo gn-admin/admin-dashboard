@@ -9,16 +9,16 @@ const Dashboard = {
     this.injectIcons();
     this.showLoading();
     try {
-      this.userProfile = await API.getUserProfile();
-      this.updateUserUI();
-      await this._loadSurveys();
-      await this.loadEstados();
-      await this.loadNotas();
-      await Promise.all([
-        this._loadListBestEffort('candidaturas', () => API.getCandidaturas()),
-        this._loadListBestEffort('acogidas', () => API.getAcogidas()),
-        this._loadListBestEffort('contratos', () => API.getContratos())
+      const [user] = await Promise.all([
+        API.getUserProfile(),
+        this._loadSurveys().catch(() => []),
+        this.loadEstados().catch(() => ({})),
+        this.loadNotas().catch(() => ({}))
       ]);
+      this.userProfile = user;
+      this.updateUserUI();
+      // Preloads no bloqueantes; cada pantalla/ficha asegura lo suyo al abrirse.
+      this._ensureListas(['candidaturas', 'acogidas', 'contratos']);
       this._renderPendingBadge();
       this.flushPendingOps();
       if (!this._onlineHook) {
@@ -31,6 +31,22 @@ const Dashboard = {
     } finally {
       this.hideLoading();
     }
+  },
+
+  // Asegura listas en memoria (best-effort: nunca lanza; usa caché si ya están).
+  async _ensureListas(keys) {
+    const fns = {
+      candidaturas: () => API.getCandidaturas(),
+      acogidas: () => API.getAcogidas(),
+      contratos: () => API.getContratos(),
+      animales: () => API.getAnimales(),
+      familias: () => API.getFamilias(),
+      adopciones: () => API.getAdopciones(),
+      socios: () => API.getSocios(),
+      blacklist: () => API.getBlacklist(),
+      actividad: () => API.getActividad()
+    };
+    await Promise.all((keys || []).map(k => (fns[k] ? this._loadListBestEffort(k, fns[k]) : null)));
   },
 
   async loadPage(page) {
@@ -671,7 +687,8 @@ const Dashboard = {
     return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
-  viewDetail(surveyId, responseId) {
+  async viewDetail(surveyId, responseId) {
+    await this._ensureListas(['candidaturas', 'animales', 'blacklist']);
     const r=(this.responses[surveyId]||[]).find(x=>x.id===responseId);
     if(!r) return;
     const blMatch = this.blacklist.find(b => {
@@ -1719,6 +1736,7 @@ const Dashboard = {
 
   async deleteAnimal(id) {
     if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
+    await this._ensureListas(['acogidas', 'candidaturas', 'adopciones']);
     try { const res = await API.deleteAnimal(id); this._assertDeleted(res, 'El animal'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.animal_id === id);
@@ -1860,6 +1878,7 @@ const Dashboard = {
 
   async deleteFamilia(id) {
     if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
+    await this._ensureListas(['acogidas']);
     try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
@@ -2106,7 +2125,8 @@ const Dashboard = {
     return true;
   },
 
-  viewAdopcion(id) {
+  async viewAdopcion(id) {
+    await this._ensureListas(['contratos']);
     const p = this._byId(this.adopciones, id);
     if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
@@ -2185,6 +2205,7 @@ const Dashboard = {
     const target = this._byId(this.adopciones, id);
     try { const res = await API.deleteAdopcion(id); this._assertDeleted(res, 'El caso'); }
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    await this._ensureListas(['contratos']);
     const c = this._contratoDeAdopcion(id);
     if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
     // Espejo local del rollback (el backend ya lo aplico en las hojas):
@@ -2337,7 +2358,8 @@ const Dashboard = {
     this.showSnackbar('Contrato firmado y guardado', 'success');
   },
 
-  descargarContrato(adopcionId) {
+  async descargarContrato(adopcionId) {
+    await this._ensureListas(['contratos']);
     const c = this._contratoDeAdopcion(adopcionId);
     if (!c) { this.showSnackbar('No hay contrato firmado', 'warning'); return; }
     PdfExport.exportContracto(c);
@@ -2345,11 +2367,12 @@ const Dashboard = {
 
   async anularContrato(adopcionId) {
     if (!(await this._confirm('Anular la firma del contrato?'))) return;
+    await this._ensureListas(['contratos']);
     const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
     this.contratos = this.contratos.filter(x => x.id !== c.id);
     this.saveLocal();
     if (c) { try { await API.deleteContrato(c.id); } catch (err) { /* local only */ } }
-    const p = this.adopciones.find(x => x.id === adopcionId);
+    const p = this._byId(this.adopciones, adopcionId);
     if (p) {
       p.estado = 'Fase: Contrato';
       p.estado_firma = '';

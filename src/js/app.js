@@ -5,13 +5,28 @@ const App = {
     this.registerServiceWorker();
     this.initSidebarCollapse();
     this.initSidebarSections();
+    this._routed = false;
     Auth.init();
+    let previa = false;
+    try { previa = localStorage.getItem('gn_session') === '1'; } catch {}
+    if (previa) {
+      // Hubo login previo: loading directo, sin pintar el login (pareceria deslogueo).
+      document.getElementById('login-view')?.classList.remove('active');
+      document.getElementById('loading')?.classList.add('active');
+    }
     Auth.onAuthChange(async user => {
+      if (!Auth._resolved && !user) return; // aun verificando sesion
       if (user) await this.showDashboard();
       else this.showLogin();
     });
     this.setupEventListeners();
     window.addEventListener('hashchange', () => this.onHashChange());
+    setTimeout(() => {
+      if (!this._routed) {
+        document.getElementById('loading')?.classList.remove('active');
+        this.showLogin();
+      }
+    }, 12000);
   },
 
   registerServiceWorker() {
@@ -32,6 +47,7 @@ const App = {
   },
 
   async showDashboard() {
+    this._routed = true;
     document.getElementById('login-view').classList.remove('active');
     document.getElementById('dashboard-view').classList.add('active');
     await Dashboard.init();
@@ -40,6 +56,8 @@ const App = {
   },
 
   showLogin() {
+    this._routed = true;
+    document.getElementById('loading')?.classList.remove('active');
     document.getElementById('dashboard-view').classList.remove('active');
     document.getElementById('login-view').classList.add('active');
   },
