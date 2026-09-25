@@ -315,7 +315,7 @@ body {
 .sidebar-link:focus-visible,
 .bottom-nav-item:focus-visible,
 .mas-menu-item:focus-visible,
-.tutorial-tab:focus-visible,
+.guide-menu-item:focus-visible,
 .password-toggle:focus-visible,
 .guide-index-item:focus-visible {
   outline: 2px solid var(--primary);
@@ -1763,32 +1763,97 @@ body {
 }
 
 /* ===== GUIA DE PROCESOS (TUTORIAL) ===== */
-.tutorial-tabs {
+.guide-menu {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .guide-menu {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.guide-menu-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.tutorial-tab {
-  font-size: 0.8rem;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: var(--gray-100);
-  color: var(--gray-600);
-  border: 1px solid transparent;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
   cursor: pointer;
-  font-weight: 600;
-  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  min-height: 68px;
+  color: var(--gray-800);
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
 
-.tutorial-tab:hover {
-  background: var(--gray-200);
+.guide-menu-item:hover {
+  border-color: var(--primary);
+  background: var(--primary-lighter);
 }
 
-.tutorial-tab.active {
-  background: var(--primary);
-  color: var(--white);
+.guide-menu-item:active {
+  transform: scale(0.99);
+}
+
+.guide-menu-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.guide-menu-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.guide-menu-text b {
+  font-size: 0.9rem;
+}
+
+.guide-menu-text small {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.guide-menu-chevron {
+  color: var(--gray-300);
+  display: flex;
+  flex-shrink: 0;
+}
+
+.tutorial-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gray-500);
+  margin: 16px 0 8px;
+}
+
+.tutorial-section-title:first-child {
+  margin-top: 0;
+}
+
+.tutorial-back {
+  margin-bottom: 12px;
+}
+
+.tutorial-guide-title {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
 }
 
 .tutorial-panel {

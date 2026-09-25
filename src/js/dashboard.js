@@ -614,8 +614,8 @@ const Dashboard = {
       ];
       return staticItems.map(item=>`<div class="timeline-item"><div class="timeline-dot-wrap"><div class="timeline-dot ${item.color}"></div><div class="timeline-line"></div></div><div class="timeline-content"><div class="timeline-text">${item.text}</div><div class="timeline-time">${item.time}</div></div></div>`).join('');
     }
-    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange' };
-    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio' };
+    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange', acogida:'blue', adopcion:'orange', contrato:'green', blacklist:'red', candidatura:'blue', socio:'green' };
+    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio', acogida:'Caso de acogida', adopcion:'Caso de adopcion', contrato:'Contrato', blacklist:'Lista negra', candidatura:'Candidatura', socio:'Socio' };
     return this.actividad.slice(0, 5).map(item => {
       const t = new Date(item.fecha);
       const diff = Math.floor((Date.now() - t.getTime()) / 60000);
@@ -805,22 +805,38 @@ const Dashboard = {
     const el = document.getElementById('tutorial-modal');
     const body = document.getElementById('tutorial-content');
     if (!el || !body) return;
-    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', estados: 'Estados y consejos' };
-    if (!tab) tab = this._tutorialTabActive || 'general';
-    this._tutorialTabActive = tab;
-    const tabbar = `<div class="tutorial-tabs">${Object.keys(tabs).map(t=>`<button class="tutorial-tab${t===tab?' active':''}" onclick="Dashboard.showTutorial('${t}')">${tabs[t]}</button>`).join('')}</div>`;
-    const panels = {
-      general: this._tutorialGeneral(),
-      adopcion: this._tutorialAdopcion(),
-      acogida: this._tutorialAcogida(),
-      redes: this._tutorialRedes(),
-      apadrinamiento: this._tutorialApadrinamiento(),
-      estados: this._tutorialEstados()
-    };
-    body.innerHTML = tabbar + `<div class="tutorial-panel">` + panels[tab] + `</div>`;
+    if (!tab) {
+      body.innerHTML = this._tutorialMenu();
+    } else {
+      const titles = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', estados: 'Estados y consejos' };
+      const panels = {
+        general: this._tutorialGeneral(),
+        adopcion: this._tutorialAdopcion(),
+        acogida: this._tutorialAcogida(),
+        redes: this._tutorialRedes(),
+        apadrinamiento: this._tutorialApadrinamiento(),
+        estados: this._tutorialEstados()
+      };
+      body.innerHTML = `<button class="btn btn-outline-green btn-sm tutorial-back" onclick="Dashboard.showTutorial()">${Icons.arrowLeft} Todas las guías</button><h3 class="tutorial-guide-title">${titles[tab] || ''}</h3><div class="tutorial-panel">${panels[tab] || ''}</div>`;
+    }
     el.style.display = 'flex';
     body.scrollTop = 0;
     this.injectIcons();
+  },
+
+  _tutorialMenu() {
+    const guides = [
+      ['general', 'Flujo general', 'Vision global del proceso.', Icons.dashboard, '#e8faf0', '#16a34a'],
+      ['adopcion', 'Adopcion (perros/gatos)', 'De la solicitud al contrato firmado.', Icons.heart, '#e8faf0', '#16a34a'],
+      ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, '#ebf5fb', '#2563eb'],
+      ['redes', 'Redes sociales', 'Plantillas y publicaciones.', Icons.clipboard, '#fce4ec', '#e91e63'],
+      ['apadrinamiento', 'Apadrinamiento', 'Padrinos, aportes e historial.', Icons.paw, '#f3e8ff', '#7c3aed'],
+      ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, '#e8faf0', '#16a34a']
+    ];
+    return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
+    <div class="guide-note">${Icons.info} <span>Los estados se pueden mover hacia delante y hacia atras en cualquier momento desde la ficha de cada solicitud.</span></div>
+    <h4 class="tutorial-section-title">Accesos directos</h4>
+    ${this._tutorialIndex()}`;
   },
 
   _flowDiagram(nodes, accent) {
@@ -957,8 +973,11 @@ const Dashboard = {
     return `
       <div class="guide-note">${Icons.info} <span>Los estados se guardan <b>por solicitud</b> y se muestran siempre como etiqueta de color junto a cada persona. Cambiar de estado es <b>reversible</b> en cualquier momento.</span></div>
       <h4 class="guide-subtitle">Que significa cada estado</h4>
-      <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>
-      <h4 class="guide-subtitle">Donde esta cada cosa</h4>
+      <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>`;
+  },
+
+  _tutorialIndex() {
+    return `
       <div class="guide-index">
         <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
@@ -2708,6 +2727,7 @@ const Dashboard = {
     if (!(await this._confirm('Anular la firma del contrato?'))) return;
     await this._ensureListas(['contratos']);
     const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
+    if (!c) { this.showSnackbar('No hay contrato que anular', 'warning'); return; }
     this.contratos = this.contratos.filter(x => x.id !== c.id);
     this.saveLocal();
     if (c) { try { await API.deleteContrato(c.id); } catch (err) { /* local only */ } }

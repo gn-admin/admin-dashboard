@@ -41,55 +41,55 @@ const API = {
   // Animales (CRUD)
   async getAnimales() { return this._get('animales'); },
   async createAnimal(data) { return this._post('animales', data); },
-  async updateAnimal(id, data) { return this._post('update-animal', { id, ...data }); },
+  async updateAnimal(id, data) { const r = await this._post('update-animal', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteAnimal(id) { return this._post('delete-animal', { id }); },
 
   // Familias acogedoras (CRUD)
   async getFamilias() { return this._get('familias'); },
   async createFamilia(data) { return this._post('familias', data); },
-  async updateFamilia(id, data) { return this._post('update-familia', { id, ...data }); },
+  async updateFamilia(id, data) { const r = await this._post('update-familia', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteFamilia(id) { return this._post('delete-familia', { id }); },
 
   // Adopciones (CRUD)
   async getAdopciones() { return this._get('adopciones'); },
   async createAdopcion(data) { return this._post('adopciones', data); },
-  async updateAdopcion(id, data) { return this._post('update-adopcion', { id, ...data }); },
+  async updateAdopcion(id, data) { const r = await this._post('update-adopcion', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteAdopcion(id) { return this._post('delete-adopcion', { id }); },
 
   // Candidaturas (CRUD)
   async getCandidaturas() { return this._get('candidaturas'); },
   async createCandidatura(data) { return this._post('candidaturas', data); },
-  async updateCandidatura(id, data) { return this._post('update-candidatura', { id, ...data }); },
+  async updateCandidatura(id, data) { const r = await this._post('update-candidatura', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteCandidatura(id) { return this._post('delete-candidatura', { id }); },
 
   // Acogidas activas (CRUD)
   async getAcogidas() { return this._get('acogidas'); },
   async createAcogida(data) { return this._post('acogidas', data); },
-  async updateAcogida(id, data) { return this._post('update-acogida', { id, ...data }); },
+  async updateAcogida(id, data) { const r = await this._post('update-acogida', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteAcogida(id) { return this._post('delete-acogida', { id }); },
 
   // Apadrinamientos (CRUD)
   async getApadrinamientos() { return this._get('apadrinamientos'); },
   async createApadrinamiento(data) { return this._post('apadrinamientos', data); },
-  async updateApadrinamiento(id, data) { return this._post('update-apadrinamiento', { id, ...data }); },
+  async updateApadrinamiento(id, data) { const r = await this._post('update-apadrinamiento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteApadrinamiento(id) { return this._post('delete-apadrinamiento', { id }); },
 
   // Contratos (CRUD)
   async getContratos() { return this._get('contratos'); },
   async createContrato(data) { return this._post('contratos', data); },
-  async updateContrato(id, data) { return this._post('update-contrato', { id, ...data }); },
+  async updateContrato(id, data) { const r = await this._post('update-contrato', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteContrato(id) { return this._post('delete-contrato', { id }); },
 
   // Socios (CRUD)
   async getSocios() { return this._get('socios'); },
   async createSocio(data) { return this._post('socios', data); },
-  async updateSocio(id, data) { return this._post('update-socio', { id, ...data }); },
+  async updateSocio(id, data) { const r = await this._post('update-socio', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteSocio(id) { return this._post('delete-socio', { id }); },
 
   // Blacklist (CRUD)
   async getBlacklist() { return this._get('blacklist'); },
   async createBlacklist(data) { return this._post('blacklist', data); },
-  async updateBlacklist(id, data) { return this._post('update-blacklist', { id, ...data }); },
+  async updateBlacklist(id, data) { const r = await this._post('update-blacklist', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteBlacklist(id) { return this._post('delete-blacklist', { id }); },
 
   // Foto animal a Drive
