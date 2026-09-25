@@ -71,6 +71,11 @@ const CONFIG = {
     name: 'GN-Encuestas',
     version: '1.0.0',
     pdfDefaultTitle: 'Reporte de Encuestas'
+  },
+
+  contacto: {
+    telefono: '${env('CONTACTO_TELEFONO')}',
+    email: '${env('CONTACTO_EMAIL')}'
   }
 };
 

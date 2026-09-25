@@ -847,10 +847,10 @@ const Dashboard = {
         ['Conecta Instagram', 'Meta: cuenta + App'],
         ['Historial real', 'enlaces en la ficha']
       ], '#e91e63')}</div>
-      ${this._guideStep(Icons.heart, '1. Elige el animal', 'En <b>Redes</b> selecciona el animal: veras su foto principal y el texto <b>plantilla</b> ya rellenado con sus datos (nombre, especie, raza, edad, descripcion y hashtags). Tambien puedes saltar desde el boton <b>Publicar</b> de su ficha.', 'Redes', true)}
-      ${this._guideStep(Icons.pencil, '2. Ajusta el texto', 'Edita el caption a tu gusto o usa <b>Copiar texto</b> para llevarlo a otra app.', 'Redes > Texto', true)}
-      ${this._guideStep(Icons.checkCircle, '3. Publica', 'Pulsa <b>Publicar</b>: de momento se guarda como <b>simulada</b> en este dispositivo (naranja) hasta conectar Instagram. Aparece en el historial y en la ficha del animal.', 'Redes > Publicar', true)}
-      ${this._guideStep(Icons.info, '4. Conexion real (pendiente)', 'Para publicar de verdad hace falta cuenta de Empresa/Creador vinculada a Facebook + App de Meta. Entonces cada post guardara su enlace y saldra en la ficha como "Ver post".', 'Meta Business', false)}`;
+      ${this._guideStep(Icons.heart, '1. Elige animal y tipo', 'En <b>Redes</b> selecciona el animal y el tipo (<b>Adopcion</b> con contrato o <b>Acogida</b> temporal): veras su foto y el texto <b>plantilla</b> ya rellenado (datos, iconos, telefonos de contacto y hashtags). Tambien se llega con el boton <b>Publicar</b> de su ficha.', 'Redes', true)}
+      ${this._guideStep(Icons.pencil, '2. Ajusta y previsualiza', 'Edita el caption (contador hasta 2200) o usa <b>Copiar texto</b>. La <b>vista previa</b> muestra como quedaria el post.', 'Redes > Vista previa', true)}
+      ${this._guideStep(Icons.checkCircle, '3. Publica', 'Pulsa <b>Publicar</b>: de momento se guarda como <b>simulada</b> (naranja) con su enlace de ejemplo en el historial. Aparece tambien en la ficha del animal.', 'Redes > Publicar', true)}
+      ${this._guideStep(Icons.info, '4. Conexion real (pendiente)', 'Para publicar de verdad hace falta cuenta de Empresa/Creador vinculada a Facebook + App de Meta. Entonces cada post guardara su enlace real y saldra en la ficha como "Ver post".', 'Meta Business', false)}`;
   },
 
   _tutorialEstados() {
@@ -1274,8 +1274,10 @@ const Dashboard = {
   // Corte a real (TODO Meta): _pushPublicacion/_removePublicacion pasaran a
   // llamar a API.createPublicacion/getPublicaciones/deletePublicacion y la
   // hoja Publicaciones sera la fuente (hoy: localStorage gn_publicaciones).
-  _plantillaPublicacion(a) {
+  _plantillaPublicacion(a, tipo, contacto) {
     a = a || {};
+    tipo = tipo === 'acogida' ? 'acogida' : 'adopcion';
+    const icon = a.especie === 'Gato' ? '🐱' : (a.especie === 'Perro' ? '🐶' : '🐾');
     const nombre = (String(a.nombre || '').trim()) || 'este peludo';
     const bits = [a.especie, a.raza, a.edad, a.sexo].map(x => String(x || '').trim()).filter(x => x);
     const desc = String(a.descripcion || '').trim();
@@ -1284,17 +1286,33 @@ const Dashboard = {
       : (a.estado === 'adoptado'
         ? 'Ya encontre mi hogar. Gracias por difundir.'
         : 'Estoy disponible para adopcion.');
+    const legal = tipo === 'acogida'
+      ? 'La acogida es temporal y se formaliza con acuerdo de acogida.'
+      : 'La adopcion se formaliza con contrato de adopcion.';
+    const cfg = contacto || ((typeof CONFIG !== 'undefined' && CONFIG.contacto) || {});
+    const tel = String(cfg.telefono || '').trim();
+    const mail = String(cfg.email || '').trim();
     const tags = ['#AdoptaNoCompres', '#GrupoNebak', '#AdopcionResponsable'];
     const esp = String(a.especie || '').replace(/[^A-Za-z]/g, '');
     if (esp) tags.push('#' + esp + 'EnAdopcion');
-    const out = ['Hola! Soy ' + nombre + '.'];
-    if (bits.length) out.push(bits.join(' · '));
-    if (desc) out.push(desc);
+    const out = [icon + ' Hola! Soy ' + nombre + ' ' + icon];
+    if (bits.length) out.push('❤️ ' + bits.join(' · '));
+    if (desc) out.push('📝 ' + desc);
     out.push('');
-    out.push(sit + ' Si quieres conocerme, escribenos por MD o email.');
+    out.push('🏠 ' + sit);
+    out.push('📋 ' + legal);
+    out.push('');
+    if (tel) out.push('📞 ' + tel);
+    if (mail) out.push('📩 ' + mail);
+    if (!tel && !mail) out.push('Escribenos por MD o email.');
     out.push('');
     out.push(tags.join(' '));
     return out.join('\n');
+  },
+
+  _dummyPermalink(id) {
+    const code = String(id || '').replace(/^pub_/, '') || 'post';
+    return 'https://www.instagram.com/p/' + code + '/';
   },
 
   _publicacionesDe(animalId) {
@@ -1327,23 +1345,57 @@ const Dashboard = {
         <div class="alert-item info" style="margin-bottom:16px">${Icons.info} <span>Modo <b>simulado</b>: las publicaciones se guardan en este dispositivo hasta conectar Instagram.</span></div>
         <div class="form-card" style="margin-bottom:16px"><h3>Nueva publicacion · Instagram</h3>
           <div class="form-row"><div class="form-group"><label>Animal *</label><select id="rd-animal" onchange="Dashboard._rellenarPlantilla()">${this.animales.map(a => `<option value="${this._esc(a.id)}" ${String(a.id) === String(selId) ? 'selected' : ''}>${this._esc(a.nombre)} · ${this._esc(a.especie || '')}</option>`).join('')}</select></div>
-          <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div></div>
-          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8"></textarea></div>
+          <div class="form-group"><label>Tipo *</label><select id="rd-tipo" onchange="Dashboard._rellenarPlantilla()"><option value="adopcion">Adopcion (contrato)</option><option value="acogida">Acogida (acuerdo temporal)</option></select></div></div>
+          <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div>
+          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:.72rem;color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
           <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard._copiarCaption()">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
         </div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Vista previa</h3></div><div class="card-body"><div id="rd-preview"></div></div></div>
         <div class="card"><div class="card-header"><h3>Historial</h3></div><div class="card-body-flush"><div id="redes-historial">${this._renderRedesHistorial()}</div></div></div>
       </div>
       <div class="page-detail-container"></div>`;
     this._rellenarPlantilla();
   },
 
+  _redesTipo() {
+    const sel = document.getElementById('rd-tipo');
+    return sel && sel.value === 'acogida' ? 'acogida' : 'adopcion';
+  },
+
   _rellenarPlantilla() {
     const sel = document.getElementById('rd-animal');
     const a = sel ? this._byId(this.animales, sel.value) : null;
     const ta = document.getElementById('rd-caption');
-    if (ta) ta.value = this._plantillaPublicacion(a);
+    if (ta) ta.value = this._plantillaPublicacion(a, this._redesTipo());
     const fv = document.getElementById('rd-foto');
     if (fv) fv.innerHTML = a && this._fotoSrc(a) ? `<img src="${this._esc(this._fotoSrc(a))}" alt="" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:2px solid var(--primary)">` : '<span style="color:var(--gray-400);font-size:.8rem">Sin foto</span>';
+    this._actualizarPreviewRedes();
+  },
+
+  _actualizarPreviewRedes() {
+    const pv = document.getElementById('rd-preview');
+    const ta = document.getElementById('rd-caption');
+    const cnt = document.getElementById('rd-count');
+    const txt = ta ? ta.value : '';
+    if (cnt) {
+      cnt.textContent = txt.length;
+      cnt.style.color = txt.length > 2200 ? 'var(--danger)' : 'var(--gray-400)';
+    }
+    if (!pv) return;
+    const sel = document.getElementById('rd-animal');
+    const a = sel ? this._byId(this.animales, sel.value) : null;
+    const foto = a ? this._fotoSrc(a) : '';
+    const cab = txt.split('\n').filter(l => l.trim())[0] || 'Nueva publicacion';
+    pv.innerHTML = `
+      <div style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;max-width:420px">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+          <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" style="width:32px;height:32px;border-radius:50%;object-fit:cover">
+          <div><div style="font-weight:700;font-size:.85rem">grupo_nebak</div><div style="font-size:.72rem;color:var(--gray-500)">Publicidad · Simulado</div></div>
+        </div>
+        ${foto ? `<img src="${this._esc(foto)}" alt="" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block">` : `<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-400);font-size:.85rem">Sin foto</div>`}
+        <div style="padding:10px 12px;font-size:.85rem;white-space:pre-wrap">${this._esc(cab)}${txt.split('\n').filter(l => l.trim()).length > 1 ? ' <span style="color:var(--gray-500)">...más</span>' : ''}</div>
+        <div style="padding:0 12px 10px;font-size:.72rem;color:var(--gray-400)">Vista previa aproximada · ${this._esc((a && a.nombre) || '')}</div>
+      </div>`;
   },
 
   async _copiarCaption() {
@@ -1360,15 +1412,18 @@ const Dashboard = {
     const a = sel ? this._byId(this.animales, sel.value) : null;
     if (!a) { this.showSnackbar('Elige un animal', 'warning'); return; }
     const ta = document.getElementById('rd-caption');
+    const tipo = this._redesTipo();
+    const id = 'pub_' + Date.now().toString(36);
     this._pushPublicacion({
-      id: 'pub_' + Date.now().toString(36),
+      id,
       fecha: new Date().toISOString(),
       red: 'instagram',
+      tipo,
       animal_id: a.id,
       animal: a.nombre,
-      caption: ta ? ta.value : this._plantillaPublicacion(a),
+      caption: ta ? ta.value : this._plantillaPublicacion(a, tipo),
       media: this._fotoSrc(a),
-      permalink: '',
+      permalink: this._dummyPermalink(id),
       estado: 'simulado'
     });
     const h = document.getElementById('redes-historial');
@@ -1379,7 +1434,7 @@ const Dashboard = {
   _renderRedesHistorial() {
     const items = (this.publicaciones || []).slice().reverse();
     if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
-    return `<table class="data-table"><thead><tr><th>Fecha</th><th>Animal</th><th>Red</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>Instagram</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap">${p.permalink ? `<a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> ` : ''}<button class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> <button class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
   },
 
   async borrarPublicacion(id) {

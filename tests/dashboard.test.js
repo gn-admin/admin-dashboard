@@ -268,3 +268,38 @@ describe('_plantillaPublicacion: post con datos del animal', () => {
     assert.doesNotMatch(t, /\n{3,}/);
   });
 });
+
+describe('_plantillaPublicacion v2: iconos, tipo y contacto', () => {
+  const base = { nombre: 'Luna', especie: 'Gato', raza: 'Comun', edad: '1 año', sexo: 'Hembra', descripcion: 'Tranquila.', estado: 'disponible' };
+
+  it('icono por especie y tipo adopcion', () => {
+    const t = Dashboard._plantillaPublicacion(base, 'adopcion', {});
+    assert.match(t, /🐱/);
+    assert.match(t, /contrato de adopcion/);
+    assert.match(t, /#GatoEnAdopcion/);
+  });
+
+  it('tipo acogida menciona acuerdo temporal', () => {
+    const t = Dashboard._plantillaPublicacion(base, 'acogida', {});
+    assert.match(t, /acuerdo de acogida/);
+    assert.doesNotMatch(t, /contrato de adopcion/);
+  });
+
+  it('contacto configurado sale con iconos', () => {
+    const t = Dashboard._plantillaPublicacion(base, 'adopcion', { telefono: '600 123 456', email: 'hola@nebak.org' });
+    assert.match(t, /📞 600 123 456/);
+    assert.match(t, /📩 hola@nebak\.org/);
+  });
+
+  it('sin contacto sale linea generica', () => {
+    const t = Dashboard._plantillaPublicacion(base, 'adopcion', {});
+    assert.match(t, /Escribenos por MD o email/);
+    assert.doesNotMatch(t, /undefined/);
+  });
+});
+
+describe('_dummyPermalink', () => {
+  it('formato enlace instagram', () => {
+    assert.equal(Dashboard._dummyPermalink('pub_mn123abc'), 'https://www.instagram.com/p/mn123abc/');
+  });
+});
