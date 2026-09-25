@@ -18,6 +18,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Apps Script responde HTTP 200 con campo `error`**: api.js lanza por `data.error`, no por status.
 - **Service worker**: al tocar `src/js/dashboard.js`, `api.js`, `auth.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v30`.
 - **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
+- **Navegación por viewport**: móvil Y tablet (≤1023px) usan bottom-nav + sidebar como drawer (sin rail fijo, sin su scroll); sidebar fija solo en escritorio (≥1024px). Reglas nav en bloques `max-width:767px` (móvil) y `768-1023px` (tablet, anula el bloque general ≥768); contenido intacto.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
 - **Sync offline**: escrituras que fallan se encolan (`gn_pending_ops`) y se reintentan al volver la red (`flushPendingOps` en init + evento `online`, badge `.pending-sync-badge`); el backend hace **upsert por `id` en `appendToSheet`** para no duplicar. `RATE_LIMIT` se aplica (fail-open, ventana 60s por token).
