@@ -1,6 +1,9 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
+  // Apadrinamientos en dummy local hasta desplegar el backend nuevo
+  // (endpoints apadrinamientos/*). Al pegar Code.gs, poner a true.
+  APADRINAMIENTOS_REMOTE: false,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
@@ -1633,7 +1636,7 @@ const Dashboard = {
     };
     this.apadrinamientos.push(row);
     this.saveLocal();
-    this._apiCreateRow(() => API.createApadrinamiento(row), { m: 'createApadrinamiento', a: [row] });
+    if (this.APADRINAMIENTOS_REMOTE) this._apiCreateRow(() => API.createApadrinamiento(row), { m: 'createApadrinamiento', a: [row] });
     this._regLog('apadrinamiento', 'Nuevo apadrinamiento de ' + pnom + ' a ' + a.nombre, 'apadrinamiento', row.id);
     finGuardar();
     this.closeFormModal();
@@ -1648,7 +1651,7 @@ const Dashboard = {
     p.estado = 'finalizada';
     p.fecha_fin = new Date().toISOString().slice(0, 10);
     this.saveLocal();
-    await this._updateLocalYApi('apadrinamientos', p);
+    if (this.APADRINAMIENTOS_REMOTE) await this._updateLocalYApi('apadrinamientos', p);
     this._regLog('apadrinamiento-fin', 'Fin apadrinamiento de ' + (p.padrino_nombre || '') + ' a ' + (p.animal || ''), 'apadrinamiento', p.id);
     this.viewAnimal(p.animal_id);
     this.showSnackbar('Apadrinamiento finalizado', 'success');
@@ -1657,10 +1660,12 @@ const Dashboard = {
   async deleteApadrinamiento(id) {
     const p = this._byId(this.apadrinamientos, id);
     if (!(await this._confirm('Eliminar este apadrinamiento?', 'Eliminar'))) return;
-    try {
-      const res = await API.deleteApadrinamiento(id);
-      this._assertDeleted(res, 'El apadrinamiento');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    if (this.APADRINAMIENTOS_REMOTE) {
+      try {
+        const res = await API.deleteApadrinamiento(id);
+        this._assertDeleted(res, 'El apadrinamiento');
+      } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    }
     this.apadrinamientos = (this.apadrinamientos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (p) this.viewAnimal(p.animal_id);
@@ -1687,7 +1692,7 @@ const Dashboard = {
         p.padrino_id = row.id;
         p.padrino_tipo = 'socio';
       }
-      await this._updateLocalYApi('apadrinamientos', p);
+      if (this.APADRINAMIENTOS_REMOTE) await this._updateLocalYApi('apadrinamientos', p);
       this.saveLocal();
       this._regLog('padrino-convertido', 'Padrino ' + (p.padrino_nombre || '') + ' convertido a socio; apadrino a ' + (p.animal || ''), 'socio', p.padrino_id);
     } catch (err) {
