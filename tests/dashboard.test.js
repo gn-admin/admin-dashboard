@@ -304,6 +304,17 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_hasHomeCache: pinta instantaneo solo con datos', () => {
+  it('false sin encuestas, true con ellas', () => {
+    const prev = Dashboard.surveys;
+    Dashboard.surveys = [];
+    assert.equal(Dashboard._hasHomeCache(), false);
+    Dashboard.surveys = [{ id: 's1' }];
+    assert.equal(Dashboard._hasHomeCache(), true);
+    Dashboard.surveys = prev;
+  });
+});
+
 describe('_ensureListas: nunca lanza', () => {
   it('claves desconocidas se ignoran', async () => {
     await Dashboard._ensureListas(['nope', null]);

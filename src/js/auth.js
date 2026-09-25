@@ -45,7 +45,8 @@ const Auth = {
     await firebase.auth().signOut();
     this.currentUser = null;
     try { localStorage.removeItem('gn_session'); } catch {}
-    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad','gn_publicaciones'].forEach(k => localStorage.removeItem(k));
+    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad','gn_publicaciones','gn_pending_ops'].forEach(k => localStorage.removeItem(k));
+    try { Object.keys(localStorage).filter(k => k.indexOf('gn_cache_') === 0).forEach(k => localStorage.removeItem(k)); } catch {}
     this._notifyListeners();
   },
 

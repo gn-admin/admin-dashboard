@@ -6,6 +6,7 @@ const Dashboard = {
 
   async init() {
     this.loadLocal();
+    this._hydrateCache();
     this.injectIcons();
     this.showLoading();
     try {
@@ -150,12 +151,42 @@ const Dashboard = {
     return (list || []).find(x => x && x.id !== undefined && x.id !== null && x.id !== '' && String(x.id) === want) || null;
   },
 
+  _cacheGet(key) {
+    try {
+      const v = localStorage.getItem('gn_cache_' + key);
+      return v ? JSON.parse(v) : null;
+    } catch { return null; }
+  },
+
+  _cacheSet(key, val) {
+    try { localStorage.setItem('gn_cache_' + key, JSON.stringify(val)); } catch {}
+  },
+
+  // Hidratacion instantanea al arrancar (sin marcar _loaded: luego refresca red).
+  _hydrateCache() {
+    const h = (k, v) => { if (v !== null && v !== undefined) this[k] = v; };
+    h('surveys', this._cacheGet('surveys'));
+    h('responses', this._cacheGet('responses'));
+    h('states', this._cacheGet('estados'));
+    h('notes', this._cacheGet('notas'));
+    h('animales', this._cacheGet('animales'));
+    h('familias', this._cacheGet('familias'));
+    h('actividad', this._cacheGet('actividad'));
+    h('candidaturas', this._cacheGet('candidaturas'));
+    h('acogidas', this._cacheGet('acogidas'));
+    h('contratos', this._cacheGet('contratos'));
+    h('blacklist', this._cacheGet('blacklist'));
+    h('socios', this._cacheGet('socios'));
+    h('adopciones', this._cacheGet('adopciones'));
+  },
+
   async loadEstados(force) {
     if (this._loaded.estados && !force) return this.states;
     if (this._loading.estados) return this._loading.estados;
     this._loading.estados = (async () => {
       const res = await API.getEstados();
       this.states = res.data || {};
+      this._cacheSet('estados', this.states);
       this._loaded.estados = true;
       return this.states;
     })();
@@ -168,6 +199,7 @@ const Dashboard = {
     this._loading.notas = (async () => {
       const res = await API.getNotas();
       this.notes = res.data || {};
+      this._cacheSet('notas', this.notes);
       this._loaded.notas = true;
       return this.notes;
     })();
@@ -180,6 +212,7 @@ const Dashboard = {
     this._loading.surveys = (async () => {
       const res = await API.getSurveys();
       this.surveys = res.data || [];
+      this._cacheSet('surveys', this.surveys);
       this._loaded.surveys = true;
       return this.surveys;
     })();
@@ -193,6 +226,7 @@ const Dashboard = {
     this._loading[key] = (async () => {
       const res = await API.getResponses(surveyId);
       this.responses[surveyId] = (res.data || []).map(r => ({ ...r, _surveyId: surveyId }));
+      this._cacheSet('responses', this.responses);
       this._loaded[key] = true;
       return this.responses[surveyId];
     })();
@@ -204,10 +238,11 @@ const Dashboard = {
     if (this._loading[key]) return this._loading[key];
     this._loading[key] = (async () => {
       const res = await apiFn();
-      const remote = (res.data || []).map(r => (r && r.id !== undefined && r.id !== null) ? { ...r, id: String(r.id) } : r);
+      const remote = res.data || [];
       const ids = new Set(remote.map(r => r.id));
       const localOnly = (this[key] || []).filter(l => l && l.id && !ids.has(l.id));
       this[key] = remote.concat(localOnly);
+      this._cacheSet(key, this[key]);
       const sinId = (this[key] || []).filter(r => !r || r.id === undefined || r.id === null || r.id === '');
       if (sinId.length) console.warn('Registros sin id en ' + key + ': ' + sinId.length + ' (no se pueden editar; revisa la cabecera id en la hoja)');
       this._loaded[key] = true;
@@ -466,6 +501,23 @@ const Dashboard = {
 
   // ==================== DASHBOARD HOME ====================
   async renderDashboardHome(el) {
+    if (!this._hasHomeCache()) {
+      el.innerHTML = `<div class="page-loader"><div class="spinner"></div><p>Cargando...</p></div>`;
+      await this._refreshHome();
+      this._paintHome(el);
+      return;
+    }
+    this._paintHome(el);
+    this._refreshHome().then(() => {
+      if (document.getElementById('page-dashboard')?.classList.contains('active')) this._paintHome(el);
+    }).catch(() => {});
+  },
+
+  _hasHomeCache() {
+    return !!(this.surveys && this.surveys.length);
+  },
+
+  async _refreshHome() {
     await this._loadSurveys();
     await Promise.all([
       this.loadEstados(),
@@ -474,6 +526,9 @@ const Dashboard = {
       this._loadList('actividad', () => API.getActividad()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
     ]);
+  },
+
+  _paintHome(el) {
     const all = Object.values(this.responses).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
     const total = activas.length;
