@@ -19,8 +19,7 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Encuestas: `pre-adopcion-perros` (80), `pre-adopcion-gatos` (8, todas 2026), `pre-acogida` (4).
 
 ## Estado de datos (hoja "Estados")
-- 43 solicitudes de 2025 de perros marcadas `descartada` (resp_2..resp_44) + acogida `resp_2` (2025).
-- Cuenta 92 total → 48 activas (37 perros + 8 gatos + 3 acogida) en dashboard; "Total Encuestas" y "Tasa de Conversión" excluyen descartadas.
+- Todas las solicitudes de **2025 van descartadas** (no cuentan en dashboard/reportes). Hay botón en **Reportes → Mantenimiento** que descarta las 2025 restantes (`Dashboard.descartar2025`, con confirmación y cuenta previa).
 
 ## Modelo de estados / notas
 - Clave compuesta `survey_id::id` en backend GET (`handleGetEstados`/`handleGetNotas`) y en frontend (`getEstado(id, surveyId)`, `states[surveyId::id]`).

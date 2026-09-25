@@ -2748,7 +2748,54 @@ const Dashboard = {
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-perros')">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-gatos')">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-acogida')">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
+      </div></div>
+      <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
+        <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>`;
+  },
+
+  _anioFecha(f) {
+    if (!f) return null;
+    const s = String(f).trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return +m[1];
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return +m[3];
+    const d = new Date(s.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d.getFullYear();
+  },
+
+  // Solicitudes de 2025 aun no descartadas (todas las encuestas).
+  _restantes2025() {
+    const out = [];
+    (this.surveys || []).forEach(s => (this.responses[s.id] || []).forEach(r => {
+      if (this._anioFecha(r.fecha_creacion) !== 2025) return;
+      if (this.getEstado(r.id, s.id) === 'descartada') return;
+      out.push({ surveyId: s.id, id: r.id });
+    }));
+    return out;
+  },
+
+  async descartar2025() {
+    const lista = this._restantes2025();
+    if (!lista.length) { this.showSnackbar('No hay solicitudes de 2025 por descartar', 'success'); return; }
+    if (!(await this._confirm('Descartar ' + lista.length + ' solicitudes de 2025? Ya no contaran en dashboard ni reportes.', 'Descartar 2025'))) return;
+    this.showLoading();
+    let ok = 0;
+    try {
+      for (const it of lista) {
+        await API.setEstado(it.id, it.surveyId, 'descartada');
+        this.states[(it.surveyId || '') + '::' + it.id] = 'descartada';
+        this._syncCard(it.surveyId, it.id);
+        ok++;
+      }
+    } catch (err) {
+      this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ': ' + this._errMsg(err), 'error');
+    } finally {
+      this.hideLoading();
+    }
+    this.renderReportes(document.getElementById('page-reportes'));
+    this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
   },
 
   // Anti-doble-clic en Guardar: deshabilita el boton, pone "Guardando..."

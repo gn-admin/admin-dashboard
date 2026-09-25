@@ -304,6 +304,32 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_anioFecha + _restantes2025', () => {
+  it('extrae anio de ISO, es-ES e invalido', () => {
+    assert.equal(Dashboard._anioFecha('2025-03-14T10:00:00.000Z'), 2025);
+    assert.equal(Dashboard._anioFecha('2025-03-14'), 2025);
+    assert.equal(Dashboard._anioFecha('14/03/2025 10:00:00'), 2025);
+    assert.equal(Dashboard._anioFecha('14/03/2025'), 2025);
+    assert.equal(Dashboard._anioFecha(''), null);
+    assert.equal(Dashboard._anioFecha(null), null);
+    assert.equal(Dashboard._anioFecha('sin-fecha'), null);
+  });
+
+  it('lista solo 2025 no descartadas de todas las encuestas', () => {
+    Dashboard.surveys = [{ id: 's1', name: 'S1' }, { id: 's2', name: 'S2' }];
+    Dashboard.responses = {
+      s1: [{ id: 'a', fecha_creacion: '2025-01-01' }, { id: 'b', fecha_creacion: '2026-01-01' }],
+      s2: [{ id: 'c', fecha_creacion: '15/06/2025 12:00:00' }, { id: 'd', fecha_creacion: '2025-02-02' }]
+    };
+    Dashboard.states = { 's2::d': 'descartada' };
+    const out = Dashboard._restantes2025();
+    assert.deepEqual(out.map(x => x.id).sort(), ['a', 'c']);
+    Dashboard.surveys = [];
+    Dashboard.responses = {};
+    Dashboard.states = {};
+  });
+});
+
 describe('_hasHomeCache: pinta instantaneo solo con datos', () => {
   it('false sin encuestas, true con ellas', () => {
     const prev = Dashboard.surveys;
