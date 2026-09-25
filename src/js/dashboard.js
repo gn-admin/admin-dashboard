@@ -1116,7 +1116,7 @@ const Dashboard = {
     this.saveLocal();
     await this._updateLocalYApi('candidaturas', c);
     this.viewDetail(surveyId, responseId);
-    this._regLog(c.tipo === 'acogida' ? 'acogida' : 'adopcion', (c.tipo === 'acogida' ? 'Caso de acogida' : 'Candidato asignado') + ': ' + a.nombre + (c.tipo === 'acogida' && familiaId ? ' a familia' : ''));
+    this._regLog(c.tipo === 'acogida' ? 'acogida' : 'adopcion', (c.tipo === 'acogida' ? 'Caso de acogida' : 'Candidato asignado') + ': ' + a.nombre + (c.tipo === 'acogida' && familiaId ? ' a familia' : ''), 'candidatura', c.id);
     this.showSnackbar('Candidato asignado. Caso creado.', 'success');
   },
 
@@ -1241,8 +1241,8 @@ const Dashboard = {
     });
   },
 
-  _regLog(tipo, detalle) {
-    const row = { id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), fecha: new Date().toISOString(), usuario: Auth.currentUser?.email || 'admin', tipo: tipo, detalle: detalle };
+  _regLog(tipo, detalle, entidad, entidadId) {
+    const row = { id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), fecha: new Date().toISOString(), usuario: Auth.currentUser?.email || 'admin', tipo: tipo, detalle: detalle, entidad: entidad || '', entidad_id: entidadId || '', descripcion: detalle };
     (this.actividad || []).unshift(row);
     this.saveLocal();
     this._apiCreateRow(() => API.createActividad(row), { m: 'createActividad', a: [row] });
@@ -2028,7 +2028,7 @@ const Dashboard = {
       const sol = this._parseSolicitud(c.solicitud_id);
       if (sol) await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
       this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
-      this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'));
+      this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'), 'acogida', c.id);
     } else {
       this.showSnackbar('Fase actualizada', 'success');
     }
@@ -2408,7 +2408,7 @@ const Dashboard = {
     }
     this.closeContratoForm();
     this.viewAdopcion(adopcionId);
-    this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''));
+    this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''), 'contrato', c.id);
     finGuardar();
     this.showSnackbar('Contrato firmado y guardado', 'success');
   },
@@ -2433,12 +2433,12 @@ const Dashboard = {
       p.estado_firma = '';
       try { await API.updateAdopcion(adopcionId, { estado: 'Fase: Contrato', estado_firma: '' }); } catch (err) { /* local only */ }
     }
-    const a = p && p.animal_id ? this.animales.find(x => x.id === p.animal_id) : null;
+    const a = p && p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     if (a && a.estado === 'adoptado') {
       a.estado = 'en_adopcion';
       await this._updateLocalYApi('animales', a);
     }
-    this._regLog('contrato', 'Firma anulada para ' + (p ? p.animal : ''));
+    this._regLog('contrato', 'Firma anulada para ' + (p ? p.animal : ''), 'contrato', c.id);
     this.viewAdopcion(adopcionId);
     this.showSnackbar('Firma anulada', 'success');
   },
