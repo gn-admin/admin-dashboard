@@ -62,6 +62,20 @@ describe('_fotoSrc: normaliza fotos para <img>', () => {
     assert.equal(Dashboard._fotoSrc(null), '');
     assert.equal(Dashboard._fotoSrc({}), '');
   });
+
+  it('tamano pedido para listado (w200)', () => {
+    assert.equal(
+      Dashboard._fotoSrc({ foto_drive_id: 'ABC123' }, 'w200'),
+      'https://drive.google.com/thumbnail?id=ABC123&sz=w200'
+    );
+  });
+
+  it('thumbnail guardado se re-dimensiona sin duplicar', () => {
+    assert.equal(
+      Dashboard._fotoSrc({ foto: 'https://drive.google.com/thumbnail?id=ABC123&sz=w800' }, 'w200'),
+      'https://drive.google.com/thumbnail?id=ABC123&sz=w200'
+    );
+  });
 });
 
 describe('_parseSolicitud: survey::resp', () => {

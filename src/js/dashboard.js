@@ -1282,7 +1282,7 @@ const Dashboard = {
         <div id="animales-form-container"></div>
         <div class="animal-grid">${filtered.length ? filtered.map(a=>`
           <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
-            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:Icons.cat}</div>`}
+            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
@@ -1298,13 +1298,14 @@ const Dashboard = {
 
   // Foto principal normalizada para <img>: admite thumbnail, fileId de Drive,
   // enlaces file/d/... o uc?...id=... (fotos antiguas) y rutas/URLs directas.
-  _fotoSrc(a) {
+  _fotoSrc(a, sz) {
+    const size = sz || 'w800';
     if (!a) return '';
-    if (a.foto_drive_id) return 'https://drive.google.com/thumbnail?id=' + a.foto_drive_id + '&sz=w800';
+    if (a.foto_drive_id) return 'https://drive.google.com/thumbnail?id=' + a.foto_drive_id + '&sz=' + size;
     const raw = String(a.foto || a.foto_url || '');
     if (!raw) return '';
     const m = raw.match(/[?&]id=([A-Za-z0-9_-]+)/) || raw.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w800';
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=' + size;
     return raw;
   },
 
@@ -1433,7 +1434,8 @@ const Dashboard = {
 
     if (fotoBase64) {
       try {
-        const up = await API.uploadFotoAnimal(fotoBase64, `animal_${data.nombre.replace(/\s+/g,'_')}_${Date.now()}.jpg`, 'image/jpeg');
+        const rawB64 = fotoBase64.indexOf(',') !== -1 ? fotoBase64.split(',')[1] : fotoBase64;
+        const up = await API.uploadFotoAnimal(rawB64, `animal_${data.nombre.replace(/\s+/g,'_')}_${Date.now()}.jpg`, 'image/jpeg');
         if (up.data && up.data.fileId) {
           data.foto_drive_id = up.data.fileId;
           data.foto_url = up.data.webViewLink || up.data.webContentLink;
