@@ -2345,11 +2345,13 @@ const Dashboard = {
       <div class="page-detail-container"></div>`;
   },
 
-  showAdopcionForm(data) {
+  async showAdopcionForm(data) {
     const isEdit = !!data;
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
+    await this._ensureListas(['animales']);
     this._renderForm('adopciones', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Adopcion</h3><form onsubmit="Dashboard.saveAdopcion(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-row"><div class="form-group"><label>Animal *</label><input type="text" id="ad-animal" value="${this._esc(data?.animal||'')}" required placeholder="Ej: Max (Labrador)"></div><div class="form-group"><label>Adoptante *</label><input type="text" id="ad-adoptante" value="${this._esc(data?.adoptante||'')}" required></div></div>
+      <div class="form-group"><label>Vincular animal (reserva estado)</label><select id="ad-animal-id" onchange="Dashboard._vincularAnimalTexto()"><option value="">Sin vincular (solo texto)</option>${this.animales.map(a=>`<option value="${this._esc(a.id)}" ${String(data?.animal_id||'')===String(a.id)?'selected':''}>${this._esc(a.nombre)} · ${this._esc(a.especie||'')}</option>`).join('')}</select></div>
       <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="ad-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="ad-telefono" value="${this._esc(data?.telefono||'')}"></div></div>
       <div class="form-row"><div class="form-group"><label>Fase *</label><select id="ad-fase" required>${fases.map(f=>`<option value="${f}" ${data?.fase===f?'selected':''}>${f}</option>`).join('')}</select></div><div class="form-group"><label>Estado</label><input type="text" id="ad-estado" value="${this._esc(data?.estado||'')}" placeholder="Descripcion del estado actual"></div></div>
       <div class="form-group"><label>Notas</label><textarea id="ad-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div>
@@ -2375,15 +2377,24 @@ const Dashboard = {
       telefono: document.getElementById('ad-telefono').value.trim(),
       fase: document.getElementById('ad-fase').value,
       estado: document.getElementById('ad-estado').value.trim(),
-      notas: document.getElementById('ad-notas').value.trim()
+      notas: document.getElementById('ad-notas').value.trim(),
+      animal_id: document.getElementById('ad-animal-id').value
     };
     try {
       if (isEdit) {
+        const prevAnimal = (this._byId(this.adopciones, id) || {}).animal_id || '';
         await API.updateAdopcion(id, data);
         const item = this._byId(this.adopciones, id); if (item) Object.assign(item, data);
+        if (prevAnimal !== (data.animal_id || '')) {
+          await this._liberarAnimal(prevAnimal, id);
+          if (data.animal_id) await this._reservarAnimal(data.animal_id, id);
+        }
       } else {
         const res = await API.createAdopcion(data);
-        if (res.data) this.adopciones.push(res.data);
+        if (res.data) {
+          this.adopciones.push(res.data);
+          if (data.animal_id) await this._reservarAnimal(data.animal_id, res.data.id);
+        }
       }
     } catch (err) {
       this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
@@ -2395,6 +2406,33 @@ const Dashboard = {
     if (isEdit) this.viewAdopcion(id);
     else this.renderAdopciones(document.getElementById('page-adopciones'));
     this.showSnackbar(isEdit ? 'Adopcion actualizada' : 'Adopcion creada', 'success');
+  },
+
+  _vincularAnimalTexto() {
+    const sel = document.getElementById('ad-animal-id');
+    const t = document.getElementById('ad-animal');
+    if (!sel || !t || t.value.trim()) return;
+    const o = sel.options[sel.selectedIndex];
+    if (o && sel.value) t.value = o.text.split(' · ')[0];
+  },
+
+  // Reserva/libera animal para casos (idempotente y seguro ante ausencias).
+  async _reservarAnimal(animalId, adopcionId) {
+    const a = animalId ? this._byId(this.animales, animalId) : null;
+    if (!a) return;
+    a.estado = 'en_adopcion';
+    a.adopcion_id = adopcionId;
+    await this._updateLocalYApi('animales', a);
+  },
+
+  async _liberarAnimal(animalId, adopcionId) {
+    const a = animalId ? this._byId(this.animales, animalId) : null;
+    if (!a) return;
+    if ((a.estado === 'en_adopcion' || a.estado === 'adoptado') && (!a.adopcion_id || a.adopcion_id === adopcionId)) {
+      a.estado = 'disponible';
+      a.adopcion_id = '';
+      await this._updateLocalYApi('animales', a);
+    }
   },
 
   // solicitud_id tiene forma "surveyId::responseId" (viene de la candidatura).
@@ -2463,7 +2501,7 @@ const Dashboard = {
       </div>
       ${contratoHtml}
       <div class="detail-section"><div class="detail-section-title">Detalles</div>
-        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${this._esc(p.animal)}</div></div>
+        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${p.animal_id ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal)}</a>` : this._esc(p.animal)}</div></div>
         <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
         <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(p.email)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(p.telefono)||'—'}</div></div>
@@ -2515,12 +2553,7 @@ const Dashboard = {
     const c = this._contratoDeAdopcion(id);
     if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
     // Espejo local del rollback (el backend ya lo aplico en las hojas):
-    const a = target && target.animal_id ? this._byId(this.animales, target.animal_id) : null;
-    if (a && (a.estado === 'en_adopcion' || a.estado === 'adoptado') && (!a.adopcion_id || a.adopcion_id === id)) {
-      a.estado = 'disponible';
-      a.adopcion_id = '';
-      await this._updateLocalYApi('animales', a);
-    }
+    if (target) await this._liberarAnimal(target.animal_id, id);
     await this._rollbackSolicitud(target && target.solicitud_id);
     this.adopciones = this.adopciones.filter(x => x.id !== id);
     this.saveLocal();

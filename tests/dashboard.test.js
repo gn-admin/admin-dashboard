@@ -363,6 +363,36 @@ describe('_cuotaEstado: al dia o pendiente', () => {
   });
 });
 
+describe('_reservarAnimal/_liberarAnimal (con stubs de entorno)', () => {
+  const G = globalThis;
+  if (!G.localStorage) G.localStorage = { _d: {}, getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
+  if (!G.document) G.document = { querySelectorAll: () => [], getElementById: () => null };
+  if (!G.API) G.API = { updateAnimal: async () => ({}) };
+
+  it('reserva pone en_adopcion + adopcion_id', async () => {
+    Dashboard.animales = [{ id: 'a1', estado: 'disponible', adopcion_id: '' }];
+    await Dashboard._reservarAnimal('a1', 'adp1');
+    assert.equal(Dashboard.animales[0].estado, 'en_adopcion');
+    assert.equal(Dashboard.animales[0].adopcion_id, 'adp1');
+    Dashboard.animales = [];
+  });
+
+  it('libera solo si lo reservo ese caso', async () => {
+    Dashboard.animales = [{ id: 'a1', estado: 'en_adopcion', adopcion_id: 'adp1' }];
+    await Dashboard._liberarAnimal('a1', 'otro');
+    assert.equal(Dashboard.animales[0].estado, 'en_adopcion');
+    await Dashboard._liberarAnimal('a1', 'adp1');
+    assert.equal(Dashboard.animales[0].estado, 'disponible');
+    assert.equal(Dashboard.animales[0].adopcion_id, '');
+    Dashboard.animales = [];
+  });
+
+  it('ignora ids ausentes', async () => {
+    await Dashboard._reservarAnimal('', 'x');
+    await Dashboard._liberarAnimal('zzz', 'x');
+  });
+});
+
 describe('_anioFecha + _restantes2025', () => {
   it('extrae anio de ISO, es-ES e invalido', () => {
     assert.equal(Dashboard._anioFecha('2025-03-14T10:00:00.000Z'), 2025);
