@@ -138,6 +138,7 @@ const backendConfig = `var CONFIG = {
     candidaturas: { sheetId: '${env('SHEET_CANDIDATURAS_ID')}', sheetName: 'Candidaturas' },
     acogidas: { sheetId: '${env('SHEET_ACOGIDAS_ID')}', sheetName: 'Acogidas' },
     contratos: { sheetId: '${env('SHEET_CONTRATOS_ID')}', sheetName: 'Contratos' },
+    apadrinamientos: { sheetId: '${env('SHEET_APADRINAMIENTOS_ID')}', sheetName: 'Apadrinamientos' },
 ${sheetsBlock()}
   }
 };

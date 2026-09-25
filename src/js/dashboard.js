@@ -1,6 +1,6 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
-  animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [],
+  animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
@@ -19,7 +19,7 @@ const Dashboard = {
       this.userProfile = user;
       this.updateUserUI();
       // Preloads no bloqueantes; cada pantalla/ficha asegura lo suyo al abrirse.
-      this._ensureListas(['candidaturas', 'acogidas', 'contratos']);
+      this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'apadrinamientos']);
       this._renderPendingBadge();
       this.flushPendingOps();
       if (!this._onlineHook) {
@@ -40,6 +40,7 @@ const Dashboard = {
       candidaturas: () => API.getCandidaturas(),
       acogidas: () => API.getAcogidas(),
       contratos: () => API.getContratos(),
+      apadrinamientos: () => API.getApadrinamientos(),
       animales: () => API.getAnimales(),
       familias: () => API.getFamilias(),
       adopciones: () => API.getAdopciones(),
@@ -132,6 +133,7 @@ const Dashboard = {
     try { this.contratos = norm(JSON.parse(localStorage.getItem('gn_contratos') || '[]')); } catch { this.contratos = []; }
     try { this.acogidas = norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')); } catch { this.acogidas = []; }
     try { this.publicaciones = norm(JSON.parse(localStorage.getItem('gn_publicaciones') || '[]')); } catch { this.publicaciones = []; }
+    try { this.apadrinamientos = norm(JSON.parse(localStorage.getItem('gn_apadrinamientos') || '[]')); } catch { this.apadrinamientos = []; }
   },
 
   saveLocal() {
@@ -140,6 +142,7 @@ const Dashboard = {
     localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || []));
     localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
     localStorage.setItem('gn_publicaciones', JSON.stringify(this.publicaciones || []));
+    localStorage.setItem('gn_apadrinamientos', JSON.stringify(this.apadrinamientos || []));
   },
 
   // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
@@ -609,8 +612,8 @@ const Dashboard = {
       ];
       return staticItems.map(item=>`<div class="timeline-item"><div class="timeline-dot-wrap"><div class="timeline-dot ${item.color}"></div><div class="timeline-line"></div></div><div class="timeline-content"><div class="timeline-text">${item.text}</div><div class="timeline-time">${item.time}</div></div></div>`).join('');
     }
-    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red' };
-    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado' };
+    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange' };
+    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio' };
     return this.actividad.slice(0, 5).map(item => {
       const t = new Date(item.fecha);
       const diff = Math.floor((Date.now() - t.getTime()) / 60000);
@@ -800,7 +803,7 @@ const Dashboard = {
     const el = document.getElementById('tutorial-modal');
     const body = document.getElementById('tutorial-content');
     if (!el || !body) return;
-    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', estados: 'Estados y consejos' };
+    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', estados: 'Estados y consejos' };
     if (!tab) tab = this._tutorialTabActive || 'general';
     this._tutorialTabActive = tab;
     const tabbar = `<div class="tutorial-tabs">${Object.keys(tabs).map(t=>`<button class="tutorial-tab${t===tab?' active':''}" onclick="Dashboard.showTutorial('${t}')">${tabs[t]}</button>`).join('')}</div>`;
@@ -809,6 +812,7 @@ const Dashboard = {
       adopcion: this._tutorialAdopcion(),
       acogida: this._tutorialAcogida(),
       redes: this._tutorialRedes(),
+      apadrinamiento: this._tutorialApadrinamiento(),
       estados: this._tutorialEstados()
     };
     body.innerHTML = tabbar + `<div class="tutorial-panel">` + panels[tab] + `</div>`;
@@ -925,6 +929,21 @@ const Dashboard = {
       ${this._guideStep(Icons.info, '4. Conexion real (pendiente)', 'Para publicar de verdad hace falta cuenta de Empresa/Creador vinculada a Facebook + App de Meta. Entonces cada post guardara su enlace real y saldra en la ficha como "Ver post".', 'Meta Business', false)}`;
   },
 
+  _tutorialApadrinamiento() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Animal apadrinable', 'check + disponible/en acogida'],
+        ['Nuevo apadrinamiento', 'socio o externo + aporte'],
+        ['Varios padrinos', 'total €/mes en ficha'],
+        ['Convertir a socio', 'externo pasa a Socios'],
+        ['Finalizar', 'se libera, queda historial']
+      ], '#7c3aed')}</div>
+      ${this._guideStep(Icons.paw, '1. Marca el animal', 'En nuevo/editar animal activa <b>Acepta apadrinamiento</b>. Solo con el check y estado disponible/en acogida sale el boton de apadrinar.', 'Animales > ficha', true)}
+      ${this._guideStep(Icons.users, '2. Socio o externo', 'Al apadrinar elige un <b>socio existente</b> o crea un <b>externo</b> (nombre + contacto + aporte €/mes). Un animal puede tener varios padrinos a la vez.', 'Ficha animal > Apadrinamientos', true)}
+      ${this._guideStep(Icons.checkCircle, '3. Seguimiento', 'La ficha suma el total mensual. En la ficha del socio veras "Apadrina a" con su historial.', 'Fichas', true)}
+      ${this._guideStep(Icons.trash, '4. Finalizar o convertir', '<b>Finalizar</b> cierra el apadrinamiento (queda en historial). Un externo se <b>convierte a socio</b> con un toque, enlazando su historial.', 'Ficha animal', false)}`;
+  },
+
   _tutorialEstados() {
     const estados = [
       ['pendiente', 'Pendiente', 'Acaba de llegar o se ha vuelto a desmarcar. Aun no se asigna nada.'],
@@ -949,6 +968,7 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
 
@@ -1184,7 +1204,7 @@ const Dashboard = {
   },
 
   async _updateLocalYApi(col, item) {
-    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato' };
+    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato', apadrinamientos: 'updateApadrinamiento' };
     const m = map[col];
     if (!m) return;
     try { await API[m](item.id, item); }
@@ -1524,6 +1544,193 @@ const Dashboard = {
     return `<div class="detail-section"><div class="detail-section-title">${Icons.heart} Publicaciones</div>${items}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div></div>`;
   },
 
+  _apadrinamientosFicha(animalId) {
+    const a = this._byId(this.animales, animalId);
+    const list = this._apadrinamientosDe(animalId);
+    const activos = list.filter(p => p.estado === 'activo');
+    const total = this._totalAportes(list);
+    const rows = list.length
+      ? list.slice().reverse().map(p => {
+        const quien = p.padrino_id
+          ? `<a href="javascript:void(0)" onclick="Dashboard.openSocioFicha('${this._esc(p.padrino_id)}')">${this._esc(p.padrino_nombre || 'Socio')}</a>`
+          : this._esc(p.padrino_nombre || 'Padrino');
+        const acc = [];
+        if (p.estado === 'activo') acc.push(`<button class="btn btn-outline-green btn-sm" onclick="Dashboard.finalizarApadrinamiento('${this._esc(p.id)}')">Finalizar</button>`);
+        if (!p.padrino_id) acc.push(`<button class="btn btn-outline-green btn-sm" onclick="Dashboard.convertirPadrino('${this._esc(p.id)}')">A socio</button>`);
+        acc.push(`<button class="btn btn-danger btn-sm" onclick="Dashboard.deleteApadrinamiento('${this._esc(p.id)}')">${Icons.trash}</button>`);
+        return `<div class="detail-field"><div class="detail-question">${quien} · ${p.aporte_mensual ? this._esc(p.aporte_mensual) + ' €/mes' : 'sin aporte'} · desde ${p.fecha_inicio ? this._fmtFecha(p.fecha_inicio) : '—'}</div><div class="detail-answer"><span class="estado-badge ${p.estado === 'activo' ? 'aprobada' : ''}">${p.estado === 'activo' ? 'Activo' : 'Finalizado'}</span><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${acc.join('')}</div></div></div>`;
+      }).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin apadrinamientos todavia</div></div>`;
+    const totalHtml = activos.length ? `<div class="detail-field"><div class="detail-question">Total</div><div class="detail-answer">${total} €/mes entre ${activos.length}</div></div>` : '';
+    const nuevo = (a && this._esApadrinable(a))
+      ? `<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showApadrinamientoForm('${animalId}')">${Icons.plus} Nuevo apadrinamiento</button></div>`
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">No apadrinable (requiere check + disponible/en acogida)</div></div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.paw} Apadrinamientos</div>${rows}${totalHtml}${nuevo}</div>`;
+  },
+
+  async showApadrinamientoForm(animalId) {
+    const a = this._byId(this.animales, animalId);
+    if (!a || !this._esApadrinable(a)) { this.showSnackbar('Este animal no es apadrinable (check + disponible/en acogida).', 'warning'); return; }
+    await this._ensureListas(['socios']);
+    const opts = (this.socios || []).map(s => `<option value="${this._esc(s.id)}">${this._esc(s.nombre)} · ${this._esc(s.tipo || '')}</option>`).join('');
+    this.showFormModal('Nuevo apadrinamiento · ' + a.nombre, `
+      <form onsubmit="Dashboard.saveApadrinamiento(event,'${a.id}')">
+      <div class="form-group"><label>Tipo de padrino *</label><select id="ap-tipo" onchange="Dashboard._togglePadrino()"><option value="Socio">Socio existente</option><option value="Externo">Externo (nuevo)</option></select></div>
+      <div class="form-group" id="ap-socio-wrap"><label>Socio *</label><select id="ap-socio">${opts || '<option value="">Sin socios</option>'}</select></div>
+      <div id="ap-externo-wrap" style="display:none">
+        <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="ap-nombre"></div><div class="form-group"><label>Email</label><input type="email" id="ap-email"></div></div>
+        <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="ap-telefono"></div><div class="form-group"><label>Aporte (€/mes)</label><input type="text" id="ap-aporte-e" placeholder="Ej: 10"></div></div>
+      </div>
+      <div class="form-row" id="ap-comun-row"><div class="form-group" id="ap-aporte-wrap"><label>Aporte (€/mes)</label><input type="text" id="ap-aporte" placeholder="Ej: 10"></div><div class="form-group"><label>Inicio</label><input type="date" id="ap-inicio" value="${new Date().toISOString().slice(0, 10)}"></div></div>
+      <div class="form-group"><label>Notas</label><textarea id="ap-notas" rows="2"></textarea></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  _togglePadrino() {
+    const t = document.getElementById('ap-tipo');
+    const ext = t && t.value === 'Externo';
+    const sw = document.getElementById('ap-socio-wrap');
+    const ew = document.getElementById('ap-externo-wrap');
+    const aw = document.getElementById('ap-aporte-wrap');
+    if (sw) sw.style.display = ext ? 'none' : '';
+    if (ew) ew.style.display = ext ? '' : 'none';
+    if (aw) aw.style.display = ext ? 'none' : '';
+  },
+
+  async saveApadrinamiento(e, animalId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const a = this._byId(this.animales, animalId);
+    if (!a || !this._esApadrinable(a)) { this.showSnackbar('Este animal ya no es apadrinable.', 'warning'); finGuardar(); return; }
+    const ext = document.getElementById('ap-tipo').value === 'Externo';
+    let pid = '', pnom = '', pmail = '', ptel = '';
+    if (!ext) {
+      const s = this._byId(this.socios, document.getElementById('ap-socio').value);
+      if (!s) { this.showSnackbar('Elige un socio', 'warning'); finGuardar(); return; }
+      pid = s.id; pnom = s.nombre; pmail = s.email || ''; ptel = s.telefono || '';
+    } else {
+      pnom = document.getElementById('ap-nombre').value.trim();
+      if (!pnom) { this.showSnackbar('Indica el nombre del padrino', 'warning'); finGuardar(); return; }
+      pmail = document.getElementById('ap-email').value.trim();
+      ptel = document.getElementById('ap-telefono').value.trim();
+    }
+    const row = {
+      id: 'apd_' + Date.now().toString(36),
+      animal_id: a.id,
+      animal: a.nombre,
+      padrino_tipo: ext ? 'externo' : 'socio',
+      padrino_id: pid,
+      padrino_nombre: pnom,
+      padrino_email: pmail,
+      padrino_telefono: ptel,
+      aporte_mensual: (ext ? document.getElementById('ap-aporte-e') : document.getElementById('ap-aporte')).value.trim(),
+      fecha_inicio: document.getElementById('ap-inicio').value || new Date().toISOString().slice(0, 10),
+      fecha_fin: '',
+      estado: 'activo',
+      notas: document.getElementById('ap-notas').value.trim()
+    };
+    this.apadrinamientos.push(row);
+    this.saveLocal();
+    this._apiCreateRow(() => API.createApadrinamiento(row), { m: 'createApadrinamiento', a: [row] });
+    this._regLog('apadrinamiento', 'Nuevo apadrinamiento de ' + pnom + ' a ' + a.nombre, 'apadrinamiento', row.id);
+    finGuardar();
+    this.closeFormModal();
+    this.viewAnimal(animalId);
+    this.showSnackbar('Apadrinamiento creado', 'success');
+  },
+
+  async finalizarApadrinamiento(id) {
+    const p = this._byId(this.apadrinamientos, id);
+    if (!p) return;
+    if (!(await this._confirm('Finalizar este apadrinamiento?', 'Finalizar'))) return;
+    p.estado = 'finalizada';
+    p.fecha_fin = new Date().toISOString().slice(0, 10);
+    this.saveLocal();
+    await this._updateLocalYApi('apadrinamientos', p);
+    this._regLog('apadrinamiento-fin', 'Fin apadrinamiento de ' + (p.padrino_nombre || '') + ' a ' + (p.animal || ''), 'apadrinamiento', p.id);
+    this.viewAnimal(p.animal_id);
+    this.showSnackbar('Apadrinamiento finalizado', 'success');
+  },
+
+  async deleteApadrinamiento(id) {
+    const p = this._byId(this.apadrinamientos, id);
+    if (!(await this._confirm('Eliminar este apadrinamiento?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteApadrinamiento(id);
+      this._assertDeleted(res, 'El apadrinamiento');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    this.apadrinamientos = (this.apadrinamientos || []).filter(x => x.id !== id);
+    this.saveLocal();
+    if (p) this.viewAnimal(p.animal_id);
+    this.showSnackbar('Apadrinamiento eliminado', 'success');
+  },
+
+  async convertirPadrino(id) {
+    const p = this._byId(this.apadrinamientos, id);
+    if (!p) return;
+    if (p.padrino_id) { this.showSnackbar('Ya esta vinculado a un socio', 'warning'); return; }
+    const email = (p.padrino_email || '').toLowerCase().trim();
+    const ya = email ? (this.socios || []).find(s => (s.email || '').toLowerCase().trim() === email) : null;
+    if (!(await this._confirm(ya ? ('Vincular con el socio existente ' + ya.nombre + '?') : ('Crear socio ' + (p.padrino_nombre || '') + '?'), 'Convertir a socio'))) return;
+    this.showLoading();
+    try {
+      if (ya) {
+        p.padrino_id = ya.id;
+        p.padrino_tipo = 'socio';
+      } else {
+        const data = { nombre: p.padrino_nombre, email: p.padrino_email || '', telefono: p.padrino_telefono || '', tipo: 'Socio', cuota: '', area: '', foto: null, carnet_id: CarnetGenerator.generateCarnetId('SOC'), activo: true, fecha_registro: new Date().toISOString().slice(0, 10), horas_mes: 0, ultima_actividad: new Date().toISOString().slice(0, 10) };
+        const res = await API.createSocio(data);
+        const row = res && res.data ? res.data : { ...data, id: 'soc_' + Date.now().toString(36) };
+        this.socios.push(row);
+        p.padrino_id = row.id;
+        p.padrino_tipo = 'socio';
+      }
+      await this._updateLocalYApi('apadrinamientos', p);
+      this.saveLocal();
+      this._regLog('padrino-convertido', 'Padrino ' + (p.padrino_nombre || '') + ' convertido a socio; apadrino a ' + (p.animal || ''), 'socio', p.padrino_id);
+    } catch (err) {
+      this.showSnackbar('No se pudo convertir: ' + this._errMsg(err), 'error');
+      return;
+    } finally {
+      this.hideLoading();
+    }
+    this.viewAnimal(p.animal_id);
+    this.showSnackbar('Padrino convertido a socio', 'success');
+  },
+
+  openSocioFicha(id) {
+    location.hash = 'socios';
+    const iv = setInterval(() => {
+      const el = document.getElementById('page-socios');
+      if (el && el.querySelector('.page-list-container')) { clearInterval(iv); this.viewSocio(id); }
+    }, 150);
+    setTimeout(() => clearInterval(iv), 6000);
+  },
+
+  openAnimalFicha(id) {
+    location.hash = 'animales';
+    const iv = setInterval(() => {
+      const el = document.getElementById('page-animales');
+      if (el && el.querySelector('.animal-grid')) { clearInterval(iv); this.viewAnimal(id); }
+    }, 150);
+    setTimeout(() => clearInterval(iv), 6000);
+  },
+
+  _apadrinaFicha(socioId) {
+    const list = (this.apadrinamientos || []).filter(x => String(x.padrino_id) === String(socioId));
+    const items = list.length
+      ? list.slice().reverse().map(p => {
+        const an = this._byId(this.animales, p.animal_id);
+        const nom = an ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal || an.nombre)}</a>` : this._esc(p.animal || '—');
+        return `<div class="detail-field"><div class="detail-question">${nom}</div><div class="detail-answer">${p.aporte_mensual ? this._esc(p.aporte_mensual) + ' €/mes · ' : ''}<span class="estado-badge ${p.estado === 'activo' ? 'aprobada' : ''}">${p.estado === 'activo' ? 'Activo' : 'Finalizado'}</span></div></div>`;
+      }).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">No apadrina ningun animal</div></div>`;
+    const total = this._totalAportes(list.filter(p => String(p.padrino_id) === String(socioId)));
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.paw} Apadrina a</div>${items}${list.length ? `<div class="detail-field"><div class="detail-question">Total</div><div class="detail-answer">${total} €/mes</div></div>` : ''}</div>`;
+  },
+
   // ==================== ANIMALES CRUD ====================
   async renderAnimales(el) {
     await Promise.all([
@@ -1596,6 +1803,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div></div>
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
@@ -1708,6 +1916,7 @@ const Dashboard = {
       grupo_id: gv ? grupo_id : '',
       grupo: gv ? gv : '',
       grupo_obligatorio: document.getElementById('an-grupo-obl').checked,
+      apadrinable: document.getElementById('an-apadrinable').checked,
       esterilizada: existing?.esterilizada || false,
       vacunas: existing?.vacunas || 'Pendientes',
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
@@ -1765,7 +1974,23 @@ const Dashboard = {
     this.showSnackbar(isEdit ? 'Animal actualizado' : 'Animal creado', 'success');
   },
 
-  viewAnimal(id) {
+  // Apadrinable = check activo Y estado disponible/en_acogida.
+  _esApadrinable(a) {
+    if (!a) return false;
+    const ok = a.apadrinable === true || a.apadrinable === 'TRUE' || a.apadrinable === 'true' || a.apadrinable === 1;
+    return ok && (a.estado === 'disponible' || a.estado === 'en_acogida');
+  },
+
+  _apadrinamientosDe(animalId) {
+    return (this.apadrinamientos || []).filter(x => String(x.animal_id) === String(animalId));
+  },
+
+  _totalAportes(list) {
+    return (list || []).filter(p => p.estado === 'activo').reduce((s, p) => s + (parseFloat(p.aporte_mensual) || 0), 0);
+  },
+
+  async viewAnimal(id) {
+    await this._ensureListas(['apadrinamientos']);
     const a = this._byId(this.animales, id);
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
@@ -1777,6 +2002,7 @@ const Dashboard = {
       </div>
       ${this._publicacionesFicha(a.id)}
       ${this._fotoSrc(a) ? `<div style="margin-bottom:16px"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:160px;height:160px;border-radius:12px;object-fit:cover;border:2px solid var(--primary)"></div>` : ''}
+      ${this._apadrinamientosFicha(a.id)}
       <div class="detail-section"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
         <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
@@ -2607,7 +2833,8 @@ const Dashboard = {
     this.showSnackbar(isEdit ? 'Socio actualizado' : 'Socio creado', 'success');
   },
 
-  viewSocio(id) {
+  async viewSocio(id) {
+    await this._ensureListas(['apadrinamientos', 'animales']);
     const s = this._byId(this.socios, id);
     if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
@@ -2637,7 +2864,8 @@ const Dashboard = {
       <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
         <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
         <div class="detail-field"><div class="detail-question">Ultima actividad</div><div class="detail-answer">${s.ultima_actividad||'Sin registro'}</div></div>
-      </div>`);
+      </div>
+      ${this._apadrinaFicha(s.id)}`);
   },
 
   showCarnet(id) {

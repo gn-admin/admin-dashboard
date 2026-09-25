@@ -304,6 +304,34 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_esApadrinable: check + estado', () => {
+  it('solo con check y disponible/en_acogida', () => {
+    assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'disponible' }), true);
+    assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'en_acogida' }), true);
+    assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'adoptado' }), false);
+    assert.equal(Dashboard._esApadrinable({ apadrinable: false, estado: 'disponible' }), false);
+    assert.equal(Dashboard._esApadrinable({ estado: 'disponible' }), false);
+    assert.equal(Dashboard._esApadrinable(null), false);
+  });
+
+  it('tolera booleanos como texto', () => {
+    assert.equal(Dashboard._esApadrinable({ apadrinable: 'TRUE', estado: 'disponible' }), true);
+  });
+});
+
+describe('_totalAportes: suma solo activos', () => {
+  it('suma aportes de activos e ignora resto', () => {
+    const list = [
+      { estado: 'activo', aporte_mensual: '10' },
+      { estado: 'activo', aporte_mensual: '5.5' },
+      { estado: 'finalizada', aporte_mensual: '100' },
+      { estado: 'activo', aporte_mensual: '' }
+    ];
+    assert.equal(Dashboard._totalAportes(list), 15.5);
+    assert.equal(Dashboard._totalAportes([]), 0);
+  });
+});
+
 describe('_tipoBadgeCls: tres perfiles', () => {
   it('mapea cada perfil', () => {
     assert.equal(Dashboard._tipoBadgeCls('Socio'), 'aprobada');

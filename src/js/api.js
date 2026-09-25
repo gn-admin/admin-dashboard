@@ -68,6 +68,12 @@ const API = {
   async updateAcogida(id, data) { return this._post('update-acogida', { id, ...data }); },
   async deleteAcogida(id) { return this._post('delete-acogida', { id }); },
 
+  // Apadrinamientos (CRUD)
+  async getApadrinamientos() { return this._get('apadrinamientos'); },
+  async createApadrinamiento(data) { return this._post('apadrinamientos', data); },
+  async updateApadrinamiento(id, data) { return this._post('update-apadrinamiento', { id, ...data }); },
+  async deleteApadrinamiento(id) { return this._post('delete-apadrinamiento', { id }); },
+
   // Contratos (CRUD)
   async getContratos() { return this._get('contratos'); },
   async createContrato(data) { return this._post('contratos', data); },
