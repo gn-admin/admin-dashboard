@@ -240,3 +240,31 @@ describe('_assertDeleted: borrado fantasma nunca silencioso', () => {
     assert.throws(() => Dashboard._assertDeleted({ success: false }, 'El animal'), /no existe en la hoja/);
   });
 });
+
+describe('_plantillaPublicacion: post con datos del animal', () => {
+  it('rellena todos los campos', () => {
+    const t = Dashboard._plantillaPublicacion({
+      nombre: 'Luna', especie: 'Perro', raza: 'Mestiza', edad: '2 años',
+      sexo: 'Hembra', descripcion: 'Muy carinosa.', estado: 'disponible'
+    });
+    assert.match(t, /Luna/);
+    assert.match(t, /Perro · Mestiza · 2 años · Hembra/);
+    assert.match(t, /Muy carinosa/);
+    assert.match(t, /disponible para adopcion/);
+    assert.match(t, /#AdoptaNoCompres/);
+    assert.match(t, /#PerroEnAdopcion/);
+  });
+
+  it('adapta situacion segun estado', () => {
+    assert.match(Dashboard._plantillaPublicacion({ nombre: 'X', estado: 'en_acogida' }), /casa de acogida/);
+    assert.match(Dashboard._plantillaPublicacion({ nombre: 'X', estado: 'adoptado' }), /Ya encontre mi hogar/);
+  });
+
+  it('sin datos no pone undefined ni lineas rotas', () => {
+    const t = Dashboard._plantillaPublicacion({});
+    assert.doesNotMatch(t, /undefined/);
+    assert.match(t, /este peludo/);
+    assert.match(t, /#GrupoNebak/);
+    assert.doesNotMatch(t, /\n{3,}/);
+  });
+});

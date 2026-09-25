@@ -1,6 +1,6 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
-  animales: [], familias: [], adopciones: [], socios: [], actividad: [],
+  animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [],
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
@@ -50,6 +50,7 @@ const Dashboard = {
       socios: () => this.renderSocios(el),
       blacklist: () => this.renderBlacklist(el),
       reportes: () => this.renderReportes(el),
+      redes: () => this.renderRedes(el),
     };
     el.innerHTML = `<div class="page-loader"><div class="spinner"></div><p>Cargando...</p></div>`;
     try {
@@ -78,10 +79,11 @@ const Dashboard = {
     set('mas-icon-adopciones', Icons.heart);
     set('mas-icon-socios', Icons.users);
     set('mas-icon-reportes', Icons.barChart);
+    set('mas-icon-redes', Icons.heart);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -112,6 +114,7 @@ const Dashboard = {
     try { this.candidaturas = norm(JSON.parse(localStorage.getItem('gn_candidaturas') || '[]')); } catch { this.candidaturas = []; }
     try { this.contratos = norm(JSON.parse(localStorage.getItem('gn_contratos') || '[]')); } catch { this.contratos = []; }
     try { this.acogidas = norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')); } catch { this.acogidas = []; }
+    try { this.publicaciones = norm(JSON.parse(localStorage.getItem('gn_publicaciones') || '[]')); } catch { this.publicaciones = []; }
   },
 
   saveLocal() {
@@ -119,6 +122,7 @@ const Dashboard = {
     localStorage.setItem('gn_candidaturas', JSON.stringify(this.candidaturas || []));
     localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || []));
     localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
+    localStorage.setItem('gn_publicaciones', JSON.stringify(this.publicaciones || []));
   },
 
   // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
@@ -724,7 +728,7 @@ const Dashboard = {
     const el = document.getElementById('tutorial-modal');
     const body = document.getElementById('tutorial-content');
     if (!el || !body) return;
-    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', estados: 'Estados y consejos' };
+    const tabs = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', estados: 'Estados y consejos' };
     if (!tab) tab = this._tutorialTabActive || 'general';
     this._tutorialTabActive = tab;
     const tabbar = `<div class="tutorial-tabs">${Object.keys(tabs).map(t=>`<button class="tutorial-tab${t===tab?' active':''}" onclick="Dashboard.showTutorial('${t}')">${tabs[t]}</button>`).join('')}</div>`;
@@ -732,6 +736,7 @@ const Dashboard = {
       general: this._tutorialGeneral(),
       adopcion: this._tutorialAdopcion(),
       acogida: this._tutorialAcogida(),
+      redes: this._tutorialRedes(),
       estados: this._tutorialEstados()
     };
     body.innerHTML = tabbar + `<div class="tutorial-panel">` + panels[tab] + `</div>`;
@@ -833,6 +838,21 @@ const Dashboard = {
       ${this._guideStep(Icons.trash, '7. Eliminar un caso', 'La papelera de cada tarjeta borra el caso con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa a <b>En proceso</b> y la candidatura se libera. Lo mismo ocurre al eliminar la familia (cierra sus casos activos).', 'Acogidas activas', false)}`;
   },
 
+  _tutorialRedes() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Elige animal', 'foto + datos'],
+        ['Revisa plantilla', 'caption editable'],
+        ['Publica (simulado)', 'historial local'],
+        ['Conecta Instagram', 'Meta: cuenta + App'],
+        ['Historial real', 'enlaces en la ficha']
+      ], '#e91e63')}</div>
+      ${this._guideStep(Icons.heart, '1. Elige el animal', 'En <b>Redes</b> selecciona el animal: veras su foto principal y el texto <b>plantilla</b> ya rellenado con sus datos (nombre, especie, raza, edad, descripcion y hashtags). Tambien puedes saltar desde el boton <b>Publicar</b> de su ficha.', 'Redes', true)}
+      ${this._guideStep(Icons.pencil, '2. Ajusta el texto', 'Edita el caption a tu gusto o usa <b>Copiar texto</b> para llevarlo a otra app.', 'Redes > Texto', true)}
+      ${this._guideStep(Icons.checkCircle, '3. Publica', 'Pulsa <b>Publicar</b>: de momento se guarda como <b>simulada</b> en este dispositivo (naranja) hasta conectar Instagram. Aparece en el historial y en la ficha del animal.', 'Redes > Publicar', true)}
+      ${this._guideStep(Icons.info, '4. Conexion real (pendiente)', 'Para publicar de verdad hace falta cuenta de Empresa/Creador vinculada a Facebook + App de Meta. Entonces cada post guardara su enlace y saldra en la ficha como "Ver post".', 'Meta Business', false)}`;
+  },
+
   _tutorialEstados() {
     const estados = [
       ['pendiente', 'Pendiente', 'Acaba de llegar o se ha vuelto a desmarcar. Aun no se asigna nada.'],
@@ -856,6 +876,7 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
       </div>`;
   },
 
@@ -1249,6 +1270,133 @@ const Dashboard = {
     return s;
   },
 
+  // ==================== REDES SOCIALES (dummy local hasta conectar Meta) ====================
+  // Corte a real (TODO Meta): _pushPublicacion/_removePublicacion pasaran a
+  // llamar a API.createPublicacion/getPublicaciones/deletePublicacion y la
+  // hoja Publicaciones sera la fuente (hoy: localStorage gn_publicaciones).
+  _plantillaPublicacion(a) {
+    a = a || {};
+    const nombre = (String(a.nombre || '').trim()) || 'este peludo';
+    const bits = [a.especie, a.raza, a.edad, a.sexo].map(x => String(x || '').trim()).filter(x => x);
+    const desc = String(a.descripcion || '').trim();
+    const sit = a.estado === 'en_acogida'
+      ? 'Estoy en una casa de acogida y busco mi hogar definitivo.'
+      : (a.estado === 'adoptado'
+        ? 'Ya encontre mi hogar. Gracias por difundir.'
+        : 'Estoy disponible para adopcion.');
+    const tags = ['#AdoptaNoCompres', '#GrupoNebak', '#AdopcionResponsable'];
+    const esp = String(a.especie || '').replace(/[^A-Za-z]/g, '');
+    if (esp) tags.push('#' + esp + 'EnAdopcion');
+    const out = ['Hola! Soy ' + nombre + '.'];
+    if (bits.length) out.push(bits.join(' · '));
+    if (desc) out.push(desc);
+    out.push('');
+    out.push(sit + ' Si quieres conocerme, escribenos por MD o email.');
+    out.push('');
+    out.push(tags.join(' '));
+    return out.join('\n');
+  },
+
+  _publicacionesDe(animalId) {
+    return (this.publicaciones || []).filter(x => String(x.animal_id) === String(animalId));
+  },
+
+  _pushPublicacion(pub) {
+    this.publicaciones.push(pub);
+    this.saveLocal();
+    return pub;
+  },
+
+  _removePublicacion(id) {
+    this.publicaciones = (this.publicaciones || []).filter(x => x.id !== id);
+    this.saveLocal();
+  },
+
+  publicarAnimal(animalId) {
+    this._redesAnimalId = animalId;
+    location.hash = 'redes';
+  },
+
+  async renderRedes(el) {
+    await this._loadList('animales', () => API.getAnimales());
+    const preset = this._redesAnimalId ? this._byId(this.animales, this._redesAnimalId) : null;
+    this._redesAnimalId = null;
+    const selId = preset ? preset.id : ((this.animales[0] || {}).id || '');
+    el.innerHTML = `
+      <div class="page-list-container">
+        <div class="alert-item info" style="margin-bottom:16px">${Icons.info} <span>Modo <b>simulado</b>: las publicaciones se guardan en este dispositivo hasta conectar Instagram.</span></div>
+        <div class="form-card" style="margin-bottom:16px"><h3>Nueva publicacion · Instagram</h3>
+          <div class="form-row"><div class="form-group"><label>Animal *</label><select id="rd-animal" onchange="Dashboard._rellenarPlantilla()">${this.animales.map(a => `<option value="${this._esc(a.id)}" ${String(a.id) === String(selId) ? 'selected' : ''}>${this._esc(a.nombre)} · ${this._esc(a.especie || '')}</option>`).join('')}</select></div>
+          <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div></div>
+          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8"></textarea></div>
+          <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard._copiarCaption()">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
+        </div>
+        <div class="card"><div class="card-header"><h3>Historial</h3></div><div class="card-body-flush"><div id="redes-historial">${this._renderRedesHistorial()}</div></div></div>
+      </div>
+      <div class="page-detail-container"></div>`;
+    this._rellenarPlantilla();
+  },
+
+  _rellenarPlantilla() {
+    const sel = document.getElementById('rd-animal');
+    const a = sel ? this._byId(this.animales, sel.value) : null;
+    const ta = document.getElementById('rd-caption');
+    if (ta) ta.value = this._plantillaPublicacion(a);
+    const fv = document.getElementById('rd-foto');
+    if (fv) fv.innerHTML = a && this._fotoSrc(a) ? `<img src="${this._esc(this._fotoSrc(a))}" alt="" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:2px solid var(--primary)">` : '<span style="color:var(--gray-400);font-size:.8rem">Sin foto</span>';
+  },
+
+  async _copiarCaption() {
+    const ta = document.getElementById('rd-caption');
+    const txt = ta ? ta.value : '';
+    try {
+      await navigator.clipboard.writeText(txt);
+      this.showSnackbar('Texto copiado', 'success');
+    } catch (err) { this.showSnackbar('No se pudo copiar', 'error'); }
+  },
+
+  publicarRedes() {
+    const sel = document.getElementById('rd-animal');
+    const a = sel ? this._byId(this.animales, sel.value) : null;
+    if (!a) { this.showSnackbar('Elige un animal', 'warning'); return; }
+    const ta = document.getElementById('rd-caption');
+    this._pushPublicacion({
+      id: 'pub_' + Date.now().toString(36),
+      fecha: new Date().toISOString(),
+      red: 'instagram',
+      animal_id: a.id,
+      animal: a.nombre,
+      caption: ta ? ta.value : this._plantillaPublicacion(a),
+      media: this._fotoSrc(a),
+      permalink: '',
+      estado: 'simulado'
+    });
+    const h = document.getElementById('redes-historial');
+    if (h) h.innerHTML = this._renderRedesHistorial();
+    this.showSnackbar('Publicacion guardada (simulada)', 'success');
+  },
+
+  _renderRedesHistorial() {
+    const items = (this.publicaciones || []).slice().reverse();
+    if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
+    return `<table class="data-table"><thead><tr><th>Fecha</th><th>Animal</th><th>Red</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>Instagram</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap">${p.permalink ? `<a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> ` : ''}<button class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+  },
+
+  async borrarPublicacion(id) {
+    if (!(await this._confirm('Eliminar esta publicacion simulada?', 'Eliminar publicacion'))) return;
+    this._removePublicacion(id);
+    const h = document.getElementById('redes-historial');
+    if (h) h.innerHTML = this._renderRedesHistorial();
+  },
+
+  _publicacionesFicha(animalId) {
+    const pubs = this._publicacionesDe(animalId);
+    const items = pubs.length
+      ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin publicaciones todavia</div></div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.heart} Publicaciones</div>${items}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div></div>`;
+  },
+
   // ==================== ANIMALES CRUD ====================
   async renderAnimales(el) {
     await Promise.all([
@@ -1479,6 +1627,7 @@ const Dashboard = {
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
+      ${this._publicacionesFicha(a.id)}
       ${this._fotoSrc(a) ? `<div style="margin-bottom:16px"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:160px;height:160px;border-radius:12px;object-fit:cover;border:2px solid var(--primary)"></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>

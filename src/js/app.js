@@ -65,7 +65,8 @@ const App = {
       adopciones: 'Adopciones',
       socios: 'Socios / Voluntarios',
       blacklist: 'Lista Negra',
-      reportes: 'Reportes'
+      reportes: 'Reportes',
+      redes: 'Redes Sociales'
     };
     document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
     this.closeSidebar();

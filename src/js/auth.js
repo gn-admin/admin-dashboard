@@ -35,7 +35,7 @@ const Auth = {
   async logout() {
     await firebase.auth().signOut();
     this.currentUser = null;
-    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad'].forEach(k => localStorage.removeItem(k));
+    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad','gn_publicaciones'].forEach(k => localStorage.removeItem(k));
     this._notifyListeners();
   },
 
