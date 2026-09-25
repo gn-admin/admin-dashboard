@@ -22,6 +22,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
 - **Sync offline**: escrituras que fallan se encolan (`gn_pending_ops`) y se reintentan al volver la red (`flushPendingOps` en init + evento `online`, badge `.pending-sync-badge`); el backend hace **upsert por `id` en `appendToSheet`** para no duplicar. `RATE_LIMIT` se aplica (fail-open, ventana 60s por token).
 - **Borrado de adopción con rollback**: `delete-adopcion` usa `deleteAdopcionCascade` (backend) + espejo en `Dashboard.deleteAdopcion` (front): animal→`disponible` (solo si lo reservó ese caso), solicitud `aprobada`→`en_proceso` (vía `solicitud_id`=`survey::resp`), candidatura→`en_lista` sin animal. El caso enlaza su cuestionario con `Dashboard.viewCuestionarioModal` (modal `info-modal`, solo lectura + PDF/salto a Encuestas).
+- **Borrado de acogida con rollback espejo** (solo front): `Dashboard.deleteAcogida` + `_rollbackSolicitud` compartido (también lo usa `deleteFamilia` por caso): animal→`disponible`, familia restaura capacidad, solicitud→`en_proceso`, candidatura→`en_lista`. Finalizar pide confirmación (`avanzarFaseAcogida`).
 
 ## Arquitectura
 - Frontend: `src/index.html` + `src/js/*` (config, auth, api, dashboard, pdf-export, carnet-generator, icons) + `src/sw.js` + `src/css/styles.css`. Router por hash en `src/js/app.js`.
