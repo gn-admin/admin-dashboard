@@ -244,39 +244,6 @@ body {
   color: var(--primary);
 }
 
-.login-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0;
-  color: var(--gray-400);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--gray-200);
-}
-
-.login-mode-badge:empty {
-  display: none;
-}
-
-.login-mode-badge {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 0.72rem;
-  color: var(--gray-400);
-  padding: 6px 12px;
-  background: var(--gray-50);
-  border-radius: var(--radius-sm);
-}
-
 /* ===== BUTTONS ===== */
 .btn {
   display: inline-flex;
@@ -353,17 +320,6 @@ body {
 .guide-index-item:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-}
-
-.btn-google {
-  background: var(--white);
-  color: var(--gray-700);
-  border: 1.5px solid var(--gray-200);
-}
-
-.btn-google:hover:not(:disabled) {
-  background: var(--gray-50);
-  border-color: var(--gray-300);
 }
 
 .btn-sm {

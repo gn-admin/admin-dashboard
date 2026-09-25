@@ -1909,6 +1909,7 @@ const Dashboard = {
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar</button>
         ${currentIdx < fases.length-1?`<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFase('${p.id}')">${Icons.arrowRight} Avanzar fase</button>`:''}
+        ${currentIdx > 0?`<button class="btn btn-sm btn-outline-green" onclick="Dashboard.retrocederFase('${p.id}')">${Icons.arrowLeft} Retroceder</button>`:''}
       </div>
       ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Pipeline de Adopcion</div>
@@ -1927,15 +1928,33 @@ const Dashboard = {
       </div>`);
   },
 
+  _fasesAdopcion() {
+    return ['Encuesta recibida', 'Revision', 'Visita domiciliaria', 'Contrato', 'Entrega', 'Seguimiento'];
+  },
+
   async avanzarFase(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) return;
-    const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
+    const fases = this._fasesAdopcion();
     const idx = fases.indexOf(p.fase);
     if (idx >= fases.length - 1) return;
     const newFase = fases[idx + 1];
     try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
     catch (err) { this.showSnackbar('No se pudo avanzar de fase', 'error'); return; }
+    p.fase = newFase;
+    p.estado = `Fase: ${newFase}`;
+    this.viewAdopcion(id);
+  },
+
+  async retrocederFase(id) {
+    const p = this._byId(this.adopciones, id);
+    if (!p) return;
+    const fases = this._fasesAdopcion();
+    const idx = fases.indexOf(p.fase);
+    if (idx <= 0) return;
+    const newFase = fases[idx - 1];
+    try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
+    catch (err) { this.showSnackbar('No se pudo retroceder de fase', 'error'); return; }
     p.fase = newFase;
     p.estado = `Fase: ${newFase}`;
     this.viewAdopcion(id);
@@ -2040,7 +2059,7 @@ const Dashboard = {
 
   async guardarContrato(e, adopcionId) {
     e.preventDefault();
-    const p = this.adopciones.find(x => x.id === adopcionId);
+    const p = this._byId(this.adopciones, adopcionId);
     if (!p) return;
     const firma = async (id) => {
       const cv = document.getElementById(id);
@@ -2074,7 +2093,8 @@ const Dashboard = {
       estado: 'firmado',
       creado: new Date().toISOString()
     };
-    const a = p.animal_id ? this.animales.find(x => x.id === p.animal_id) : null;
+    if (!c.f1_firma) { this.showSnackbar('Falta la firma del firmante 1: dibujala en el recuadro', 'error'); return; }
+    const a = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     if (a) { c.especie = a.especie; c.raza = a.raza; c.edad = a.edad; }
     this.contratos.push(c);
     this.saveLocal();

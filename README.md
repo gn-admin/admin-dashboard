@@ -46,12 +46,12 @@ El workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) inyec
 gn-encuestas/
 ├── docs/                  # Documentación
 ├── .github/workflows/     # Despliegue automático a GitHub Pages
-├── apps-script/           # Backend (Google Apps Script)
-│   ├── Code.gs            # Punto de entrada
+├── apps-script/           # Backend (Google Apps Script, NO en git: solo local para desplegar)
+│   ├── Code.gs            # Punto de entrada + CRUD + cascadas
 │   ├── Config.gs          # Configuración (GENERADO desde .env)
 │   ├── Auth.gs            # Verificación JWT
-│   ├── DataFilter.gs      # Filtrado por rol
-│   └── PdfService.gs      # Generación de PDF
+│   ├── DataFilter.gs      # Filtrado por rol (reservado, sin uso actual)
+│   └── PdfService.gs      # PDF en servidor (reservado; el front exporta en cliente)
 ├── scripts/
 │   └── gen-config.js      # Genera config a partir de .env / variables de CI
 ├── src/                   # Frontend PWA
@@ -59,13 +59,17 @@ gn-encuestas/
 │   ├── manifest.webmanifest
 │   ├── sw.js              # Service Worker
 │   ├── css/styles.css     # Mobile-first CSS
+│   ├── assets/icons/      # logo + icon-180/192/512.png (PWA)
 │   └── js/
 │       ├── config.js      # Configuración (GENERADO desde .env)
+│       ├── icons.js
 │       ├── auth.js
 │       ├── api.js
 │       ├── dashboard.js
+│       ├── carnet-generator.js
 │       ├── pdf-export.js
 │       └── app.js
+├── tests/                 # Unitarios (`npm test`, node --test, sin dependencias)
 ├── package.json
 └── .gitignore
 ```

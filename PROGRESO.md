@@ -26,13 +26,12 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Clave compuesta `survey_id::id` en backend GET (`handleGetEstados`/`handleGetNotas`) y en frontend (`getEstado(id, surveyId)`, `states[surveyId::id]`).
 - Hojas: `Estados` (response_id|survey_id|estado|fecha) y `Notas` (response_id|survey_id|nota|fecha) — IDs en `.env`.
 
-## Pendientes
-1. **Redeplegar backend Apps Script** (Implementar → Gestión de implementaciones → Nueva versión → Implementar; la URL no cambia). El código local incluye el fix de `handleSetEstado`/`handleSetNota` (match por `response_id` + `survey_id`), CRUD de `candidaturas`/`acogidas`/`contratos`, `appendToSheet`/`updateSheetRow` alineados por cabecera (este último añade columnas nuevas), **POST `actividad`** (log de acciones), **blacklist con id estable** (`bl_<fila>` si no hay columna `id`; `update-blacklist`/`delete-blacklist`), **CORS por coincidencia exacta** (sin substrings; `''`/`null` se rechazan salvo `ALLOW_ORIGIN_EMPTY:true`; se permiten `http(s)://localhost:*` y `http(s)://127.0.0.1:*` para dev) y **`REQUIRE_EMAIL_VERIFIED`** (rechaza tokens de usuarios con email sin verificar; `true` por defecto). `Config.gs` regenerado con `SHEET_NOTAS_ID` corregido (44 chars) y `APPS_SCRIPT_ALLOWED_ORIGINS` apuntando a `https://gn-admin.github.io` (+ localhost).
-2. **Desplegar el front** (push a `main`): SW `v26` con fixes de seguridad (escapado XSS en listados/detalle/PDF), botones de edición por id (sin `JSON.stringify` inline), reserva de animal (`en_adopcion`) al asignar candidatura y `adoptado` al firmar contrato (con liberación al anular/eliminar), limpieza de huérfanos al borrar animal/familia, blacklist sincronizada con la API (antes solo local), log de actividad en acciones clave, firma/foto con downscale, export/gráfico que excluyen descartadas y logout que limpia localStorage.
-3. **Verificación de emails:** al activar `REQUIRE_EMAIL_VERIFIED` los usuarios dados de alta a mano en Firebase con email sin verificar quedarán bloqueados hasta verificar (o se desactiva el flag en `.env` + redeploy). Revisar `Auth.gs`.
-4. **Dar permisos a la API** sobre las 3 spreadsheets (`Candidaturas`, `Acogidas`, `Contratos`) y (opcional) crear cabeceras manuales (columnas listadas abajo) para legibilidad.
-5. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas manuales en la app; decidir si se restaura a `descartada`.
-6. **Iconos PWA:** el manifest apunta al logo (`assets/icons/logo-nebak.jpg`); falta generar/referenciar `icon-*.png` (72–512) de verdad si se quiere instalabilidad PWA completa.
+## Pendientes (lado humano, fuera de git)
+1. **Redeplegar backend Apps Script** (misma implementación `AKfycbw4…` → *Nueva versión*; la URL no cambia). Pegar `Code.gs` + `Config.gs` (+ `Auth.gs`/`DataFilter.gs` si no están al día) y **mantener `PdfService.gs` y `DataFilter.gs`** en el editor. El código local incluye: `handleSetEstado`/`handleSetNota` por clave compuesta, CRUD candidaturas/acogidas/contratos, `appendToSheet`/`updateSheetRow` con columnas nuevas + **upsert por id** (no duplica en reintentos), `appendToSheet` que **persiste el id** (no más filas fantasma), comparaciones de id como texto, **POST `actividad`**, blacklist con id estable, `deleteAdopcionCascade` (rollback), **`ALLOW_ORIGIN_EMPTY:true`** (Apps Script no ve cabeceras Origin; el control real es el token Firebase), **`REQUIRE_EMAIL_VERIFIED:false`**, `RATE_LIMIT:100` aplicado (fail-open).
+2. **Secret `API_URL` en GitHub** (Settings → Secrets and variables → Actions) con la URL del exec vigente + re-ejecutar el workflow `deploy.yml` (el front de Pages se genera desde los secrets, no del `.env` local).
+3. **Reparar filas fantasma**: filas de hoja con celda `id` vacía (creadas antes del fix) → rellenar `id` único o borrar la fila. Sin esto no se editan ni borran desde la app.
+4. **Hojas nuevas**: dar permisos a la API sobre `Candidaturas`, `Acogidas`, `Contratos`, `Estados`, `Notas`, `Actividad` (y opcional cabeceras `foto`, `foto_url`, `foto_drive_id` en Animales).
+5. **Resp_9 (perros 2025):** quedó `en_proceso` tras pruebas; decidir si vuelve a `descartada`.
 
 ## Hojas persistentes (candidaturas/acogidas/contratos)
 - Columnas `Candidaturas`: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`.
@@ -60,7 +59,7 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Datos locales de respaldo (`gn_candidaturas`, `gn_contratos`, `gn_acogidas`) hasta que el backend tenga hojas/endpoints.
 
 ## Service worker
-- Estado actual: **`gn-encuestas-v26`** (fixes de seguridad y estados de animal vía frontend).
+- Estado actual: **`gn-encuestas-v45`** (subir `CACHE_NAME` al tocar `dashboard.js`/`api.js`/`auth.js`/`index.html`/CSS; regla en `AGENTS.md`).
 - Regla: al tocar `src/js/dashboard.js`, `api.js` u otros assets, **subir CACHE_NAME** en `src/sw.js`.
 
 ## Configuración / despliegue
