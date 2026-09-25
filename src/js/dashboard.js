@@ -474,11 +474,11 @@ const Dashboard = {
         <div class="stat-card"><div class="stat-card-icon blue">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">En Acogida</div><div class="stat-card-value">${enAcogida}</div><div class="stat-card-change">${familiasLibres} familias libres</div></div></div>
         <div class="stat-card"><div class="stat-card-icon green">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Adoptados</div><div class="stat-card-value">${adoptados}</div><div class="stat-card-change up">${disponibles} disponibles</div></div></div>
       </div>
-      <div class="dashboard-grid" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:24px;">
+      <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
         <div class="card"><div class="card-header"><h3>Solicitudes por Mes</h3></div><div class="chart-container">${this._buildBarChart()}</div></div>
         <div class="card"><div class="card-header"><h3>Distribucion por Tipo</h3></div><div class="donut-chart-wrapper">${this._buildDonutChart(perros,gatos,acogida)}</div></div>
       </div>
-      <div class="dashboard-grid" style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:24px;">
+      <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
         <div class="card"><div class="card-header"><h3>Actividad Reciente</h3></div><div class="timeline">${this._buildTimeline()}</div></div>
         <div class="card"><div class="card-header"><h3>Requieren atención</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th>Espera</th></tr></thead><tbody>${this._atencionRows()}</tbody></table></div></div>
       </div>
@@ -821,14 +821,16 @@ const Dashboard = {
         ['Aprueba: crea la familia', 'maximo 1 animal'],
         ['Asigna animal y familia', 'estado → Elegida'],
         ['Seguimiento del caso', 'Entrega → En casa → Finalizada'],
-        ['Cierre', 'animal Disponible, familia Libre']
+        ['Cierre', 'animal Disponible, familia Libre'],
+        ['Caso eliminado', 'animal Disponible · solicitud En proceso']
       ], '#2563eb')}</div>
       ${this._guideStep(Icons.home, '1. La solicitud llega', 'Cada persona que completa la encuesta de <b>pre-acogida</b> aparece en el listado con estado <b>Pendiente</b>.', 'Encuestas > Acogida', false)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'Abre el detalle, lee sus respuestas, deja <b>notas</b> y marca <b>En proceso</b> mientras la valoras.', 'Detalle: botones Nota y En proceso', false)}
       ${this._guideStep(Icons.checkCircle, '3. Aprueba (crea la familia)', 'Al aprobar se crea la <b>familia acogedora</b> a partir de los datos de la encuesta (<b>maximo 1 animal por familia</b>) y la candidatura de la persona. Si ya existe coincidira automaticamente.', 'Detalle: boton Aprobar', false)}
       ${this._guideStep(Icons.paw, '4. Asigna animal y familia', 'En el detalle de la persona aprobada usa el bloque <b>Asignar animal</b>: elige el animal disponible y confirma la familia acogedora (verde = libre). El estado pasa a <b>Elegida</b> y se crea el caso.', 'Ficha de la solicitud aprobada', false)}
       ${this._guideStep(Icons.clock, '5. Seguimiento del caso', 'El caso se controla en <b>Acogidas activas</b> con los botones de fase: <b>Entrega → En casa → Finalizada</b>.', 'Acogidas activas', false)}
-      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al marcar <b>Finalizada</b> el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b>, lista para otra acogida.', 'Acogidas activas', false)}`;
+      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al marcar <b>Finalizada</b> (pide confirmacion) el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b> si no tiene mas animales, lista para otra acogida.', 'Acogidas activas', false)}
+      ${this._guideStep(Icons.trash, '7. Eliminar un caso', 'La papelera de cada tarjeta borra el caso con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa a <b>En proceso</b> y la candidatura se libera. Lo mismo ocurre al eliminar la familia (cierra sus casos activos).', 'Acogidas activas', false)}`;
   },
 
   _tutorialEstados() {
@@ -1646,15 +1648,16 @@ const Dashboard = {
     catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
     if (casos.length) {
-      casos.forEach(c => {
+      for (const c of casos) {
         if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
-        const a = this.animales.find(x => x.id === c.animal_id);
-        if (a && a.estado === 'en_acogida' && a.acogida_familia === id) {
+        const a = this._byId(this.animales, c.animal_id);
+        if (a && a.estado === 'en_acogida' && (!a.acogida_familia || a.acogida_familia === id)) {
           a.estado = 'disponible';
           a.acogida_familia = '';
-          this._updateLocalYApi('animales', a);
+          await this._updateLocalYApi('animales', a);
         }
-      });
+        await this._rollbackSolicitud(c.solicitud_id);
+      }
       this.acogidas = this.acogidas.filter(x => x.familia_id !== id);
     }
     this.familias = this.familias.filter(f => f.id !== id);
@@ -1670,6 +1673,7 @@ const Dashboard = {
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('familias', () => API.getFamilias())
     ]);
+    await this._loadListBestEffort('acogidas', () => API.getAcogidas());
     const casos = (this.acogidas || []).slice().reverse();
     const fases = ['entrega', 'en_casa', 'finalizada'];
     const faseLabel = { entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' };
@@ -1699,6 +1703,7 @@ const Dashboard = {
             <div style="padding:0 16px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
               ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
               ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
+              <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${c.id}')">${Icons.trash}</button>
               ${c.notas ? `<span style="color:var(--gray-400);font-size:0.75rem">${this._esc(c.notas)}</span>` : ''}
             </div>
           </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
@@ -1711,26 +1716,27 @@ const Dashboard = {
     const c = this._byId(this.acogidas, id);
     if (!c) return;
     const order = { entrega: 'en_casa', en_casa: 'finalizada' };
-    c.fase = order[c.fase] || c.fase;
+    const next = order[c.fase];
+    if (!next) return;
+    if (next === 'finalizada' && !(await this._confirm('Finalizar la acogida? El animal volvera a Disponible y la familia quedara Libre.', 'Finalizar acogida'))) return;
+    c.fase = next;
     if (c.fase === 'finalizada') {
       c.estado = 'finalizada';
       c.fin = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-      const a = this.animales.find(x => x.id === c.animal_id);
+      const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
       if (a) {
         a.estado = 'disponible';
         a.acogida_familia = '';
         this._updateLocalYApi('animales', a);
       }
-      const fam = this.familias.find(x => x.id === c.familia_id);
+      const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
       if (fam) {
-        fam.capacidad = 'Libre';
         fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
+        if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
         this._updateLocalYApi('familias', fam);
       }
-      if (c.solicitud_id && c.solicitud_id.includes('::')) {
-        const [sid, rid] = c.solicitud_id.split('::');
-        await this.setEstado(rid, 'finalizada', sid);
-      }
+      const sol = this._parseSolicitud(c.solicitud_id);
+      if (sol) await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
       this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
       this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'));
     } else {
@@ -1738,6 +1744,32 @@ const Dashboard = {
     }
     this.saveLocal();
     this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+  },
+
+  async deleteAcogida(id) {
+    if (!(await this._confirm('Eliminar este caso de acogida? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar acogida'))) return;
+    const target = this._byId(this.acogidas, id);
+    try {
+      const res = await API.deleteAcogida(id);
+      this._assertDeleted(res, 'El caso');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    const a = target && target.animal_id ? this._byId(this.animales, target.animal_id) : null;
+    if (a && a.estado === 'en_acogida') {
+      a.estado = 'disponible';
+      a.acogida_familia = '';
+      await this._updateLocalYApi('animales', a);
+    }
+    const fam = target && target.familia_id ? this._byId(this.familias, target.familia_id) : null;
+    if (fam) {
+      fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
+      if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
+      await this._updateLocalYApi('familias', fam);
+    }
+    await this._rollbackSolicitud(target && target.solicitud_id);
+    this.acogidas = (this.acogidas || []).filter(x => x.id !== id);
+    this.saveLocal();
+    this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+    this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
   },
 
   // ==================== ADOPCIONES CRUD ====================
@@ -1833,6 +1865,27 @@ const Dashboard = {
     return { 'pre-adopcion-perros': 'encuestas-perros', 'pre-adopcion-gatos': 'encuestas-gatos', 'pre-acogida': 'encuestas-acogida' }[surveyId] || 'encuestas';
   },
 
+  // Rollback compartido adopcion/acogida: solicitud aprobada -> en_proceso
+  // y candidatura liberada (en_lista sin animal). Idempotente.
+  async _rollbackSolicitud(solicitudId) {
+    const sol = this._parseSolicitud(solicitudId);
+    if (!sol) return false;
+    if (this.getEstado(sol.responseId, sol.surveyId) === 'aprobada') {
+      await this.setEstado(sol.responseId, 'en_proceso', sol.surveyId);
+    }
+    let tocadas = false;
+    (this.candidaturas || []).forEach(cand => {
+      if (cand.solicitud_id === (sol.surveyId + '::' + sol.responseId) && cand.animal_id) {
+        cand.estado = 'en_lista';
+        cand.animal_id = '';
+        this._updateLocalYApi('candidaturas', cand);
+        tocadas = true;
+      }
+    });
+    if (tocadas) this.saveLocal();
+    return true;
+  },
+
   viewAdopcion(id) {
     const p = this._byId(this.adopciones, id);
     if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
@@ -1902,20 +1955,7 @@ const Dashboard = {
       a.adopcion_id = '';
       await this._updateLocalYApi('animales', a);
     }
-    const sol = this._parseSolicitud(target && target.solicitud_id);
-    if (sol && this.getEstado(sol.responseId, sol.surveyId) === 'aprobada') {
-      await this.setEstado(sol.responseId, 'en_proceso', sol.surveyId);
-    }
-    if (sol) {
-      (this.candidaturas || []).forEach(cand => {
-        if (cand.solicitud_id === (sol.surveyId + '::' + sol.responseId) && cand.animal_id) {
-          cand.estado = 'en_lista';
-          cand.animal_id = '';
-          this._updateLocalYApi('candidaturas', cand);
-        }
-      });
-      this.saveLocal();
-    }
+    await this._rollbackSolicitud(target && target.solicitud_id);
     this.adopciones = this.adopciones.filter(x => x.id !== id);
     this.saveLocal();
     this._hideDetail('adopciones');
