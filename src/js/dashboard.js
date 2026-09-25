@@ -547,6 +547,10 @@ const Dashboard = {
       this._loadList('familias', () => API.getFamilias()),
       this._loadList('actividad', () => API.getActividad()),
       this._loadList('recordatorios', () => API.getRecordatorios()),
+      this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos()),
+      this._loadListBestEffort('donaciones', () => API.getDonaciones()),
+      this._loadListBestEffort('gastos', () => API.getGastos()),
+      this._loadListBestEffort('socios', () => API.getSocios()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
     ]);
   },
@@ -564,6 +568,13 @@ const Dashboard = {
     const gatos = (this.responses['pre-adopcion-gatos'] || []).filter(r => this.getEstado(r.id, 'pre-adopcion-gatos') !== 'descartada').length;
     const acogida = (this.responses['pre-acogida'] || []).filter(r => this.getEstado(r.id, 'pre-acogida') !== 'descartada').length;
     const familiasLibres = this.familias.filter(f => f.capacidad === 'Libre').length;
+    const apadActivos = (this.apadrinamientos || []).filter(p => p.estado === 'activo');
+    const apadEuros = this._totalAportes(this.apadrinamientos);
+    const donTotal = this._totalDonaciones(this.donaciones);
+    const gastoTotal = this._totalGastos(this.gastos);
+    const nSocios = (this.socios || []).length;
+    const sociosActivos = (this.socios || []).filter(s => s.activo).length;
+    const vencidos = (this.recordatorios || []).filter(r => !r.hecho && (this._diasHasta(r.fecha) ?? 99) < 0).length;
 
     el.innerHTML = `
       <div class="stats-grid">
@@ -571,6 +582,12 @@ const Dashboard = {
         <div class="stat-card"><div class="stat-card-icon orange">${Icons.clock}</div><div class="stat-card-info"><div class="stat-card-label">En Proceso</div><div class="stat-card-value">${enProceso}</div><div class="progress-bar"><div class="progress-bar-fill orange" style="width:${total?(enProceso/total*100):0}%"></div></div></div></div>
         <div class="stat-card"><div class="stat-card-icon blue">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">En Acogida</div><div class="stat-card-value">${enAcogida}</div><div class="stat-card-change">${familiasLibres} familias libres</div></div></div>
         <div class="stat-card"><div class="stat-card-icon green">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Adoptados</div><div class="stat-card-value">${adoptados}</div><div class="stat-card-change up">${disponibles} disponibles</div></div></div>
+      </div>
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-card-icon blue">${Icons.paw}</div><div class="stat-card-info"><div class="stat-card-label">Apadrinamientos</div><div class="stat-card-value">${apadActivos.length}</div><div class="stat-card-change">${apadEuros.toFixed(2)} €/mes</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Donaciones</div><div class="stat-card-value">${donTotal.toFixed(2)} €</div><div class="stat-card-change">${(this.donaciones || []).length} donaciones</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon orange">${Icons.activity}</div><div class="stat-card-info"><div class="stat-card-label">Gastos</div><div class="stat-card-value">${gastoTotal.toFixed(2)} €</div><div class="stat-card-change">veterinarios</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon blue">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Socios</div><div class="stat-card-value">${nSocios}</div><div class="stat-card-change">${sociosActivos} activos</div></div></div>
       </div>
       <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
         <div class="card"><div class="card-header"><h3>Solicitudes por Mes</h3></div><div class="chart-container">${this._buildBarChart()}</div></div>
@@ -587,7 +604,8 @@ const Dashboard = {
         ${enProceso?`<div class="alert-item info">${Icons.activity}<span>${enProceso} procesos en curso</span></div>`:''}
         ${this.blacklist.length?`<div class="alert-item danger">${Icons.ban}<span>${this.blacklist.length} en lista negra</span></div>`:''}
         ${enAcogida?`<div class="alert-item info">${Icons.home}<span>${enAcogida} animales en acogida</span></div>`:''}
-        ${!pendientes&&!enProceso&&!this.blacklist.length?'<div style="text-align:center;padding:16px;color:var(--gray-400)">No hay alertas pendientes</div>':''}
+        ${vencidos?`<div class="alert-item warning">${Icons.clock}<span>${vencidos} vencimientos pendientes</span></div>`:''}
+        ${!pendientes&&!enProceso&&!this.blacklist.length&&!vencidos?'<div style="text-align:center;padding:16px;color:var(--gray-400)">No hay alertas pendientes</div>':''}
       </div></div>`;
   },
 
@@ -3227,7 +3245,7 @@ const Dashboard = {
       </div>
       <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
         <div>${fotoHtml}</div>
-        <div style="flex:1;min-width:200px">
+        <div style="flex:1;min-width:min(200px,100%)">
           <div class="detail-section"><div class="detail-section-title">Informacion del Socio</div>
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
@@ -3549,7 +3567,12 @@ const Dashboard = {
     void el.offsetWidth;
     el.classList.add('active');
     clearTimeout(this._snackbarTimer);
-    this._snackbarTimer = setTimeout(() => { el.classList.remove('active'); el.className = 'toast-error'; }, 5000);
+    const token = (this._snackbarToken = (this._snackbarToken || 0) + 1);
+    this._snackbarTimer = setTimeout(() => {
+      if (this._snackbarToken !== token) return;
+      el.classList.remove('active');
+      el.className = 'toast-error';
+    }, 5000);
   },
 
   showError(msg) { this.showSnackbar(msg, 'error'); }
