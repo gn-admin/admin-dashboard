@@ -306,7 +306,7 @@ const Dashboard = {
     } catch (err) {
       const fallback = { ...data, id: 'fam_' + Date.now().toString(36), fecha_registro: new Date().toISOString().slice(0, 10) };
       this.familias.push(fallback);
-      this.showSnackbar('Familia registrada localmente (backend sin hoja)', 'error');
+      this.showSnackbar('Familia registrada localmente (backend sin hoja)', 'warning');
       return fallback;
     }
   },
@@ -938,7 +938,7 @@ const Dashboard = {
     }
     this.hideLoading();
     const r = (this.responses[surveyId] || []).find(x => String(x.id) === String(responseId));
-    if (!r) { this.showSnackbar('Cuestionario no encontrado', 'error'); return; }
+    if (!r) { this.showSnackbar('Cuestionario no encontrado', 'warning'); return; }
     const sections = this._buildSections(r, surveyId);
     const e = this.getEstado(r.id, surveyId);
     const note = this.notes[surveyId + '::' + r.id] || '';
@@ -998,7 +998,7 @@ const Dashboard = {
 
   async asignarCandidatura(surveyId, responseId) {
     if (this.getEstado(responseId, surveyId) !== 'aprobada') {
-      this.showSnackbar('La solicitud no esta aprobada', 'error');
+      this.showSnackbar('La solicitud no esta aprobada', 'warning');
       this.viewDetail(surveyId, responseId);
       return;
     }
@@ -1008,12 +1008,12 @@ const Dashboard = {
     const selKey = surveyId + '-' + responseId;
     const animalSel = document.getElementById('asg-animal-' + selKey);
     const a = animalSel ? this.animales.find(x => x.id === animalSel.value) : null;
-    if (!a) { this.showSnackbar('Selecciona un animal', 'error'); return; }
+    if (!a) { this.showSnackbar('Selecciona un animal', 'warning'); return; }
     let familiaId = null;
     if (c.tipo === 'acogida') {
       const fs = document.getElementById('asg-familia-' + selKey);
       familiaId = fs ? fs.value : c.familia_id;
-      if (!familiaId) { this.showSnackbar('Selecciona una familia de acogida', 'error'); return; }
+        if (!familiaId) { this.showSnackbar('Selecciona una familia de acogida', 'warning'); return; }
     }
     const ok = await this._crearCasoDesdeCandidatura(c, a, familiaId);
     if (!ok) return;
@@ -1031,7 +1031,7 @@ const Dashboard = {
     const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     if (c.tipo === 'acogida') {
       const fam = this.familias.find(f => f.id === familiaId);
-      if (!fam) { this.showSnackbar('Familia no encontrada', 'error'); return false; }
+      if (!fam) { this.showSnackbar('Familia no encontrada', 'warning'); return false; }
       const caso = {
         id: 'acg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         animal_id: a.id,
@@ -1330,7 +1330,7 @@ const Dashboard = {
   showAnimalFormById(id) {
     if (!id) { this.showAnimalForm(null); return; }
     const data = this._byId(this.animales, id);
-    if (!data) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if (!data) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     this.showAnimalForm(data);
   },
 
@@ -1359,7 +1359,7 @@ const Dashboard = {
     const edad = document.getElementById('cm-edad').value.trim();
     const sexo = document.getElementById('cm-sexo').value;
     const obl = document.getElementById('cm-obl').checked;
-    if (!grupo || !base) { this.showSnackbar('Completa grupo y nombre base', 'error'); return; }
+    if (!grupo || !base) { this.showSnackbar('Completa grupo y nombre base', 'warning'); return; }
     const grupo_id = 'gpo_' + Date.now().toString(36);
     this.showLoading();
     try {
@@ -1463,7 +1463,7 @@ const Dashboard = {
 
   viewAnimal(id) {
     const a = this._byId(this.animales, id);
-    if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
     this._showDetail('animales', a.nombre, `
@@ -1582,7 +1582,7 @@ const Dashboard = {
   showFamiliaFormById(id) {
     if (!id) { this.showFamiliaForm(null); return; }
     const data = this._byId(this.familias, id);
-    if (!data) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if (!data) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'warning'); return; }
     this.showFamiliaForm(data);
   },
 
@@ -1620,7 +1620,7 @@ const Dashboard = {
 
   viewFosterFamily(id) {
     const f = this._byId(this.familias, id);
-    if(!f) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if(!f) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const animalesEnAcogida = this.animales.filter(a => a.acogida_familia === id);
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -1819,7 +1819,7 @@ const Dashboard = {
   showAdopcionFormById(id) {
     if (!id) { this.showAdopcionForm(null); return; }
     const data = this._byId(this.adopciones, id);
-    if (!data) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if (!data) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     this.showAdopcionForm(data);
   },
 
@@ -1888,7 +1888,7 @@ const Dashboard = {
 
   viewAdopcion(id) {
     const p = this._byId(this.adopciones, id);
-    if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
     const currentIdx = fases.indexOf(p.fase);
     const contrato = this._contratoDeAdopcion(p.id);
@@ -2093,7 +2093,7 @@ const Dashboard = {
       estado: 'firmado',
       creado: new Date().toISOString()
     };
-    if (!c.f1_firma) { this.showSnackbar('Falta la firma del firmante 1: dibujala en el recuadro', 'error'); return; }
+    if (!c.f1_firma) { this.showSnackbar('Falta la firma del firmante 1: dibujala en el recuadro', 'warning'); return; }
     const a = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     if (a) { c.especie = a.especie; c.raza = a.raza; c.edad = a.edad; }
     this.contratos.push(c);
@@ -2116,7 +2116,7 @@ const Dashboard = {
 
   descargarContrato(adopcionId) {
     const c = this._contratoDeAdopcion(adopcionId);
-    if (!c) { this.showSnackbar('No hay contrato firmado', 'error'); return; }
+    if (!c) { this.showSnackbar('No hay contrato firmado', 'warning'); return; }
     PdfExport.exportContracto(c);
   },
 
@@ -2179,7 +2179,7 @@ const Dashboard = {
   showSocioFormById(id) {
     if (!id) { this.showSocioForm(null); return; }
     const data = this._byId(this.socios, id);
-    if (!data) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if (!data) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     this.showSocioForm(data);
   },
 
@@ -2267,7 +2267,7 @@ const Dashboard = {
 
   viewSocio(id) {
     const s = this._byId(this.socios, id);
-    if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'error'); return; }
+    if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">

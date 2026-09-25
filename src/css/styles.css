@@ -1431,6 +1431,7 @@ body {
 
 .toast-error.toast-success { background: var(--primary); }
 .toast-error.toast-info { background: var(--info); }
+.toast-error.toast-warning { background: var(--warning); }
 .toast-error.toast-error { background: var(--danger); }
 
 .toast-error.active {
