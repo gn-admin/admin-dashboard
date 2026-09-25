@@ -313,6 +313,28 @@ describe('_tipoBadgeCls: tres perfiles', () => {
   });
 });
 
+describe('_cuotaEstado: al dia o pendiente', () => {
+  it('no aplica si no es socio', () => {
+    assert.equal(Dashboard._cuotaEstado({ tipo: 'Voluntario' }), null);
+    assert.equal(Dashboard._cuotaEstado({}), null);
+    assert.equal(Dashboard._cuotaEstado(null), null);
+  });
+
+  it('sin pagos o sin datos', () => {
+    assert.deepEqual(Dashboard._cuotaEstado({ tipo: 'Socio' }), { label: 'Sin pagos', cls: '' });
+    assert.deepEqual(Dashboard._cuotaEstado({ tipo: 'Ambos', ultimo_pago: 'no-fecha' }), { label: 'Sin datos', cls: '' });
+  });
+
+  it('al dia si pago hace menos de un anio', () => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    assert.deepEqual(Dashboard._cuotaEstado({ tipo: 'Socio', ultimo_pago: hoy }), { label: 'Al dia', cls: 'aprobada' });
+  });
+
+  it('pendiente si pago hace mas de un anio', () => {
+    assert.deepEqual(Dashboard._cuotaEstado({ tipo: 'Socio', ultimo_pago: '2020-01-01' }), { label: 'Pendiente', cls: 'descartada' });
+  });
+});
+
 describe('_anioFecha + _restantes2025', () => {
   it('extrae anio de ISO, es-ES e invalido', () => {
     assert.equal(Dashboard._anioFecha('2025-03-14T10:00:00.000Z'), 2025);
