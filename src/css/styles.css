@@ -511,6 +511,48 @@ body {
   overflow: hidden;
 }
 
+/* Secciones plegables del sidebar (acordeon) */
+.sidebar-section-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.sidebar-section-toggle:hover {
+  color: rgba(255,255,255,0.7);
+}
+
+.section-chevron {
+  display: flex;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  color: rgba(255,255,255,0.35);
+}
+
+.sidebar-section.collapsed .section-chevron {
+  transform: rotate(-90deg);
+}
+
+.sidebar-section.collapsed > .sidebar-link {
+  display: none;
+}
+
+/* En rail los grupos siempre muestran sus iconos (si no serian inalcanzables) */
+.sidebar.collapsed .sidebar-section.collapsed > .sidebar-link {
+  display: flex;
+}
+
+.sidebar.collapsed .section-chevron {
+  display: none;
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;
@@ -2610,7 +2652,7 @@ body {
   }
 
   .sidebar-overlay {
-    display: none;
+    display: none !important;
   }
 
   .main-wrapper {
@@ -2679,7 +2721,7 @@ body {
 
   .mas-menu-overlay,
   .mas-menu-popup {
-    display: none;
+    display: none !important;
   }
 
   .sidebar.collapsed ~ .main-wrapper {
@@ -2691,40 +2733,6 @@ body {
 @media (min-width: 768px) and (max-width: 1023px) {
   .topbar {
     padding: 0 16px;
-  }
-
-  /* Patron movil en tablet: bottom-nav + sidebar como drawer.
-     Anula el rail fijo del bloque general (evita su scroll). */
-  .sidebar,
-  .sidebar.collapsed {
-    width: var(--sidebar-width);
-    transform: translateX(-100%);
-  }
-
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
-  .sidebar-toggle-btn {
-    display: inline-flex;
-  }
-
-  .sidebar-collapse-btn {
-    display: none;
-  }
-
-  .main-wrapper,
-  .sidebar.collapsed ~ .main-wrapper {
-    margin-left: 0;
-    padding-bottom: calc(var(--bottomnav-height) + 16px);
-  }
-
-  .bottom-nav {
-    display: flex;
-  }
-
-  .toast-error {
-    bottom: calc(var(--bottomnav-height) + env(safe-area-inset-bottom, 0px) + 12px);
   }
 
   .tutorial-btn {

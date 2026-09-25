@@ -4,6 +4,7 @@ const App = {
   init() {
     this.registerServiceWorker();
     this.initSidebarCollapse();
+    this.initSidebarSections();
     Auth.init();
     Auth.onAuthChange(async user => {
       if (user) await this.showDashboard();
@@ -98,6 +99,34 @@ const App = {
     localStorage.setItem('gn_sidebar_collapsed', isCollapsed ? 'true' : 'false');
     const btn = document.getElementById('sidebar-collapse-btn');
     if (btn) btn.innerHTML = isCollapsed ? Icons.arrowRight : Icons.sidebarCollapse;
+  },
+
+  initSidebarSections() {
+    let collapsed = [];
+    try { collapsed = JSON.parse(localStorage.getItem('gn_sidebar_sections') || '[]'); } catch {}
+    document.querySelectorAll('.sidebar-section[data-section]').forEach(sec => {
+      const key = sec.dataset.section;
+      const toggle = sec.querySelector('[data-section-toggle]');
+      if (collapsed.includes(key)) sec.classList.add('collapsed');
+      if (toggle) {
+        toggle.setAttribute('aria-expanded', collapsed.includes(key) ? 'false' : 'true');
+        toggle.addEventListener('click', () => this.toggleSidebarSection(key));
+      }
+    });
+  },
+
+  toggleSidebarSection(key) {
+    const sec = document.querySelector('.sidebar-section[data-section="' + key + '"]');
+    if (!sec) return;
+    sec.classList.toggle('collapsed');
+    const isCollapsed = sec.classList.contains('collapsed');
+    sec.querySelector('[data-section-toggle]')?.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    let collapsed = [];
+    try { collapsed = JSON.parse(localStorage.getItem('gn_sidebar_sections') || '[]'); } catch {}
+    const i = collapsed.indexOf(key);
+    if (isCollapsed && i === -1) collapsed.push(key);
+    if (!isCollapsed && i !== -1) collapsed.splice(i, 1);
+    localStorage.setItem('gn_sidebar_sections', JSON.stringify(collapsed));
   },
 
   toggleMasMenu() {
