@@ -72,3 +72,16 @@ PWA admin de Grupo Nebak (Apps Script + Sheets + Firebase Auth) desplegada y **f
 - Backend: `apps-script/Code.gs`, `apps-script/Auth.gs` (local, no en git).
 - Front: `src/js/dashboard.js`, `src/js/api.js`, `src/js/auth.js`, `src/sw.js`.
 - Docs: `README.md`, `docs/GUIA-DESPLIEGUE.md`.
+
+## Estado final (cierre): qué se ha hecho
+- Front completo y pusheado (SW v70, 56 tests en verde): encuestas, animales (foto Drive + thumbnails), familias, acogidas con rollback, adopciones (fases +/-, contrato con firma obligatoria, rollback en cascada, cuestionario linkado, manual vinculado), apadrinamientos (varios, socio/externo, conversión, totales), socios (3 perfiles, cuota, carnets por perfil), blacklist, donaciones, gastos, recordatorios con widget, seguimiento post-adopción, reportes (+descartar 2025), dashboard (KPIs, atención, vencimientos), guía por botones (7 pestañas), auth sin flash de login, sync offline con cola, semáforo verde/naranja/rojo + glyphs, anti-doble-clic en forms, PWA instalable.
+- Backend local listo (cascadas, upsert, ids persistentes, rate-limit, keepWarm, 20 endpoints nuevos): **pendiente pegar `Code.gs`+`Config.gs` y Nueva versión**.
+- Decisiones: sin roles (todos admin), sin reset de contraseña, `horas_mes` sin uso, documentos y redes en dummy local.
+
+## Futuro desarrollo (no empezado)
+1. **Redes real (Meta)**: cuenta Empresa/Creador + App + cablear `_pushPublicacion` (marcado `TODO Meta`) + hoja `Publicaciones`.
+2. **Documentos real**: subida a Drive + visor (hoy referencias locales).
+3. **WhatsApp**: enlaces `wa.me` precargados en solicitud/familia/adopción.
+4. **Anti-doble-tap en botones** de fase/asignar/aprobar (los forms ya lo tienen).
+5. **Endpoint agregado** `dashboard` (1 ejecución en vez de 6; requiere deploy).
+6. **Push notifications**, fusión de duplicados, auditoría lector de pantalla, logo en alta para splash 512.
