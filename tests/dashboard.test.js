@@ -312,6 +312,16 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_bajoStock: aviso de inventario', () => {
+  it('solo con minimo configurado y alcanzado', () => {
+    assert.equal(Dashboard._bajoStock({ cantidad: 1, minimo: 2 }), true);
+    assert.equal(Dashboard._bajoStock({ cantidad: 2, minimo: 2 }), true);
+    assert.equal(Dashboard._bajoStock({ cantidad: 5, minimo: 2 }), false);
+    assert.equal(Dashboard._bajoStock({ cantidad: 0, minimo: 0 }), false);
+    assert.equal(Dashboard._bajoStock({}), false);
+  });
+});
+
 describe('_totalGastos/_totalDonaciones: suman importes', () => {
   it('suma con coma decimal e ignora vacios', () => {
     assert.equal(Dashboard._totalGastos([{ importe: '10' }, { importe: '5,5' }, { importe: '' }]), 15.5);

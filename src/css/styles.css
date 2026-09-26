@@ -1674,6 +1674,15 @@ body {
   background: var(--gray-50);
 }
 
+.mas-menu-sep {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gray-400);
+  padding: 8px 12px 4px;
+}
+
 .mas-menu-icon {
   width: 20px;
   height: 20px;
@@ -2147,6 +2156,11 @@ body {
 .animal-card-status.adoptado {
   background: var(--warning-light);
   color: var(--warning);
+}
+
+.animal-card-status.fallecido {
+  background: var(--gray-200);
+  color: var(--gray-600);
 }
 
 .animal-group-badge {

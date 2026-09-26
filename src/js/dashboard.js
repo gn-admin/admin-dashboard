@@ -1,7 +1,7 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
-  gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [],
+  gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [], inventario: [],
   // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
   APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
@@ -77,6 +77,7 @@ const Dashboard = {
       reportes: () => this.renderReportes(el),
       redes: () => this.renderRedes(el),
       donaciones: () => this.renderDonaciones(el),
+      almacen: () => this.renderAlmacen(el),
     };
     el.innerHTML = `<div class="page-loader"><div class="spinner"></div><p>Cargando...</p></div>`;
     try {
@@ -107,10 +108,11 @@ const Dashboard = {
     set('mas-icon-reportes', Icons.barChart);
     set('mas-icon-redes', Icons.heart);
     set('mas-icon-donaciones', Icons.heart);
+    set('mas-icon-almacen', Icons.box);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart, donaciones: Icons.heart };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart, donaciones: Icons.heart, almacen: Icons.box };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -148,6 +150,7 @@ const Dashboard = {
     try { this.donaciones = norm(JSON.parse(localStorage.getItem('gn_donaciones') || '[]')); } catch { this.donaciones = []; }
     try { this.seguimientos = norm(JSON.parse(localStorage.getItem('gn_seguimientos') || '[]')); } catch { this.seguimientos = []; }
     try { this.documentos = JSON.parse(localStorage.getItem('gn_documentos') || '[]'); } catch { this.documentos = []; }
+    try { this.inventario = norm(JSON.parse(localStorage.getItem('gn_inventario') || '[]')); } catch { this.inventario = []; }
   },
 
   saveLocal() {
@@ -162,6 +165,7 @@ const Dashboard = {
     localStorage.setItem('gn_donaciones', JSON.stringify(this.donaciones || []));
     localStorage.setItem('gn_seguimientos', JSON.stringify(this.seguimientos || []));
     localStorage.setItem('gn_documentos', JSON.stringify(this.documentos || []));
+    localStorage.setItem('gn_inventario', JSON.stringify(this.inventario || []));
   },
 
   // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
@@ -946,7 +950,7 @@ const Dashboard = {
 
   _animalName(id) { const a=this.animales.find(x=>x.id===id); return a?a.nombre:'(sin animal)'; },
 
-  _animalEstadoLabel(e) { const m={disponible:'Disponible',en_acogida:'En acogida',en_adopcion:'En adopcion',adoptado:'Adoptado'}; return m[e]||e||'Sin estado'; },
+  _animalEstadoLabel(e) { const m={disponible:'Disponible',en_acogida:'En acogida',en_adopcion:'En adopcion',adoptado:'Adoptado',fallecido:'Fallecido'}; return m[e]||e||'Sin estado'; },
 
   // ==================== GUIA DE PROCESOS / PERFIL / ASIGNACION ====================
 
@@ -1157,6 +1161,7 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.box}</span><div><b>Almacén</b><small>Inventario simulado con aviso de bajo stock.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
@@ -2059,7 +2064,7 @@ const Dashboard = {
     const especie = this._currentEspecieFilter;
     let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
     if (especie!=='all') filtered = especie==='otro' ? filtered.filter(a=>!['Perro','Gato'].includes(a.especie)) : filtered.filter(a=>(a.especie||'')===especie);
-    const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length};
+    const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length, fallecido:this.animales.filter(a=>a.estado==='fallecido').length};
     const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
     el.innerHTML = `
       <div class="page-list-container">
@@ -2071,6 +2076,7 @@ const Dashboard = {
             <option value="en_acogida" ${filter==='en_acogida'?'selected':''}>En acogida (${counts.en_acogida})</option>
             <option value="en_adopcion" ${filter==='en_adopcion'?'selected':''}>Reservados (${counts.en_adopcion})</option>
             <option value="adoptado" ${filter==='adoptado'?'selected':''}>Adoptados (${counts.adoptado})</option>
+            <option value="fallecido" ${filter==='fallecido'?'selected':''}>Fallecidos (${counts.fallecido})</option>
           </select>
           <select onchange="Dashboard._currentEspecieFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
             <option value="all" ${especie==='all'?'selected':''}>Especie: Todas</option>
@@ -2123,7 +2129,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div></div>
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
-      <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
+      <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form>`);
@@ -2632,7 +2638,7 @@ const Dashboard = {
   // ==================== ADOPCIONES CRUD ====================
   async renderAdopciones(el) {
     await this._loadList('adopciones', () => API.getAdopciones());
-    const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
+    const fases = this._fasesAdopcion();
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${this.adopciones.length} procesos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionForm()">${Icons.plus} Nueva</button></div>
@@ -2663,7 +2669,7 @@ const Dashboard = {
 
   async showAdopcionForm(data) {
     const isEdit = !!data;
-    const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
+    const fases = this._fasesAdopcion();
     await this._ensureListas(['animales']);
     this._renderForm('adopciones', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Adopcion</h3><form onsubmit="Dashboard.saveAdopcion(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-row"><div class="form-group"><label>Animal *</label><input type="text" id="ad-animal" value="${this._esc(data?.animal||'')}" required placeholder="Ej: Max (Labrador)"></div><div class="form-group"><label>Adoptante *</label><input type="text" id="ad-adoptante" value="${this._esc(data?.adoptante||'')}" required></div></div>
@@ -2789,7 +2795,7 @@ const Dashboard = {
     await this._ensureListas(['contratos', 'seguimientos']);
     const p = this._byId(this.adopciones, id);
     if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
-    const fases = ['Encuesta recibida','Revision','Visita domiciliaria','Contrato','Entrega','Seguimiento'];
+    const fases = this._fasesAdopcion();
     const currentIdx = fases.indexOf(p.fase);
     const contrato = this._contratoDeAdopcion(p.id);
     const sol = this._parseSolicitud(p.solicitud_id);
@@ -2830,7 +2836,7 @@ const Dashboard = {
   },
 
   _fasesAdopcion() {
-    return ['Encuesta recibida', 'Revision', 'Visita domiciliaria', 'Contrato', 'Entrega', 'Seguimiento'];
+    return ['Encuesta recibida', 'Revision', 'Visita domiciliaria', 'Contrato', 'Entrega', 'Prueba', 'Seguimiento'];
   },
 
   async avanzarFase(id) {
@@ -3452,6 +3458,83 @@ const Dashboard = {
     this.saveLocal();
     this.renderDonaciones(document.getElementById('page-donaciones'));
     this.showSnackbar('Donacion eliminada', 'success');
+  },
+
+  // ==================== ALMACEN (dummy local: sin backend) ====================
+  _bajoStock(it) {
+    const min = parseFloat(it.minimo) || 0;
+    return min > 0 && (parseFloat(it.cantidad) || 0) <= min;
+  },
+
+  async renderAlmacen(el) {
+    const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
+    el.innerHTML = `
+      <div class="page-list-container">
+        <div class="alert-item info" style="margin-bottom:16px">${Icons.info} <span>Inventario <b>simulado</b> en este dispositivo.</span></div>
+        <div class="list-header"><span class="response-count">${items.length} artículos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--gray-400)">Almacén vacío</td></tr>`}</tbody></table></div></div>
+      </div>
+      <div class="page-detail-container"></div>`;
+  },
+
+  showInventarioForm(id) {
+    const data = id ? this._byId(this.inventario, id) : null;
+    const isEdit = !!data;
+    this.showFormModal(isEdit ? 'Editar artículo' : 'Nuevo artículo', `
+      <form onsubmit="Dashboard.saveInventario(event,'${data ? this._esc(data.id) : ''}')">
+      <div class="form-row"><div class="form-group"><label>Artículo *</label><input type="text" id="iv-nombre" required value="${this._esc(data?.nombre || '')}" placeholder="Ej: Pienso cachorro"></div>
+      <div class="form-group"><label>Unidad</label><input type="text" id="iv-unidad" value="${this._esc(data?.unidad || '')}" placeholder="Ej: sacos, latas"></div></div>
+      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="iv-cantidad" required step="any" value="${data?.cantidad ?? ''}" placeholder="Ej: 12"></div>
+      <div class="form-group"><label>Mínimo (aviso)</label><input type="number" id="iv-minimo" step="any" value="${data?.minimo ?? ''}" placeholder="Ej: 2"></div></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      </form>`);
+  },
+
+  saveInventario(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const nombre = document.getElementById('iv-nombre').value.trim();
+    const cantidad = parseFloat(document.getElementById('iv-cantidad').value);
+    if (!nombre || isNaN(cantidad)) { this.showSnackbar('Completa nombre y cantidad válida', 'warning'); finGuardar(); return; }
+    if (id) {
+      const it = this._byId(this.inventario, id);
+      if (it) Object.assign(it, {
+        nombre,
+        unidad: document.getElementById('iv-unidad').value.trim(),
+        cantidad,
+        minimo: parseFloat(document.getElementById('iv-minimo').value) || 0
+      });
+    } else {
+      this.inventario.push({
+        id: 'inv_' + Date.now().toString(36),
+        nombre,
+        unidad: document.getElementById('iv-unidad').value.trim(),
+        cantidad,
+        minimo: parseFloat(document.getElementById('iv-minimo').value) || 0
+      });
+    }
+    this.saveLocal();
+    finGuardar();
+    this.closeFormModal();
+    this.renderAlmacen(document.getElementById('page-almacen'));
+    this.showSnackbar(id ? 'Artículo actualizado' : 'Artículo creado', 'success');
+  },
+
+  ajustarInventario(id, delta) {
+    const it = this._byId(this.inventario, id);
+    if (!it) return;
+    it.cantidad = Math.max(0, (parseFloat(it.cantidad) || 0) + delta);
+    this.saveLocal();
+    this.renderAlmacen(document.getElementById('page-almacen'));
+  },
+
+  async deleteInventario(id) {
+    if (!(await this._confirm('Eliminar este artículo?', 'Eliminar'))) return;
+    this.inventario = (this.inventario || []).filter(x => x.id !== id);
+    this.saveLocal();
+    this.renderAlmacen(document.getElementById('page-almacen'));
+    this.showSnackbar('Artículo eliminado', 'success');
   },
 
   // ==================== REPORTES ====================

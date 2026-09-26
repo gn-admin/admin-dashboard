@@ -86,7 +86,8 @@ const App = {
       blacklist: 'Lista Negra',
       reportes: 'Reportes',
       redes: 'Redes Sociales',
-      donaciones: 'Donaciones'
+      donaciones: 'Donaciones',
+      almacen: 'Almacén'
     };
     document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
     this.closeSidebar();
