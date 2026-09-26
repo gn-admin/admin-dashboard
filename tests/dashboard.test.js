@@ -174,44 +174,52 @@ describe('_fmtFecha: fechas legibles, resto intacto', () => {
   });
 });
 
-describe('_atencionItems: pendientes mas antiguos primero', () => {
-  it('filtra descartadas/aprobadas y ordena por fecha', () => {
+describe('_accionItems: vencidos primero, luego por antiguedad', () => {
+  it('ordena vencidos antes que solicitudes', () => {
     Dashboard.surveys = [{ id: 's1', name: 'S1' }];
     Dashboard.responses = {
       s1: [
         { id: 'nueva', fecha_creacion: '2026-09-20' },
         { id: 'vieja', fecha_creacion: '2026-09-01' },
-        { id: 'aprob', fecha_creacion: '2026-08-01' },
-        { id: 'desc', fecha_creacion: '2026-07-01' }
+        { id: 'aprob', fecha_creacion: '2026-08-01' }
       ]
     };
-    Dashboard.states = {
-      's1::nueva': 'pendiente',
-      's1::vieja': 'en_proceso',
-      's1::aprob': 'aprobada',
-      's1::desc': 'descartada'
-    };
-    const items = Dashboard._atencionItems(10);
-    assert.deepEqual(items.map(r => r.id), ['vieja', 'nueva']);
-    assert.equal(items[0]._estado, 'en_proceso');
+    Dashboard.states = { 's1::nueva': 'pendiente', 's1::vieja': 'en_proceso', 's1::aprob': 'aprobada' };
+    Dashboard.recordatorios = [{ id: 'v1', titulo: 'V', fecha: '2000-01-01', hecho: false }];
+    const items = Dashboard._accionItems(10);
+    assert.equal(items[0].kind, 'vencimiento');
+    assert.deepEqual(items.filter(i => i.kind === 'solicitud').map(r => r.id), ['vieja', 'nueva']);
     Dashboard.surveys = [];
     Dashboard.responses = {};
     Dashboard.states = {};
+    Dashboard.recordatorios = [];
   });
 
-  it('respeta el limite', () => {
+  it('ignora hechos, descartadas y respeta limite', () => {
     Dashboard.surveys = [{ id: 's1', name: 'S1' }];
-    Dashboard.responses = {
-      s1: [
-        { id: 'a', fecha_creacion: '2026-09-01' },
-        { id: 'b', fecha_creacion: '2026-09-02' }
-      ]
-    };
-    Dashboard.states = {};
-    assert.equal(Dashboard._atencionItems(1).length, 1);
+    Dashboard.responses = { s1: [{ id: 'a', fecha_creacion: '2026-09-01' }, { id: 'b', fecha_creacion: '2026-09-02' }] };
+    Dashboard.states = { 's1::b': 'descartada' };
+    Dashboard.recordatorios = [{ id: 'h', titulo: 'H', fecha: '2000-01-01', hecho: true }];
+    assert.equal(Dashboard._accionItems(10).length, 1);
     Dashboard.surveys = [];
     Dashboard.responses = {};
     Dashboard.states = {};
+    Dashboard.recordatorios = [];
+  });
+});
+
+describe('_cuentaMes/_sumaMes/_deltaTexto', () => {
+  it('cuenta y suma mes actual vs anterior', () => {
+    const now = new Date();
+    const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const esteMes = iso(now);
+    const pasado = iso(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+    const items = [{ f: esteMes, v: '10' }, { f: esteMes, v: '5' }, { f: pasado, v: '7' }, { f: 'x', v: '9' }, {}];
+    assert.deepEqual(Dashboard._cuentaMes(items, x => x.f), { cur: 2, prev: 1 });
+    assert.deepEqual(Dashboard._sumaMes(items, x => x.f, x => x.v), { cur: 15, prev: 7 });
+    assert.equal(Dashboard._deltaTexto(2, 1), '+1 vs mes pasado');
+    assert.equal(Dashboard._deltaTexto(1, 1), 'igual que el mes pasado');
+    assert.equal(Dashboard._deltaTexto(0, 3), '-3 vs mes pasado');
   });
 });
 

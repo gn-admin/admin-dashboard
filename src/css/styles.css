@@ -2275,121 +2275,6 @@ body {
   max-width: 100%;
 }
 
-.donut-chart-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 16px 0;
-}
-
-.donut-chart {
-  width: 120px;
-  height: 120px;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.donut-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.donut-center .donut-center-value {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--gray-800);
-}
-
-.donut-center .donut-center-label {
-  font-size: 0.65rem;
-  color: var(--gray-400);
-}
-
-.donut-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.donut-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  color: var(--gray-600);
-}
-
-.donut-legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-/* ===== TIMELINE ===== */
-.timeline {
-  position: relative;
-  padding-left: 24px;
-}
-
-.timeline::before {
-  content: '';
-  position: absolute;
-  left: 7px;
-  top: 4px;
-  bottom: 4px;
-  width: 2px;
-  background: var(--gray-200);
-}
-
-.timeline-item {
-  position: relative;
-  padding-bottom: 20px;
-}
-
-.timeline-item:last-child {
-  padding-bottom: 0;
-}
-
-.timeline-dot-wrap {
-  position: absolute;
-  left: -20px;
-  top: 4px;
-}
-
-.timeline-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--primary);
-  border: 2px solid var(--white);
-  box-shadow: 0 0 0 2px var(--primary-light);
-}
-
-.timeline-line {
-  display: none;
-}
-
-.timeline-content {
-  padding-left: 4px;
-}
-
-.timeline-text {
-  font-size: 0.85rem;
-  color: var(--gray-700);
-  line-height: 1.5;
-}
-
-.timeline-time {
-  font-size: 0.72rem;
-  color: var(--gray-400);
-  margin-top: 4px;
-}
-
 /* ===== PROGRESS BAR ===== */
 .progress-bar {
   width: 100%;
@@ -2877,12 +2762,6 @@ body {
 
   .bar-chart-value {
     color: var(--gray-500);
-  }
-
-  .donut-chart-wrapper {
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 16px;
   }
 }
 

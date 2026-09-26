@@ -545,12 +545,12 @@ const Dashboard = {
       this.loadEstados(),
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('familias', () => API.getFamilias()),
-      this._loadList('actividad', () => API.getActividad()),
-      this._loadList('recordatorios', () => API.getRecordatorios()),
+      this._loadListBestEffort('recordatorios', () => API.getRecordatorios()),
       this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos()),
       this._loadListBestEffort('donaciones', () => API.getDonaciones()),
       this._loadListBestEffort('gastos', () => API.getGastos()),
       this._loadListBestEffort('socios', () => API.getSocios()),
+      this._loadListBestEffort('contratos', () => API.getContratos()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
     ]);
   },
@@ -558,55 +558,45 @@ const Dashboard = {
   _paintHome(el) {
     const all = Object.values(this.responses).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
-    const total = activas.length;
     const pendientes = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'pendiente').length;
     const enProceso = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'en_proceso').length;
     const enAcogida = this.animales.filter(a => a.estado === 'en_acogida').length;
-    const disponibles = this.animales.filter(a => a.estado === 'disponible').length;
-    const adoptados = this.animales.filter(a => a.estado === 'adoptado').length;
-    const perros = (this.responses['pre-adopcion-perros'] || []).filter(r => this.getEstado(r.id, 'pre-adopcion-perros') !== 'descartada').length;
-    const gatos = (this.responses['pre-adopcion-gatos'] || []).filter(r => this.getEstado(r.id, 'pre-adopcion-gatos') !== 'descartada').length;
-    const acogida = (this.responses['pre-acogida'] || []).filter(r => this.getEstado(r.id, 'pre-acogida') !== 'descartada').length;
     const familiasLibres = this.familias.filter(f => f.capacidad === 'Libre').length;
     const apadActivos = (this.apadrinamientos || []).filter(p => p.estado === 'activo');
     const apadEuros = this._totalAportes(this.apadrinamientos);
-    const donTotal = this._totalDonaciones(this.donaciones);
-    const gastoTotal = this._totalGastos(this.gastos);
-    const nSocios = (this.socios || []).length;
-    const sociosActivos = (this.socios || []).filter(s => s.activo).length;
+    const solNuevas = this._cuentaMes(activas, r => r.fecha_creacion);
+    const adopMes = this._cuentaMes(this.contratos, c => c.fecha);
+    const donMes = this._sumaMes(this.donaciones, d => d.fecha, d => d.importe);
+    const gastoMes = this._sumaMes(this.gastos, g => g.fecha, g => g.importe);
+    const balance = donMes.cur - gastoMes.cur;
+    const cuotasPend = (this.socios || []).filter(s => (this._cuotaEstado(s) || {}).label === 'Pendiente').length;
     const vencidos = (this.recordatorios || []).filter(r => !r.hecho && (this._diasHasta(r.fecha) ?? 99) < 0).length;
+    const hoyN = pendientes + vencidos + enProceso;
 
     el.innerHTML = `
+      <div class="card" style="margin-bottom:16px"><div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="font-size:2rem;font-weight:800;color:${vencidos ? 'var(--danger)' : 'var(--primary-hover)'}">${hoyN}</div>
+        <div style="flex:1;min-width:180px"><div style="font-weight:700">Hoy</div><div style="color:var(--gray-500);font-size:.85rem">${hoyN ? `${pendientes} pendientes · ${vencidos} vencidos · ${enProceso} en proceso` : 'Todo al día, sin pendientes'}</div></div>
+        ${hoyN ? `<button class="btn btn-primary btn-sm" onclick="document.getElementById('accion-card')?.scrollIntoView({behavior:'smooth'})">Ver</button>` : ''}
+      </div></div>
       <div class="stats-grid">
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.clipboard}</div><div class="stat-card-info"><div class="stat-card-label">Total Solicitudes</div><div class="stat-card-value">${total}</div><div class="stat-card-change">${perros} perros · ${gatos} gatos · ${acogida} acogida</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon orange">${Icons.clock}</div><div class="stat-card-info"><div class="stat-card-label">En Proceso</div><div class="stat-card-value">${enProceso}</div><div class="progress-bar"><div class="progress-bar-fill orange" style="width:${total?(enProceso/total*100):0}%"></div></div></div></div>
-        <div class="stat-card"><div class="stat-card-icon blue">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">En Acogida</div><div class="stat-card-value">${enAcogida}</div><div class="stat-card-change">${familiasLibres} familias libres</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Adoptados</div><div class="stat-card-value">${adoptados}</div><div class="stat-card-change up">${disponibles} disponibles</div></div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="location.hash='encuestas'"><div class="stat-card-icon green">${Icons.clipboard}</div><div class="stat-card-info"><div class="stat-card-label">Solicitudes (mes)</div><div class="stat-card-value">${solNuevas.cur}</div><div class="stat-card-change">${this._deltaTexto(solNuevas.cur, solNuevas.prev)}</div></div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="Dashboard._currentAnimalFilter='en_acogida';location.hash='animales'"><div class="stat-card-icon blue">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">En Acogida</div><div class="stat-card-value">${enAcogida}</div><div class="stat-card-change">${familiasLibres} familias libres</div></div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="location.hash='adopciones'"><div class="stat-card-icon green">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Adopciones (mes)</div><div class="stat-card-value">${adopMes.cur}</div><div class="stat-card-change">${this._deltaTexto(adopMes.cur, adopMes.prev)}</div></div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="location.hash='animales'"><div class="stat-card-icon blue">${Icons.paw}</div><div class="stat-card-info"><div class="stat-card-label">Apadrinados</div><div class="stat-card-value">${apadActivos.length}</div><div class="stat-card-change">${apadEuros.toFixed(2)} €/mes</div></div></div>
       </div>
       <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card"><div class="stat-card-icon blue">${Icons.paw}</div><div class="stat-card-info"><div class="stat-card-label">Apadrinamientos</div><div class="stat-card-value">${apadActivos.length}</div><div class="stat-card-change">${apadEuros.toFixed(2)} €/mes</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Donaciones</div><div class="stat-card-value">${donTotal.toFixed(2)} €</div><div class="stat-card-change">${(this.donaciones || []).length} donaciones</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon orange">${Icons.activity}</div><div class="stat-card-info"><div class="stat-card-label">Gastos</div><div class="stat-card-value">${gastoTotal.toFixed(2)} €</div><div class="stat-card-change">veterinarios</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon blue">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Socios</div><div class="stat-card-value">${nSocios}</div><div class="stat-card-change">${sociosActivos} activos</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Donaciones (mes)</div><div class="stat-card-value">${donMes.cur.toFixed(2)} €</div><div class="stat-card-change">tesorería</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon orange">${Icons.activity}</div><div class="stat-card-info"><div class="stat-card-label">Gastos (mes)</div><div class="stat-card-value">${gastoMes.cur.toFixed(2)} €</div><div class="stat-card-change">veterinarios</div></div></div>
+        <div class="stat-card"><div class="stat-card-icon ${balance >= 0 ? 'green' : 'orange'}">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Balance (mes)</div><div class="stat-card-value">${balance.toFixed(2)} €</div><div class="stat-card-change">donaciones − gastos</div></div></div>
+        <div class="stat-card" style="cursor:pointer" onclick="location.hash='socios'"><div class="stat-card-icon blue">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Cuotas pendientes</div><div class="stat-card-value">${cuotasPend}</div><div class="stat-card-change">revisar en Socios</div></div></div>
       </div>
+      <div class="card" id="accion-card" style="margin-bottom:16px"><div class="card-header"><h3>Accion requerida</h3><button class="btn btn-primary btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Nuevo</button></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th></th></tr></thead><tbody>${this._accionRows()}</tbody></table></div></div>
       <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
         <div class="card"><div class="card-header"><h3>Solicitudes por Mes</h3></div><div class="chart-container">${this._buildBarChart()}</div></div>
-        <div class="card"><div class="card-header"><h3>Distribucion por Tipo</h3></div><div class="donut-chart-wrapper">${this._buildDonutChart(perros,gatos,acogida)}</div></div>
+        <div class="card"><div class="card-header"><h3>Embudo de adopcion</h3></div><div class="card-body">${this._funnelAdopcion()}</div></div>
       </div>
-      <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
-        <div class="card"><div class="card-header"><h3>Actividad Reciente</h3></div><div class="timeline">${this._buildTimeline()}</div></div>
-        <div class="card"><div class="card-header"><h3>Requieren atención</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th>Espera</th></tr></thead><tbody>${this._atencionRows()}</tbody></table></div></div>
-      </div>
-      ${this._recordatoriosWidget()}
-      <div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Solicitudes Recientes</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${this._recentRows()}</tbody></table></div></div>
-      <div class="card"><div class="card-header"><h3>Alertas</h3></div><div class="card-body">
-        ${pendientes?`<div class="alert-item warning">${Icons.alertTriangle}<span>${pendientes} solicitudes pendientes</span></div>`:''}
-        ${enProceso?`<div class="alert-item info">${Icons.activity}<span>${enProceso} procesos en curso</span></div>`:''}
-        ${this.blacklist.length?`<div class="alert-item danger">${Icons.ban}<span>${this.blacklist.length} en lista negra</span></div>`:''}
-        ${enAcogida?`<div class="alert-item info">${Icons.home}<span>${enAcogida} animales en acogida</span></div>`:''}
-        ${vencidos?`<div class="alert-item warning">${Icons.clock}<span>${vencidos} vencimientos pendientes</span></div>`:''}
-        ${!pendientes&&!enProceso&&!this.blacklist.length&&!vencidos?'<div style="text-align:center;padding:16px;color:var(--gray-400)">No hay alertas pendientes</div>':''}
-      </div></div>`;
+      <div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Solicitudes Recientes</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${this._recentRows()}</tbody></table></div></div>`;
   },
 
   _buildBarChart() {
@@ -634,33 +624,6 @@ const Dashboard = {
     return `<div class="bar-chart">${buckets.map(b=>{const h=(b.count/max*120);return`<div class="bar-chart-col"><div class="bar-chart-value">${b.count}</div><div class="bar-chart-bar" style="height:${h}px${b.key===curKey?';background:var(--primary-hover)':''}"><span class="bar-tooltip">${b.label}: ${b.count}</span></div><span class="bar-chart-label">${b.label}</span></div>`;}).join('')}</div>`;
   },
 
-  _buildDonutChart(perros, gatos, acogida) {
-    const total = perros+gatos+acogida;
-    if(!total) return '<p style="color:var(--gray-400)">Sin datos</p>';
-    const r=54,c=2*Math.PI*r;
-    const d1=(perros/total)*c,d2=(gatos/total)*c,d3=(acogida/total)*c;
-    const colors=['#1FC95B','#3498db','#f39c12'];
-    return `<div class="donut-chart"><svg viewBox="0 0 140 140"><circle cx="70" cy="70" r="${r}" stroke="#e8eaed" stroke-width="20"/><circle cx="70" cy="70" r="${r}" stroke="${colors[0]}" stroke-width="20" stroke-dasharray="${d1} ${c-d1}" stroke-dashoffset="0"/><circle cx="70" cy="70" r="${r}" stroke="${colors[1]}" stroke-width="20" stroke-dasharray="${d2} ${c-d2}" stroke-dashoffset="${-d1}"/><circle cx="70" cy="70" r="${r}" stroke="${colors[2]}" stroke-width="20" stroke-dasharray="${d3} ${c-d3}" stroke-dashoffset="${-(d1+d2)}"/></svg><div class="donut-center"><span class="donut-center-value">${total}</span><span class="donut-center-label">Total</span></div></div>
-    <div class="donut-legend"><div class="donut-legend-item"><span class="donut-legend-dot" style="background:${colors[0]}"></span>Perros<span class="donut-legend-value">${perros}</span></div><div class="donut-legend-item"><span class="donut-legend-dot" style="background:${colors[1]}"></span>Gatos<span class="donut-legend-value">${gatos}</span></div><div class="donut-legend-item"><span class="donut-legend-dot" style="background:${colors[2]}"></span>Acogida<span class="donut-legend-value">${acogida}</span></div></div>`;
-  },
-
-  _buildTimeline() {
-    if (!this.actividad.length) {
-      const staticItems = [
-        {text:'Sistema iniciado',time:'Ahora',color:'green'},
-      ];
-      return staticItems.map(item=>`<div class="timeline-item"><div class="timeline-dot-wrap"><div class="timeline-dot ${item.color}"></div><div class="timeline-line"></div></div><div class="timeline-content"><div class="timeline-text">${item.text}</div><div class="timeline-time">${item.time}</div></div></div>`).join('');
-    }
-    const colorMap = { animal_creado:'green', animal_actualizado:'blue', animal_eliminado:'red', familia_creada:'green', familia_actualizada:'blue', familia_eliminada:'red', adopcion_creada:'orange', adopcion_actualizada:'blue', adopcion_eliminada:'red', socio_creado:'green', socio_actualizado:'blue', socio_eliminado:'red', apadrinamiento:'green', 'apadrinamiento-fin':'blue', 'padrino-convertido':'orange', acogida:'blue', adopcion:'orange', contrato:'green', blacklist:'red', candidatura:'blue', socio:'green', gasto:'orange', donacion:'green', seguimiento:'blue' };
-    const labelMap = { animal_creado:'Animal registrado', animal_actualizado:'Animal actualizado', animal_eliminado:'Animal eliminado', familia_creada:'Familia registrada', familia_actualizada:'Familia actualizada', familia_eliminada:'Familia eliminada', adopcion_creada:'Adopcion iniciada', adopcion_actualizada:'Adopcion actualizada', adopcion_eliminada:'Adopcion eliminada', socio_creado:'Socio registrado', socio_actualizado:'Socio actualizado', socio_eliminado:'Socio eliminado', apadrinamiento:'Apadrinamiento iniciado', 'apadrinamiento-fin':'Apadrinamiento finalizado', 'padrino-convertido':'Padrino convertido a socio', acogida:'Caso de acogida', adopcion:'Caso de adopcion', contrato:'Contrato', blacklist:'Lista negra', candidatura:'Candidatura', socio:'Socio', gasto:'Gasto veterinario', donacion:'Donacion', seguimiento:'Seguimiento' };
-    return this.actividad.slice(0, 5).map(item => {
-      const t = new Date(item.fecha);
-      const diff = Math.floor((Date.now() - t.getTime()) / 60000);
-      const time = diff < 1 ? 'Ahora' : diff < 60 ? `Hace ${diff}m` : diff < 1440 ? `Hace ${Math.floor(diff/60)}h` : `Hace ${Math.floor(diff/1440)}d`;
-      return `<div class="timeline-item"><div class="timeline-dot-wrap"><div class="timeline-dot ${colorMap[item.tipo]||'blue'}"></div><div class="timeline-line"></div></div><div class="timeline-content"><div class="timeline-text">${labelMap[item.tipo]||item.tipo}: <strong>${item.detalle}</strong></div><div class="timeline-time">${time}</div></div></div>`;
-    }).join('');
-  },
-
   _recentRows() {
     const all = [];
     this.surveys.forEach(s => (this.responses[s.id]||[]).forEach(r => all.push({...r,_survey:s.name,_surveyId:s.id})));
@@ -668,16 +631,95 @@ const Dashboard = {
     return all.slice(0,5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}):'';const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" onclick="location.hash='${page}'"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
   },
 
-  // Pendientes/en_proceso mas antiguos (descartadas y resto fuera).
-  _atencionItems(max) {
-    const all = [];
+  // Conteo/suma por mes natural (actual vs anterior) para KPIs.
+  _cuentaMes(items, getFecha) {
+    const now = new Date();
+    const cur = { y: now.getFullYear(), m: now.getMonth() };
+    const pv = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prev = { y: pv.getFullYear(), m: pv.getMonth() };
+    let c = 0, p = 0;
+    (items || []).forEach(it => {
+      const f = getFecha(it);
+      if (!f) return;
+      const d = new Date(String(f).replace(' ', 'T'));
+      if (isNaN(d.getTime())) return;
+      if (d.getFullYear() === cur.y && d.getMonth() === cur.m) c++;
+      else if (d.getFullYear() === prev.y && d.getMonth() === prev.m) p++;
+    });
+    return { cur: c, prev: p };
+  },
+
+  _sumaMes(items, getFecha, getEuros) {
+    const now = new Date();
+    const cur = { y: now.getFullYear(), m: now.getMonth() };
+    const pv = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prev = { y: pv.getFullYear(), m: pv.getMonth() };
+    let c = 0, p = 0;
+    (items || []).forEach(it => {
+      const f = getFecha(it);
+      if (!f) return;
+      const d = new Date(String(f).replace(' ', 'T'));
+      if (isNaN(d.getTime())) return;
+      const v = parseFloat(String(getEuros(it)).replace(',', '.')) || 0;
+      if (d.getFullYear() === cur.y && d.getMonth() === cur.m) c += v;
+      else if (d.getFullYear() === prev.y && d.getMonth() === prev.m) p += v;
+    });
+    return { cur: c, prev: p };
+  },
+
+  _deltaTexto(cur, prev) {
+    if (cur === prev) return 'igual que el mes pasado';
+    const d = cur - prev;
+    return (d > 0 ? '+' : '') + d + ' vs mes pasado';
+  },
+
+  // Cola unica de accion: vencidos primero, luego por antiguedad.
+  _accionItems(max) {
+    const items = [];
+    (this.recordatorios || []).forEach(r => {
+      if (r.hecho) return;
+      items.push({ kind: 'vencimiento', fecha: r.fecha || '', titulo: r.titulo || 'Recordatorio', ref: r });
+    });
     (this.surveys || []).forEach(s => (this.responses[s.id] || []).forEach(r => {
       const e = this.getEstado(r.id, s.id);
       if (e !== 'pendiente' && e !== 'en_proceso') return;
-      all.push({ ...r, _survey: s.name, _surveyId: s.id, _estado: e });
+      items.push({ kind: 'solicitud', fecha: r.fecha_creacion || '', nombre: (((r.nombre || '') + ' ' + (r.apellidos || '')).trim()), survey: s.name, surveyId: s.id, id: r.id, estado: e });
     }));
-    all.sort((a, b) => (a.fecha_creacion || '').localeCompare(b.fecha_creacion || ''));
-    return all.slice(0, max || 5);
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const t0 = hoy.getTime();
+    const t = (x) => { const d = new Date(String(x.fecha || '').replace(' ', 'T')).getTime(); return isNaN(d) ? Infinity : d; };
+    items.sort((a, b) => {
+      const ao = a.kind === 'vencimiento' && t(a) < t0, bo = b.kind === 'vencimiento' && t(b) < t0;
+      if (ao !== bo) return ao ? -1 : 1;
+      return t(a) - t(b);
+    });
+    return items.slice(0, max || 8);
+  },
+
+  _accionRows() {
+    const items = this._accionItems(8);
+    if (!items.length) return `<tr><td colspan="3" style="text-align:center;color:var(--gray-400);padding:16px">Todo al día</td></tr>`;
+    return items.map(it => {
+      if (it.kind === 'vencimiento') {
+        const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
+        return `<tr><td>${this._esc(it.titulo)}<div style="font-size:.72rem;color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button></td></tr>`;
+      }
+      return `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')"><td>${this._esc(it.nombre)}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
+    }).join('');
+  },
+
+  _funnelAdopcion() {
+    const acts = Object.values(this.responses).flat().filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
+    const st = (e) => acts.filter(r => this.getEstado(r.id, r._surveyId) === e).length;
+    const stages = [
+      ['Pendientes', st('pendiente'), '#9aa0a6'],
+      ['En proceso', st('en_proceso'), '#3498db'],
+      ['Aprobadas', st('aprobada'), '#1FC95B'],
+      ['Adoptados', (this.animales || []).filter(a => a.estado === 'adoptado').length, '#0A431E']
+    ];
+    const max = Math.max(...stages.map(s => s[1]), 1);
+    return stages.map(([label, n, color]) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:92px;font-size:.78rem;color:var(--gray-600)">${label}</div><div style="flex:1;background:var(--gray-100);border-radius:6px;height:22px"><div style="width:${Math.round(n / max * 100)}%;background:${color};height:100%;border-radius:6px"></div></div><div style="width:34px;text-align:right;font-weight:800">${n}</div></div>`).join('');
   },
 
   _diasEspera(fecha) {
@@ -686,12 +728,6 @@ const Dashboard = {
     if (isNaN(t)) return '—';
     const d = Math.floor((Date.now() - t) / 86400000);
     return d <= 0 ? 'hoy' : (d === 1 ? '1 día' : d + ' días');
-  },
-
-  _atencionRows() {
-    const items = this._atencionItems(5);
-    if (!items.length) return `<tr><td colspan="3" style="text-align:center;color:var(--gray-400);padding:16px">Todo al día, sin pendientes</td></tr>`;
-    return items.map(r => `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${r._surveyId}','${r.id}')"><td>${this._esc(r.nombre || '')} ${this._esc(r.apellidos || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(r._survey)}</div></td><td><span class="estado-badge ${this._estadoCls(r._estado)}">${this._estadoLabel(r._estado)}</span></td><td>${this._diasEspera(r.fecha_creacion)}</td></tr>`).join('');
   },
 
   // ==================== RECORDATORIOS ====================
@@ -713,25 +749,6 @@ const Dashboard = {
     if (d < 0) return { label: 'Vencido', cls: 'descartada' };
     if (d === 0) return { label: 'Hoy', cls: 'en_proceso' };
     return { label: 'En ' + d + (d === 1 ? ' día' : ' días'), cls: '' };
-  },
-
-  _proximosRecordatorios(max) {
-    return (this.recordatorios || [])
-      .filter(r => !r.hecho)
-      .slice()
-      .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
-      .slice(0, max || 5);
-  },
-
-  _recordatoriosWidget() {
-    const items = this._proximosRecordatorios(5);
-    const rows = items.length
-      ? items.map(r => {
-        const e = this._estadoRecordatorio(r);
-        return `<div class="detail-field"><div class="detail-question">${this._esc(r.titulo || 'Recordatorio')}<div style="font-size:.72rem;color:var(--gray-500)">${r.fecha ? this._fmtFecha(r.fecha) : 'Sin fecha'}</div></div><div class="detail-answer"><span class="estado-badge ${e.cls}">${e.label}</span><div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(r.id)}')">${Icons.check} Hecho</button><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteRecordatorio('${this._esc(r.id)}')">${Icons.trash}</button></div></div></div>`;
-      }).join('')
-      : `<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin vencimientos</div>`;
-    return `<div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Próximos vencimientos</h3><button class="btn btn-primary btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Nuevo</button></div><div class="card-body">${rows}</div></div>`;
   },
 
   showRecordatorioForm() {
