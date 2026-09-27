@@ -317,7 +317,9 @@ body {
 .mas-menu-item:focus-visible,
 .guide-menu-item:focus-visible,
 .password-toggle:focus-visible,
-.guide-index-item:focus-visible {
+.guide-index-item:focus-visible,
+.detail-section-head:focus-visible,
+[role="button"]:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -2875,5 +2877,17 @@ body {
   a {
     text-decoration: none;
     color: black;
+  }
+
+  .detail-section-body {
+    display: block !important;
+  }
+
+  .detail-section-head {
+    pointer-events: none;
+  }
+
+  .detail-section-head .section-chevron {
+    display: none;
   }
 }

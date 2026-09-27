@@ -493,3 +493,14 @@ describe('_ensureListas: nunca lanza', () => {
     await Dashboard._ensureListas();
   });
 });
+
+describe('_euros: formato monetario uniforme', () => {
+  it('dos decimales siempre', () => {
+    assert.equal(Dashboard._euros('45.5'), '45.50');
+    assert.equal(Dashboard._euros('45,5'), '45.50');
+    assert.equal(Dashboard._euros('30'), '30.00');
+    assert.equal(Dashboard._euros(''), '0.00');
+    assert.equal(Dashboard._euros(null), '0.00');
+    assert.equal(Dashboard._euros('x'), '0.00');
+  });
+});

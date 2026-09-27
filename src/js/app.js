@@ -193,7 +193,26 @@ const App = {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key === 'Tab') {
+        const open = [...document.querySelectorAll('.modal-overlay')].filter(m => m.style.display === 'flex');
+        if (!open.length) return;
+        const top = open[open.length - 1];
+        const f = [...top.querySelectorAll('button, input, select, textarea, a[href], [tabindex]')].filter(x => !x.disabled && x.offsetParent !== null);
+        if (!f.length) return;
+        const first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        return;
+      }
+      if (e.key !== 'Escape' && e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        const t = e.target?.closest?.('[role="button"]');
+        if (t && !['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(t.tagName)) {
+          e.preventDefault();
+          t.click();
+        }
+        return;
+      }
       if (document.getElementById('confirm-modal')?.style.display === 'flex') { Dashboard.cancelConfirm(false); return; }
       if (document.getElementById('contrato-modal')?.style.display === 'flex') { Dashboard.closeContratoForm(); return; }
       if (document.getElementById('form-modal')?.style.display === 'flex') { Dashboard.closeFormModal(); return; }
