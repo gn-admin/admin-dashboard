@@ -1070,6 +1070,7 @@ const Dashboard = {
         ['Cierre', 'adoptado / familia libre']
       ], '#1FC95B')}</div>
       <div class="guide-note">${Icons.info} <span>La barra de estado del detalle te deja mover la solicitud hacia delante y hacia atras en cualquier momento: <b>Pendiente</b>, <b>En proceso</b>, <b>Aprobar</b> y <b>Descartar</b>.</span></div>
+      <div class="guide-note">${Icons.info} <span>Sin red no pasa nada: los cambios se encolan (insignia "N pendientes" arriba) y se envian solos al volver la conexion. El boton <b>Guardar</b> se bloquea con "Guardando..." para no duplicar.</span></div>
       <div class="guide-cols">
         <div class="guide-card"><div class="guide-card-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora (maximo 1 animal). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
         <div class="guide-card"><div class="guide-card-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y formalizarlo con el <b>Contrato de adopcion</b> (firma + PDF) desde Adopciones.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
@@ -1084,6 +1085,7 @@ const Dashboard = {
         ['Aprueba o descarta', 'Aprobar crea la candidatura'],
         ['Asigna un animal', 'estado → Elegida'],
         ['Contrato de adopcion', 'firma + PDF'],
+        ['Entrega y Prueba', 'Prueba reversible'],
         ['Adoptado', 'animal fuera de disponibles'],
         ['Caso eliminado', 'animal Disponible · solicitud En proceso']
       ], '#16a34a')}</div>
@@ -1092,9 +1094,10 @@ const Dashboard = {
       ${this._guideStep(Icons.checkCircle, '3. Aprueba o descarta', 'Cuando termines pulsa <b>Aprobar</b>: se crea su candidatura automaticamente y pasa a la lista de aprobados. Con <b>Descartar</b> se aparta. <br><b>Importante:</b> si la solicitud vuelve a Pendiente (o se descarta), deja de ser candidata y ya no podra asignarsele animal.', 'Detalle: botones Aprobar / Descartar', true)}
       ${this._guideStep(Icons.paw, '4. Asigna el animal', 'Reabre el detalle de la persona ya aprobada: veras el bloque <b>Asignar animal</b>. Elige un animal disponible y guarda. El estado pasa a <b>Elegida</b> y se crea el caso en Adopciones.', 'Ficha de la solicitud aprobada', true)}
       ${this._guideStep(Icons.fileText, '5. Contrato de adopcion', 'Entra en <b>Adopciones</b>, abre el caso y pulsa <b>Nuevo contrato</b>: firmante 1 obligatorio (firma dibujada en pantalla), firmante 2 opcional (por defecto Grupo Nebak), fecha y ciudad. Descarga el <b>PDF</b> y guarda.', 'Adopciones > caso', true)}
-      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces.', 'Adopciones', true)}
+      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces. Entre <b>Entrega</b> y <b>Seguimiento</b> esta la fase <b>Prueba</b> (periodo de adaptacion); con <b>Retroceder</b> vuelves atras si avanzas por error.', 'Adopciones', true)}
       ${this._guideStep(Icons.eye, '7. Ver el cuestionario desde el caso', 'En el detalle del caso, el bloque <b>Solicitud de origen</b> tiene el boton <b>Ver cuestionario</b>: abre las respuestas tal cual se ven en Encuestas, con opcion a PDF o a saltar a su ficha.', 'Adopciones > caso', true)}
-      ${this._guideStep(Icons.trash, '8. Anular un caso', 'Con <b>Eliminar</b> se borra el caso (y su contrato si lo hay) con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa de Aprobada a <b>En proceso</b> y la candidatura se libera. Puedes reasignar desde cero.', 'Adopciones > caso > Eliminar', false)}`;
+      ${this._guideStep(Icons.trash, '8. Anular un caso', 'Con <b>Eliminar</b> se borra el caso (y su contrato si lo hay) con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa de Aprobada a <b>En proceso</b> y la candidatura se libera. Puedes reasignar desde cero.', 'Adopciones > caso > Eliminar', false)}
+      ${this._guideStep(Icons.plus, '9. Alta manual (sin encuesta)', 'Con <b>Nuevo</b> creas un caso a mano; usa <b>Vincular animal</b> para reservarlo (si no, queda solo texto). El detalle llega del contrato y del cuestionario si lo hay.', 'Adopciones > Nuevo', false)}`;
   },
 
   _tutorialAcogida() {
@@ -1154,13 +1157,17 @@ const Dashboard = {
         ['Vencimiento', 'widget + aviso'],
         ['Donacion', 'pantalla Donaciones'],
         ['Socio / voluntario', 'cuota + carnet'],
-        ['Documento', 'referencia en ficha']
+        ['Documento', 'referencia en ficha'],
+        ['Memoria anual', 'Reportes por ejercicio'],
+        ['Almacen', 'inventario simulado']
       ], '#2563eb')}</div>
       ${this._guideStep(Icons.activity, '1. Gastos veterinarios', 'En la ficha del animal, seccion <b>Gastos</b>: fecha, concepto e importe, con total acumulado.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.calendar, '2. Vencimientos', 'El widget del dashboard avisa (Vencido/Hoy/En N dias). Marca <b>Hecho</b> o elimina desde ahi mismo.', 'Dashboard', false)}
       ${this._guideStep(Icons.heart, '3. Donaciones', 'Pantalla propia con total, alta y baja. Cada donacion queda en su hoja.', 'Donaciones', false)}
       ${this._guideStep(Icons.users, '4. Socios y voluntarios', 'Perfiles <b>Socio</b>, <b>Voluntario</b> o <b>Ambos</b> (la cuota solo aplica a socios). El carnet cambia de color por perfil.', 'Socios', false)}
-      ${this._guideStep(Icons.fileText, '5. Documentos', 'Referencias locales (cartilla, vacunas, analiticas) en la ficha del animal, marcadas como simuladas hasta archivar en Drive.', 'Animales > ficha', false)}`;
+      ${this._guideStep(Icons.fileText, '5. Documentos', 'Referencias locales (cartilla, vacunas, analiticas) en la ficha del animal, marcadas como simuladas hasta archivar en Drive.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
+      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Inventario <b>simulado</b> en este dispositivo: altas, botones +1/−1, edicion y aviso de bajo stock. Sin backend de momento.', 'Almacén', false)}`;
   },
 
   _tutorialEstados() {
@@ -1174,7 +1181,9 @@ const Dashboard = {
     return `
       <div class="guide-note">${Icons.info} <span>Los estados se guardan <b>por solicitud</b> y se muestran siempre como etiqueta de color junto a cada persona. Cambiar de estado es <b>reversible</b> en cualquier momento.</span></div>
       <h4 class="guide-subtitle">Que significa cada estado</h4>
-      <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>`;
+      <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>
+      <h4 class="guide-subtitle">Estados del animal</h4>
+      <div class="guide-estados">${[['Disponible','Listo para asignar a adopcion, acogida o apadrinamiento.'],['En acogida','Vive con una familia acogedora.'],['En adopcion','Reservado: asignado a un caso de adopcion.'],['Adoptado','Contrato firmado; fuera de disponibles.'],['Fallecido','Baja: conserva el historial pero no se asigna.']].map(e=>`<div class="guide-estado"><span class="estado-badge">${e[0]}</span><p>${e[1]}</p></div>`).join('')}</div>`;
   },
 
   _tutorialIndex() {
