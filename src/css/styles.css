@@ -2836,6 +2836,28 @@ body {
   }
 }
 
+/* ===== TACTIL (movil, tablet, portatil tactil): dianas generosas por puntero, no por viewport ===== */
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm,
+  .btn-full {
+    min-height: 44px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .filter-row select,
+  .search-box input {
+    min-height: 44px;
+  }
+
+  .sidebar-link,
+  .mas-menu-item {
+    min-height: 44px;
+  }
+}
+
 /* ===== PRINT ===== */
 @media print {
   .sidebar,

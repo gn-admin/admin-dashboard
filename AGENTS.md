@@ -19,6 +19,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Service worker**: al tocar `src/js/dashboard.js`, `api.js`, `auth.js` u otros, subir `CACHE_NAME` en `src/sw.js`. Estado actual: `gn-encuestas-v30`.
 - **Hub encuestas (móvil)**: bottom nav unificada en `Inicio | Encuestas | Animales | Más`. "Encuestas" abre un hub con 3 tarjetas (perros/gatos/acogida) que redirigen a sus listados; la sidebar de escritorio/tablet conserva los 3 enlaces directos.
 - **Navegación por viewport**: móvil (≤767px) usa bottom-nav + sidebar como drawer; tablet (768-1023px) y escritorio (≥1024px) usan sidebar fija (rail colapsable en tablet). Reglas nav separadas por breakpoint; contenido intacto.
+- **Táctil por `pointer:coarse`**, no por viewport: botones/inputs/links a 44px en móvil, tablet y portátiles táctiles (el bloque `max-width:767px` solo afina layout).
 - **Sidebar por secciones plegables**: los grupos (Encuestas/Gestión/Herramientas) son acordeón (`data-section`, estado persistido en `gn_sidebar_sections`); en rail (`collapsed`) los iconos siempre visibles para no perder acceso.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/` (rutas absolutas `/css/...` → 404).
 - Feedback de estado en `Dashboard.setEstado`: muestra loader y revierte el estado si falla.
