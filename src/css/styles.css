@@ -1263,6 +1263,29 @@ body {
   letter-spacing: 0.4px;
 }
 
+.detail-section-head {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+  min-height: 44px;
+}
+
+.detail-section-head .section-chevron {
+  color: var(--gray-400);
+}
+
+.detail-section.collapsible.open .section-chevron {
+  transform: rotate(180deg);
+}
+
 .detail-field {
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-sm);

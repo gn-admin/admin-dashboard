@@ -312,6 +312,24 @@ describe('_dummyPermalink', () => {
   });
 });
 
+describe('_collapsibleSection: desglose progresivo', () => {
+  const G = globalThis;
+  if (!G.Icons) G.Icons = { chevronDown: '<svg></svg>' };
+
+  it('abierta por defecto solo si se pide o estaba abierta', () => {
+    Dashboard._openSections = new Set(['info']);
+    const cerrada = Dashboard._collapsibleSection('pubs', 'Pubs', '<p>x</p>', false);
+    assert.match(cerrada, /data-sec="pubs"/);
+    assert.doesNotMatch(cerrada, /collapsible open/);
+    assert.match(cerrada, /display:none/);
+    const abierta = Dashboard._collapsibleSection('info', 'Info', '<p>y</p>', false);
+    assert.match(abierta, /collapsible open/);
+    const forzada = Dashboard._collapsibleSection('otra', 'O', '<p>z</p>', true);
+    assert.match(forzada, /collapsible open/);
+    delete Dashboard._openSections;
+  });
+});
+
 describe('_bajoStock: aviso de inventario', () => {
   it('solo con minimo configurado y alcanzado', () => {
     assert.equal(Dashboard._bajoStock({ cantidad: 1, minimo: 2 }), true);

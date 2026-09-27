@@ -497,6 +497,31 @@ const Dashboard = {
     }
   },
 
+  // Secciones plegables en fichas (desglose progresivo): abiertas por
+  // defecto solo las marcadas; el resto colapsan. Estado en memoria.
+  _collapsibleSection(id, titleHtml, bodyHtml, defOpen) {
+    if (!this._openSections) this._openSections = new Set(['info']);
+    const open = !!defOpen || this._openSections.has(id);
+    return `<div class="detail-section collapsible${open ? ' open' : ''}" data-sec="${id}">
+      <button class="detail-section-head" onclick="Dashboard._toggleSection(this,'${id}')">
+        <span class="detail-section-title" style="margin:0">${titleHtml}</span>
+        <span class="section-chevron">${Icons.chevronDown}</span>
+      </button>
+      <div class="detail-section-body"${open ? '' : ' style="display:none"'}>${bodyHtml}</div>
+    </div>`;
+  },
+
+  _toggleSection(btn, id) {
+    if (!this._openSections) this._openSections = new Set(['info']);
+    const sec = btn.closest('.detail-section');
+    const open = sec ? !sec.classList.contains('open') : true;
+    if (open) this._openSections.add(id); else this._openSections.delete(id);
+    if (!sec) return;
+    sec.classList.toggle('open', open);
+    const body = sec.querySelector('.detail-section-body');
+    if (body) body.style.display = open ? '' : 'none';
+  },
+
   // ==================== INLINE DETAIL SYSTEM ====================
   _showDetail(pageId, title, contentHTML) {
     const page = document.getElementById('page-' + pageId);
@@ -1735,7 +1760,8 @@ const Dashboard = {
     const items = pubs.length
       ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin publicaciones todavia</div></div>`;
-    return `<div class="detail-section"><div class="detail-section-title">${Icons.heart} Publicaciones</div>${items}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div></div>`;
+    const badgePubs = pubs.length ? ` · ${pubs.length}` : '';
+    return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div>`);
   },
 
   _apadrinamientosFicha(animalId) {
@@ -1759,7 +1785,8 @@ const Dashboard = {
     const nuevo = (a && this._esApadrinable(a))
       ? `<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showApadrinamientoForm('${animalId}')">${Icons.plus} Nuevo apadrinamiento</button></div>`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">No apadrinable (requiere check + disponible/en acogida)</div></div>`;
-    return `<div class="detail-section"><div class="detail-section-title">${Icons.paw} Apadrinamientos</div>${rows}${totalHtml}${nuevo}</div>`;
+    const badgeApad = activos.length ? ` · ${activos.length}` : '';
+    return this._collapsibleSection('apad', `${Icons.paw} Apadrinamientos${badgeApad}`, `${rows}${totalHtml}${nuevo}`);
   },
 
   async showApadrinamientoForm(animalId) {
@@ -1942,7 +1969,8 @@ const Dashboard = {
     const rows = list.length
       ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._esc(g.importe || '0')} € <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
-    return `<div class="detail-section"><div class="detail-section-title">${Icons.activity} Gastos veterinarios${list.length ? ` · Total ${total.toFixed(2)} €` : ''}</div>${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div></div>`;
+    const badgeGastos = list.length ? ` · ${total.toFixed(2)} €` : '';
+    return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div>`);
   },
 
   showGastoForm(animalId) {
@@ -2007,7 +2035,8 @@ const Dashboard = {
     const rows = list.length
       ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
-    return `<div class="detail-section"><div class="detail-section-title">${Icons.fileText} Documentos <span class="estado-badge en_proceso">Simulado</span></div>${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir referencia</button></div></div>`;
+    const badgeDocs = list.length ? ` · ${list.length}` : '';
+    return this._collapsibleSection('docs', `${Icons.fileText} Documentos <span class="estado-badge en_proceso">Simulado</span>${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir referencia</button></div>`);
   },
 
   showDocumentoForm(animalId) {
@@ -2319,16 +2348,22 @@ const Dashboard = {
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
+    const fotoHero = this._fotoSrc(a)
+      ? `<img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);flex-shrink:0">`
+      : `<div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'};flex-shrink:0">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`;
     this._showDetail('animales', a.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
-      ${this._publicacionesFicha(a.id)}
-      ${this._fotoSrc(a) ? `<div style="margin-bottom:16px"><img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:160px;height:160px;border-radius:12px;object-fit:cover;border:2px solid var(--primary)"></div>` : ''}
-      ${this._apadrinamientosFicha(a.id)}
-      ${this._gastosFicha(a.id)}
-      ${this._documentosFicha(a.id)}
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        ${fotoHero}
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--gray-900)">${this._esc(a.nombre)}</div>
+          <div style="margin:4px 0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div>
+          <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(a.especie||'')} &middot; ${this._esc(a.raza||'')} &middot; ${this._esc(a.edad||'')}</div>
+        </div>
+      </div>
       <div class="detail-section"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
         <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
@@ -2339,6 +2374,10 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}</div></div>
         <div class="detail-field"><div class="detail-question">Descripcion</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
       </div>
+      ${this._publicacionesFicha(a.id)}
+      ${this._apadrinamientosFicha(a.id)}
+      ${this._gastosFicha(a.id)}
+      ${this._documentosFicha(a.id)}
       ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div>${siblings.map(x=>`<div class="detail-field"><div class="detail-question">${this._esc(x.nombre)}</div><div class="detail-answer">${this._esc(x.especie)} &middot; ${this._esc(x.raza)} &middot; ${this._esc(x.edad||'')} &middot; <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span></div></div>`).join('')}</div>`:''}
       ${foster?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Familia Acogedora</div>
         <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(foster.nombre)}</div></div>
