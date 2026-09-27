@@ -504,3 +504,16 @@ describe('_euros: formato monetario uniforme', () => {
     assert.equal(Dashboard._euros('x'), '0.00');
   });
 });
+
+describe('_contratoEjemploHtml: ejemplo en guia', () => {
+  it('iframe con el contrato real escapado', () => {
+    const G = globalThis;
+    const prev = G.PdfExport;
+    G.PdfExport = { _logoFallback: 'x', _buildContracto: () => '<html><body class="x" id="y">T</body></html>' };
+    const out = Dashboard._contratoEjemploHtml();
+    assert.match(out, /<iframe/);
+    assert.match(out, /srcdoc="/);
+    assert.match(out, /&quot;/);
+    if (prev === undefined) delete G.PdfExport; else G.PdfExport = prev;
+  });
+});

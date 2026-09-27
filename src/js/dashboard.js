@@ -1097,7 +1097,9 @@ const Dashboard = {
       ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces. Entre <b>Entrega</b> y <b>Seguimiento</b> esta la fase <b>Prueba</b> (periodo de adaptacion); con <b>Retroceder</b> vuelves atras si avanzas por error.', 'Adopciones', true)}
       ${this._guideStep(Icons.eye, '7. Ver el cuestionario desde el caso', 'En el detalle del caso, el bloque <b>Solicitud de origen</b> tiene el boton <b>Ver cuestionario</b>: abre las respuestas tal cual se ven en Encuestas, con opcion a PDF o a saltar a su ficha.', 'Adopciones > caso', true)}
       ${this._guideStep(Icons.trash, '8. Anular un caso', 'Con <b>Eliminar</b> se borra el caso (y su contrato si lo hay) con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa de Aprobada a <b>En proceso</b> y la candidatura se libera. Puedes reasignar desde cero.', 'Adopciones > caso > Eliminar', false)}
-      ${this._guideStep(Icons.plus, '9. Alta manual (sin encuesta)', 'Con <b>Nuevo</b> creas un caso a mano; usa <b>Vincular animal</b> para reservarlo (si no, queda solo texto). El detalle llega del contrato y del cuestionario si lo hay.', 'Adopciones > Nuevo', false)}`;
+      ${this._guideStep(Icons.plus, '9. Alta manual (sin encuesta)', 'Con <b>Nuevo</b> creas un caso a mano; usa <b>Vincular animal</b> para reservarlo (si no, queda solo texto). El detalle llega del contrato y del cuestionario si lo hay.', 'Adopciones > Nuevo', false)}
+      ${this._guideStep(Icons.eye, '10. Ejemplo de contrato', 'Asi queda el PDF que se descarga al firmar. Revisa que el formato os sirve.', 'Adopciones > Guia', true)}
+      ${this._contratoEjemploHtml()}`;
   },
 
   _tutorialAcogida() {
@@ -1168,6 +1170,13 @@ const Dashboard = {
       ${this._guideStep(Icons.fileText, '5. Documentos', 'Referencias locales (cartilla, vacunas, analiticas) en la ficha del animal, marcadas como simuladas hasta archivar en Drive.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
       ${this._guideStep(Icons.clipboard, '7. Almacén', 'Inventario <b>simulado</b> en este dispositivo: altas, botones +1/−1, edicion y aviso de bajo stock. Sin backend de momento.', 'Almacén', false)}`;
+  },
+
+  _contratoEjemploHtml() {
+    if (typeof PdfExport === 'undefined') return '';
+    const demo = { adopcion_id: 'EJEMPLO', animal: 'Max (Labrador)', especie: 'Perro', raza: 'Labrador', edad: '2 años', ciudad: 'Irun', fecha: new Date().toISOString().slice(0, 10), f1_nombre: 'Nombre Apellido', f1_dni: '12345678A', f1_rol: 'El adoptante', f1_email: 'ejemplo@email.com', f1_telefono: '600123123', f1_firma: '', f2_nombre: 'Grupo Nebak', f2_rol: 'Entidad', f2_firma: '' };
+    const html = PdfExport._buildContracto(demo, PdfExport._logoFallback);
+    return `<iframe title="Ejemplo de contrato" srcdoc="${html.replace(/"/g, '&quot;')}" style="width:100%;height:420px;border:1px solid var(--gray-200);border-radius:8px;background:#fff;margin-top:8px"></iframe>`;
   },
 
   _tutorialEstados() {
