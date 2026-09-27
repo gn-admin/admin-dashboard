@@ -4,14 +4,35 @@
 
 const PdfExport = {
 
-  exportSingleResponse(row, survey) {
-    const content = this._buildSingleReport(row, survey);
-    this._openPrintWindow(content, `Informe-${row.id}.pdf`);
+  async exportSingleResponse(row, survey, nota) {
+    return this._printAsync(`Informe-${row.id}.pdf`, (logo) => this._buildSingleReport(row, survey, logo, nota));
   },
 
-  exportAllResponses(responses, survey) {
-    const content = this._buildFullReport(responses, survey);
-    this._openPrintWindow(content, `Informe-${survey?.id || 'encuesta'}.pdf`);
+  async exportAllResponses(responses, survey) {
+    return this._printAsync(`Informe-${survey?.id || 'encuesta'}.pdf`, (logo) => this._buildFullReport(responses, survey, logo));
+  },
+
+  _logoFallback: 'https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg',
+  _logoCache: null,
+
+  // Logo local (offline) con fallback remoto. No bloquear: se resuelve antes de pintar.
+  async _logoUrl() {
+    if (this._logoCache) return this._logoCache;
+    try {
+      const res = await fetch('assets/icons/logo-nebak.jpg');
+      if (!res.ok) throw 0;
+      const blob = await res.blob();
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+      this._logoCache = dataUrl;
+      return dataUrl;
+    } catch {
+      return this._logoFallback;
+    }
   },
 
   _esc(str) {
@@ -19,7 +40,11 @@ const PdfExport = {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   },
 
-  _buildSingleReport(row, survey) {
+  _buildSingleReport(row, survey, logo, nota) {
+    const sid = (survey && survey.id) || row._surveyId || '';
+    const estado = (typeof Dashboard !== 'undefined' && sid) ? Dashboard.getEstado(row.id, sid) : '';
+    const estBadge = estado ? `<span class="badge badge-${estado}">${this._esc(estado.replace(/_/g, ' '))}</span>` : '';
+    const img = logo || this._logoFallback;
     const date = row.fecha_creacion
       ? new Date(row.fecha_creacion).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : '—';
@@ -49,70 +74,102 @@ const PdfExport = {
         .name{font-size:18pt;font-weight:700;color:#191919}
         .meta{font-size:9pt;color:#757575;margin-top:2px}
         .badge{display:inline-block;background:#AFF3C7;color:#15863D;padding:2px 10px;border-radius:999px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
-        .section{margin-bottom:20px}
+        .badge-pendiente{background:#e8eaed;color:#6b7280}.badge-en_proceso{background:#ebf5fb;color:#2563db}.badge-aprobada{background:#AFF3C7;color:#15863D}.badge-descartada{background:#fde2e2;color:#c0392b}
+        .section{margin-bottom:20px;break-inside:avoid}
         .section-title{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#757575;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e8eaed}
-        .field{margin-bottom:12px}
+        .field{margin-bottom:12px;break-inside:avoid}
         .question{font-size:8pt;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:3px}
         .answer{font-size:10pt;color:#191919;line-height:1.5}
         .footer{text-align:center;margin-top:32px;padding-top:12px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
       </style></head><body>
       <div class="report-header">
-        <img src="https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg" class="report-logo" alt="Grupo Nebak">
+        <img src="${img}" class="report-logo" alt="Grupo Nebak">
         <div class="avatar">${(row.nombre?.[0]||'')+(row.apellidos?.[0]||'')}</div>
         <div>
           <div class="name">${this._esc(row.nombre)} ${this._esc(row.apellidos)}</div>
           <div class="meta">${this._esc(row.email)} · ${date}</div>
-          ${survey ? `<span class="badge">${survey.name}</span>` : ''}
+          ${survey ? `<span class="badge">${survey.name}</span>` : ''} ${estBadge}
         </div>
       </div>
       ${sectionsHtml}
+      ${nota ? `<div class="section"><div class="section-title">Notas del evaluador</div><div class="answer">${this._esc(nota)}</div></div>` : ''}
       <div class="footer">
         Generado por GN-Encuestas · Grupo Nebak · ${new Date().toLocaleDateString('es-ES')} · Documento confidencial
       </div>
     </body></html>`;
   },
 
-  _buildFullReport(responses, survey) {
-    const headers = responses.length > 0
-      ? Object.keys(responses[0]).filter(h => h.charAt(0) !== '_' && !['userId','nombre','apellidos','email','fecha_creacion'].includes(h))
-      : [];
+  _buildFullReport(responses, survey, logo) {
+    const sid = (survey && survey.id) || '';
+    const rows = (responses || []).map(r => ({
+      row: r,
+      estado: (typeof Dashboard !== 'undefined' && sid) ? Dashboard.getEstado(r.id, sid) : ''
+    }));
+    const counts = {};
+    rows.forEach(({ estado }) => { const k = estado || 'pendiente'; counts[k] = (counts[k] || 0) + 1; });
+    const fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const img = logo || this._logoFallback;
+    const order = ['pendiente', 'en_proceso', 'aprobada', 'descartada'];
+    const dist = order.filter(k => counts[k]).map(k => `<div class="kpi"><div class="kpi-n">${counts[k]}</div><div class="kpi-l">${k.replace(/_/g, ' ')}</div></div>`).join('');
+
+    const pages = rows.map(({ row, estado }, i) => {
+      const sections = (typeof Dashboard !== 'undefined') ? Dashboard._buildSections(row, sid) : [];
+      const who = [row.nombre, row.apellidos].filter(Boolean).join(' ').trim() || ('Solicitud ' + (row.id || (i + 1)));
+      return `<div class="sheet">
+        <div class="sheet-head"><span class="sheet-n">${i + 1}</span>
+          <div><div class="sheet-name">${this._esc(who)}</div>
+          <div class="sheet-meta">${this._esc(row.email || '')}${row.fecha_creacion ? ' · ' + this._esc(row.fecha_creacion) : ''}</div></div>
+          ${estado ? `<span class="badge badge-${estado}">${this._esc(estado.replace(/_/g, ' '))}</span>` : ''}
+        </div>
+        ${sections.map(s => `<div class="section"><div class="section-title">${this._esc(s.title)}</div>${s.fields.map(f => `<div class="field"><div class="question">${this._esc(f.label)}</div><div class="answer">${f.value == null ? '—' : this._esc(f.value)}</div></div>`).join('')}</div>`).join('')}
+      </div>`;
+    }).join('');
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
       <title>${survey?.name || 'Informe'} - Reporte completo</title>
       <style>
         @page{size:A4;margin:2cm}
-        body{font:10pt/1.4 Arial,sans-serif;color:#191919;padding:0;margin:0}
-        .header{text-align:center;margin-bottom:20px;padding-bottom:12px;border-bottom:3px solid #1FC95B}
-        h1{font-size:16pt;color:#191919;margin:0}
-        .sub{font-size:9pt;color:#757575;margin-top:4px}
-        table{width:100%;border-collapse:collapse;font-size:8pt}
-        th{background:#1FC95B;color:#fff;padding:6px 8px;text-align:left;font-weight:600}
-        td{padding:5px 8px;border-bottom:1px solid #e8eaed}
-        tr:nth-child(even){background:#f9fafb}
+        body{font:10pt/1.5 Arial,sans-serif;color:#191919;padding:0;margin:0}
+        .cover{text-align:center;padding:48px 0 32px;border-bottom:3px solid #1FC95B;margin-bottom:24px}
+        .cover img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B}
+        .cover h1{font-size:20pt;margin:12px 0 4px}
+        .cover .sub{font-size:10pt;color:#757575}
+        .kpis{display:flex;gap:12px;justify-content:center;margin:20px 0 8px;flex-wrap:wrap}
+        .kpi{background:#f9fafb;border:1px solid #e8eaed;border-radius:8px;padding:8px 18px;text-align:center}
+        .kpi-n{font-size:16pt;font-weight:800}
+        .kpi-l{font-size:8pt;color:#757575;text-transform:uppercase;letter-spacing:.5px}
+        .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;background:#AFF3C7;color:#15863D}
+        .badge-pendiente{background:#e8eaed;color:#6b7280}.badge-en_proceso{background:#ebf5fb;color:#2563db}.badge-aprobada{background:#AFF3C7;color:#15863D}.badge-descartada{background:#fde2e2;color:#c0392b}
+        .sheet{page-break-before:always;padding-top:8px}
+        .sheet:first-of-type{page-break-before:avoid}
+        .sheet-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #1FC95B}
+        .sheet-n{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#1FC95B;color:#fff;font-weight:800;font-size:11pt;flex-shrink:0}
+        .sheet-name{font-size:14pt;font-weight:700}
+        .sheet-meta{font-size:8pt;color:#757575;margin-top:2px}
+        .sheet-head .badge{margin-left:auto}
+        .section{margin-bottom:18px}
+        .section-title{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#757575;margin-bottom:10px;padding-bottom:4px;border-bottom:1px solid #e8eaed}
+        .field{margin-bottom:10px;break-inside:avoid}
+        .question{font-size:8pt;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+        .answer{font-size:10pt;line-height:1.5}
         .footer{text-align:center;margin-top:24px;padding-top:8px;border-top:1px solid #e8eaed;font-size:7pt;color:#9aa0a6}
       </style></head><body>
-      <div class="header" style="display:flex;align-items:center;gap:16px;text-align:left">
-        <img src="https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B" alt="Grupo Nebak">
-        <div>
-          <h1>${survey?.name || 'Reporte'}</h1>
-          <div class="sub">${new Date().toLocaleDateString('es-ES')} · ${responses.length} solicitudes</div>
-        </div>
+      <div class="cover">
+        <img src="${img}" alt="Grupo Nebak">
+        <h1>${survey?.name || 'Reporte'}</h1>
+        <div class="sub">Grupo Nebak · ${fecha} · ${rows.length} solicitudes</div>
+        <div class="kpis">${dist}</div>
       </div>
-      <table><thead><tr>
-        ${headers.map(h => `<th>${this._label(h)}</th>`).join('')}
-      </tr></thead><tbody>
-        ${responses.map(row => `<tr>${headers.map(h => `<td>${row[h] == null ? '—' : this._esc(row[h])}</td>`).join('')}</tr>`).join('')}
-      </tbody></table>
-      <div class="footer">GN-Encuestas · Grupo Nebak · Documento confidencial</div>
+      ${pages}
+      <div class="footer">Generado por GN-Admin · Grupo Nebak · ${fecha} · Documento confidencial</div>
     </body></html>`;
   },
 
   exportContracto(c) {
-    const content = this._buildContracto(c);
-    this._openPrintWindow(content, `Contrato-Adopcion-${c.adopcion_id || 'signed'}.pdf`);
+    return this._printAsync(`Contrato-Adopcion-${c.adopcion_id || 'signed'}.pdf`, (logo) => this._buildContracto(c, logo));
   },
 
-  _buildContracto(c) {
+  _buildContracto(c, logo) {
     const fecha = c.fecha
       ? new Date(c.fecha + (c.fecha.length <= 10 ? 'T00:00:00' : '')).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
       : new Date().toLocaleDateString('es-ES');
@@ -146,9 +203,9 @@ const PdfExport = {
         .grid{display:flex;flex-wrap:wrap;gap:4px 24px;font-size:10pt}
         .grid>div{width:45%}
         .label{font-size:8pt;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.3px}
-        .clausula{margin-bottom:10px;font-size:10pt;text-align:justify}
+        .clausula{margin-bottom:10px;font-size:10pt;text-align:justify;break-inside:avoid}
         .clausula b{color:#191919}
-        .signatures{display:flex;gap:48px;margin-top:48px}
+        .signatures{display:flex;gap:48px;margin-top:48px;break-inside:avoid}
         .signature{flex:1}
         .sig-label{font-size:9pt;color:#757575;margin-bottom:4px}
         .firma-img{height:70px;object-fit:contain}
@@ -157,7 +214,7 @@ const PdfExport = {
         .footer{text-align:center;margin-top:40px;padding-top:10px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
       </style></head><body>
       <div class="header">
-        <img src="https://static.wixstatic.com/media/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg/v1/fill/w_96,h_96,al_c,q_80/ef25d5_6d0863724c2041aeac7b5291f0433409~mv2.jpg" class="logo" alt="Grupo Nebak">
+        <img src="${logo || this._logoFallback}" class="logo" alt="Grupo Nebak">
         <div><div class="title">Contrato de Adopcion</div><div class="sub">Asociacion Grupo Nebak &middot; Expediente ${c.adopcion_id || c.id || ''}</div></div>
       </div>
 
@@ -212,13 +269,23 @@ const PdfExport = {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   },
 
-  _openPrintWindow(html, filename) {
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 400);
-  }
+  // Apertura sincrona (no la bloquea el popup-blocker) + contenido async.
+  async _printAsync(filename, build) {
+    const w = (typeof window !== 'undefined') ? window.open('', '_blank') : null;
+    if (!w) return;
+    try { w.document.write('<html><head><meta charset="UTF-8"><title>' + filename + '</title></head><body style="font-family:Arial,sans-serif"><p>Generando informe...</p></body></html>'); w.document.close(); } catch {}
+    const logo = await this._logoUrl();
+    let content;
+    try { content = await build(logo); }
+    catch (err) { content = '<html><head><meta charset="UTF-8"></head><body><p>Error generando el informe.</p></body></html>'; }
+    try {
+      w.document.open();
+      w.document.write(content);
+      w.document.close();
+      w.focus();
+    } catch { return; }
+    setTimeout(() => { try { if (!w.closed) w.print(); } catch {} }, 400);
+  },
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = PdfExport;

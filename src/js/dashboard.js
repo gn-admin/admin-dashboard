@@ -1490,7 +1490,7 @@ const Dashboard = {
   exportSingle(surveyId, id) {
     const row = (this.responses[surveyId] || []).find(r => r.id === id);
     const survey = this.surveys.find(s => s.id === surveyId);
-    if (row) PdfExport.exportSingleResponse(row, survey);
+    if (row) PdfExport.exportSingleResponse(row, survey, this.notes[surveyId + '::' + id] || '');
   },
 
   // Formatea fechas de Forms/Sheets (ISO, Date o "D/M/YYYY [hh:mm]").
