@@ -12,14 +12,38 @@ const API = {
     }
   },
 
+  // El backend responde siempre HTTP 200 y marca `status`: 'success' | 'warning'
+  // | 'error'. Aqui se respeta: warning y error se lanzan con `err.status` para
+  // que la UI pinte el snackbar ambar o rojo; success devuelve el dato.
+  async _resultado(res) {
+    if (!res.ok) {
+      const e = new Error(`HTTP ${res.status}: ${res.statusText}`);
+      e.status = 'error';
+      throw e;
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (data == null) {
+      const e = new Error('Respuesta no valida del servidor');
+      e.status = 'error';
+      throw e;
+    }
+    const st = data.status || (data.error ? 'error' : 'success');
+    if (st === 'error' || st === 'warning') {
+      const e = new Error(data.error || data.message || (st === 'warning' ? 'Aviso del servidor' : 'Error del servidor'));
+      e.status = st;
+      e.detail = data.detail || '';
+      e.code = data.code;
+      throw e;
+    }
+    return data;
+  },
+
   async _get(endpoint, params = {}) {
     const token = await Auth.getIdToken();
     const qs = new URLSearchParams({ endpoint, ...params, token }).toString();
     const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data;
+    return this._resultado(res);
   },
 
   async _post(endpoint, body = {}) {
@@ -27,10 +51,7 @@ const API = {
     const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
       method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data;
+    return this._resultado(res);
   },
 
   // Encuestas (RU)

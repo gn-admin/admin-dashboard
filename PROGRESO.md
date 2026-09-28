@@ -80,7 +80,11 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 `actividad`, `estados`, `notas`, `apadrinamientos`, `gastos`, `recordatorios`,
 `donaciones`, `seguimientos`, `documentos`, `inventario` (+ `update-*`, `delete-*`,
 `upload-foto-animal`, `upload-documento`, `delete-documento`).
-- Responde HTTP 200 con campo `error`; `api.js` lanza por `data.error`.
+- Responde **siempre HTTP 200** con `status` (`success` | `warning` | `error`) y,
+  si no va bien, `error` (mensaje). `jsonResponse` infiere `status` si el llamante
+  no lo pone. `actualizar()` devuelve error explícito en vez de `{data:null}`.
+- `api.js` lanza con `err.status`; el front pinta con `_snackErr(err, msg)`
+  (ámbar en `warning`, rojo en `error`). Hoy emite `warning` el rate-limit (429).
 - POST siempre `Content-Type: text/plain;charset=utf-8` (sin preflight).
 - `appendToSheet` persiste `id` y hace **upsert** (sin duplicados en reintentos);
   auto-añade columnas nuevas. `updateSheetRow` también auto-añade columnas.

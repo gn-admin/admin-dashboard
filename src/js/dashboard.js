@@ -835,7 +835,7 @@ const Dashboard = {
     try {
       const res = await API.deleteRecordatorio(id);
       this._assertDeleted(res, 'El recordatorio');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.recordatorios = (this.recordatorios || []).filter(x => x.id !== id);
     this.saveLocal();
     this.renderDashboardHome(document.getElementById('page-dashboard'));
@@ -1290,7 +1290,7 @@ const Dashboard = {
       ]);
     } catch (err) {
       this.hideLoading();
-      this.showSnackbar('No se pudo cargar el cuestionario: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo cargar el cuestionario: ' + this._errMsg(err));
       return;
     }
     this.hideLoading();
@@ -1528,7 +1528,7 @@ const Dashboard = {
       await API.setNota(id, surveyId, nota);
       this.showSnackbar('Nota guardada', 'success');
     } catch (err) {
-      this.showSnackbar(this._errMsg(err), 'error');
+      this._snackErr(err, this._errMsg(err));
     }
   },
 
@@ -1907,7 +1907,7 @@ const Dashboard = {
       try {
         const res = await API.deleteApadrinamiento(id);
         this._assertDeleted(res, 'El apadrinamiento');
-      } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+      } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     }
     this.apadrinamientos = (this.apadrinamientos || []).filter(x => x.id !== id);
     this.saveLocal();
@@ -1939,7 +1939,7 @@ const Dashboard = {
       this.saveLocal();
       this._regLog('padrino-convertido', 'Padrino ' + (p.padrino_nombre || '') + ' convertido a socio; apadrino a ' + (p.animal || ''), 'socio', p.padrino_id);
     } catch (err) {
-      this.showSnackbar('No se pudo convertir: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo convertir: ' + this._errMsg(err));
       return;
     } finally {
       this.hideLoading();
@@ -2051,7 +2051,7 @@ const Dashboard = {
     try {
       const res = await API.deleteGasto(id);
       this._assertDeleted(res, 'El gasto');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.gastos = (this.gastos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (g) this.viewAnimal(g.animal_id);
@@ -2132,7 +2132,7 @@ const Dashboard = {
       fileId = up.data.fileId;
       fileUrl = up.data.webViewLink || up.data.webContentLink || '';
     } catch (err) {
-      this.showSnackbar('No se pudo subir: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo subir: ' + this._errMsg(err));
       finGuardar();
       return;
     }
@@ -2161,7 +2161,7 @@ const Dashboard = {
     try {
       const res = await API.deleteDocumento(id);
       this._assertDeleted(res, 'El documento');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.documentos = (this.documentos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (d) this.viewAnimal(d.animal_id);
@@ -2401,7 +2401,7 @@ const Dashboard = {
         if (res.data) this.animales.push(res.data);
       }
     } catch (err) {
-      this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
       finGuardar();
       return;
     }
@@ -2490,7 +2490,7 @@ const Dashboard = {
     if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
     await this._ensureListas(['acogidas', 'candidaturas', 'adopciones']);
     try { const res = await API.deleteAnimal(id); this._assertDeleted(res, 'El animal'); }
-    catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     const casos = this.acogidas.filter(x => x.animal_id === id);
     if (casos.length) {
       this.acogidas = this.acogidas.filter(x => x.animal_id !== id);
@@ -2593,7 +2593,7 @@ const Dashboard = {
         if (res.data) this.familias.push(res.data);
       }
     } catch (err) {
-      this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
       finGuardar();
       return;
     }
@@ -2632,7 +2632,7 @@ const Dashboard = {
     if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
     await this._ensureListas(['acogidas']);
     try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
-    catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
     if (casos.length) {
       for (const c of casos) {
@@ -2739,7 +2739,7 @@ const Dashboard = {
     try {
       const res = await API.deleteAcogida(id);
       this._assertDeleted(res, 'El caso');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     const a = target && target.animal_id ? this._byId(this.animales, target.animal_id) : null;
     if (a && a.estado === 'en_acogida') {
       a.estado = 'disponible';
@@ -2843,7 +2843,7 @@ const Dashboard = {
         }
       }
     } catch (err) {
-      this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
       finGuardar();
       return;
     }
@@ -3016,7 +3016,7 @@ const Dashboard = {
     if (!motivo) { this.showSnackbar('Indica el motivo de la devolucion', 'warning'); finGuardar(); return; }
     const data = { desenlace: 'devuelto', motivo_devolucion: motivo, fecha_devolucion: new Date().toISOString().slice(0, 10), estado: 'Devuelto' };
     try { await API.updateAdopcion(id, data); }
-    catch (err) { this.showSnackbar('No se pudo registrar: ' + this._errMsg(err), 'error'); finGuardar(); return; }
+    catch (err) { this._snackErr(err, 'No se pudo registrar: ' + this._errMsg(err)); finGuardar(); return; }
     Object.assign(p, data);
     await this._ensureListas(['contratos']);
     await this._liberarAnimal(p.animal_id, id);
@@ -3082,7 +3082,7 @@ const Dashboard = {
     try {
       const res = await API.deleteSeguimiento(id);
       this._assertDeleted(res, 'El seguimiento');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.seguimientos = (this.seguimientos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (s) this.viewAdopcion(s.adopcion_id);
@@ -3093,7 +3093,7 @@ const Dashboard = {
     if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
     const target = this._byId(this.adopciones, id);
     try { const res = await API.deleteAdopcion(id); this._assertDeleted(res, 'El caso'); }
-    catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     await this._ensureListas(['contratos']);
     const c = this._contratoDeAdopcion(id);
     if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
@@ -3411,7 +3411,7 @@ const Dashboard = {
         if (res.data) this.socios.push(res.data);
       }
     } catch (err) {
-      this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
       finGuardar();
       return;
     }
@@ -3477,7 +3477,7 @@ const Dashboard = {
   async deleteSocio(id) {
     if (!(await this._confirm('Eliminar este socio permanentemente?'))) return;
     try { const res = await API.deleteSocio(id); this._assertDeleted(res, 'El socio'); }
-    catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.socios = this.socios.filter(s => s.id !== id);
     this._hideDetail('socios');
     this.renderSocios(document.getElementById('page-socios'));
@@ -3537,7 +3537,7 @@ const Dashboard = {
       fecha: prev ? prev.fecha : new Date().toISOString()
     };
     try { await (id ? API.updateBlacklist(item.id, item) : API.createBlacklist(item)); }
-    catch (err) { this.showSnackbar(this._errMsg(err), 'error'); finGuardar(); return; }
+    catch (err) { this._snackErr(err, this._errMsg(err)); finGuardar(); return; }
     finGuardar();
     if (id) { const i = (this.blacklist || []).findIndex(b => String(b.id) === String(item.id)); if (i >= 0) this.blacklist[i] = item; }
     else { this.blacklist.push(item); }
@@ -3554,7 +3554,7 @@ const Dashboard = {
     const target = idx >= 0 ? this.blacklist[idx] : this.blacklist[Number(id)];
     if (!target) return;
     try { await API.deleteBlacklist(target.id); }
-    catch (err) { this.showSnackbar(this._errMsg(err), 'error'); return; }
+    catch (err) { this._snackErr(err, this._errMsg(err)); return; }
     this.blacklist.splice(idx >= 0 ? idx : Number(id), 1);
     this.saveLocal();
     const lc=document.getElementById('blacklist-list-container'); if(lc) lc.innerHTML=this._renderBlacklistCards();
@@ -3625,7 +3625,7 @@ const Dashboard = {
     try {
       const res = await API.deleteDonacion(id);
       this._assertDeleted(res, 'La donacion');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.donaciones = (this.donaciones || []).filter(x => x.id !== id);
     this.saveLocal();
     this.renderDonaciones(document.getElementById('page-donaciones'));
@@ -3687,7 +3687,7 @@ const Dashboard = {
         if (!res.data) throw new Error('sin datos');
         if (it) Object.assign(it, data);
       } catch (err) {
-        this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+        this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
         finGuardar();
         return;
       }
@@ -3728,7 +3728,7 @@ const Dashboard = {
     try {
       const res = await API.deleteInventario(id);
       this._assertDeleted(res, 'El artículo');
-    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
+    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
     this.inventario = (this.inventario || []).filter(x => x.id !== id);
     this.saveLocal();
     this.renderAlmacen(document.getElementById('page-almacen'));
@@ -3902,7 +3902,7 @@ const Dashboard = {
         ok++;
       }
     } catch (err) {
-      this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ': ' + this._errMsg(err), 'error');
+      this._snackErr(err, 'Descartadas ' + ok + ' de ' + lista.length + ': ' + this._errMsg(err));
     } finally {
       this.hideLoading();
     }
@@ -3937,6 +3937,13 @@ const Dashboard = {
     const m = err.message || err.error || '';
     if (m && m !== 'Error') return m;
     return 'Error desconocido';
+  },
+
+  // Snack que respeta el `status` que devuelve el backend:
+  // 'error' -> rojo, 'warning' -> ambar, 'success' -> verde.
+  _snackErr(err, msg) {
+    const st = (err && err.status) || 'error';
+    this.showSnackbar(msg, st === 'warning' ? 'warning' : st === 'success' ? 'success' : 'error');
   },
 
   showSnackbar(msg, type = 'error') {
