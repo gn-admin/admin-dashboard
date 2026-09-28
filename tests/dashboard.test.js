@@ -723,3 +723,41 @@ describe('grupos: destino al renombrar (fusion si choca)', () => {
     });
   });
 });
+
+describe('_snackTipo: el color depende del status del backend', () => {
+  const T = (e) => Dashboard._snackTipo(e);
+
+  it('respeta los tres status explicitos', () => {
+    assert.equal(T({ status: 'success' }), 'success');
+    assert.equal(T({ status: 'warning' }), 'warning');
+    assert.equal(T({ status: 'error' }), 'error');
+  });
+
+  it('sin status, error por defecto', () => {
+    assert.equal(T(new Error('boom')), 'error');
+    assert.equal(T({ message: 'HTTP 500: Internal Server Error' }), 'error');
+    assert.equal(T(null), 'error');
+    assert.equal(T(undefined), 'error');
+  });
+
+  it('hoja sin configurar -> warning, aunque no traiga status', () => {
+    assert.equal(T(new Error('Hoja Grupos sin configurar: crea la hoja y rellena SHEET_GRUPOS_ID')), 'warning');
+    assert.equal(T({ error: 'DRIVE_FOTOS_FOLDER_ID no configurado' }), 'warning');
+  });
+
+  it('rate limit -> warning (429 o por mensaje)', () => {
+    assert.equal(T({ code: 429, message: 'demasiadas peticiones' }), 'warning');
+    assert.equal(T({ message: 'Demasiadas peticiones: espera unos segundos y reintenta' }), 'warning');
+  });
+
+  it('un status desconocido no se cuela como verde', () => {
+    assert.equal(T({ status: 'ok' }), 'error');
+    assert.equal(T({ status: '' }), 'error');
+  });
+
+  it('mensaje de fallo normal no se confunde con aviso', () => {
+    assert.equal(T(new Error('El backend no devolvio el registro (id sin sincronizar)')), 'error');
+    assert.equal(T(new Error('Token invalido')), 'error');
+    assert.equal(T(new Error('No se pudo subir la foto')), 'error');
+  });
+});

@@ -31,7 +31,7 @@ const Dashboard = {
       }
     } catch (err) {
       console.error('Error init:', err);
-      this.showSnackbar('No se pudieron cargar los datos iniciales', 'error');
+      this._snackErr(err, 'No se pudieron cargar los datos iniciales');
     } finally {
       this.hideLoading();
     }
@@ -90,7 +90,7 @@ const Dashboard = {
     } catch (err) {
       console.error('Error cargando ' + page + ':', err);
       if (token !== this._pageToken) return;
-      this.showSnackbar('No se pudo cargar esta pantalla', 'error');
+      this._snackErr(err, 'No se pudo cargar esta pantalla');
       el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.loadPage('${page}')">Reintentar</button></div>`;
       return;
     }
@@ -326,7 +326,7 @@ const Dashboard = {
       console.error('Error setEstado:', err);
       this.states[key] = anterior;
       this._syncCard(surveyId, id);
-      this.showSnackbar('No se pudo guardar el estado', 'error');
+      this._snackErr(err, 'No se pudo guardar el estado');
     } finally {
       this.hideLoading();
     }
@@ -3330,7 +3330,7 @@ const Dashboard = {
     if (idx >= fases.length - 1) return;
     const newFase = fases[idx + 1];
     try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
-    catch (err) { this.showSnackbar('No se pudo avanzar de fase', 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo avanzar de fase'); return; }
     p.fase = newFase;
     p.estado = `Fase: ${newFase}`;
     this.viewAdopcion(id);
@@ -3344,7 +3344,7 @@ const Dashboard = {
     if (idx <= 0) return;
     const newFase = fases[idx - 1];
     try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
-    catch (err) { this.showSnackbar('No se pudo retroceder de fase', 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo retroceder de fase'); return; }
     p.fase = newFase;
     p.estado = `Fase: ${newFase}`;
     this.viewAdopcion(id);
@@ -3825,7 +3825,7 @@ const Dashboard = {
     if (!s) return;
     const newActivo = !s.activo;
     try { await API.updateSocio(id, { activo: newActivo }); }
-    catch (err) { this.showSnackbar('No se pudo actualizar el estado', 'error'); return; }
+    catch (err) { this._snackErr(err, 'No se pudo actualizar el estado'); return; }
     s.activo = newActivo;
     this.viewSocio(id);
     this.showSnackbar(newActivo ? 'Socio activado' : 'Socio desactivado', 'success');
@@ -4296,11 +4296,22 @@ const Dashboard = {
     return 'Error desconocido';
   },
 
-  // Snack que respeta el `status` que devuelve el backend:
+  // Clasifica el snack a partir de un error (función pura, testeada en tests/).
   // 'error' -> rojo, 'warning' -> ambar, 'success' -> verde.
+  // Si el backend no marca `status`, infiere por el mensaje para no pintar de
+  // rojo avisos que no son fallos (hoja sin configurar, rate limit, etc.).
+  _snackTipo(err) {
+    const st = err && err.status;
+    if (st === 'warning' || st === 'success' || st === 'error') return st;
+    if (err && err.code === 429) return 'warning';
+    const m = String((err && (err.message || err.error)) || '').toLowerCase();
+    if (m && /sin configurar|no configurado|demasiadas peticiones|espera unos segundos/.test(m)) return 'warning';
+    return 'error';
+  },
+
+  // Snack que respeta el `status` que devuelve el backend.
   _snackErr(err, msg) {
-    const st = (err && err.status) || 'error';
-    this.showSnackbar(msg, st === 'warning' ? 'warning' : st === 'success' ? 'success' : 'error');
+    this.showSnackbar(msg, this._snackTipo(err));
   },
 
   showSnackbar(msg, type = 'error') {

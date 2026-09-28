@@ -1515,16 +1515,19 @@ body {
   text-align: center;
   animation: snackbarIn 0.25s ease-out;
   display: none;
+  border-left: 5px solid transparent;
 }
 
-.toast-error.toast-success { background: var(--primary); }
-.toast-error.toast-info { background: var(--info); }
-.toast-error.toast-warning { background: var(--warning); }
-.toast-error.toast-error { background: var(--danger); }
+.toast-error.toast-success { background: var(--primary); border-left-color: var(--primary-dark); }
+.toast-error.toast-info { background: var(--info); border-left-color: #21618c; }
+.toast-error.toast-warning { background: #facc15; color: var(--black); border-left-color: #ca8a04; }
+.toast-error.toast-error { background: var(--danger); border-left-color: var(--danger-hover); }
 
 .toast-error::before {
   margin-right: 8px;
   font-weight: 800;
+  font-size: 1rem;
+  display: inline-block;
 }
 
 .toast-error.toast-success::before { content: '✓'; }
