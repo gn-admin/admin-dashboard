@@ -102,19 +102,19 @@ const Dashboard = {
     set('sidebar-collapse-btn', Icons.sidebarCollapse);
     set('mas-menu-icon', Icons.menu);
     set('mas-icon-acogidas', Icons.home);
-    set('mas-icon-acogidas-activas', Icons.home);
+    set('mas-icon-acogidas-activas', Icons.activity);
     set('tutorial-btn', Icons.helpCircle);
     set('profile-btn', Icons.user);
-    set('mas-icon-adopciones', Icons.heart);
+    set('mas-icon-adopciones', Icons.fileText);
     set('mas-icon-socios', Icons.users);
     set('mas-icon-reportes', Icons.barChart);
-    set('mas-icon-redes', Icons.heart);
-    set('mas-icon-donaciones', Icons.heart);
+    set('mas-icon-redes', Icons.eye);
+    set('mas-icon-donaciones', Icons.trendingUp);
     set('mas-icon-almacen', Icons.box);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.home, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.home, adopciones: Icons.heart, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.heart, donaciones: Icons.heart, almacen: Icons.box };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
