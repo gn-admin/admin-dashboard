@@ -157,6 +157,12 @@ const API = {
   async updateInventario(id, data) { const r = await this._post('update-inventario', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteInventario(id) { return this._post('delete-inventario', { id }); },
 
+  // Grupos de animales (foto, descripcion y notas comunes)
+  async getGrupos() { return this._get('grupos'); },
+  async createGrupo(data) { return this._post('grupos', data); },
+  async updateGrupo(id, data) { const r = await this._post('update-grupo', { id, ...data }); if (!r.data) throw new Error('El backend no devolvio el registro (id sin sincronizar)'); return r; },
+  async deleteGrupo(id) { return this._post('delete-grupo', { id }); },
+
   // Actividad
   async getActividad() { return this._get('actividad'); },
   async createActividad(data) { return this._post('actividad', data); },

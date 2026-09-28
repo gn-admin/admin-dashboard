@@ -599,3 +599,79 @@ describe('grupos: un mismo nombre => un mismo grupo_id (opcion A)', () => {
   });
 });
 
+
+describe('grupos: layout y resumen', () => {
+  const conAnimales = (list, fn) => {
+    const prev = Dashboard.animales;
+    Dashboard.animales = list;
+    try { return fn(); } finally { Dashboard.animales = prev; }
+  };
+
+  const A = (id, grupo, gid, extra) => Object.assign({ id, grupo, grupo_id: gid }, extra || {});
+
+  it('2+ miembros visibles -> bloque; el resto suelto', () => {
+    conAnimales([
+      A('a1', 'Luna', 'gpo_l', { estado: 'disponible' }),
+      A('a2', 'Luna', 'gpo_l', { estado: 'disponible' }),
+      A('a3', 'Solo', 'gpo_s', { estado: 'disponible' }),
+      A('a4', null, '', { estado: 'disponible' })
+    ], () => {
+      const { bloques, sueltos } = Dashboard._bloquesDeGrupo(Dashboard.animales);
+      assert.equal(bloques.length, 1);
+      assert.equal(bloques[0].gid, 'gpo_l');
+      assert.equal(bloques[0].items.length, 2);
+      assert.equal(sueltos.length, 2);
+      assert.deepEqual(sueltos.map(a => a.id).sort(), ['a3', 'a4']);
+    });
+  });
+
+  it('grupo partido en dos ids no se agrupa (sigue siendo visible)', () => {
+    conAnimales([
+      A('a1', 'X', 'gpo_1'),
+      A('a2', 'X', 'gpo_2')
+    ], () => {
+      const { bloques, sueltos } = Dashboard._bloquesDeGrupo(Dashboard.animales);
+      assert.equal(bloques.length, 0);
+      assert.equal(sueltos.length, 2);
+    });
+  });
+
+  it('un solo miembro visible no forma bloque', () => {
+    conAnimales([A('a1', 'Luna', 'gpo_l')], () => {
+      const { bloques, sueltos } = Dashboard._bloquesDeGrupo(Dashboard.animales);
+      assert.equal(bloques.length, 0);
+      assert.equal(sueltos.length, 1);
+    });
+  });
+
+  it('solo con nombre e id se considera grupo', () => {
+    conAnimales([
+      A('a1', '', 'gpo_x'),
+      A('a2', 'X', '')
+    ], () => {
+      const { bloques, sueltos } = Dashboard._bloquesDeGrupo(Dashboard.animales);
+      assert.equal(bloques.length, 0);
+      assert.equal(sueltos.length, 2);
+    });
+  });
+
+  it('_grupoResumen cuenta miembros, disponibles y especies', () => {
+    conAnimales([
+      A('a1', 'Luna', 'gpo_l', { estado: 'disponible', especie: 'Gato' }),
+      A('a2', 'Luna', 'gpo_l', { estado: 'adoptado', especie: 'Gato' }),
+      A('a3', 'Luna', 'gpo_l', { estado: 'disponible', especie: 'Perro' })
+    ], () => {
+      assert.equal(Dashboard._grupoResumen('gpo_l'), '3 animales · 2 disponibles · Gato / Perro');
+    });
+  });
+
+  it('_grupoMiembros devuelve los del id exacto', () => {
+    conAnimales([
+      A('a1', 'X', 'gpo_1'),
+      A('a2', 'X', 'gpo_2')
+    ], () => {
+      assert.equal(Dashboard._grupoMiembros('gpo_1').length, 1);
+      assert.equal(Dashboard._grupoMiembros('gpo_9').length, 0);
+    });
+  });
+});

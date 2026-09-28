@@ -22,7 +22,7 @@ const Dashboard = {
       this.userProfile = user;
       this.updateUserUI();
       // Preloads no bloqueantes; cada pantalla/ficha asegura lo suyo al abrirse.
-      this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos']);
+      this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos', 'grupos']);
       this._renderPendingBadge();
       this.flushPendingOps();
       if (!this._onlineHook) {
@@ -55,6 +55,7 @@ const Dashboard = {
       adopciones: () => API.getAdopciones(),
       socios: () => API.getSocios(),
       blacklist: () => API.getBlacklist(),
+      grupos: () => API.getGrupos(),
       actividad: () => API.getActividad()
     };
     await Promise.all((keys || []).map(k => (fns[k] ? this._loadListBestEffort(k, fns[k]) : null)));
@@ -1138,13 +1139,15 @@ const Dashboard = {
       ], '#16a34a')}</div>
       ${this._guideStep(Icons.paw, '1. Donde se crean', 'Entra en <b>Animales</b>: arriba hay dos botones. <b>Nuevo</b> registra un animal a la vez; <b>Alta de camada</b> crea varios de golpe con el mismo grupo. Los filtros de <b>estado</b> y <b>especie</b> ordenan el inventario.', 'Animales', true)}
       ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges <b>Perro</b>, <b>Gato</b> u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
-      ${this._guideStep(Icons.users, '3. Grupo / Camada', 'En el campo <b>Grupo / Camada</b> escribe <b>un nombre nuevo</b> (p. ej. <i>Camada Luna Mayo 2026</i>): al guardar se crea el grupo. Si ya existe, sale en el desplegable y al elegirlo el animal se mete en ese grupo. Dos animales con el mismo nombre comparten <b>grupo_id</b>.', 'Nuevo Animal > Grupo / Camada', true)}
+      ${this._guideStep(Icons.users, '3. Grupo / Camada', 'En el campo <b>Grupo / Camada</b> escribe <b>un nombre nuevo</b> (p. ej. <i>Camada Luna Mayo 2026</i>): al guardar se crea el grupo. Si ya existe, sale en el desplegable y al elegirlo el animal entra en ese grupo <b>y se rellenan solos especie, raza, edad y sexo</b>. Dos animales con el mismo nombre comparten <b>grupo_id</b>.', 'Nuevo Animal > Grupo / Camada', true)}
       ${this._guideStep(Icons.checkCircle, '4. Grupo obligatorio', 'El check <b>Grupo obligatorio</b> marca que el grupo es parte del seguimiento (no un dato decorativo): en la ficha aparece el aviso al lado del nombre. En el alta de camada viene <b>activado</b> por defecto.', 'Nuevo Animal', false)}
       ${this._guideStep(Icons.paw, '5. Alta de camada (varios de golpe)', 'Boton <b>Alta de camada</b>: <b>Nombre del grupo</b> + <b>Nombre base</b> + <b>Cantidad</b> (de 1 a 12) + especie, raza, edad y sexo. Crea los N animales con el mismo grupo, estado <b>Disponible</b>, descripcion <b>Camada: ...</b> y fecha de ingreso de hoy. Los nombres se numeran con romanos: <b>Luna I, Luna II, Luna III</b> (con cantidad 1 solo sale <i>Luna</i>). <b>Necesita conexion</b>: son varias altas seguidas.', 'Animales > Alta de camada', true)}
-      ${this._guideStep(Icons.users, '6. Como se ve el grupo', 'En la <b>tarjeta</b> aparece una insignia con el nombre del grupo y cuantos animales tiene. En la <b>ficha</b> esta el campo <b>Grupo / Camada</b> y una seccion <b>Grupo (N)</b> con cada hermano y su estado, para ver de un vistazo quien sigue disponible.', 'Animales > tarjeta / ficha', true)}
-      ${this._guideStep(Icons.heart, '7. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
-      ${this._guideStep(Icons.eye, '8. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
-      <div class="guide-note">${Icons.info} <span><b>Los grupos se unen por nombre.</b> Dos animales escritos con el mismo nombre de grupo (mayusculas o acentos no importan) comparten el grupo automaticamente; si cambias el nombre, el animal sale de su grupo y entra en el nuevo. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
+      ${this._guideStep(Icons.users, '6. Como se ven los grupos', 'En el listado, un grupo con 2 o mas miembros se pinta como un <b>bloque con cabecera</b>: foto (collage de los miembros o foto propia), nombre, cuantos son, cuantos disponibles y un boton <b>Ver grupo</b>. Dentro estan sus tarjetas. Los grupos de un solo animal salen como tarjeta normal con su insignia, que tambien abre el grupo.', 'Animales', true)}
+      ${this._guideStep(Icons.eye, '7. Ficha de grupo', 'Pulsar <b>Ver grupo</b> abre su ficha con <b>foto</b>, descripcion, notas y la lista de miembros con su estado (clic en un miembro abre su ficha). Con <b>Editar grupo</b> cambias nombre, foto, descripcion y notas; <b>renombrar</b> lo aplica a todos los miembros. <b>Anadir animal</b> abre el formulario ya rellenado con los datos del grupo.', 'Animales > Ver grupo', true)}
+      ${this._guideStep(Icons.users, '8. Separar del grupo', 'En la ficha del animal, campo <b>Grupo / Camada</b>, los botones <b>Ver grupo</b> y <b>Separar</b>. Separar quita el animal del grupo (con confirmacion): queda con su propia ficha y, si era el ultimo, la ficha del grupo se elimina.', 'Animales > ficha > Grupo / Camada', false)}
+      ${this._guideStep(Icons.heart, '9. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
+      ${this._guideStep(Icons.clipboard, '10. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
+      <div class="guide-note">${Icons.info} <span><b>Los grupos se unen por nombre.</b> Dos animales escritos con el mismo nombre de grupo (mayusculas o acentos no importan) comparten el grupo automaticamente; al abrir Animales se corrigen los que estuvieran partidos. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
   },
 
   _tutorialRedes() {
@@ -2204,6 +2207,30 @@ const Dashboard = {
     if (especie!=='all') filtered = especie==='otro' ? filtered.filter(a=>!['Perro','Gato'].includes(a.especie)) : filtered.filter(a=>(a.especie||'')===especie);
     const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length, fallecido:this.animales.filter(a=>a.estado==='fallecido').length};
     const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
+    const { bloques, sueltos } = this._bloquesDeGrupo(filtered);
+    const tarjeta = (a, enBloque) => `
+          <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
+            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
+            <div class="animal-card-body">
+              <div class="animal-card-name">${this._esc(a.nombre)}</div>
+              <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
+              <div class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</div>
+              ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" onclick="event.stopPropagation();Dashboard.viewGrupo('${a.grupo_id}')" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
+            </div>
+          </div>`;
+    const bloquesHtml = bloques.map(b => `
+        <section class="animal-group-block">
+          <div class="animal-group-head">
+            ${this._grupoCollage(b.gid)}
+            <div class="animal-group-info"><b>${this._esc(b.nombre)}</b><small>${this._esc(this._grupoResumen(b.gid))}</small></div>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${b.gid}')">${Icons.eye} Ver grupo</button>
+          </div>
+          <div class="animal-group-body"><div class="animal-grid">${b.items.map(a => tarjeta(a, true)).join('')}</div></div>
+        </section>`).join('');
+    const sueltosHtml = sueltos.length ? `<div class="animal-grid">${sueltos.map(a => tarjeta(a, false)).join('')}</div>` : '';
+    const vacio = filtered.length ? '' : (this.animales.length
+      ? `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>Prueba otro estado o cambia la especie.</p></div>`
+      : `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportAnimalesCsv()">${Icons.download} CSV</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
@@ -2224,16 +2251,9 @@ const Dashboard = {
           </select>
         </div></div>
         <div id="animales-form-container"></div>
-        <div class="animal-grid">${filtered.length ? filtered.map(a=>`
-          <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
-            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
-            <div class="animal-card-body">
-              <div class="animal-card-name">${this._esc(a.nombre)}</div>
-              <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
-              <div class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</div>
-              ${(a.grupo && a.grupo_id)?`<div class="animal-group-badge">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
-            </div>
-          </div>`).join('') : (this.animales.length ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>Prueba otro estado o cambia la especie.</p></div>` : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`)}</div>
+        ${bloquesHtml}
+        ${sueltosHtml}
+        ${vacio}
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -2316,6 +2336,214 @@ const Dashboard = {
     this.showSnackbar('CSV descargado (' + list.length + ' animales)', 'success');
   },
 
+  // ==================== GRUPOS DE ANIMALES ====================
+
+  _grupoInfo(gid) { return (this.grupos || []).find(g => String(g.id) === String(gid)) || null; },
+
+  _grupoMiembros(gid) { return (this.animales || []).filter(a => a.grupo_id === gid); },
+
+  _grupoFoto(gid) {
+    const g = this._grupoInfo(gid);
+    return g ? this._fotoSrc(g) : '';
+  },
+
+  // Retrato del grupo: la foto propia si existe, si no un collage 2x2 de miembros.
+  _grupoCollage(gid) {
+    const foto = this._grupoFoto(gid);
+    if (foto) return `<img class="animal-collage-foto" loading="lazy" src="${this._esc(foto)}" alt="">`;
+    const celdas = this._grupoMiembros(gid).slice(0, 4).map(a => {
+      const src = this._fotoSrc(a, 'w80');
+      return src
+        ? `<img loading="lazy" src="${this._esc(src)}" alt="">`
+        : `<span class="collage-ph${a.especie === 'Perro' ? ' perro' : ''}">${a.especie === 'Perro' ? Icons.dog : (a.especie === 'Gato' ? Icons.cat : Icons.paw)}</span>`;
+    });
+    while (celdas.length < 4) celdas.push('<span class="collage-ph empty"></span>');
+    return `<span class="animal-collage">${celdas.join('')}</span>`;
+  },
+
+  _grupoResumen(gid) {
+    const ms = this._grupoMiembros(gid);
+    const disp = ms.filter(m => m.estado === 'disponible').length;
+    const esp = [...new Set(ms.map(m => m.especie).filter(Boolean))];
+    let s = ms.length + (ms.length === 1 ? ' animal' : ' animales') + ' · ' + disp + ' disponible' + (disp === 1 ? '' : 's');
+    if (esp.length) s += ' · ' + esp.join(' / ');
+    return s;
+  },
+
+  // La lista visible se parte en bloques de grupo (2+ miembros visibles) y el resto.
+  _bloquesDeGrupo(list) {
+    const visibles = {};
+    list.forEach(a => { if (a.grupo_id && a.grupo) (visibles[a.grupo_id] = visibles[a.grupo_id] || []).push(a); });
+    const bloques = [];
+    const enBloque = new Set();
+    Object.keys(visibles).forEach(gid => {
+      const items = visibles[gid];
+      if (items.length < 2) return;
+      bloques.push({ gid, nombre: items[0].grupo, items });
+      items.forEach(a => enBloque.add(a.id));
+    });
+    return { bloques, sueltos: list.filter(a => !enBloque.has(a.id)) };
+  },
+
+  _prefillGrupo(valor, isEdit) {
+    if (isEdit) return;
+    const n = this._normGrupo(valor);
+    if (!n) return;
+    const ref = (this.animales || []).find(a => this._normGrupo(a.grupo) === n);
+    if (!ref) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    set('an-raza', ref.raza);
+    set('an-edad', ref.edad);
+    set('an-sexo', ref.sexo);
+    const esp = document.getElementById('an-especie');
+    if (esp && ref.especie) {
+      const opts = Array.prototype.map.call(esp.options, o => o.value);
+      if (opts.indexOf(ref.especie) !== -1) { esp.value = ref.especie; }
+      else { esp.value = '__otro__'; set('an-especie-otra', ref.especie); }
+      this._toggleEspecieOtra(esp.value);
+    }
+    this.showSnackbar('Datos del grupo "' + ref.grupo + '" aplicados al formulario', 'success');
+  },
+
+  async separarDelGrupo(id) {
+    const a = this._byId(this.animales, id);
+    if (!a || !a.grupo_id) return;
+    const gid = a.grupo_id;
+    if (!(await this._confirm('Quitar a ' + a.nombre + ' de "' + a.grupo + '"? Cada animal queda con su propia ficha.', 'Separar del grupo'))) return;
+    try {
+      await API.updateAnimal(id, { grupo_id: '', grupo: '' });
+    } catch (err) { this._snackErr(err, 'No se pudo separar: ' + this._errMsg(err)); return; }
+    a.grupo_id = '';
+    a.grupo = '';
+    this._cacheSet('animales', this.animales);
+    if (!this._grupoMiembros(gid).length) {
+      const g = this._grupoInfo(gid);
+      if (g) {
+        try { await API.deleteGrupo(gid); } catch (err) { console.warn('Grupo huerfano sin limpiar:', err); }
+        this.grupos = (this.grupos || []).filter(x => String(x.id) !== String(gid));
+        this._cacheSet('grupos', this.grupos);
+      }
+    }
+    this.showSnackbar(a.nombre + ' separado del grupo', 'success');
+    await this._repintarAnimales();
+    this.viewAnimal(id);
+  },
+
+  viewGrupo(gid) {
+    const ms = this._grupoMiembros(gid);
+    if (!ms.length) { this.showSnackbar('Grupo no encontrado', 'warning'); return; }
+    const g = this._grupoInfo(gid);
+    const nombre = (g && g.nombre) || ms[0].grupo || gid;
+    const cabecera = this._grupoCollage(gid);
+    const filas = ms.map(x => `
+      <div class="grupo-miembro" onclick="Dashboard.closeInfoModal();Dashboard.viewAnimal('${x.id}')">
+        <span class="grupo-miembro-foto">${this._fotoSrc(x) ? `<img loading="lazy" src="${this._esc(this._fotoSrc(x, 'w80'))}" alt="">` : (x.especie === 'Perro' ? Icons.dog : (x.especie === 'Gato' ? Icons.cat : Icons.paw))}</span>
+        <span class="grupo-miembro-nombre"><b>${this._esc(x.nombre)}</b><small>${this._esc(x.raza || '')}${x.edad ? ' · ' + this._esc(x.edad) : ''} · ${this._esc(x.sexo || '')}</small></span>
+        <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span>
+      </div>`).join('');
+    this.showInfoModal('Grupo · ' + nombre, `
+      <div class="grupo-hero">
+        ${cabecera}
+        <div class="grupo-hero-txt"><h4>${this._esc(nombre)}</h4><p>${this._esc(this._grupoResumen(gid))}</p></div>
+      </div>
+      <div style="display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showGrupoForm('${gid}')">${Icons.pencil} Editar grupo</button>
+        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showAnimalFormInGroup('${gid}')">${Icons.plus} Anadir animal</button>
+      </div>
+      ${g && g.descripcion ? `<div class="detail-section"><div class="detail-section-title">${Icons.info} Descripcion</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5">${this._esc(g.descripcion)}</p></div>` : ''}
+      ${g && g.notas ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5;white-space:pre-wrap">${this._esc(g.notas)}</p></div>` : ''}
+      <div class="detail-section"><div class="detail-section-title">${Icons.users} Miembros (${ms.length})</div>${filas}</div>`);
+  },
+
+  showAnimalFormInGroup(gid) {
+    const ms = this._grupoMiembros(gid);
+    this.showAnimalForm(null);
+    const inp = document.getElementById('an-grupo');
+    if (inp && ms.length) {
+      inp.value = ms[0].grupo || '';
+      this._prefillGrupo(inp.value, false);
+    }
+  },
+
+  showGrupoForm(gid) {
+    const ms = this._grupoMiembros(gid);
+    if (!ms.length) return;
+    const g = this._grupoInfo(gid) || {};
+    const nombre = g.nombre || ms[0].grupo || '';
+    const fotoActual = this._grupoFoto(gid) || '';
+    this.showFormModal('Editar grupo', `<form onsubmit="Dashboard.saveGrupo(event,'${gid}')">
+      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:.72rem;color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label>Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'gr-foto-preview')"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
+      <div class="form-group"><label>Descripcion</label><textarea id="gr-descripcion" rows="2" placeholder="De donde viene la camada, caracteristicas...">${this._esc(g.descripcion || '')}</textarea></div>
+      <div class="form-group"><label>Notas</label><textarea id="gr-notas" rows="3" placeholder="Seguimiento, tratamientos, acuerdos...">${this._esc(g.notas || '')}</textarea></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+    </form>`);
+  },
+
+  async saveGrupo(e, gid) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const ms = this._grupoMiembros(gid);
+    const nombre = (document.getElementById('gr-nombre').value || '').trim();
+    if (!nombre) { this.showSnackbar('Pon un nombre para el grupo', 'warning'); finGuardar(); return; }
+    const payload = {
+      id: gid,
+      nombre,
+      descripcion: (document.getElementById('gr-descripcion').value || '').trim(),
+      notas: (document.getElementById('gr-notas').value || '').trim()
+    };
+    const inputFoto = document.getElementById('gr-foto');
+    if (inputFoto && inputFoto.files && inputFoto.files[0]) {
+      try {
+        const b64 = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, 800, 600, 0.78));
+          r.onerror = () => resolve(null);
+          r.readAsDataURL(inputFoto.files[0]);
+        });
+        if (b64) {
+          const up = await API.uploadFotoAnimal(b64.split(',')[1], 'grupo_' + gid + '_' + Date.now() + '.jpg', 'image/jpeg');
+          if (up.data && up.data.fileId) {
+            payload.foto_drive_id = up.data.fileId;
+            payload.foto_url = up.data.webViewLink || up.data.webContentLink || '';
+            payload.foto = 'https://drive.google.com/thumbnail?id=' + up.data.fileId + '&sz=w800';
+          }
+        }
+      } catch (err) { this.showSnackbar('Foto del grupo no subida: ' + this._errMsg(err), 'warning'); }
+    }
+    let aviso = '';
+    try {
+      const prev = this._grupoInfo(gid);
+      if (prev) {
+        const r = await API.updateGrupo(gid, payload);
+        Object.assign(prev, (r && r.data) || payload);
+      } else {
+        const r = await API.createGrupo(payload);
+        this.grupos = this.grupos || [];
+        this.grupos.push((r && r.data) || payload);
+      }
+    } catch (err) {
+      if (!err || err.status !== 'warning') { finGuardar(); this._snackErr(err, 'No se pudo guardar el grupo: ' + this._errMsg(err)); return; }
+      aviso = err.message || 'Hoja Grupos sin configurar';
+    }
+    if (this._normGrupo(nombre) !== this._normGrupo(ms.length ? ms[0].grupo : '')) {
+      try {
+        await Promise.all(ms.map(x => API.updateAnimal(x.id, { grupo: nombre }).then(() => { x.grupo = nombre; })));
+        this._cacheSet('animales', this.animales);
+      } catch (err) { finGuardar(); this._snackErr(err, 'Nombre no aplicado a los animales: ' + this._errMsg(err)); return; }
+    }
+    this._cacheSet('grupos', this.grupos || []);
+    finGuardar();
+    this.closeFormModal();
+    this.showSnackbar(aviso ? ('Grupo con avisos: ' + aviso) : 'Grupo actualizado', aviso ? 'warning' : 'success');
+    await this._repintarAnimales();
+  },
+
+  _repintarAnimales() {
+    const el = document.getElementById('page-animales');
+    return el ? this.renderAnimales(el) : Promise.resolve();
+  },
+
 
   // Foto principal normalizada para <img>: admite thumbnail, fileId de Drive,
   // enlaces file/d/... o uc?...id=... (fotos antiguas) y rutas/URLs directas.
@@ -2341,7 +2569,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
-      <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna" onchange="Dashboard._prefillGrupo(this.value, ${isEdit?'true':'false'})"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist><p style="font-size:.72rem;color:var(--gray-500)">Al elegir un grupo existente se rellenan especie, raza, edad y sexo.</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div></div>
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
@@ -2556,7 +2784,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Peso</div><div class="detail-answer">${this._esc(a.peso)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)}</div></div>
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div></div>
-        <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}</div></div>
+        <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}${a.grupo_id?` <button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button><button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button>`:''}</div></div>
         <div class="detail-field"><div class="detail-question">Descripcion</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
       </div>
       ${this._publicacionesFicha(a.id)}

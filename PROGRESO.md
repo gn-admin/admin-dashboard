@@ -44,6 +44,16 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   `_repairGrupos` (una vez por sesión, al abrir Animales) fusiona por nombre los
   grupos ya partidos y lo persiste con `updateAnimal`. **Export CSV** (`;` + BOM UTF-8)
   de todo el inventario con las columnas `grupo`/`grupo_id` para revisar en Excel.
+  **UI de grupos**: el listado pinta bloques por grupo (cabecera con collage 2x2 de
+  los miembros —o foto propia—, nombre, totales y botón *Ver grupo*) y el resto de
+  tarjetas sueltas; la insignia de la tarjeta abre el grupo. Ficha de grupo en
+  `info-modal` (foto, descripción, notas, miembros clicables, *Editar grupo*,
+  *Añadir animal* con datos precargados) y **Separar** desde la ficha del animal
+  (con confirmación; si era el último miembro se borra la fila del grupo).
+  Prefill al elegir grupo en *Nuevo Animal* (especie/raza/edad/sexo).
+  **Entidad `grupos`**: hoja `Grupos` (`SHEET_GRUPOS_ID`) + endpoints
+  `grupos`/`update-grupo`/`delete-grupo`; mientras la hoja no exista, GET devuelve
+  `[]` y los guards emiten `status:'warning'` explicativo.
 - **Familias**: CRUD, capacidad/ocupación, borrado con cierre de casos.
 - **Acogidas activas**: ciclo entrega→en_casa→finalizada (con confirmación), borrado
   de caso individual, rollback espejo (animal, familia, solicitud, candidatura).
@@ -112,6 +122,7 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 - **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto)
 - **Blacklist**: `id, nombre, apellidos, email, telefono, motivo, notas, origen, fecha`
 - **Actividad**: `id, fecha, usuario, tipo, detalle, entidad, entidad_id, descripcion`
+- **Grupos**: `id, nombre, descripcion, notas, foto_drive_id, foto_url, foto, fecha_creacion` (nueva; `SHEET_GRUPOS_ID` en `.env`)
 - **Apadrinamientos**: `id, animal_id, animal, padrino_tipo, padrino_id, padrino_nombre, padrino_email, padrino_telefono, aporte_mensual, fecha_inicio, fecha_fin, estado, notas`
 - **Gastos**: `id, animal_id, animal, fecha, concepto, importe` (+ `factura_file_id, factura_url, factura_nombre` con factura adjunta)
 - **Recordatorios**: `id, titulo, fecha, notas, hecho, creado`
@@ -137,6 +148,10 @@ en PDF, texto de uso del Almacén**. Detalle commit a commit en `git log`.
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
 2. Secrets `API_URL` (+ `CONTACTO_TELEFONO/EMAIL`) y re-ejecutar workflow tras cambiarlos.
 3. Hojas nuevas con pestaña exacta + acceso API; `id` rellenos (sin celdas vacías).
+   **Pendiente ahora**: crear la hoja **`Grupos`** (nueva hoja de cálculo), copiar el ID
+   a `.env` como `SHEET_GRUPOS_ID=…` y ejecutar `node scripts/gen-config.js`.
+   Mientras no exista, foto/descripción/notas de grupo degradan con aviso
+   (`status:'warning'`), pero renombrar grupo sí aplica a los miembros.
 4. Ejecutar Descartar-2025 en Reportes una vez.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
 

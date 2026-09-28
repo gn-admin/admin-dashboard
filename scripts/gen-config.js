@@ -147,6 +147,7 @@ const backendConfig = `var CONFIG = {
     seguimientos: { sheetId: '${env('SHEET_SEGUIMIENTOS_ID')}', sheetName: 'Seguimientos' },
     documentos: { sheetId: '${env('SHEET_DOCUMENTOS_ID')}', sheetName: 'Documentos' },
     inventario: { sheetId: '${env('SHEET_INVENTARIO_ID')}', sheetName: 'Inventario' },
+    grupos: { sheetId: '${env('SHEET_GRUPOS_ID')}', sheetName: 'Grupos' },
 ${sheetsBlock()}
   }
 };
