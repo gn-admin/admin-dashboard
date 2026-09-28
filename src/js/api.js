@@ -124,8 +124,8 @@ const API = {
   // Documentos a Drive
   async getDocumentos() { return this._get('documentos'); },
   async createDocumento(data) { return this._post('documentos', data); },
-  async uploadDocumento(base64, nombre, mimeType) {
-    return this._post('upload-documento', { archivo_base64: base64, nombre, mime_type: mimeType });
+  async uploadDocumento(base64, nombre, mimeType, tipo) {
+    return this._post('upload-documento', { archivo_base64: base64, nombre, mime_type: mimeType, tipo: tipo || 'documento' });
   },
   async updateDocumento(id, data) { const r = await this._post('update-documento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteDocumento(id) { return this._post('delete-documento', { id }); },

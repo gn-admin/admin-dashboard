@@ -54,7 +54,9 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   pestaña); los registros antiguos que la tengan se conservan como opción legada.
 - **Lista negra**: CRUD con aviso en fichas coincidentes.
 - **Donaciones / Gastos / Recordatorios / Seguimiento**: CRUD completos. **Gastos con
-  factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura»).
+  factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura») en **carpeta
+  propia**: `DRIVE_FACTURAS_FOLDER_ID` si está configurada, si no subcarpeta
+  «Facturas» auto-creada dentro de la de documentos.
 - **Documentos / Almacén**: reales (Drive + API compartida); el Almacén lleva texto
   de uso «Qué se guarda aquí».
 - **Redes**: módulo Instagram en dummy local (plantilla con iconos/tipo/contacto,
@@ -76,11 +78,16 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 `adopciones`, `socios`, `blacklist`, `candidaturas`, `acogidas`, `contratos`,
 `actividad`, `estados`, `notas`, `apadrinamientos`, `gastos`, `recordatorios`,
-`donaciones`, `seguimientos` (+ `update-*`, `delete-*`, `upload-foto-animal`).
+`donaciones`, `seguimientos`, `documentos`, `inventario` (+ `update-*`, `delete-*`,
+`upload-foto-animal`, `upload-documento`, `delete-documento`).
 - Responde HTTP 200 con campo `error`; `api.js` lanza por `data.error`.
 - POST siempre `Content-Type: text/plain;charset=utf-8` (sin preflight).
 - `appendToSheet` persiste `id` y hace **upsert** (sin duplicados en reintentos);
-  auto-añade columnas nuevas. Comparaciones de id como texto.
+  auto-añade columnas nuevas. `updateSheetRow` también auto-añade columnas.
+  Comparaciones de id como texto.
+- `carpetaDestino(tipo)` decide dónde aterriza la subida: `tipo='factura'` →
+  `DRIVE_FACTURAS_FOLDER_ID` (o subcarpeta «Facturas» creada al vuelo), resto →
+  `DRIVE_DOCS_FOLDER_ID`.
 - `ALLOW_ORIGIN_EMPTY:true` (Apps Script no ve cabeceras Origin; el control real
   es el token). `REQUIRE_EMAIL_VERIFIED:false`. `RATE_LIMIT:100` fail-open/60s.
 - `deleteAdopcionCascade`: borra caso y revierte animal/solicitud/candidatura.

@@ -2023,7 +2023,7 @@ const Dashboard = {
     let justificante = null;
     const factInput = document.getElementById('gs-factura');
     if (factInput && factInput.files && factInput.files[0]) {
-      justificante = await this._subirFichero(factInput.files[0], 'Factura_' + concepto.replace(/\s+/g, '_'));
+      justificante = await this._subirFichero(factInput.files[0], 'Factura_' + concepto.replace(/\s+/g, '_'), 'factura');
       if (!justificante) this.showSnackbar('El gasto se guarda sin factura: no se pudo subir el justificante', 'warning');
     }
     const row = {
@@ -2058,8 +2058,9 @@ const Dashboard = {
     this.showSnackbar('Gasto eliminado', 'success');
   },
 
-  // Lee un fichero del input y lo sube a Drive. Devuelve {fileId,url} o null.
-  async _subirFichero(file, nombreBase) {
+  // Lee un fichero del input y lo sube a Drive. `tipo` decide la carpeta
+  // ('factura' -> carpeta propia). Devuelve {fileId,url} o null.
+  async _subirFichero(file, nombreBase, tipo) {
     if (!file) return null;
     try {
       const raw = await new Promise((resolve) => {
@@ -2071,7 +2072,7 @@ const Dashboard = {
       if (!raw) return null;
       const b64 = raw.indexOf(',') !== -1 ? raw.split(',')[1] : raw;
       const safe = (file.name || 'adjunto').replace(/\s+/g, '_');
-      const up = await API.uploadDocumento(b64, (nombreBase || 'adjunto') + '_' + Date.now().toString(36) + '_' + safe, file.type || 'application/pdf');
+      const up = await API.uploadDocumento(b64, (nombreBase || 'adjunto') + '_' + Date.now().toString(36) + '_' + safe, file.type || 'application/pdf', tipo);
       if (!up || !up.data || !up.data.fileId) return null;
       return { fileId: up.data.fileId, url: up.data.webViewLink || up.data.webContentLink || '' };
     } catch (err) { return null; }
