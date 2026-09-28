@@ -43,17 +43,23 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   de caso individual, rollback espejo (animal, familia, solicitud, candidatura).
 - **Adopciones**: pipeline de 7 fases (+/−), contrato con firma en canvas (firmante 1
   obligatorio) + PDF, borrado con rollback en cascada (backend `deleteAdopcionCascade`
-  + espejo front), enlace al cuestionario origen (modal solo lectura + salto).
+  + espejo front), **devolución con motivo** (`desenlace=devuelto`, `motivo_devolucion`,
+  `fecha_devolucion`: conserva el caso y revierte animal/solicitud/candidatura),
+  enlace al cuestionario origen (modal solo lectura + salto).
 - **Apadrinamientos**: N padrinos por animal (socio existente o externo con
   conversión a socio), aporte mensual, totales, finalizar/eliminar.
 - **Socios/voluntarios**: perfiles Socio/Voluntario/Ambos, cuota + último pago con
-  estado (Al día/Pendiente), carnets diferenciados por color con QR.
+  estado (Al día/Pendiente), carnets diferenciados por color con QR. **Sin campo
+  «Área»** (quitado del form, lista, ficha, carnét y estadística).
 - **Lista negra**: CRUD con aviso en fichas coincidentes.
-- **Donaciones / Gastos / Recordatorios / Seguimiento / Documentos / Almacén**:
-  CRUD completos (documentos y almacén en dummy local).
+- **Donaciones / Gastos / Recordatorios / Seguimiento**: CRUD completos. **Gastos con
+  factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura»).
+- **Documentos / Almacén**: reales (Drive + API compartida); el Almacén lleva texto
+  de uso «Qué se guarda aquí».
 - **Redes**: módulo Instagram en dummy local (plantilla con iconos/tipo/contacto,
   preview, historial con enlace simulado). Corte a real marcado `TODO Meta`.
-- **Reportes**: tasas, resumen por entidad, memoria anual por ejercicio, exports PDF.
+- **Reportes**: tasas, resumen por entidad, **memoria anual por ejercicio (tarjeta
+  con selector + descarga PDF)**, exports PDF de encuestas.
 - **Dashboard**: tarjeta Hoy, Acción requerida unificada, KPIs clicables con deltas,
   Tesorería (donaciones/gastos/balance/cuotas), barras + embudo, recientes. Pintado
   instantáneo desde caché + refresco en fondo.
@@ -81,15 +87,15 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 ## Hojas y columnas (fila 1; el orden da igual; `id` obligatorio salvo Forms/Estados/Notas)
 - **Animales**: `id, nombre, especie, raza, edad, peso, sexo, estado, microchip, descripcion, grupo_id, grupo, grupo_obligatorio, esterilizada, vacunas, fecha_ingreso, foto_drive_id, foto_url, foto, adopcion_id, acogida_familia, apadrinable`
 - **Familias**: `id, nombre, email, telefono, ubicacion, especialidad, max_capacity, notas, capacidad, animales_actuales, origen, fecha_registro`
-- **Adopciones**: `id, animal, adoptante, email, telefono, fase, estado, notas, fecha, solicitud_id, animal_id, estado_firma`
+- **Adopciones**: `id, animal, adoptante, email, telefono, fase, estado, notas, fecha, solicitud_id, animal_id, estado_firma` (+ `desenlace, motivo_devolucion, fecha_devolucion` al devolver; el backend añade columnas que falten)
 - **Acogidas**: `id, animal_id, familia_id, animal, familia, fase, estado, inicio, solicitud_id, notas` (+ `fin` al finalizar)
 - **Candidaturas**: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`
 - **Contratos**: `id, adopcion_id, animal, animal_id, fecha, ciudad, estado, creado, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`
-- **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto)
+- **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto; `area` es legado: el form ya no la pide ni se muestra)
 - **Blacklist**: `id, nombre, apellidos, email, telefono, motivo, notas, origen, fecha`
 - **Actividad**: `id, fecha, usuario, tipo, detalle, entidad, entidad_id, descripcion`
 - **Apadrinamientos**: `id, animal_id, animal, padrino_tipo, padrino_id, padrino_nombre, padrino_email, padrino_telefono, aporte_mensual, fecha_inicio, fecha_fin, estado, notas`
-- **Gastos**: `id, animal_id, animal, fecha, concepto, importe`
+- **Gastos**: `id, animal_id, animal, fecha, concepto, importe` (+ `factura_file_id, factura_url, factura_nombre` con factura adjunta)
 - **Recordatorios**: `id, titulo, fecha, notas, hecho, creado`
 - **Donaciones**: `id, donante, importe, fecha, notas`
 - **Seguimientos**: `id, adopcion_id, adoptante, animal, fecha, tipo, nota`
@@ -105,7 +111,9 @@ Tesorería/embudo) → costes (0 €) → foto principal → toast semáforo →
 ficha por secciones → PDF profesionales → socios/voluntarios + cuota + carnets →
 apadrinamientos → gestión (gastos/recordatorios/donaciones/seguimiento/documentos) →
 fallecido + fase Prueba + memoria anual + almacén + menú agrupado → guía por botones →
-a11y/teclado → dashboard Hoy/Acción final. Detalle commit a commit en `git log`.
+a11y/teclado → dashboard Hoy/Acción final → **quitar «Área» de socios, factura
+adjunta al gasto, desenlace `devuelto`, memoria anual en PDF, texto de uso del
+Almacén**. Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
@@ -115,7 +123,9 @@ a11y/teclado → dashboard Hoy/Acción final. Detalle commit a commit en `git lo
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
 
 ## Futuro desarrollo (no empezado)
-Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), documentos en Drive,
-WhatsApp (`wa.me`), anti-doble-tap en botones de fase, endpoint agregado `dashboard`,
-push notifications, fusión de duplicados, lector de pantalla completo, logo en alta
-para splash 512, recibos SEPA, inventario real, colonias felinas CER.
+Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), **urgencias de
+acogida/adopción** (prioridad por animal, propuesto y aún sin diseñar), WhatsApp
+(`wa.me`), portal público con datos de aquí, anti-doble-tap en botones de fase,
+endpoint agregado `dashboard`, push notifications, fusión de duplicados, lector de
+pantalla completo, logo en alta para splash 512, recibos SEPA, colonias felinas CER,
+alta de voluntarios vía Google Form, protocolo automático de recordatorios de entrada.

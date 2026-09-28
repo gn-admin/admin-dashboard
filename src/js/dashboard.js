@@ -1928,7 +1928,7 @@ const Dashboard = {
         p.padrino_id = ya.id;
         p.padrino_tipo = 'socio';
       } else {
-        const data = { nombre: p.padrino_nombre, email: p.padrino_email || '', telefono: p.padrino_telefono || '', tipo: 'Socio', cuota: '', area: '', foto: null, carnet_id: CarnetGenerator.generateCarnetId('SOC'), activo: true, fecha_registro: new Date().toISOString().slice(0, 10), horas_mes: 0, ultima_actividad: new Date().toISOString().slice(0, 10) };
+        const data = { nombre: p.padrino_nombre, email: p.padrino_email || '', telefono: p.padrino_telefono || '', tipo: 'Socio', cuota: '', foto: null, carnet_id: CarnetGenerator.generateCarnetId('SOC'), activo: true, fecha_registro: new Date().toISOString().slice(0, 10), horas_mes: 0, ultima_actividad: new Date().toISOString().slice(0, 10) };
         const res = await API.createSocio(data);
         const row = res && res.data ? res.data : { ...data, id: 'soc_' + Date.now().toString(36) };
         this.socios.push(row);
@@ -1992,7 +1992,7 @@ const Dashboard = {
     const list = this._gastosDe(animalId);
     const total = this._totalGastos(list);
     const rows = list.length
-      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} € <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener">${Icons.fileText} Ver factura</a>` : ''} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
     const badgeGastos = list.length ? ` · ${total.toFixed(2)} €` : '';
     return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div>`);
@@ -2006,6 +2006,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="gs-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
       <div class="form-group"><label>Importe (€) *</label><input type="text" id="gs-importe" required placeholder="Ej: 45.50" inputmode="decimal"></div></div>
       <div class="form-group"><label>Concepto *</label><input type="text" id="gs-concepto" required placeholder="Ej: Vacuna rabia"></div>
+      <div class="form-group"><label>Factura / justificante (opcional)</label><input type="file" id="gs-factura" accept="application/pdf,image/*"><p style="font-size:.72rem;color:var(--gray-500)">Se guarda en Drive y queda vinculada al gasto. Requiere conexion.</p></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
   },
@@ -2019,13 +2020,20 @@ const Dashboard = {
     const concepto = document.getElementById('gs-concepto').value.trim();
     const importe = document.getElementById('gs-importe').value.trim().replace(',', '.');
     if (!concepto || isNaN(parseFloat(importe))) { this.showSnackbar('Completa concepto e importe válido', 'warning'); finGuardar(); return; }
+    let justificante = null;
+    const factInput = document.getElementById('gs-factura');
+    if (factInput && factInput.files && factInput.files[0]) {
+      justificante = await this._subirFichero(factInput.files[0], 'Factura_' + concepto.replace(/\s+/g, '_'));
+      if (!justificante) this.showSnackbar('El gasto se guarda sin factura: no se pudo subir el justificante', 'warning');
+    }
     const row = {
       id: 'gst_' + Date.now().toString(36),
       animal_id: a.id,
       animal: a.nombre,
       fecha: document.getElementById('gs-fecha').value || new Date().toISOString().slice(0, 10),
       concepto,
-      importe
+      importe,
+      ...(justificante ? { factura_file_id: justificante.fileId, factura_url: justificante.url, factura_nombre: factInput.files[0].name || '' } : {})
     };
     this.gastos.push(row);
     this.saveLocal();
@@ -2048,6 +2056,25 @@ const Dashboard = {
     this.saveLocal();
     if (g) this.viewAnimal(g.animal_id);
     this.showSnackbar('Gasto eliminado', 'success');
+  },
+
+  // Lee un fichero del input y lo sube a Drive. Devuelve {fileId,url} o null.
+  async _subirFichero(file, nombreBase) {
+    if (!file) return null;
+    try {
+      const raw = await new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = (ev) => resolve(ev.target.result);
+        r.onerror = () => resolve(null);
+        r.readAsDataURL(file);
+      });
+      if (!raw) return null;
+      const b64 = raw.indexOf(',') !== -1 ? raw.split(',')[1] : raw;
+      const safe = (file.name || 'adjunto').replace(/\s+/g, '_');
+      const up = await API.uploadDocumento(b64, (nombreBase || 'adjunto') + '_' + Date.now().toString(36) + '_' + safe, file.type || 'application/pdf');
+      if (!up || !up.data || !up.data.fileId) return null;
+      return { fileId: up.data.fileId, url: up.data.webViewLink || up.data.webContentLink || '' };
+    } catch (err) { return null; }
   },
 
   // ==================== DOCUMENTOS (dummy local: referencias sin fichero) ====================
@@ -2753,7 +2780,7 @@ const Dashboard = {
           <div class="response-card-header">
             <div class="response-avatar" style="background:var(--warning-light);color:var(--warning)">${Icons.heart}</div>
             <div class="response-info">
-              <div class="response-name">${p.animal} <span class="estado-badge ${p.fase==='Contrato'?'en_proceso':'pendiente'}">${p.fase}</span></div>
+              <div class="response-name">${p.animal} <span class="estado-badge ${p.fase==='Contrato'?'en_proceso':'pendiente'}">${p.fase}</span>${p.desenlace==='devuelto'?' <span class="estado-badge descartada">Devuelto</span>':''}</div>
               <div class="response-email">${p.adoptante} &middot; ${p.estado}</div>
             </div>
             <div class="response-date">${p.fecha}</div>
@@ -2909,6 +2936,7 @@ const Dashboard = {
     this._showDetail('adopciones', p.animal, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
+        ${p.desenlace === 'devuelto' ? '' : `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolucion</button>`}
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar</button>
         ${currentIdx < fases.length-1?`<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFase('${p.id}')">${Icons.arrowRight} Avanzar fase</button>`:''}
         ${currentIdx > 0?`<button class="btn btn-sm btn-outline-green" onclick="Dashboard.retrocederFase('${p.id}')">${Icons.arrowLeft} Retroceder</button>`:''}
@@ -2926,6 +2954,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(p.telefono)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer"><span class="estado-badge en_proceso">${p.fase}</span></div></div>
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado)}</div></div>
+        ${p.desenlace === 'devuelto' ? `<div class="detail-field"><div class="detail-question">Desenlace</div><div class="detail-answer"><span class="estado-badge descartada">Devuelto</span></div></div><div class="detail-field"><div class="detail-question">Motivo de la devolucion</div><div class="detail-answer">${this._esc(p.motivo_devolucion || '—')}</div></div><div class="detail-field"><div class="detail-question">Fecha devolucion</div><div class="detail-answer">${this._fmtFecha(p.fecha_devolucion) || '—'}</div></div>` : ''}
         <div class="detail-field"><div class="detail-question">Fecha inicio</div><div class="detail-answer">${p.fecha}</div></div>
         ${p.notas?`<div class="detail-field"><div class="detail-question">Notas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>`:''}
       </div>`);
@@ -2961,6 +2990,42 @@ const Dashboard = {
     p.fase = newFase;
     p.estado = `Fase: ${newFase}`;
     this.viewAdopcion(id);
+  },
+
+  // Devolucion: conserva el caso con desenlace y revierte los efectos
+  // (animal a Disponible, solicitud a En proceso) sin borrar nada.
+  showDevolucionForm(id) {
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    this.showFormModal('Registrar devolucion · ' + p.animal, `
+      <form onsubmit="Dashboard.guardarDevolucion(event,'${id}')">
+        <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: queda con desenlace <b>Devuelto</b>. El animal vuelve a <b>Disponible</b> y la solicitud a <b>En proceso</b>, para que pueda volver a adoptarse.</span></div>
+        <div class="form-group"><label>Motivo de la devolucion *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej: El adoptante se ha mudado y no puede continuar con la adaptacion"></textarea></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Registrar devolucion</button></div>
+      </form>`);
+  },
+
+  async guardarDevolucion(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); finGuardar(); return; }
+    const motivo = (document.getElementById('dv-motivo').value || '').trim();
+    if (!motivo) { this.showSnackbar('Indica el motivo de la devolucion', 'warning'); finGuardar(); return; }
+    const data = { desenlace: 'devuelto', motivo_devolucion: motivo, fecha_devolucion: new Date().toISOString().slice(0, 10), estado: 'Devuelto' };
+    try { await API.updateAdopcion(id, data); }
+    catch (err) { this.showSnackbar('No se pudo registrar: ' + this._errMsg(err), 'error'); finGuardar(); return; }
+    Object.assign(p, data);
+    await this._ensureListas(['contratos']);
+    await this._liberarAnimal(p.animal_id, id);
+    await this._rollbackSolicitud(p.solicitud_id);
+    this.saveLocal();
+    finGuardar();
+    this.closeFormModal();
+    this.viewAdopcion(id);
+    this.renderAdopciones(document.getElementById('page-adopciones'));
+    this.showSnackbar('Devolucion registrada: el animal vuelve a Disponible', 'success');
   },
 
   _seguimientosFicha(adopcionId) {
@@ -3211,7 +3276,6 @@ const Dashboard = {
   async renderSocios(el) {
     await this._loadList('socios', () => API.getSocios());
     const activos = this.socios.filter(s=>s.activo).length;
-    const areas = [...new Set(this.socios.map(s=>s.area))];
     const esSocio = s => s.tipo === 'Socio' || s.tipo === 'Ambos';
     const esVol = s => s.tipo === 'Voluntario' || s.tipo === 'Ambos';
     const tipoF = this._currentSocioTipoFilter || 'all';
@@ -3221,7 +3285,7 @@ const Dashboard = {
         <div class="stats-grid" style="margin-bottom:16px">
           <div class="stat-card"><div class="stat-card-icon green">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Total Socios</div><div class="stat-card-value">${this.socios.length}</div></div></div>
           <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
-          <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon orange">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Voluntarios</div><div class="stat-card-value">${this.socios.filter(esVol).length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${visibles.length} registros</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
       <div class="filters-bar"><div class="filter-row">
@@ -3233,8 +3297,8 @@ const Dashboard = {
       </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3247,7 +3311,7 @@ const Dashboard = {
       <div class="form-group"><label>Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'so-foto-preview')"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Tipo *</label><select id="so-tipo" required onchange="Dashboard._toggleCuota()"><option value="">Seleccionar...</option><option value="Socio" ${data?.tipo==='Socio'?'selected':''}>Solo socio (cuota)</option><option value="Voluntario" ${data?.tipo==='Voluntario'?'selected':''}>Solo voluntario (colabora)</option><option value="Ambos" ${data?.tipo==='Ambos'?'selected':''}>Ambos</option></select></div><div class="form-group" id="so-cuota-wrap" style="${(data?.tipo==='Socio'||data?.tipo==='Ambos')?'':'display:none'}"><label>Cuota (€/año)</label><input type="text" id="so-cuota" value="${this._esc(data?.cuota||'')}" placeholder="Ej: 30"><label style="margin-top:8px">Ultimo pago</label><input type="date" id="so-ultimo-pago" value="${this._esc(data?.ultimo_pago||'')}"></div></div>
-      <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Area *</label><select id="so-area" required><option value="">Seleccionar area...</option><option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Cuidado de acogida" ${data?.area==='Cuidado de acogida'?'selected':''}>Cuidado de acogida</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option></select></div></div>
+      <div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div>
       ${data?.carnet_id ? `<div class="form-group"><label>ID Carnet</label><input type="text" value="${this._esc(data.carnet_id)}" readonly style="background:var(--gray-100);font-family:monospace"></div>` : ''}
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('socios')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
@@ -3298,8 +3362,7 @@ const Dashboard = {
       telefono: document.getElementById('so-telefono').value.trim(),
       tipo: document.getElementById('so-tipo').value,
       cuota: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-cuota').value.trim() : '',
-      ultimo_pago: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-ultimo-pago').value : '',
-      area: document.getElementById('so-area').value
+      ultimo_pago: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-ultimo-pago').value : ''
     };
     // Foto
     const fotoInput = document.getElementById('so-foto');
@@ -3317,14 +3380,14 @@ const Dashboard = {
     }
     // Carnet ID
     if (!isEdit) {
-      data.carnet_id = CarnetGenerator.generateCarnetId(data.area);
+      data.carnet_id = CarnetGenerator.generateCarnetId(data.tipo);
       data.activo = true;
       data.fecha_registro = new Date().toISOString().slice(0,10);
       data.horas_mes = 0;
       data.ultima_actividad = new Date().toISOString().slice(0,10);
     } else {
       const existing = this._byId(this.socios, id);
-      data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.area);
+      data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.tipo);
       data.activo = existing?.activo ?? true;
       data.fecha_registro = existing?.fecha_registro || new Date().toISOString().slice(0,10);
       data.horas_mes = existing?.horas_mes || 0;
@@ -3371,7 +3434,6 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${s.telefono||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
             ${(s.tipo==='Socio'||s.tipo==='Ambos')?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
-            <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${s.area}</div></div>
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></div></div>
             <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${s.fecha_registro||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${s.carnet_id||'Sin generar'}</div></div>
@@ -3571,7 +3633,12 @@ const Dashboard = {
     const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${items.length} artículos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-body" style="padding:16px">
+          <div style="font-weight:700;margin-bottom:6px">${Icons.box} Que se guarda aqui</div>
+          <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
+          <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
+        </div></div>
+        <div class="list-header"><span class="response-count">${items.length} articulos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
         <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--gray-400)">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3667,6 +3734,7 @@ const Dashboard = {
       this._loadList('adopciones', () => API.getAdopciones()),
       this._loadList('socios', () => API.getSocios()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
+      this._ensureListas(['gastos', 'donaciones', 'apadrinamientos']),
     ]);
     const all = Object.values(this.responses).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
@@ -3696,6 +3764,13 @@ const Dashboard = {
         <div class="alert-item info">${Icons.users} <span>${this.socios.length} socios (${sociosActivos} activos)</span></div>
         <div class="alert-item info">${Icons.calendar} <span>${this.adopciones.length} adopciones en curso</span></div>
       </div></div>
+      <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Memoria anual</h3></div><div class="card-body">
+        <div class="filters-bar" style="margin-bottom:12px"><div class="filter-row">
+          <select id="mem-anio" onchange="Dashboard._pintarMemoria()">${this._memoriaAnios().map(y => `<option value="${y}" ${y === new Date().getFullYear() ? 'selected' : ''}>Ejercicio ${y}</option>`).join('')}</select>
+          <button class="btn btn-primary btn-sm" onclick="Dashboard.exportMemoria()">${Icons.download} Descargar memoria (PDF)</button>
+        </div></div>
+        <div id="memoria-resumen"></div>
+      </div></div>
       <div class="card"><div class="card-header"><h3>Reportes</h3></div><div class="card-body">
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-perros')">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-gatos')">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
@@ -3704,6 +3779,81 @@ const Dashboard = {
       <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
         <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>`;
+    this._pintarMemoria();
+  },
+
+  // ==================== MEMORIA ANUAL ====================
+  _memoriaAnios() {
+    const anios = new Set([new Date().getFullYear()]);
+    const push = f => { const y = this._anioFecha(f); if (y) anios.add(y); };
+    (this.gastos || []).forEach(g => push(g.fecha));
+    (this.donaciones || []).forEach(d => push(d.fecha));
+    (this.adopciones || []).forEach(p => push(p.fecha));
+    (this.animales || []).forEach(a => push(a.fecha_ingreso));
+    (this.socios || []).forEach(s => push(s.fecha_registro));
+    return Array.from(anios).sort((a, b) => b - a);
+  },
+
+  _memoriaAnio() {
+    return parseInt(document.getElementById('mem-anio')?.value, 10) || new Date().getFullYear();
+  },
+
+  _importeDe(x) {
+    const n = parseFloat(String((x && x.importe) != null ? x.importe : 0).replace(',', '.'));
+    return isNaN(n) ? 0 : n;
+  },
+
+  _memoriaData(year) {
+    const enAnio = f => this._anioFecha(f) === year;
+    const suma = arr => arr.reduce((t, x) => t + this._importeDe(x), 0);
+    const gastos = (this.gastos || []).filter(g => enAnio(g.fecha));
+    const donaciones = (this.donaciones || []).filter(d => enAnio(d.fecha));
+    const adopciones = (this.adopciones || []).filter(p => enAnio(p.fecha));
+    const altas = (this.animales || []).filter(a => enAnio(a.fecha_ingreso));
+    const sociosNuevos = (this.socios || []).filter(s => enAnio(s.fecha_registro));
+    const apadrinamientos = (this.apadrinamientos || []).filter(a => String(a.estado || '').toLowerCase() !== 'inactivo');
+    const donTotal = suma(donaciones);
+    const gasTotal = suma(gastos);
+    return {
+      year,
+      adopciones, adopcionesN: adopciones.length,
+      altas, altasN: altas.length,
+      donaciones, donacionesN: donaciones.length, donTotal,
+      gastos, gastosN: gastos.length, gasTotal,
+      balance: donTotal - gasTotal,
+      sociosTotal: (this.socios || []).length,
+      sociosActivos: (this.socios || []).filter(s => s.activo).length,
+      sociosNuevos: sociosNuevos.length,
+      apadrinamientosN: apadrinamientos.length,
+      apadrinaTotal: suma(apadrinamientos)
+    };
+  },
+
+  _pintarMemoria() {
+    const box = document.getElementById('memoria-resumen');
+    if (!box) return;
+    const m = this._memoriaData(this._memoriaAnio());
+    const fila = (valor, label, extra) => `<div class="detail-field"><div class="detail-question">${label}</div><div class="detail-answer"><b>${valor}</b>${extra ? ` <span style="color:var(--gray-500);font-size:.8rem">${extra}</span>` : ''}</div></div>`;
+    box.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 24px">
+        <div>${fila(m.altasN, 'Altas de animales')}</div>
+        <div>${fila(m.adopcionesN, 'Adopciones cerradas')}</div>
+        <div>${fila(m.donacionesN, 'Donaciones recibidas', this._euros(m.donTotal) + ' €')}</div>
+        <div>${fila(m.gastosN, 'Gastos registrados', '−' + this._euros(m.gasTotal) + ' €')}</div>
+        <div>${fila(this._euros(m.balance) + ' €', 'Balance del ejercicio')}</div>
+        <div>${fila(m.sociosNuevos, 'Socios dados de alta', m.sociosTotal + ' en total · ' + m.sociosActivos + ' activos')}</div>
+        <div>${fila(m.apadrinamientosN, 'Apadrinamientos activos', this._euros(m.apadrinaTotal) + ' €')}</div>
+      </div>`;
+  },
+
+  async exportMemoria() {
+    await this._ensureListas(['gastos', 'donaciones', 'apadrinamientos']);
+    const m = this._memoriaData(this._memoriaAnio());
+    if (!m.altasN && !m.adopcionesN && !m.donacionesN && !m.gastosN && !m.sociosNuevos) {
+      this.showSnackbar('No hay datos registrados en el ejercicio ' + m.year, 'warning');
+      return;
+    }
+    await PdfExport.exportMemoria(m);
   },
 
   _anioFecha(f) {

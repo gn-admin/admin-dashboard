@@ -265,6 +265,91 @@ const PdfExport = {
     </body></html>`;
   },
 
+  exportMemoria(m) {
+    return this._printAsync(`Memoria-Anual-${m.year}.pdf`, (logo) => this._buildMemoria(m, logo));
+  },
+
+  _buildMemoria(m, logo) {
+    const fecha = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+    const img = logo || this._logoFallback;
+    const eur = n => (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace('.', ',');
+    const fechita = f => { if (!f) return '—'; try { const s = String(f); return new Date(s.length <= 10 ? s + 'T00:00:00' : s).toLocaleDateString('es-ES'); } catch (e) { return this._esc(f); } };
+    const tabla = (tit, cols, filas) => filas.length
+      ? `<div class="section"><div class="section-title">${tit}</div><table class="tbl"><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${filas.join('')}</tbody></table></div>`
+      : '';
+    const kpi = (n, l) => `<div class="kpi"><div class="kpi-n">${n}</div><div class="kpi-l">${l}</div></div>`;
+
+    const tblAdop = (m.adopciones || []).map(a => `<tr><td>${this._esc(a.animal || '—')}</td><td>${this._esc(a.adoptante || '—')}</td><td>${fechita(a.fecha)}</td><td>${this._esc(a.desenlace === 'devuelto' ? 'Devuelto' : (a.fase || '—'))}</td></tr>`);
+    const tblAltas = (m.altas || []).map(a => `<tr><td>${this._esc(a.nombre || '—')}</td><td>${this._esc(a.especie || '—')}</td><td>${this._esc(a.raza || '—')}</td><td>${fechita(a.fecha_ingreso)}</td><td>${this._esc(a.estado || '—')}</td></tr>`);
+    const tblDon = (m.donaciones || []).map(d => `<tr><td>${fechita(d.fecha)}</td><td>${this._esc(d.donante || 'Anonimo')}</td><td>${this._esc(d.notas || '—')}</td><td class="num">${eur(d.importe)} €</td></tr>`);
+    const tblGas = (m.gastos || []).map(g => `<tr><td>${fechita(g.fecha)}</td><td>${this._esc(g.concepto || '—')}</td><td>${this._esc(g.animal || '—')}</td><td class="num">${eur(g.importe)} €</td></tr>`);
+
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Memoria anual ${m.year} - Grupo Nebak</title>
+      <style>
+        @page{size:A4;margin:2cm}
+        body{font:10pt/1.55 Arial,sans-serif;color:#191919;padding:0;margin:0}
+        .cover{text-align:center;padding:48px 0 32px;border-bottom:3px solid #1FC95B;margin-bottom:26px}
+        .cover img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B}
+        .cover h1{font-size:20pt;margin:12px 0 4px}
+        .cover .sub{font-size:10pt;color:#757575}
+        .kpis{display:flex;gap:12px;justify-content:center;margin:22px 0 8px;flex-wrap:wrap}
+        .kpi{background:#f9fafb;border:1px solid #e8eaed;border-radius:8px;padding:8px 18px;text-align:center;min-width:96px}
+        .kpi-n{font-size:16pt;font-weight:800;color:#15863D}
+        .kpi-n.neg{color:#c0392b}
+        .kpi-l{font-size:8pt;color:#757575;text-transform:uppercase;letter-spacing:.5px}
+        h2{font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:26px 0 8px;padding-bottom:5px;border-bottom:2px solid #1FC95B}
+        .section{margin-bottom:18px;break-inside:avoid}
+        .section-title{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#757575;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e8eaed}
+        .tbl{width:100%;border-collapse:collapse;font-size:9pt}
+        .tbl th{background:#f9fafb;text-align:left;font-size:8pt;text-transform:uppercase;letter-spacing:.4px;color:#757575;padding:6px 8px;border-bottom:1px solid #e8eaed}
+        .tbl td{padding:6px 8px;border-bottom:1px solid #f1f3f4;vertical-align:top}
+        .tbl .num{text-align:right;font-weight:700;white-space:nowrap}
+        .resumen{width:100%;border-collapse:collapse;font-size:10pt;margin-top:6px}
+        .resumen td{padding:7px 8px;border-bottom:1px solid #f1f3f4}
+        .resumen .k{color:#757575;width:62%}
+        .resumen .v{text-align:right;font-weight:800}
+        .total-row td{border-top:2px solid #1FC95B;font-weight:800}
+        .footer{text-align:center;margin-top:28px;padding-top:8px;border-top:1px solid #e8eaed;font-size:7pt;color:#9aa0a6}
+        .vacio{color:#9aa0a6;font-style:italic;font-size:9pt;padding:6px 0}
+      </style></head><body>
+      <div class="cover">
+        <img src="${img}" alt="Grupo Nebak">
+        <h1>Memoria anual ${m.year}</h1>
+        <div class="sub">Asociacion Grupo Nebak · Ejercicio ${m.year} · Generado el ${fecha}</div>
+        <div class="kpis">
+          ${kpi(m.altasN, 'Altas')}
+          ${kpi(m.adopcionesN, 'Adopciones')}
+          ${kpi(eur(m.donTotal) + ' €', 'Donaciones')}
+          ${kpi(eur(m.gasTotal) + ' €', 'Gastos')}
+          ${kpi(eur(m.balance) + ' €', 'Balance')}
+        </div>
+      </div>
+
+      <h2>1. Resumen del ejercicio</h2>
+      <table class="resumen">
+        <tr><td class="k">Altas de animales registradas</td><td class="v">${m.altasN}</td></tr>
+        <tr><td class="k">Adopciones cerradas</td><td class="v">${m.adopcionesN}</td></tr>
+        <tr><td class="k">Donaciones recibidas</td><td class="v">${m.donacionesN} · ${eur(m.donTotal)} €</td></tr>
+        <tr><td class="k">Gastos registrados</td><td class="v">${m.gastosN} · ${eur(m.gasTotal)} €</td></tr>
+        <tr class="total-row"><td class="k">Balance del ejercicio</td><td class="v">${eur(m.balance)} €</td></tr>
+        <tr><td class="k">Socios dados de alta en el ejercicio</td><td class="v">${m.sociosNuevos}</td></tr>
+        <tr><td class="k">Socios totales / activos</td><td class="v">${m.sociosTotal} / ${m.sociosActivos}</td></tr>
+        <tr><td class="k">Apadrinamientos activos</td><td class="v">${m.apadrinamientosN} · ${eur(m.apadrinaTotal)} €</td></tr>
+      </table>
+
+      <h2>2. Detalle</h2>
+      ${tabla('Adopciones cerradas en el ejercicio', ['Animal', 'Adoptante', 'Fecha', 'Estado'], tblAdop) || '<div class="vacio">Sin adopciones registradas en el ejercicio.</div>'}
+      ${tabla('Altas de animales', ['Nombre', 'Especie', 'Raza', 'Fecha de ingreso', 'Estado'], tblAltas) || '<div class="vacio">Sin altas de animales en el ejercicio.</div>'}
+      ${tabla('Donaciones', ['Fecha', 'Donante', 'Notas', 'Importe'], tblDon) || '<div class="vacio">Sin donaciones en el ejercicio.</div>'}
+      <table class="resumen"><tr class="total-row"><td class="k">Total donaciones</td><td class="v">${eur(m.donTotal)} €</td></tr></table>
+      ${tabla('Gastos', ['Fecha', 'Concepto', 'Animal', 'Importe'], tblGas) || '<div class="vacio">Sin gastos en el ejercicio.</div>'}
+      <table class="resumen"><tr class="total-row"><td class="k">Total gastos</td><td class="v">${eur(m.gasTotal)} €</td></tr></table>
+
+      <div class="footer">Generado por GN-Admin · Grupo Nebak · Memoria del ejercicio ${m.year} · Documento confidencial</div>
+    </body></html>`;
+  },
+
   _label(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   },
