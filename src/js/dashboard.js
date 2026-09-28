@@ -1169,9 +1169,9 @@ const Dashboard = {
       ${this._guideStep(Icons.calendar, '2. Vencimientos', 'El widget del dashboard avisa (Vencido/Hoy/En N dias). Marca <b>Hecho</b> o elimina desde ahi mismo.', 'Dashboard', false)}
       ${this._guideStep(Icons.heart, '3. Donaciones', 'Pantalla propia con total, alta y baja. Cada donacion queda en su hoja.', 'Donaciones', false)}
       ${this._guideStep(Icons.users, '4. Socios y voluntarios', 'Perfiles <b>Socio</b>, <b>Voluntario</b> o <b>Ambos</b> (la cuota solo aplica a socios). El carnet cambia de color por perfil.', 'Socios', false)}
-      ${this._guideStep(Icons.fileText, '5. Documentos', 'Sube PDF o imagen (cartilla, vacunas, analiticas) a la carpeta de Drive desde la ficha del animal. Borrar elimina tambien el fichero.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.fileText, '5. Documentos', 'En la ficha, seccion <b>Documentos</b> > <b>Añadir documento</b>: nombre, tipo (Cartilla/Vacunas/Analitica/Otro) y fichero <b>PDF o imagen</b>. Requiere conexion: se sube a la carpeta de Drive y queda enlazado con <b>Ver</b>. Borrar elimina la fila <b>y</b> el fichero de Drive.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
-      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Inventario compartido: altas, botones +1/−1, edicion y aviso de bajo stock.', 'Almacén', false)}`;
+      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Pantalla <b>Almacén</b>: <b>Nuevo</b> con nombre, unidad, cantidad y minimo. Los botones <b>+1/−1</b> descuentan al momento (compartido entre dispositivos). En rojo lo que esta bajo minimo. <b>Editar</b> corrige datos, la papelera elimina.', 'Almacén', false)}`;
   },
 
   _contratoEjemploHtml() {
