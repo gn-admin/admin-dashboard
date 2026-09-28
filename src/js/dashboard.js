@@ -1928,7 +1928,7 @@ const Dashboard = {
         p.padrino_id = ya.id;
         p.padrino_tipo = 'socio';
       } else {
-        const data = { nombre: p.padrino_nombre, email: p.padrino_email || '', telefono: p.padrino_telefono || '', tipo: 'Socio', cuota: '', foto: null, carnet_id: CarnetGenerator.generateCarnetId('SOC'), activo: true, fecha_registro: new Date().toISOString().slice(0, 10), horas_mes: 0, ultima_actividad: new Date().toISOString().slice(0, 10) };
+        const data = { nombre: p.padrino_nombre, email: p.padrino_email || '', telefono: p.padrino_telefono || '', tipo: 'Socio', cuota: '', area: '', foto: null, carnet_id: CarnetGenerator.generateCarnetId('SOC'), activo: true, fecha_registro: new Date().toISOString().slice(0, 10), horas_mes: 0, ultima_actividad: new Date().toISOString().slice(0, 10) };
         const res = await API.createSocio(data);
         const row = res && res.data ? res.data : { ...data, id: 'soc_' + Date.now().toString(36) };
         this.socios.push(row);
@@ -3276,6 +3276,7 @@ const Dashboard = {
   async renderSocios(el) {
     await this._loadList('socios', () => API.getSocios());
     const activos = this.socios.filter(s=>s.activo).length;
+    const areas = [...new Set(this.socios.map(s=>s.area))].filter(Boolean);
     const esSocio = s => s.tipo === 'Socio' || s.tipo === 'Ambos';
     const esVol = s => s.tipo === 'Voluntario' || s.tipo === 'Ambos';
     const tipoF = this._currentSocioTipoFilter || 'all';
@@ -3285,7 +3286,7 @@ const Dashboard = {
         <div class="stats-grid" style="margin-bottom:16px">
           <div class="stat-card"><div class="stat-card-icon green">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Total Socios</div><div class="stat-card-value">${this.socios.length}</div></div></div>
           <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
-          <div class="stat-card"><div class="stat-card-icon orange">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Voluntarios</div><div class="stat-card-value">${this.socios.filter(esVol).length}</div></div></div>
+          <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${visibles.length} registros</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
       <div class="filters-bar"><div class="filter-row">
@@ -3297,8 +3298,8 @@ const Dashboard = {
       </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="4" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)||'—'}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3307,11 +3308,17 @@ const Dashboard = {
   showSocioForm(data) {
     const isEdit = !!data;
     const fotoPreview = data?.foto ? `<img src="${this._esc(data.foto)}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);margin-bottom:8px;display:block">` : '';
+    // Si el area guardada ya no esta en la lista (p. ej. «Cuidado de acogida»,
+    // que paso a gestionarse en su propia pestana), se conserva como opcion
+    // para no bloquear el guardado del registro existente.
+    const areasDisp = ['Paseos de perros', 'Socializacion de gatos', 'Transporte de animales', 'Eventos y captacion', 'Fotografia', 'Administracion'];
+    const areaActual = data?.area || '';
+    const areaExtra = areaActual && areasDisp.indexOf(areaActual) === -1 ? `<option value="${this._esc(areaActual)}" selected>${this._esc(areaActual)}</option>` : '';
     this._renderForm('socios', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Socio</h3><form onsubmit="Dashboard.saveSocio(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-group"><label>Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'so-foto-preview')"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Tipo *</label><select id="so-tipo" required onchange="Dashboard._toggleCuota()"><option value="">Seleccionar...</option><option value="Socio" ${data?.tipo==='Socio'?'selected':''}>Solo socio (cuota)</option><option value="Voluntario" ${data?.tipo==='Voluntario'?'selected':''}>Solo voluntario (colabora)</option><option value="Ambos" ${data?.tipo==='Ambos'?'selected':''}>Ambos</option></select></div><div class="form-group" id="so-cuota-wrap" style="${(data?.tipo==='Socio'||data?.tipo==='Ambos')?'':'display:none'}"><label>Cuota (€/año)</label><input type="text" id="so-cuota" value="${this._esc(data?.cuota||'')}" placeholder="Ej: 30"><label style="margin-top:8px">Ultimo pago</label><input type="date" id="so-ultimo-pago" value="${this._esc(data?.ultimo_pago||'')}"></div></div>
-      <div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div>
+      <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Area *</label><select id="so-area" required><option value="">Seleccionar area...</option>${areaExtra}<option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option></select></div></div>
       ${data?.carnet_id ? `<div class="form-group"><label>ID Carnet</label><input type="text" value="${this._esc(data.carnet_id)}" readonly style="background:var(--gray-100);font-family:monospace"></div>` : ''}
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('socios')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
@@ -3362,7 +3369,8 @@ const Dashboard = {
       telefono: document.getElementById('so-telefono').value.trim(),
       tipo: document.getElementById('so-tipo').value,
       cuota: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-cuota').value.trim() : '',
-      ultimo_pago: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-ultimo-pago').value : ''
+      ultimo_pago: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-ultimo-pago').value : '',
+      area: document.getElementById('so-area').value
     };
     // Foto
     const fotoInput = document.getElementById('so-foto');
@@ -3380,14 +3388,14 @@ const Dashboard = {
     }
     // Carnet ID
     if (!isEdit) {
-      data.carnet_id = CarnetGenerator.generateCarnetId(data.tipo);
+      data.carnet_id = CarnetGenerator.generateCarnetId(data.area);
       data.activo = true;
       data.fecha_registro = new Date().toISOString().slice(0,10);
       data.horas_mes = 0;
       data.ultima_actividad = new Date().toISOString().slice(0,10);
     } else {
       const existing = this._byId(this.socios, id);
-      data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.tipo);
+      data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.area);
       data.activo = existing?.activo ?? true;
       data.fecha_registro = existing?.fecha_registro || new Date().toISOString().slice(0,10);
       data.horas_mes = existing?.horas_mes || 0;
@@ -3434,6 +3442,7 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${s.telefono||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
             ${(s.tipo==='Socio'||s.tipo==='Ambos')?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
+            <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${this._esc(s.area)||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></div></div>
             <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${s.fecha_registro||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${s.carnet_id||'Sin generar'}</div></div>

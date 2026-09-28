@@ -96,9 +96,10 @@ const CarnetGenerator = {
 
     ctx.font = '13px Inter, Arial, sans-serif';
     ctx.fillStyle = '#666666';
-    ctx.fillText('Tipo: ' + (socio.tipo || 'Sin definir'), infoX, 140);
-    ctx.fillText('Email: ' + (socio.email || ''), infoX, 160);
-    ctx.fillText('Telefono: ' + (socio.telefono || ''), infoX, 180);
+    ctx.fillText('Area: ' + (socio.area || 'Sin asignar'), infoX, 140);
+    ctx.fillText('Tipo: ' + (socio.tipo || 'Sin definir'), infoX, 160);
+    ctx.fillText('Email: ' + (socio.email || ''), infoX, 180);
+    ctx.fillText('Telefono: ' + (socio.telefono || ''), infoX, 200);
 
     // QR Code
     const qrSize = 120;

@@ -49,8 +49,9 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - **Apadrinamientos**: N padrinos por animal (socio existente o externo con
   conversión a socio), aporte mensual, totales, finalizar/eliminar.
 - **Socios/voluntarios**: perfiles Socio/Voluntario/Ambos, cuota + último pago con
-  estado (Al día/Pendiente), carnets diferenciados por color con QR. **Sin campo
-  «Área»** (quitado del form, lista, ficha, carnét y estadística).
+  estado (Al día/Pendiente), carnets diferenciados por color con QR. Campo **Área**
+  con la opción «Cuidado de acogida» **retirada** (esa gestión vive en su propia
+  pestaña); los registros antiguos que la tengan se conservan como opción legada.
 - **Lista negra**: CRUD con aviso en fichas coincidentes.
 - **Donaciones / Gastos / Recordatorios / Seguimiento**: CRUD completos. **Gastos con
   factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura»).
@@ -91,7 +92,7 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 - **Acogidas**: `id, animal_id, familia_id, animal, familia, fase, estado, inicio, solicitud_id, notas` (+ `fin` al finalizar)
 - **Candidaturas**: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`
 - **Contratos**: `id, adopcion_id, animal, animal_id, fecha, ciudad, estado, creado, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`
-- **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto; `area` es legado: el form ya no la pide ni se muestra)
+- **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto)
 - **Blacklist**: `id, nombre, apellidos, email, telefono, motivo, notas, origen, fecha`
 - **Actividad**: `id, fecha, usuario, tipo, detalle, entidad, entidad_id, descripcion`
 - **Apadrinamientos**: `id, animal_id, animal, padrino_tipo, padrino_id, padrino_nombre, padrino_email, padrino_telefono, aporte_mensual, fecha_inicio, fecha_fin, estado, notas`
@@ -111,9 +112,9 @@ Tesorería/embudo) → costes (0 €) → foto principal → toast semáforo →
 ficha por secciones → PDF profesionales → socios/voluntarios + cuota + carnets →
 apadrinamientos → gestión (gastos/recordatorios/donaciones/seguimiento/documentos) →
 fallecido + fase Prueba + memoria anual + almacén + menú agrupado → guía por botones →
-a11y/teclado → dashboard Hoy/Acción final → **quitar «Área» de socios, factura
-adjunta al gasto, desenlace `devuelto`, memoria anual en PDF, texto de uso del
-Almacén**. Detalle commit a commit en `git log`.
+a11y/teclado → dashboard Hoy/Acción final → **retirar opción «Cuidado de acogida»
+del Área de socios, factura adjunta al gasto, desenlace `devuelto`, memoria anual
+en PDF, texto de uso del Almacén**. Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
