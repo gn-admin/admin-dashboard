@@ -66,8 +66,8 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - **Dashboard**: tarjeta Hoy, Acción requerida unificada, KPIs clicables con deltas,
   Tesorería (donaciones/gastos/balance/cuotas), barras + embudo, recientes. Pintado
   instantáneo desde caché + refresco en fondo.
-- **Guía**: modal por botones (7 pestañas: general, adopción, acogida, redes,
-  apadrinamiento, gestión, estados) + accesos directos.
+- **Guía**: modal por botones (8 pestañas: general, adopción, acogida, **animales
+  (camadas y grupos)**, redes, apadrinamiento, gestión, estados) + accesos directos.
 - **Transversal**: login sin flash (`gn_session`), init perezoso con `_ensureListas`,
   sync offline con cola (`gn_pending_ops` + badge + upsert backend), anti-doble-clic
   en forms (`Guardando...`), semáforo verde/naranja/rojo + glyphs, PWA instalable

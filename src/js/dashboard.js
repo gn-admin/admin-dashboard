@@ -993,11 +993,12 @@ const Dashboard = {
     if (!tab) {
       body.innerHTML = this._tutorialMenu();
     } else {
-      const titles = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', gestion: 'Gestion diaria', estados: 'Estados y consejos' };
+      const titles = { general: 'Flujo general', adopcion: 'Adopcion (perros/gatos)', acogida: 'Acogida', animales: 'Animales, camadas y grupos', redes: 'Redes sociales', apadrinamiento: 'Apadrinamiento', gestion: 'Gestion diaria', estados: 'Estados y consejos' };
       const panels = {
         general: this._tutorialGeneral(),
         adopcion: this._tutorialAdopcion(),
         acogida: this._tutorialAcogida(),
+      animales: this._tutorialAnimales(),
       redes: this._tutorialRedes(),
       apadrinamiento: this._tutorialApadrinamiento(),
       gestion: this._tutorialGestion(),
@@ -1015,6 +1016,7 @@ const Dashboard = {
       ['general', 'Flujo general', 'Vision global del proceso.', Icons.dashboard, '#e8faf0', '#16a34a'],
       ['adopcion', 'Adopcion (perros/gatos)', 'De la solicitud al contrato firmado.', Icons.heart, '#e8faf0', '#16a34a'],
       ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, '#ebf5fb', '#2563eb'],
+      ['animales', 'Animales, camadas y grupos', 'Alta individual y alta masiva.', Icons.paw, '#e8faf0', '#16a34a'],
       ['redes', 'Redes sociales', 'Plantillas y publicaciones.', Icons.clipboard, '#fce4ec', '#e91e63'],
       ['apadrinamiento', 'Apadrinamiento', 'Padrinos, aportes e historial.', Icons.paw, '#f3e8ff', '#7c3aed'],
       ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, '#ebf5fb', '#2563eb'],
@@ -1122,6 +1124,26 @@ const Dashboard = {
       ${this._guideStep(Icons.clock, '5. Seguimiento del caso', 'El caso se controla en <b>Acogidas activas</b> con los botones de fase: <b>Entrega → En casa → Finalizada</b>.', 'Acogidas activas', false)}
       ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al marcar <b>Finalizada</b> (pide confirmacion) el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b> si no tiene mas animales, lista para otra acogida.', 'Acogidas activas', false)}
       ${this._guideStep(Icons.trash, '7. Eliminar un caso', 'La papelera de cada tarjeta borra el caso con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa a <b>En proceso</b> y la candidatura se libera. Lo mismo ocurre al eliminar la familia (cierra sus casos activos).', 'Acogidas activas', false)}`;
+  },
+
+  _tutorialAnimales() {
+    return `
+      <div class="guide-diagram">${this._flowDiagram([
+        ['Elige el camino', 'Nuevo (1) o Alta de camada (N)'],
+        ['Datos basicos', 'nombre, especie, raza, sexo'],
+        ['Grupo / Camada', 'escribes un nombre y se crea'],
+        ['Estado inicial', 'Disponible'],
+        ['Ficha animal', 'foto, grupo, hermanos, documentos'],
+        ['Sale a adopcion o acogida', 'desde la solicitud aprobada']
+      ], '#16a34a')}</div>
+      ${this._guideStep(Icons.paw, '1. Donde se crean', 'Entra en <b>Animales</b>: arriba hay dos botones. <b>Nuevo</b> registra un animal a la vez; <b>Alta de camada</b> crea varios de golpe con el mismo grupo. Los filtros de <b>estado</b> y <b>especie</b> ordenan el inventario.', 'Animales', true)}
+      ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges <b>Perro</b>, <b>Gato</b> u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
+      ${this._guideStep(Icons.users, '3. Grupo / Camada', 'En el campo <b>Grupo / Camada</b> escribe <b>un nombre nuevo</b> (p. ej. <i>Camada Luna Mayo 2026</i>): al guardar se crea el grupo. Si ya existe, sale en el desplegable y al elegirlo el animal se mete en ese grupo. Dos animales con el mismo nombre comparten <b>grupo_id</b>.', 'Nuevo Animal > Grupo / Camada', true)}
+      ${this._guideStep(Icons.checkCircle, '4. Grupo obligatorio', 'El check <b>Grupo obligatorio</b> marca que el grupo es parte del seguimiento (no un dato decorativo): en la ficha aparece el aviso al lado del nombre. En el alta de camada viene <b>activado</b> por defecto.', 'Nuevo Animal', false)}
+      ${this._guideStep(Icons.paw, '5. Alta de camada (varios de golpe)', 'Boton <b>Alta de camada</b>: <b>Nombre del grupo</b> + <b>Nombre base</b> + <b>Cantidad</b> (de 1 a 12) + especie, raza, edad y sexo. Crea los N animales con el mismo grupo, estado <b>Disponible</b>, descripcion <b>Camada: ...</b> y fecha de ingreso de hoy. Los nombres se numeran con romanos: <b>Luna I, Luna II, Luna III</b> (con cantidad 1 solo sale <i>Luna</i>). <b>Necesita conexion</b>: son varias altas seguidas.', 'Animales > Alta de camada', true)}
+      ${this._guideStep(Icons.users, '6. Como se ve el grupo', 'En la <b>tarjeta</b> aparece una insignia con el nombre del grupo y cuantos animales tiene. En la <b>ficha</b> esta el campo <b>Grupo / Camada</b> y una seccion <b>Grupo (N)</b> con cada hermano y su estado, para ver de un vistazo quien sigue disponible.', 'Animales > tarjeta / ficha', true)}
+      ${this._guideStep(Icons.heart, '7. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
+      ${this._guideStep(Icons.eye, '8. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}`;
   },
 
   _tutorialRedes() {
