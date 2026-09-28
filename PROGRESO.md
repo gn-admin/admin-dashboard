@@ -97,7 +97,10 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   sync offline con cola (`gn_pending_ops` + badge + upsert backend), anti-doble-clic
   en forms (`Guardando...`), semáforo verde/naranja/rojo + glyphs, PWA instalable
   (iconos 180/192/512), a11y (diálogos, foco, teclado global, reduced-motion),
-  responsive móvil/tablet/escritorio + táctil por `pointer:coarse`.
+  responsive móvil/tablet/escritorio + táctil por `pointer:coarse`. **Animales en
+  móvil (≤767px)**: 2 columnas, imagen 104px, tipografía/padding reducidos y bloques
+  de grupo con cabecera a 40px (collage) y 8px de aire; por debajo de 360px se vuelve
+  a 1 columna. Regla en `styles.css` «ANIMALES EN MOVIL».
 
 ## Backend: endpoints y reglas
 GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,

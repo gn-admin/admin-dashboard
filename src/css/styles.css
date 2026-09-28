@@ -2389,6 +2389,116 @@ body {
   color: var(--gray-500);
 }
 
+/* ===== ANIMALES EN MOVIL: listado compacto (tarjetas + bloques de grupo) ===== */
+@media (max-width: 767px) {
+  .animal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .animal-card-img {
+    height: 104px;
+  }
+
+  .animal-card-body {
+    padding: 8px 10px;
+  }
+
+  .animal-card-name {
+    font-size: 0.88rem;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .animal-card-breed {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .animal-card-status {
+    padding: 2px 7px;
+    font-size: 0.64rem;
+  }
+
+  .animal-group-badge {
+    margin-top: 6px;
+    padding: 1px 6px;
+    font-size: 0.6rem;
+    max-width: 100%;
+  }
+
+  .animal-group-badge svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .animal-group-block {
+    margin-bottom: 12px;
+    border-left-width: 3px;
+  }
+
+  .animal-group-head {
+    gap: 8px;
+    padding: 8px 10px;
+    flex-wrap: nowrap;
+  }
+
+  .animal-group-info {
+    min-width: 0;
+  }
+
+  .animal-group-info b {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .animal-group-info small {
+    font-size: 0.68rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .animal-group-head .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .animal-group-body {
+    padding: 8px;
+  }
+
+  .animal-collage,
+  .animal-collage-foto {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+  }
+
+  .animal-collage .collage-ph svg {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+/* Pantallas muy estrechas (<=359px): se vuelve a una columna para no partir los datos */
+@media (max-width: 359px) {
+  .animal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .animal-card-img {
+    height: 96px;
+  }
+}
+
 /* ===== ALERTS ===== */
 .alert-item {
   display: flex;
