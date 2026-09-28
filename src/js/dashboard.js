@@ -2518,6 +2518,7 @@ const Dashboard = {
         const r = await API.updateGrupo(gid, payload);
         Object.assign(prev, (r && r.data) || payload);
       } else {
+        payload.fecha_creacion = payload.fecha_creacion || new Date().toISOString().slice(0, 10);
         const r = await API.createGrupo(payload);
         this.grupos = this.grupos || [];
         this.grupos.push((r && r.data) || payload);
