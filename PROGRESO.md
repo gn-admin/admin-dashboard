@@ -54,6 +54,12 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   **Entidad `grupos`**: hoja `Grupos` (`SHEET_GRUPOS_ID`) + endpoints
   `grupos`/`update-grupo`/`delete-grupo`; mientras la hoja no exista, GET devuelve
   `[]` y los guards emiten `status:'warning'` explicativo.
+  **Auditoría de grupos (v90)**: renombrar a un nombre ya usado **fusiona** los dos
+  grupos en el id existente y borra la fila absorbida (`_grupoDestino`); la ficha del
+  grupo deja de bloquear el renombrado si falla (aviso, no error) y si `update-grupo`
+  no encuentra la fila se reintenta con el alta (upsert); `grupos` se carga en
+  `renderAnimales` con `_loadListBestEffort` (un backend sin el endpoint **no rompe**
+  el listado) y se hidrata desde caché.
 - **Familias**: CRUD, capacidad/ocupación, borrado con cierre de casos.
 - **Acogidas activas**: ciclo entrega→en_casa→finalizada (con confirmación), borrado
   de caso individual, rollback espejo (animal, familia, solicitud, candidatura).
@@ -84,6 +90,9 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   instantáneo desde caché + refresco en fondo.
 - **Guía**: modal por botones (8 pestañas: general, adopción, acogida, **animales
   (camadas y grupos)**, redes, apadrinamiento, gestión, estados) + accesos directos.
+  La de animales lleva **11 pasos** con el paso 3 «Crear un grupo (no hay pantalla
+  aparte)»: los grupos se crean escribiendo el nombre en *Grupo / Camada* (o en
+  *Alta de camada* o desde *Editar*), no en una pantalla propia.
 - **Transversal**: login sin flash (`gn_session`), init perezoso con `_ensureListas`,
   sync offline con cola (`gn_pending_ops` + badge + upsert backend), anti-doble-clic
   en forms (`Guardando...`), semáforo verde/naranja/rojo + glyphs, PWA instalable

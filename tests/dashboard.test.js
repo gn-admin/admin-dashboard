@@ -675,3 +675,51 @@ describe('grupos: layout y resumen', () => {
     });
   });
 });
+
+describe('grupos: destino al renombrar (fusion si choca)', () => {
+  const conAnimales = (list, fn) => {
+    const prev = Dashboard.animales;
+    Dashboard.animales = list;
+    try { return fn(); } finally { Dashboard.animales = prev; }
+  };
+  const A = (id, grupo, gid) => ({ id, grupo, grupo_id: gid });
+
+  it('sin choque devuelve el mismo id', () => {
+    conAnimales([A('a1', 'Luna', 'gpo_l'), A('a2', 'Luna', 'gpo_l')], () => {
+      assert.deepEqual(Dashboard._grupoDestino('gpo_l', 'Cachorros'), { destino: 'gpo_l', choque: false });
+    });
+  });
+
+  it('si otro grupo ya tiene ese nombre, se converge en el suyo', () => {
+    conAnimales([
+      A('a1', 'Luna', 'gpo_l'),
+      A('a2', 'Sol', 'gpo_s')
+    ], () => {
+      assert.deepEqual(Dashboard._grupoDestino('gpo_l', 'Sol'), { destino: 'gpo_s', choque: true });
+    });
+  });
+
+  it('el propio grupo no cuenta como choque', () => {
+    conAnimales([A('a1', 'Luna', 'gpo_l'), A('a2', 'Luna', 'gpo_l')], () => {
+      const r = Dashboard._grupoDestino('gpo_l', 'Luna');
+      assert.equal(r.choque, false);
+      assert.equal(r.destino, 'gpo_l');
+    });
+  });
+
+  it('choque detecta diferencias de mayusculas y acentos', () => {
+    conAnimales([
+      A('a1', 'Cachorros de Vera', 'gpo_1'),
+      A('a2', 'Atun', 'gpo_2')
+    ], () => {
+      assert.equal(Dashboard._grupoDestino('gpo_2', 'CACHORROS de VERA').choque, true);
+      assert.equal(Dashboard._grupoDestino('gpo_2', 'ATÚN').choque, false);
+    });
+  });
+
+  it('un animal sin grupo_id no provoca choque', () => {
+    conAnimales([A('a1', 'Luna', '')], () => {
+      assert.equal(Dashboard._grupoDestino('gpo_l', 'Luna').choque, false);
+    });
+  });
+});

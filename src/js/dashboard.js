@@ -212,6 +212,7 @@ const Dashboard = {
     h('blacklist', this._cacheGet('blacklist'));
     h('socios', this._cacheGet('socios'));
     h('adopciones', this._cacheGet('adopciones'));
+    h('grupos', this._cacheGet('grupos'));
   },
 
   async loadEstados(force) {
@@ -1132,22 +1133,23 @@ const Dashboard = {
       <div class="guide-diagram">${this._flowDiagram([
         ['Elige el camino', 'Nuevo (1) o Alta de camada (N)'],
         ['Datos basicos', 'nombre, especie, raza, sexo'],
-        ['Grupo / Camada', 'escribes un nombre y se crea'],
+        ['Grupo / Camada', 'nombre nuevo = grupo nuevo'],
         ['Estado inicial', 'Disponible'],
         ['Ficha animal', 'foto, grupo, hermanos, documentos'],
         ['Sale a adopcion o acogida', 'desde la solicitud aprobada']
       ], '#16a34a')}</div>
       ${this._guideStep(Icons.paw, '1. Donde se crean', 'Entra en <b>Animales</b>: arriba hay dos botones. <b>Nuevo</b> registra un animal a la vez; <b>Alta de camada</b> crea varios de golpe con el mismo grupo. Los filtros de <b>estado</b> y <b>especie</b> ordenan el inventario.', 'Animales', true)}
       ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges <b>Perro</b>, <b>Gato</b> u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
-      ${this._guideStep(Icons.users, '3. Grupo / Camada', 'En el campo <b>Grupo / Camada</b> escribe <b>un nombre nuevo</b> (p. ej. <i>Camada Luna Mayo 2026</i>): al guardar se crea el grupo. Si ya existe, sale en el desplegable y al elegirlo el animal entra en ese grupo <b>y se rellenan solos especie, raza, edad y sexo</b>. Dos animales con el mismo nombre comparten <b>grupo_id</b>.', 'Nuevo Animal > Grupo / Camada', true)}
-      ${this._guideStep(Icons.checkCircle, '4. Grupo obligatorio', 'El check <b>Grupo obligatorio</b> marca que el grupo es parte del seguimiento (no un dato decorativo): en la ficha aparece el aviso al lado del nombre. En el alta de camada viene <b>activado</b> por defecto.', 'Nuevo Animal', false)}
-      ${this._guideStep(Icons.paw, '5. Alta de camada (varios de golpe)', 'Boton <b>Alta de camada</b>: <b>Nombre del grupo</b> + <b>Nombre base</b> + <b>Cantidad</b> (de 1 a 12) + especie, raza, edad y sexo. Crea los N animales con el mismo grupo, estado <b>Disponible</b>, descripcion <b>Camada: ...</b> y fecha de ingreso de hoy. Los nombres se numeran con romanos: <b>Luna I, Luna II, Luna III</b> (con cantidad 1 solo sale <i>Luna</i>). <b>Necesita conexion</b>: son varias altas seguidas.', 'Animales > Alta de camada', true)}
-      ${this._guideStep(Icons.users, '6. Como se ven los grupos', 'En el listado, un grupo con 2 o mas miembros se pinta como un <b>bloque con cabecera</b>: foto (collage de los miembros o foto propia), nombre, cuantos son, cuantos disponibles y un boton <b>Ver grupo</b>. Dentro estan sus tarjetas. Los grupos de un solo animal salen como tarjeta normal con su insignia, que tambien abre el grupo.', 'Animales', true)}
-      ${this._guideStep(Icons.eye, '7. Ficha de grupo', 'Pulsar <b>Ver grupo</b> abre su ficha con <b>foto</b>, descripcion, notas y la lista de miembros con su estado (clic en un miembro abre su ficha). Con <b>Editar grupo</b> cambias nombre, foto, descripcion y notas; <b>renombrar</b> lo aplica a todos los miembros. <b>Anadir animal</b> abre el formulario ya rellenado con los datos del grupo.', 'Animales > Ver grupo', true)}
-      ${this._guideStep(Icons.users, '8. Separar del grupo', 'En la ficha del animal, campo <b>Grupo / Camada</b>, los botones <b>Ver grupo</b> y <b>Separar</b>. Separar quita el animal del grupo (con confirmacion): queda con su propia ficha y, si era el ultimo, la ficha del grupo se elimina.', 'Animales > ficha > Grupo / Camada', false)}
-      ${this._guideStep(Icons.heart, '9. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
-      ${this._guideStep(Icons.clipboard, '10. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
-      <div class="guide-note">${Icons.info} <span><b>Los grupos se unen por nombre.</b> Dos animales escritos con el mismo nombre de grupo (mayusculas o acentos no importan) comparten el grupo automaticamente; al abrir Animales se corrigen los que estuvieran partidos. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
+      ${this._guideStep(Icons.users, '3. Crear un grupo (no hay pantalla aparte)', 'Los grupos <b>se crean al dar de alta un animal</b>: en el campo <b>Grupo / Camada</b> escribe <b>un nombre nuevo</b> (p. ej. <i>Camada Luna Mayo 2026</i>) y al guardar ya existe. Si prefieres varios de golpe, usa <b>Alta de camada</b>: el <b>Nombre del grupo</b> crea el grupo y sus N animales a la vez. Tambien puedes crearlo desde la <b>ficha de un animal ya dado de alta</b> con <b>Editar</b>.', 'Animales > Nuevo > Grupo / Camada', true)}
+      ${this._guideStep(Icons.checkCircle, '4. Unirse a un grupo existente', 'Si el nombre ya existe aparece en el <b>desplegable</b> (datelist). Al elegirlo el animal se une a ese grupo <b>y se rellenan solos especie, raza, edad y sexo</b> con los del primer miembro. Dos animales con el mismo nombre (mayusculas y acentos no importan) comparten <b>grupo_id</b>.', 'Nuevo Animal > Grupo / Camada', true)}
+      ${this._guideStep(Icons.check, '5. Grupo obligatorio', 'El check <b>Grupo obligatorio</b> marca que el grupo es parte del seguimiento (no un dato decorativo): en la ficha aparece el aviso al lado del nombre. En el alta de camada viene <b>activado</b> por defecto.', 'Nuevo Animal', false)}
+      ${this._guideStep(Icons.paw, '6. Alta de camada (varios de golpe)', 'Boton <b>Alta de camada</b>: <b>Nombre del grupo</b> + <b>Nombre base</b> + <b>Cantidad</b> (de 1 a 12) + especie, raza, edad y sexo. Crea los N animales con el mismo grupo, estado <b>Disponible</b>, descripcion <b>Camada: ...</b> y fecha de ingreso de hoy. Los nombres se numeran con romanos: <b>Luna I, Luna II, Luna III</b> (con cantidad 1 solo sale <i>Luna</i>). <b>Necesita conexion</b>: son varias altas seguidas.', 'Animales > Alta de camada', true)}
+      ${this._guideStep(Icons.users, '7. Como se ven los grupos', 'En el listado, un grupo con 2 o mas miembros se pinta como un <b>bloque con cabecera</b>: foto (collage de los miembros o foto propia), nombre, cuantos son, cuantos disponibles y un boton <b>Ver grupo</b>. Dentro estan sus tarjetas. Los grupos de un solo animal salen como tarjeta normal con su insignia, que tambien abre el grupo.', 'Animales', true)}
+      ${this._guideStep(Icons.eye, '8. Ficha de grupo', 'Pulsar <b>Ver grupo</b> abre su ficha con <b>foto</b>, descripcion, notas y la lista de miembros con su estado (clic en un miembro abre su ficha). Con <b>Editar grupo</b> cambias nombre, foto, descripcion y notas; <b>renombrar</b> lo aplica a todos los miembros y, si el nombre ya existia, unifica los dos grupos en uno. <b>Anadir animal</b> abre el formulario ya rellenado con los datos del grupo.', 'Animales > Ver grupo', true)}
+      ${this._guideStep(Icons.users, '9. Separar del grupo', 'En la ficha del animal, campo <b>Grupo / Camada</b>, los botones <b>Ver grupo</b> y <b>Separar</b>. Separar quita el animal del grupo (con confirmacion): queda con su propia ficha y, si era el ultimo, la ficha del grupo se elimina.', 'Animales > ficha > Grupo / Camada', false)}
+      ${this._guideStep(Icons.heart, '10. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
+      ${this._guideStep(Icons.clipboard, '11. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
+      <div class="guide-note">${Icons.info} <span><b>Resumen en una linea:</b> para crear un grupo basta con escribir el mismo nombre de grupo en dos o mas animales. <b>Los grupos se unen por nombre</b> (mayusculas y acentos no importan), asi que aunque estuvieran partidos, al abrir Animales se corrigen solos. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
   },
 
   _tutorialRedes() {
@@ -2198,7 +2200,10 @@ const Dashboard = {
   async renderAnimales(el) {
     await Promise.all([
       this._loadList('animales', () => API.getAnimales()),
-      this._loadList('familias', () => API.getFamilias())
+      this._loadList('familias', () => API.getFamilias()),
+      // Best-effort: si el backend aun no tiene el endpoint `grupos` (404) no
+      // debe romper el listado; los bloques salen igual, solo falta la foto/notas.
+      this._loadListBestEffort('grupos', () => API.getGrupos())
     ]);
     this._repairGrupos();
     const filter = this._currentAnimalFilter;
@@ -2479,6 +2484,14 @@ const Dashboard = {
     </form>`);
   },
 
+  // Al renombrar un grupo puede chocar con otro ya existente: en ese caso todos
+  // los miembros convergen en el id del grupo que ya tenia ese nombre.
+  _grupoDestino(gid, nombre) {
+    const n = this._normGrupo(nombre);
+    const choque = (this.animales || []).find(x => x.grupo_id && x.grupo_id !== gid && this._normGrupo(x.grupo) === n);
+    return { destino: choque ? choque.grupo_id : gid, choque: !!choque };
+  },
+
   async saveGrupo(e, gid) {
     e.preventDefault();
     const finGuardar = this._guardando(e.target);
@@ -2486,8 +2499,10 @@ const Dashboard = {
     const ms = this._grupoMiembros(gid);
     const nombre = (document.getElementById('gr-nombre').value || '').trim();
     if (!nombre) { this.showSnackbar('Pon un nombre para el grupo', 'warning'); finGuardar(); return; }
+    const nNombre = this._normGrupo(nombre);
+    const { destino, choque } = this._grupoDestino(gid, nombre);
     const payload = {
-      id: gid,
+      id: destino,
       nombre,
       descripcion: (document.getElementById('gr-descripcion').value || '').trim(),
       notas: (document.getElementById('gr-notas').value || '').trim()
@@ -2502,7 +2517,7 @@ const Dashboard = {
           r.readAsDataURL(inputFoto.files[0]);
         });
         if (b64) {
-          const up = await API.uploadFotoAnimal(b64.split(',')[1], 'grupo_' + gid + '_' + Date.now() + '.jpg', 'image/jpeg');
+          const up = await API.uploadFotoAnimal(b64.split(',')[1], 'grupo_' + destino + '_' + Date.now() + '.jpg', 'image/jpeg');
           if (up.data && up.data.fileId) {
             payload.foto_drive_id = up.data.fileId;
             payload.foto_url = up.data.webViewLink || up.data.webContentLink || '';
@@ -2511,27 +2526,40 @@ const Dashboard = {
         }
       } catch (err) { this.showSnackbar('Foto del grupo no subida: ' + this._errMsg(err), 'warning'); }
     }
+    // La ficha del grupo (foto/descripcion/notas) es auxiliar: si falla se
+    // avisa, pero no se bloquea renombrar a los miembros (es lo importante).
     let aviso = '';
-    try {
-      const prev = this._grupoInfo(gid);
-      if (prev) {
-        const r = await API.updateGrupo(gid, payload);
-        Object.assign(prev, (r && r.data) || payload);
-      } else {
-        payload.fecha_creacion = payload.fecha_creacion || new Date().toISOString().slice(0, 10);
-        const r = await API.createGrupo(payload);
-        this.grupos = this.grupos || [];
-        this.grupos.push((r && r.data) || payload);
-      }
-    } catch (err) {
-      if (!err || err.status !== 'warning') { finGuardar(); this._snackErr(err, 'No se pudo guardar el grupo: ' + this._errMsg(err)); return; }
-      aviso = err.message || 'Hoja Grupos sin configurar';
-    }
-    if (this._normGrupo(nombre) !== this._normGrupo(ms.length ? ms[0].grupo : '')) {
+    const prev = this._grupoInfo(destino);
+    let guardado = false;
+    if (prev) {
       try {
-        await Promise.all(ms.map(x => API.updateAnimal(x.id, { grupo: nombre }).then(() => { x.grupo = nombre; })));
+        const r = await API.updateGrupo(destino, payload);
+        Object.assign(prev, (r && r.data) || payload);
+        guardado = true;
+      } catch (err) { console.warn('updateGrupo, se reintenta como alta:', err); }
+    }
+    if (!guardado) {
+      // POST `grupos` hace upsert por id en el backend: sirve para crear y
+      // tambien para resucitar una fila que hubiera desaparecido de la hoja.
+      if (!prev) payload.fecha_creacion = payload.fecha_creacion || new Date().toISOString().slice(0, 10);
+      try {
+        const r = await API.createGrupo(payload);
+        if (prev) Object.assign(prev, (r && r.data) || payload);
+        else { this.grupos = this.grupos || []; this.grupos.push((r && r.data) || payload); }
+      } catch (err) {
+        aviso = (err && err.message) || 'No se pudo guardar la ficha del grupo';
+      }
+    }
+    if (choque || (ms.length && nNombre !== this._normGrupo(ms[0].grupo))) {
+      try {
+        await Promise.all(ms.map(x => API.updateAnimal(x.id, { grupo: nombre, grupo_id: destino }).then(() => { x.grupo = nombre; x.grupo_id = destino; })));
         this._cacheSet('animales', this.animales);
       } catch (err) { finGuardar(); this._snackErr(err, 'Nombre no aplicado a los animales: ' + this._errMsg(err)); return; }
+    }
+    if (choque) {
+      try { await API.deleteGrupo(gid); } catch (err) { console.warn('Grupo absorbido sin limpiar:', err); }
+      this.grupos = (this.grupos || []).filter(x => String(x.id) !== String(gid));
+      aviso = (aviso ? aviso + ' · ' : '') + 'Ya existia otro grupo con ese nombre: se han unificado en uno solo.';
     }
     this._cacheSet('grupos', this.grupos || []);
     finGuardar();
