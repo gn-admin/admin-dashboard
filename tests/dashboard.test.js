@@ -517,3 +517,85 @@ describe('_contratoEjemploHtml: ejemplo en guia', () => {
     if (prev === undefined) delete G.PdfExport; else G.PdfExport = prev;
   });
 });
+
+describe('grupos: un mismo nombre => un mismo grupo_id (opcion A)', () => {
+  const conAnimales = (list, fn) => {
+    const prev = Dashboard.animales;
+    Dashboard.animales = list;
+    try { return fn(); } finally { Dashboard.animales = prev; }
+  };
+
+  it('_normGrupo: mayusculas, acentos y espacios no parten el grupo', () => {
+    assert.equal(Dashboard._normGrupo('  Camada   Luna '), 'camada luna');
+    assert.equal(Dashboard._normGrupo('CAMILA'), Dashboard._normGrupo('camila'));
+    assert.equal(Dashboard._normGrupo('Última Camada'), 'ultima camada');
+    assert.equal(Dashboard._normGrupo('Ultima Camada'), 'ultima camada');
+    assert.equal(Dashboard._normGrupo(''), '');
+    assert.equal(Dashboard._normGrupo(null), '');
+    assert.equal(Dashboard._normGrupo(undefined), '');
+  });
+
+  it('nombre vacio -> sin grupo', () => {
+    assert.equal(Dashboard._resolveGrupoId('', null), '');
+    assert.equal(Dashboard._resolveGrupoId('   ', null), '');
+  });
+
+  it('reutiliza el id del animal existente con el mismo nombre', () => {
+    conAnimales([{ id: 'a1', grupo: 'Jula y Unda', grupo_id: 'gpo_111' }], () => {
+      assert.equal(Dashboard._resolveGrupoId('jula y unda', null), 'gpo_111');
+      assert.equal(Dashboard._resolveGrupoId('  JULA Y UNDA  ', null), 'gpo_111');
+    });
+  });
+
+  it('crear un segundo animal en el mismo grupo no genera otro id', () => {
+    conAnimales([{ id: 'a1', grupo: 'Jula y Unda', grupo_id: 'gpo_111' }], () => {
+      assert.equal(Dashboard._resolveGrupoId('Jula y Unda', null), 'gpo_111');
+    });
+  });
+
+  it('nombre nuevo -> id nuevo y distinto', () => {
+    conAnimales([], () => {
+      const a = Dashboard._resolveGrupoId('Camada Nueva', null);
+      const b = Dashboard._resolveGrupoId('Otro Grupo', null);
+      assert.match(a, /^gpo_/);
+      assert.notEqual(a, b);
+    });
+  });
+
+  it('al editar conserva su propio id si el nombre no cambia', () => {
+    conAnimales([
+      { id: 'a1', grupo: 'X', grupo_id: 'gpo_x' },
+      { id: 'a2', grupo: 'X', grupo_id: 'gpo_x' }
+    ], () => {
+      assert.equal(Dashboard._resolveGrupoId('X', 'a2'), 'gpo_x');
+    });
+  });
+
+  it('al cambiar el nombre se va al grupo destino y sale del anterior', () => {
+    conAnimales([
+      { id: 'a1', grupo: 'Viejo', grupo_id: 'gpo_v' },
+      { id: 'a2', grupo: 'Nuevo', grupo_id: 'gpo_n' }
+    ], () => {
+      assert.equal(Dashboard._resolveGrupoId('Nuevo', 'a1'), 'gpo_n');
+      assert.match(Dashboard._resolveGrupoId('Solo mio', 'a1'), /^gpo_/);
+    });
+  });
+
+  it('dos nombres distintos no comparten id', () => {
+    conAnimales([{ id: 'a1', grupo: 'Uno', grupo_id: 'gpo_1' }], () => {
+      assert.notEqual(Dashboard._resolveGrupoId('Dos', null), 'gpo_1');
+    });
+  });
+
+  it('_grupoSize cuenta por grupo_id y no por nombre', () => {
+    conAnimales([
+      { id: 'a1', grupo: 'X', grupo_id: 'gpo_x' },
+      { id: 'a2', grupo: 'X', grupo_id: 'gpo_x' },
+      { id: 'a3', grupo: 'X', grupo_id: 'gpo_otro' }
+    ], () => {
+      assert.equal(Dashboard._grupoSize('gpo_x'), 2);
+      assert.equal(Dashboard._grupoSize('gpo_otro'), 1);
+    });
+  });
+});
+

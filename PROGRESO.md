@@ -38,6 +38,12 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   especie extensible, grupos, estados (`disponible`, `en_acogida`, `en_adopcion`,
   `adoptado`, `fallecido`), ficha con héroe + secciones plegables (info, publicaciones,
   apadrinamientos, gastos, documentos-dummy, grupo, familia, historial médico).
+  **Grupos unidos por nombre** (opción A): `_normGrupo` normaliza mayúsculas/acentos/
+  espacios y `_resolveGrupoId` reutiliza el `grupo_id` existente → alta, edición y
+  camada convergen en un mismo grupo; cambiar de nombre saca del grupo anterior.
+  `_repairGrupos` (una vez por sesión, al abrir Animales) fusiona por nombre los
+  grupos ya partidos y lo persiste con `updateAnimal`. **Export CSV** (`;` + BOM UTF-8)
+  de todo el inventario con las columnas `grupo`/`grupo_id` para revisar en Excel.
 - **Familias**: CRUD, capacidad/ocupación, borrado con cierre de casos.
 - **Acogidas activas**: ciclo entrega→en_casa→finalizada (con confirmación), borrado
   de caso individual, rollback espejo (animal, familia, solicitud, candidatura).

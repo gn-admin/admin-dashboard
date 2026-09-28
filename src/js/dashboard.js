@@ -1143,7 +1143,8 @@ const Dashboard = {
       ${this._guideStep(Icons.paw, '5. Alta de camada (varios de golpe)', 'Boton <b>Alta de camada</b>: <b>Nombre del grupo</b> + <b>Nombre base</b> + <b>Cantidad</b> (de 1 a 12) + especie, raza, edad y sexo. Crea los N animales con el mismo grupo, estado <b>Disponible</b>, descripcion <b>Camada: ...</b> y fecha de ingreso de hoy. Los nombres se numeran con romanos: <b>Luna I, Luna II, Luna III</b> (con cantidad 1 solo sale <i>Luna</i>). <b>Necesita conexion</b>: son varias altas seguidas.', 'Animales > Alta de camada', true)}
       ${this._guideStep(Icons.users, '6. Como se ve el grupo', 'En la <b>tarjeta</b> aparece una insignia con el nombre del grupo y cuantos animales tiene. En la <b>ficha</b> esta el campo <b>Grupo / Camada</b> y una seccion <b>Grupo (N)</b> con cada hermano y su estado, para ver de un vistazo quien sigue disponible.', 'Animales > tarjeta / ficha', true)}
       ${this._guideStep(Icons.heart, '7. Estado y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones.', 'Animales > ficha > Estado', false)}
-      ${this._guideStep(Icons.eye, '8. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}`;
+      ${this._guideStep(Icons.eye, '8. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
+      <div class="guide-note">${Icons.info} <span><b>Los grupos se unen por nombre.</b> Dos animales escritos con el mismo nombre de grupo (mayusculas o acentos no importan) comparten el grupo automaticamente; si cambias el nombre, el animal sale de su grupo y entra en el nuevo. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
   },
 
   _tutorialRedes() {
@@ -2196,6 +2197,7 @@ const Dashboard = {
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('familias', () => API.getFamilias())
     ]);
+    this._repairGrupos();
     const filter = this._currentAnimalFilter;
     const especie = this._currentEspecieFilter;
     let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
@@ -2204,7 +2206,7 @@ const Dashboard = {
     const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportAnimalesCsv()">${Icons.download} CSV</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
         <div class="filters-bar"><div class="filter-row">
           <select onchange="Dashboard._currentAnimalFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
@@ -2229,7 +2231,7 @@ const Dashboard = {
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
               <div class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</div>
-              ${a.grupo_id?`<div class="animal-group-badge">${Icons.users} ${this._esc(a.grupo||a.grupo_id)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
+              ${(a.grupo && a.grupo_id)?`<div class="animal-group-badge">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
           </div>`).join('') : (this.animales.length ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>Prueba otro estado o cambia la especie.</p></div>` : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`)}</div>
       </div>
@@ -2237,6 +2239,83 @@ const Dashboard = {
   },
 
   _grupoSize(gid) { return (this.animales||[]).filter(x=>x.grupo_id===gid).length; },
+
+  // Nombre de grupo normalizado: mayusculas, acentos y espacios dobles no deben
+  // partir en dos lo que el usuario escribe como un mismo grupo.
+  _normGrupo(s) {
+    return String(s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  },
+
+  _newGrupoId() {
+    return 'gpo_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  },
+
+  // Un mismo nombre de grupo => un mismo grupo_id (opción A).
+  // keepId = id del animal que se está guardando (si su nombre no cambió, se
+  // conserva su id para no reescribir la hoja en cada guardado).
+  _resolveGrupoId(nombre, keepId) {
+    const n = this._normGrupo(nombre);
+    if (!n) return '';
+    const self = keepId ? (this.animales || []).find(a => a.id === keepId) : null;
+    if (self && this._normGrupo(self.grupo) === n && self.grupo_id) return self.grupo_id;
+    const ref = (this.animales || []).find(a => a.id !== keepId && this._normGrupo(a.grupo) === n && a.grupo_id);
+    return ref ? ref.grupo_id : this._newGrupoId();
+  },
+
+  // Reparación de grupos ya partidos: animales con el mismo nombre de grupo pero
+  // distinto grupo_id pasan a compartir el id más frecuente. Idempotente.
+  async _repairGrupos() {
+    if (this._gruposFixTried || !this.animales || !this.animales.length) return 0;
+    this._gruposFixTried = true;
+    const byName = {};
+    this.animales.forEach(a => {
+      const n = this._normGrupo(a.grupo);
+      if (!n) return;
+      (byName[n] = byName[n] || []).push(a);
+    });
+    const changed = [];
+    Object.keys(byName).forEach(n => {
+      const arr = byName[n];
+      const counts = {};
+      arr.forEach(a => { if (a.grupo_id) counts[a.grupo_id] = (counts[a.grupo_id] || 0) + 1; });
+      let canon = '';
+      let max = 0;
+      Object.keys(counts).forEach(gid => { if (counts[gid] > max) { max = counts[gid]; canon = gid; } });
+      if (!canon) canon = this._newGrupoId();
+      arr.forEach(a => { if (a.grupo_id !== canon) { a.grupo_id = canon; changed.push(a); } });
+    });
+    if (!changed.length) return 0;
+    await Promise.all(changed.map(a => API.updateAnimal(a.id, { grupo_id: a.grupo_id })
+      .catch(err => { console.warn('Reparacion de grupo pendiente:', a.id, err); })));
+    this._cacheSet('animales', this.animales);
+    this.showSnackbar(changed.length + ' animal(es) unidos a su grupo por nombre', 'success');
+    if (location.hash.replace('#', '') === 'animales') this.renderAnimales(document.getElementById('page-animales'));
+    return changed.length;
+  },
+
+  // Export de diagnostico: una fila por animal con las columnas de grupo, para
+  // ver en Excel que nombres estan repetidos con ids distintos.
+  exportAnimalesCsv() {
+    const list = this.animales || [];
+    const cols = ['id', 'nombre', 'especie', 'raza', 'edad', 'sexo', 'estado', 'peso', 'microchip', 'grupo', 'grupo_id', 'grupo_obligatorio', 'apadrinable', 'fecha_ingreso'];
+    const esc = v => {
+      const s = (v === undefined || v === null) ? '' : String(v);
+      return /[",;\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = [cols.join(';')];
+    list.forEach(a => rows.push(cols.map(c => esc(a[c])).join(';')));
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'animales_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    this.showSnackbar('CSV descargado (' + list.length + ' animales)', 'success');
+  },
+
 
   // Foto principal normalizada para <img>: admite thumbnail, fileId de Drive,
   // enlaces file/d/... o uc?...id=... (fotos antiguas) y rutas/URLs directas.
@@ -2325,7 +2404,7 @@ const Dashboard = {
     const sexo = document.getElementById('cm-sexo').value;
     const obl = document.getElementById('cm-obl').checked;
     if (!grupo || !base) { this.showSnackbar('Completa grupo y nombre base', 'warning'); return; }
-    const grupo_id = 'gpo_' + Date.now().toString(36);
+    const grupo_id = this._resolveGrupoId(grupo, null);
     const finGuardar = this._guardando(e.target);
     if (!finGuardar) return;
     try {
@@ -2361,8 +2440,7 @@ const Dashboard = {
     let especie = document.getElementById('an-especie').value;
     if (especie === '__otro__') especie = document.getElementById('an-especie-otra').value.trim() || especie;
     const gv = document.getElementById('an-grupo').value.trim();
-    let grupo_id = existing?.grupo_id || (gv ? 'gpo_' + Date.now().toString(36) : '');
-    if (existing && gv && gv === existing.grupo) grupo_id = existing.grupo_id;
+    const grupo_id = this._resolveGrupoId(gv, isEdit ? id : null);
     const data = {
       nombre: document.getElementById('an-nombre').value.trim(),
       especie,
@@ -2373,7 +2451,7 @@ const Dashboard = {
       estado: document.getElementById('an-estado').value,
       microchip: document.getElementById('an-microchip').value.trim(),
       descripcion: document.getElementById('an-descripcion').value.trim(),
-      grupo_id: gv ? grupo_id : '',
+      grupo_id: grupo_id,
       grupo: gv ? gv : '',
       grupo_obligatorio: document.getElementById('an-grupo-obl').checked,
       apadrinable: document.getElementById('an-apadrinable').checked,
