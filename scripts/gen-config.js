@@ -102,6 +102,7 @@ const backendConfig = `var CONFIG = {
   REQUIRE_EMAIL_VERIFIED: ${env('APPS_SCRIPT_REQUIRE_EMAIL_VERIFIED', 'false') === 'true' ? 'true' : 'false'},
   ALLOW_ORIGIN_EMPTY: ${env('APPS_SCRIPT_ALLOW_ORIGIN_EMPTY', 'false') === 'true' ? 'true' : 'false'},
   DRIVE_FOTOS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FOTOS_FOLDER_ID', '')}',
+  DRIVE_DOCS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_DOCS_FOLDER_ID', '')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario' },
 
   surveys: {
@@ -143,6 +144,8 @@ const backendConfig = `var CONFIG = {
     recordatorios: { sheetId: '${env('SHEET_RECORDATORIOS_ID')}', sheetName: 'Recordatorios' },
     donaciones: { sheetId: '${env('SHEET_DONACIONES_ID')}', sheetName: 'Donaciones' },
     seguimientos: { sheetId: '${env('SHEET_SEGUIMIENTOS_ID')}', sheetName: 'Seguimientos' },
+    documentos: { sheetId: '${env('SHEET_DOCUMENTOS_ID')}', sheetName: 'Documentos' },
+    inventario: { sheetId: '${env('SHEET_INVENTARIO_ID')}', sheetName: 'Inventario' },
 ${sheetsBlock()}
   }
 };

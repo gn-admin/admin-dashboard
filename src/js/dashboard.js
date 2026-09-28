@@ -44,6 +44,8 @@ const Dashboard = {
       acogidas: () => API.getAcogidas(),
       contratos: () => API.getContratos(),
       apadrinamientos: () => API.getApadrinamientos(),
+      documentos: () => API.getDocumentos(),
+      inventario: () => API.getInventario(),
       gastos: () => API.getGastos(),
       recordatorios: () => API.getRecordatorios(),
       donaciones: () => API.getDonaciones(),
@@ -1161,15 +1163,15 @@ const Dashboard = {
         ['Socio / voluntario', 'cuota + carnet'],
         ['Documento', 'referencia en ficha'],
         ['Memoria anual', 'Reportes por ejercicio'],
-        ['Almacen', 'inventario simulado']
+        ['Almacen', 'inventario compartido']
       ], '#2563eb')}</div>
       ${this._guideStep(Icons.activity, '1. Gastos veterinarios', 'En la ficha del animal, seccion <b>Gastos</b>: fecha, concepto e importe, con total acumulado.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.calendar, '2. Vencimientos', 'El widget del dashboard avisa (Vencido/Hoy/En N dias). Marca <b>Hecho</b> o elimina desde ahi mismo.', 'Dashboard', false)}
       ${this._guideStep(Icons.heart, '3. Donaciones', 'Pantalla propia con total, alta y baja. Cada donacion queda en su hoja.', 'Donaciones', false)}
       ${this._guideStep(Icons.users, '4. Socios y voluntarios', 'Perfiles <b>Socio</b>, <b>Voluntario</b> o <b>Ambos</b> (la cuota solo aplica a socios). El carnet cambia de color por perfil.', 'Socios', false)}
-      ${this._guideStep(Icons.fileText, '5. Documentos', 'Referencias locales (cartilla, vacunas, analiticas) en la ficha del animal, marcadas como simuladas hasta archivar en Drive.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.fileText, '5. Documentos', 'Sube PDF o imagen (cartilla, vacunas, analiticas) a la carpeta de Drive desde la ficha del animal. Borrar elimina tambien el fichero.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
-      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Inventario <b>simulado</b> en este dispositivo: altas, botones +1/−1, edicion y aviso de bajo stock. Sin backend de momento.', 'Almacén', false)}`;
+      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Inventario compartido: altas, botones +1/−1, edicion y aviso de bajo stock.', 'Almacén', false)}`;
   },
 
   _contratoEjemploHtml() {
@@ -1209,7 +1211,7 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.box}</span><div><b>Almacén</b><small>Inventario simulado con aviso de bajo stock.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
@@ -1446,7 +1448,7 @@ const Dashboard = {
   },
 
   async _updateLocalYApi(col, item) {
-    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato', apadrinamientos: 'updateApadrinamiento', gastos: 'updateGasto', recordatorios: 'updateRecordatorio', donaciones: 'updateDonacion', seguimientos: 'updateSeguimiento' };
+    const map = { animales: 'updateAnimal', familias: 'updateFamilia', candidaturas: 'updateCandidatura', acogidas: 'updateAcogida', contratos: 'updateContrato', apadrinamientos: 'updateApadrinamiento', gastos: 'updateGasto', recordatorios: 'updateRecordatorio', donaciones: 'updateDonacion', seguimientos: 'updateSeguimiento', inventario: 'updateInventario' };
     const m = map[col];
     if (!m) return;
     try { await API[m](item.id, item); }
@@ -2056,50 +2058,82 @@ const Dashboard = {
   _documentosFicha(animalId) {
     const list = this._documentosDe(animalId);
     const rows = list.length
-      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
     const badgeDocs = list.length ? ` · ${list.length}` : '';
-    return this._collapsibleSection('docs', `${Icons.fileText} Documentos <span class="estado-badge en_proceso">Simulado</span>${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir referencia</button></div>`);
+    return this._collapsibleSection('docs', `${Icons.fileText} Documentos${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir documento</button></div>`);
   },
 
   showDocumentoForm(animalId) {
     const a = this._byId(this.animales, animalId);
     if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
-    this.showFormModal('Referencia de documento · ' + a.nombre, `
+    this.showFormModal('Nuevo documento · ' + a.nombre, `
       <form onsubmit="Dashboard.saveDocumento(event,'${a.id}')">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
       <div class="form-group"><label>Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
-      <div class="alert-item info" style="margin-bottom:12px">${Icons.info} <span>Referencia local: el fichero seguira en Drive o papel.</span></div>
-      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
+      <div class="form-group"><label>Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:.72rem;color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Subir y guardar</button></div>
       </form>`);
   },
 
-  saveDocumento(e, animalId) {
+  async saveDocumento(e, animalId) {
     e.preventDefault();
     const finGuardar = this._guardando(e.target);
     if (!finGuardar) return;
     const a = this._byId(this.animales, animalId);
     if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
     const nombre = document.getElementById('dc-nombre').value.trim();
+    const fileInput = document.getElementById('dc-archivo');
     if (!nombre) { this.showSnackbar('Indica el nombre del documento', 'warning'); finGuardar(); return; }
-    this.documentos.push({
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) { this.showSnackbar('Elige el fichero a subir', 'warning'); finGuardar(); return; }
+    const f = fileInput.files[0];
+    const raw = await new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = (ev) => resolve(ev.target.result);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(f);
+    });
+    if (!raw) { this.showSnackbar('No se pudo leer el fichero', 'error'); finGuardar(); return; }
+    const b64 = raw.indexOf(',') !== -1 ? raw.split(',')[1] : raw;
+    const safeOrig = (f.name || 'doc').replace(/\s+/g, '_');
+    const upName = nombre.replace(/\s+/g, '_') + '_' + Date.now().toString(36) + '_' + safeOrig;
+    let fileId = '', fileUrl = '';
+    try {
+      const up = await API.uploadDocumento(b64, upName, f.type || 'application/pdf');
+      if (!up.data || !up.data.fileId) throw new Error('sin fileId');
+      fileId = up.data.fileId;
+      fileUrl = up.data.webViewLink || up.data.webContentLink || '';
+    } catch (err) {
+      this.showSnackbar('No se pudo subir: ' + this._errMsg(err), 'error');
+      finGuardar();
+      return;
+    }
+    const row = {
       id: 'doc_' + Date.now().toString(36),
       animal_id: a.id,
       animal: a.nombre,
       nombre,
       tipo: document.getElementById('dc-tipo').value,
+      file_id: fileId,
+      url: fileUrl,
       fecha: new Date().toISOString().slice(0, 10)
-    });
+    };
+    this.documentos.push(row);
     this.saveLocal();
+    this._apiCreateRow(() => API.createDocumento(row), { m: 'createDocumento', a: [row] });
     finGuardar();
     this.closeFormModal();
     this.viewAnimal(animalId);
-    this.showSnackbar('Referencia guardada (simulada)', 'success');
+    this.showSnackbar('Documento subido', 'success');
   },
 
   async deleteDocumento(id) {
     const d = this._byId(this.documentos, id);
-    if (!(await this._confirm('Eliminar esta referencia?', 'Eliminar'))) return;
+    if (!(await this._confirm('Eliminar este documento? Se borra tambien de Drive.', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteDocumento(id);
+      this._assertDeleted(res, 'El documento');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     this.documentos = (this.documentos || []).filter(x => x.id !== id);
     this.saveLocal();
     if (d) this.viewAnimal(d.animal_id);
@@ -2366,7 +2400,7 @@ const Dashboard = {
   },
 
   async viewAnimal(id) {
-    await this._ensureListas(['apadrinamientos', 'gastos']);
+    await this._ensureListas(['apadrinamientos', 'gastos', 'documentos']);
     const a = this._byId(this.animales, id);
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
@@ -3533,10 +3567,10 @@ const Dashboard = {
   },
 
   async renderAlmacen(el) {
+    await this._loadList('inventario', () => API.getInventario());
     const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="alert-item info" style="margin-bottom:16px">${Icons.info} <span>Inventario <b>simulado</b> en este dispositivo.</span></div>
         <div class="list-header"><span class="response-count">${items.length} artículos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
         <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--gray-400)">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
@@ -3556,7 +3590,7 @@ const Dashboard = {
       </form>`);
   },
 
-  saveInventario(e, id) {
+  async saveInventario(e, id) {
     e.preventDefault();
     const finGuardar = this._guardando(e.target);
     if (!finGuardar) return;
@@ -3565,20 +3599,36 @@ const Dashboard = {
     if (!nombre || isNaN(cantidad)) { this.showSnackbar('Completa nombre y cantidad válida', 'warning'); finGuardar(); return; }
     if (id) {
       const it = this._byId(this.inventario, id);
-      if (it) Object.assign(it, {
+      const data = {
         nombre,
         unidad: document.getElementById('iv-unidad').value.trim(),
         cantidad,
         minimo: parseFloat(document.getElementById('iv-minimo').value) || 0
-      });
+      };
+      try {
+        const res = await API.updateInventario(id, data);
+        if (!res.data) throw new Error('sin datos');
+        if (it) Object.assign(it, data);
+      } catch (err) {
+        this.showSnackbar('No se pudo guardar: ' + this._errMsg(err), 'error');
+        finGuardar();
+        return;
+      }
     } else {
-      this.inventario.push({
+      const row = {
         id: 'inv_' + Date.now().toString(36),
         nombre,
         unidad: document.getElementById('iv-unidad').value.trim(),
         cantidad,
         minimo: parseFloat(document.getElementById('iv-minimo').value) || 0
-      });
+      };
+      try {
+        const res = await API.createInventario(row);
+        this.inventario.push(res.data || row);
+      } catch (err) {
+        this.inventario.push(row);
+        this._enqueueOp({ m: 'createInventario', a: [row] });
+      }
     }
     this.saveLocal();
     finGuardar();
@@ -3592,11 +3642,16 @@ const Dashboard = {
     if (!it) return;
     it.cantidad = Math.max(0, (parseFloat(it.cantidad) || 0) + delta);
     this.saveLocal();
+    this._updateLocalYApi('inventario', it);
     this.renderAlmacen(document.getElementById('page-almacen'));
   },
 
   async deleteInventario(id) {
     if (!(await this._confirm('Eliminar este artículo?', 'Eliminar'))) return;
+    try {
+      const res = await API.deleteInventario(id);
+      this._assertDeleted(res, 'El artículo');
+    } catch (err) { this.showSnackbar('No se pudo eliminar: ' + this._errMsg(err), 'error'); return; }
     this.inventario = (this.inventario || []).filter(x => x.id !== id);
     this.saveLocal();
     this.renderAlmacen(document.getElementById('page-almacen'));
