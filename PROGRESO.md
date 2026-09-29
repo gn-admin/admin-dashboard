@@ -27,7 +27,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v94`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v95`.
 
 ## Mapa funcional final
 - **Encuestas** (3): listados con filtros/buscador, ficha con estados (`pendiente`,

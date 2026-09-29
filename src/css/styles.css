@@ -1059,6 +1059,7 @@ body {
 .filter-row select:focus {
   outline: none;
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-lighter);
 }
 
 /* ===== LIST HEADER ===== */
@@ -1518,10 +1519,12 @@ body {
   border-left: 5px solid transparent;
 }
 
-.toast-error.toast-success { background: var(--primary); border-left-color: var(--primary-dark); }
+/* Colores elegidos por contraste WCAG AA: blanco sobre --primary da 2,2:1 y
+   sobre --danger 3,8:1; --primary-hover (4,7:1) y --danger-hover (5,4:1) cumplen. */
+.toast-error.toast-success { background: var(--primary-hover); border-left-color: var(--primary-dark); }
 .toast-error.toast-info { background: var(--info); border-left-color: #21618c; }
 .toast-error.toast-warning { background: #facc15; color: var(--black); border-left-color: #ca8a04; }
-.toast-error.toast-error { background: var(--danger); border-left-color: var(--danger-hover); }
+.toast-error.toast-error { background: var(--danger-hover); border-left-color: #7d1d13; }
 
 .toast-error::before {
   margin-right: 8px;
@@ -1589,6 +1592,24 @@ body {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-lighter);
+}
+
+/* El checkbox hereda el padding/borde/min-height del input de texto y el
+   navegador lo pinta como un cuadro enorme. Se restaura el aspecto nativo
+   (la diana de 44px la aporta el <label>, que envuelve el control). */
+.form-group input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--primary-hover);
+}
+
+.form-group label:has(input[type="checkbox"]) {
+  min-height: 44px;
 }
 
 .form-group .error-message {
@@ -2202,6 +2223,13 @@ select.form-input {
   font-weight: 600;
 }
 
+.animal-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
 .urgente-badge {
   display: inline-flex;
   align-items: center;
@@ -2211,9 +2239,8 @@ select.form-input {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--danger);
+  background: var(--danger-hover);
   color: var(--white);
-  margin-bottom: 6px;
 }
 
 .animal-card-status.disponible {
@@ -2223,7 +2250,7 @@ select.form-input {
 
 .animal-card-status.en_acogida {
   background: var(--info-light);
-  color: var(--info);
+  color: #1d6fa5;
 }
 
 .animal-card-status.en_adopcion {
@@ -2233,7 +2260,7 @@ select.form-input {
 
 .animal-card-status.adoptado {
   background: var(--warning-light);
-  color: var(--warning);
+  color: #92400e;
 }
 
 .animal-card-status.fallecido {
@@ -2480,8 +2507,7 @@ select.form-input {
 
   .urgente-badge {
     padding: 2px 7px;
-    font-size: 0.6rem;
-    margin-bottom: 4px;
+    font-size: 0.66rem;
   }
 
   .animal-group-badge {
@@ -3204,6 +3230,8 @@ select.form-input {
   .filter-row select,
   .search-box input {
     min-height: 44px;
+    /* >=16px: Safari en iPad hace zoom automatico al enfocar campos mas pequenos */
+    font-size: 16px;
   }
 
   .sidebar-link,

@@ -810,8 +810,41 @@ describe('_ordenaUrgentes: los urgentes salen primero', () => {
   });
 
   it('entiende la marca venga como texto de la hoja', () => {
-    const lista = [{ id: 'x' }, { id: 'y', urgente: 'TRUE' }];
+    const lista = [{ id: 'x', estado: 'disponible' }, { id: 'y', urgente: 'TRUE', estado: 'disponible' }];
     assert.deepEqual(Dashboard._ordenaUrgentes(lista).map(x => x.id), ['y', 'x']);
+  });
+
+  it('un animal que ya no necesita hogar no se adelanta', () => {
+    const lista = [
+      { id: 'a', estado: 'disponible' },
+      { id: 'b', urgente: true, estado: 'adoptado' },
+      { id: 'c', urgente: true, estado: 'fallecido' },
+      { id: 'd', urgente: true, estado: 'en_adopcion' },
+      { id: 'e', urgente: true, estado: 'disponible' }
+    ];
+    assert.deepEqual(Dashboard._ordenaUrgentes(lista).map(x => x.id), ['e', 'a', 'b', 'c', 'd']);
+  });
+});
+
+describe('_esPrioritario: solo lo que sigue necesitando hogar', () => {
+  const P = (estado) => Dashboard._esPrioritario({ urgente: true, estado });
+
+  it('visible en disponible y en acogida', () => {
+    assert.equal(P('disponible'), true);
+    assert.equal(P('en_acogida'), true);
+  });
+
+  it('oculto si ya esta reservado, adoptado o de baja', () => {
+    assert.equal(P('en_adopcion'), false);
+    assert.equal(P('adoptado'), false);
+    assert.equal(P('fallecido'), false);
+    assert.equal(P(undefined), false);
+  });
+
+  it('sin la marca de urgencia nunca es prioritario', () => {
+    assert.equal(Dashboard._esPrioritario({ estado: 'disponible' }), false);
+    assert.equal(Dashboard._esPrioritario(null), false);
+    assert.equal(Dashboard._esPrioritario(undefined), false);
   });
 });
 
