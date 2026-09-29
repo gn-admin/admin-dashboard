@@ -176,7 +176,7 @@ const App = {
       btn.classList.add('loading');
       btn.disabled = true;
       try { await Auth.loginWithEmail(email, password); }
-      catch (err) { errorEl.textContent = err.message || 'Error al iniciar sesion'; errorEl.classList.add('active'); }
+      catch (err) { errorEl.textContent = Auth._msgLogin(err); errorEl.classList.add('active'); }
       finally { btn.classList.remove('loading'); btn.disabled = false; }
     });
 

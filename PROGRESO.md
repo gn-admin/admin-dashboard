@@ -27,7 +27,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v97`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v98`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -135,6 +135,12 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   móvil (≤767px)**: 2 columnas, imagen 104px, tipografía/padding reducidos y bloques
   de grupo con cabecera a 40px (collage) y 8px de aire; por debajo de 360px se vuelve
   a 1 columna. Regla en `styles.css` «ANIMALES EN MOVIL».
+- **Login sin identificar al proveedor (v98)**: `Auth._msgLogin(err)` traduce cualquier
+  error de acceso a una frase genérica en castellano («Email o contrasena incorrectos»,
+  «Demasiados intentos…», «No se pudo conectar…») y **nunca** se pinta `err.message`:
+  nada de `auth/…` ni «Firebase» en pantalla ni en `console.error`. Test en
+  `tests/auth.test.js`. Ojo: `CONFIG.firebase.authDomain` y los `<script>` de
+  `gstatic.com` siguen visibles en el bundle (inherente a la autenticación en cliente).
 
 ## Backend: endpoints y reglas
 GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
@@ -195,7 +201,8 @@ checkbox nativo 44px, zoom iOS) → **v96 filtro de urgentes, `.btn-primary` con
 contraste AA, pantalla de Registro de actividad, horas de voluntariado, Analítica
 en Reportes y anti-doble-tap en fases** → **v97 especies domésticas (ficha animal,
 alta de camada y filtro de especie dinámico) y retirada de la encuesta «Otras
-Especies» del front y del generador**.
+Especies» del front y del generador** → **v98 errores de login anónimos (sin
+mencionar el proveedor de autenticación)**.
 Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)

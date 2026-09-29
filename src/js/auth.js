@@ -21,7 +21,7 @@ const Auth = {
         this._notifyListeners();
       });
     }).catch(err => {
-      console.error('Error cargando Firebase SDK:', err);
+      console.error('Error cargando el modulo de acceso:', this._msgLogin(err));
       this._resolved = true;
       this._notifyListeners();
     });
@@ -29,7 +29,17 @@ const Auth = {
 
   async loginWithEmail(email, password) {
     await this._ensureSDK();
-    const result = await firebase.auth().signInWithEmailAndPassword(email, password);
+    let result;
+    try {
+      result = await firebase.auth().signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      // Nunca se propaga el error crudo (codigos tipo auth/... ni el nombre
+      // del proveedor): se traduce a un mensaje generico y sin identificar
+      // la tecnologia usada detras del login.
+      const e = new Error(this._msgLogin(err));
+      e.code = 'LOGIN_FAILED';
+      throw e;
+    }
     const fbUser = result.user;
     this.currentUser = {
       uid: fbUser.uid,
@@ -60,6 +70,29 @@ const Auth = {
 
   isAuthenticated() {
     return this.currentUser !== null;
+  },
+
+  // Mensaje de login seguro para el usuario. Acepta cualquier error (del
+  // proveedor de auth, de red o del SDK) y siempre devuelve una frase propia:
+  // no copia `err.message` ni muestra codigos internos. Pura y testeable.
+  _msgLogin(err) {
+    const raw = String((err && (err.code || err.message)) || '').toLowerCase();
+    if (!raw) return 'No se pudo iniciar sesion. Intentalo de nuevo.';
+    if (/too-many-requests|rate-?limit|quota|blocked/.test(raw))
+      return 'Demasiados intentos. Espera unos minutos y vuelve a probar.';
+    if (/network|offline|timeout|unavailable|failed to fetch/.test(raw))
+      return 'No se pudo conectar. Comprueba tu conexion e intentalo de nuevo.';
+    if (/invalid-email|missing-email|missing-password|empty-password|invalid-password/.test(raw))
+      return 'Introduce un email y una contrasena validos.';
+    if (/user-disabled/.test(raw))
+      return 'Esta cuenta esta desactivada. Contacta con el administrador.';
+    if (/user-not-found|wrong-password|invalid-credential|invalid-login/.test(raw))
+      return 'Email o contrasena incorrectos.';
+    if (/operation-not-allowed|configuration|unauthorized/.test(raw))
+      return 'Inicio de sesion no disponible. Contacta con el administrador.';
+    if (/sdk|script|load/.test(raw))
+      return 'No se pudo cargar el modulo de acceso. Recarga la pagina e intentalo de nuevo.';
+    return 'No se pudo iniciar sesion. Intentalo de nuevo.';
   },
 
   onAuthChange(callback) {
@@ -108,7 +141,7 @@ const Auth = {
           window.__fbAuthLoading = false;
           if (ok && sdkReady()) resolve();
           else if (attempts < 2) { attempts++; setTimeout(load, 600 + attempts * 400); }
-          else reject(new Error('No se pudo cargar el SDK de Firebase (app/auth)'));
+          else reject(new Error('No se pudo cargar el modulo de acceso'));
         };
 
         scripts.forEach(src => {
