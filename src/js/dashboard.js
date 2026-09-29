@@ -73,7 +73,6 @@ const Dashboard = {
       'encuestas-perros': () => this.renderEncuesta(el, 'pre-adopcion-perros'),
       'encuestas-gatos': () => this.renderEncuesta(el, 'pre-adopcion-gatos'),
       'encuestas-acogida': () => this.renderEncuesta(el, 'pre-acogida'),
-      'encuestas-otras': () => this._hayEncuestaOtras() ? this.renderEncuesta(el, 'otras-especies') : this._sinEncuestaOtras(el),
       animales: () => this.renderAnimales(el),
       acogidas: () => this.renderAcogidas(el),
       'acogidas-activas': () => this.renderAcogidasActivas(el),
@@ -120,7 +119,7 @@ const Dashboard = {
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, 'encuestas-otras': Icons.paw, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, actividad: Icons.activity, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, actividad: Icons.activity, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -850,34 +849,23 @@ const Dashboard = {
   },
 
   // ==================== ENCUESTAS ====================
+  // Solo hay 3 encuestas. Los animales de otras especies (conejos, aves,
+  // roedores...) NO tienen formulario propio: adopcion y acogida se tramitan
+  // con estas mismas encuestas (el selector de asignacion no filtra por especie).
   async renderEncuestasHub(el) {
     await this._loadSurveys();
-    const otrasOk = this._hayEncuestaOtras();
     await Promise.all([
       this._loadResponses('pre-adopcion-perros'),
       this._loadResponses('pre-adopcion-gatos'),
       this._loadResponses('pre-acogida'),
-      otrasOk ? this._loadResponses('otras-especies') : null,
       this.loadEstados()
     ]);
     const defs = [
       { surveyId: 'pre-adopcion-perros', page: 'encuestas-perros', icon: Icons.dog, title: 'Pre-adopción Perros' },
       { surveyId: 'pre-adopcion-gatos', page: 'encuestas-gatos', icon: Icons.cat, title: 'Pre-adopción Gatos' },
-      { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' },
-      { surveyId: 'otras-especies', page: 'encuestas-otras', icon: Icons.paw, title: 'Otras Especies', falta: !otrasOk }
+      { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' }
     ];
     const cards = defs.map(d => {
-      if (d.falta) {
-        return `<a class="hub-card" onclick="Dashboard.infoOtrasEspecies()">
-          <div class="hub-card-icon" style="background:var(--gray-100);color:var(--gray-400)">${d.icon}</div>
-          <div class="hub-card-body">
-            <div class="hub-card-title">${d.title}</div>
-            <div class="hub-card-meta">Formulario pendiente de configurar</div>
-            <div class="hub-card-date">Ver como activarla</div>
-          </div>
-          <span class="hub-card-chevron">${Icons.chevronRight}</span>
-        </a>`;
-      }
       const list = this.responses[d.surveyId] || [];
       const activas = list.filter(r => this.getEstado(r.id, d.surveyId) !== 'descartada');
       const pendientes = activas.filter(r => this.getEstado(r.id, d.surveyId) === 'pendiente').length;
@@ -895,31 +883,6 @@ const Dashboard = {
       </a>`;
     }).join('');
     el.innerHTML = `<div class="page-list-container"><div class="hub-grid">${cards}</div></div>`;
-  },
-
-  // La 4ª encuesta (otras especies) solo aparece operativa cuando el backend
-  // la tiene definida; mientras tanto la tarjeta explica como activarla.
-  _hayEncuestaOtras() {
-    return !!(this.surveys || []).some(s => s.id === 'otras-especies');
-  },
-
-  _sinEncuestaOtras(el) {
-    el.innerHTML = `<div class="page-list-container"><div class="empty-state"><div class="empty-state-icon">${Icons.paw}</div>
-      <h3>Encuesta de Otras Especies sin configurar</h3>
-      <p>Esta encuesta aun no tiene formulario asociado en el backend.</p>
-      <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.infoOtrasEspecies()">Ver como activarla</button>
-    </div></div><div class="page-detail-container"></div>`;
-  },
-
-  infoOtrasEspecies() {
-    this.showInfoModal('Encuesta · Otras Especies', `
-      <div class="alert-item info" style="margin-bottom:12px">${Icons.info} <span>Esta encuesta es para <b>adopción de animales que no son perro ni gato</b> (conejos, aves, reptiles, roedores...).</span></div>
-      <div class="detail-section"><div class="detail-section-title">Como activarla</div>
-        <div class="detail-field"><div class="detail-question">1. Crea el formulario</div><div class="detail-answer">En Google Forms, duplica la encuesta de pre-adopción y adapta las preguntas a la especie.</div></div>
-        <div class="detail-field"><div class="detail-question">2. Añade las variables en <code>.env</code></div><div class="detail-answer"><code>FORM_OTRAS_ESPECIES_ID</code> y <code>SHEET_OTRAS_ESPECIES_ID</code>.</div></div>
-        <div class="detail-field"><div class="detail-question">3. Regenera la configuración</div><div class="detail-answer"><code>node scripts/gen-config.js</code> (añade la entrada <code>otras-especies</code> a <code>apps-script/Config.gs</code>).</div></div>
-        <div class="detail-field"><div class="detail-question">4. Despliega el backend</div><div class="detail-answer">Pega el <code>Config.gs</code> en el editor de Apps Script y publica una <b>Nueva versión</b>.</div></div>
-      </div>`);
   },
 
   async renderEncuesta(el, surveyId) {
@@ -1193,6 +1156,7 @@ const Dashboard = {
       ${this._guideStep(Icons.users, '9. Separar del grupo', 'En la ficha del animal, campo <b>Grupo / Camada</b>, los botones <b>Ver grupo</b> y <b>Separar</b>. Separar quita el animal del grupo (con confirmacion): queda con su propia ficha y, si era el ultimo, la ficha del grupo se elimina.', 'Animales > ficha > Grupo / Camada', false)}
       ${this._guideStep(Icons.heart, '10. Estado, urgencia y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones. El check <b>Necesita acogida/adopcion urgente</b> del formulario muestra la insignia roja <b>Urgente</b> y coloca el animal el primero en el selector de asignacion.', 'Animales > ficha > Estado', false)}
       ${this._guideStep(Icons.clipboard, '11. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.paw, '12. Especies admitidas', 'Ademas de <b>Perro</b> y <b>Gato</b> puedes registrar <b>Conejo, Hámster, Pájaro, Tortuga, Hurón, Cobaya, Erizo</b> y <b>Pez</b> (cualquier otra con <b>Otro...</b>). Se gestionan igual: grupos, urgencias, acogida y adopcion. <b>No hay encuesta propia</b>: las solicitudes de cualquier especie se tramitan con las encuestas de <b>perros, gatos</b> y la de <b>acogida</b>.', 'Animales > Nuevo', false)}
       <div class="guide-note">${Icons.info} <span><b>Resumen en una linea:</b> para crear un grupo elige <b>Crear grupo nuevo</b> en el selector <b>Grupo / Camada</b> (o escribe el mismo nombre en dos o mas animales). <b>Los grupos se unen por nombre</b> (mayusculas y acentos no importan), asi que aunque estuvieran partidos, al abrir Animales se corrigen solos. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
   },
 
@@ -2252,13 +2216,20 @@ const Dashboard = {
     ]);
     this._repairGrupos();
     const filter = this._currentAnimalFilter;
-    const especie = this._currentEspecieFilter;
+    let especie = this._currentEspecieFilter;
     const prioridad = this._currentPrioridadFilter;
+    // Filtro de especie dinamico: Perro/Gato primero y luego cualquier otra
+    // especie que haya en el inventario (conejo, pajaro, tortuga...).
+    const conocidas = this._especiesDomesticas();
+    const presentes = Array.from(new Set((this.animales || []).map(a => a.especie).filter(Boolean)));
+    const rank = s => { const i = conocidas.indexOf(s); return i === -1 ? 999 : i; };
+    const listaEsp = presentes.slice().sort((a, b) => rank(a) - rank(b) || String(a).localeCompare(String(b), 'es'));
+    const nEsp = sp => this.animales.filter(a => a.especie === sp).length;
+    if (especie !== 'all' && listaEsp.indexOf(especie) === -1) especie = 'all';
     let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
-    if (especie!=='all') filtered = especie==='otro' ? filtered.filter(a=>!['Perro','Gato'].includes(a.especie)) : filtered.filter(a=>(a.especie||'')===especie);
+    if (especie!=='all') filtered = filtered.filter(a=>(a.especie||'')===especie);
     if (prioridad==='solo') filtered = filtered.filter(a=>this._esPrioritario(a));
     const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length, fallecido:this.animales.filter(a=>a.estado==='fallecido').length};
-    const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
     const nUrgentes=this.animales.filter(a=>this._esPrioritario(a)).length;
     // Los urgentes se adelantan dentro de cada bloque (no muta el original).
     filtered = this._ordenaUrgentes(filtered);
@@ -2298,11 +2269,9 @@ const Dashboard = {
             <option value="adoptado" ${filter==='adoptado'?'selected':''}>Adoptados (${counts.adoptado})</option>
             <option value="fallecido" ${filter==='fallecido'?'selected':''}>Fallecidos (${counts.fallecido})</option>
           </select>
-          <select onchange="Dashboard._currentEspecieFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
-            <option value="all" ${especie==='all'?'selected':''}>Especie: Todas</option>
-            <option value="Perro" ${especie==='Perro'?'selected':''}>Perros (${nPerros})</option>
-            <option value="Gato" ${especie==='Gato'?'selected':''}>Gatos (${nGatos})</option>
-            <option value="otro" ${especie==='otro'?'selected':''}>Otros (${nOtro})</option>
+          <select onchange="Dashboard._currentEspecieFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))" aria-label="Filtrar por especie">
+            <option value="all" ${especie==='all'?'selected':''}>Especie: Todas (${this.animales.length})</option>
+            ${listaEsp.map(sp=>`<option value="${this._esc(sp)}" ${especie===sp?'selected':''}>${this._esc(sp)} (${nEsp(sp)})</option>`).join('')}
           </select>
           <select onchange="Dashboard._currentPrioridadFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))" aria-label="Filtrar por prioridad">
             <option value="all" ${prioridad==='all'?'selected':''}>Prioridad: Todas</option>
@@ -2705,9 +2674,16 @@ const Dashboard = {
     return raw;
   },
 
+  // Especies domesticas del selector de la ficha de animal. "Otro..." sigue
+  // disponible para cualquier otra; adopcion/acogida de todas ellas se tramita
+  // con las encuestas de perros, gatos y acogida (no hay formulario propio).
+  _especiesDomesticas() {
+    return ['Perro', 'Gato', 'Conejo', 'Hámster', 'Pájaro', 'Tortuga', 'Hurón', 'Cobaya', 'Erizo', 'Pez'];
+  },
+
   showAnimalForm(data) {
     const isEdit = !!data;
-    const especies = ['Perro', 'Gato'];
+    const especies = this._especiesDomesticas();
     const custom = data?.especie && !especies.includes(data.especie) ? data.especie : null;
     const especieOpts = especies.map(s=>`<option value="${s}" ${data?.especie===s?'selected':''}>${s}</option>`).join('') + (custom ? `<option value="${this._esc(custom)}" selected>${this._esc(custom)}</option>` : '') + (custom ? '' : `<option value="__otro__">Otro...</option>`);
     const listaGrupos = this._listaGrupos();
@@ -2719,7 +2695,7 @@ const Dashboard = {
       + (grupoVal && !enLista ? `<option value="${this._esc(grupoVal)}" selected>${this._esc(grupoVal)}</option>` : '')
       + `<option value="__nuevo__">Crear grupo nuevo...</option>`;
     this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"></div></div>
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:.72rem;color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" onchange="Dashboard._onChangeGrupo(this.value, ${isEdit?'true':'false'})">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" onchange="Dashboard._onChangeGrupoNuevo(${isEdit?'true':'false'})"><p style="font-size:.72rem;color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
@@ -2767,7 +2743,7 @@ const Dashboard = {
   showCamadaForm() {
     this.showFormModal('Alta de camada', `<form onsubmit="Dashboard.saveCamada(event)">
       <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
-      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required><option value="Perro">Perro</option><option value="Gato">Gato</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required>${this._especiesDomesticas().map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>
       <div class="form-row"><div class="form-group"><label>Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label>Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
       <div class="form-row"><div class="form-group"><label>Sexo *</label><select id="cm-sexo"><option value="Macho">Macho</option><option value="Hembra">Hembra</option></select></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="cm-obl" checked> Grupo obligatorio</label></div></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Crear camada</button></div>
@@ -4444,7 +4420,6 @@ const Dashboard = {
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-perros')">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-gatos')">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-acogida')">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
-        ${this._hayEncuestaOtras() ? `<div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('otras-especies')">${Icons.download} <span>Exportar otras especies (PDF)</span></div>` : ''}
       </div></div>
       <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
         <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>

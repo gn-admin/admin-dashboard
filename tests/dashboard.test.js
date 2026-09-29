@@ -964,3 +964,26 @@ describe('_busyStart / _busyEnd: anti doble-tap de fase', () => {
     assert.doesNotThrow(() => Dashboard._busyEnd('nunca-empezo'));
   });
 });
+
+describe('_especiesDomesticas: opciones del selector de especie', () => {
+  it('incluye perro y gato primero', () => {
+    const l = Dashboard._especiesDomesticas();
+    assert.equal(l[0], 'Perro');
+    assert.equal(l[1], 'Gato');
+  });
+
+  it('anima domesticos comunes y sin "Otro..." (lo anade el formulario)', () => {
+    const l = Dashboard._especiesDomesticas();
+    ['Conejo', 'Hámster', 'Pájaro', 'Tortuga', 'Hurón', 'Cobaya', 'Erizo', 'Pez'].forEach(e => {
+      assert.ok(l.includes(e), 'falta ' + e);
+    });
+    assert.ok(!l.includes('__otro__'));
+    assert.ok(!l.includes('Otro...'));
+  });
+
+  it('sin duplicados y todo string', () => {
+    const l = Dashboard._especiesDomesticas();
+    assert.equal(new Set(l).size, l.length);
+    assert.ok(l.every(s => typeof s === 'string' && s.trim() !== ''));
+  });
+});

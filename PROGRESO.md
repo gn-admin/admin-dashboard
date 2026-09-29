@@ -27,20 +27,26 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v96`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v97`.
 
 ## Mapa funcional final
-- **Encuestas** (3 + 1 opcional «Otras Especies»): listados con filtros/buscador, ficha con estados (`pendiente`,
+- **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
   `en_proceso`, `aprobada`, `descartada`, clave `survey_id::id`), notas, aprobar→
   candidatura (+auto-familia en acogida), asignar animal/familia, PDF individual y
   completo (portada + KPIs + fichas), chequeo de blacklist, mantenimiento Descartar-2025.
-  El hub móvil pinta **4 tarjetas**; la de *Otras Especies* (`otras-especies`) se
-  activa con `FORM_OTRAS_ESPECIES_ID` en `.env` + regenerar + redeploy, y mientras
-  tanto muestra la ficha `infoOtrasEspecies()` con los pasos.
+  **No hay encuesta de «otras especies»**: esa opción está **retirada del front y del
+  generador** (decisión: no exponer nada a medias); de momento la adopción/acogida de
+  cualquier especie se tramita con `pre-adopcion-perros`, `pre-adopcion-gatos` y
+  `pre-acogida` (el selector de asignación no filtra por especie).
 - **Animales**: CRUD en modal, alta de camada bulk, foto principal (Drive + thumbnail),
   especie extensible, grupos, estados (`disponible`, `en_acogida`, `en_adopcion`,
   `adoptado`, `fallecido`), ficha con héroe + secciones plegables (info, publicaciones,
   apadrinamientos, gastos, documentos-dummy, grupo, familia, historial médico).
+  **Especies domésticas (v97)**: `_especiesDomesticas()` ofrece *Perro, Gato, Conejo,
+  Hámster, Pájaro, Tortuga, Hurón, Cobaya, Erizo, Pez* en la ficha y en *Alta de
+  camada* (`Otro...` sigue libre) y el **filtro de especie de Animales es dinámico**
+  (lista las especies presentes, las conocidas primero) en lugar del fijo
+  *Perro/Gato/Otros*.
   **Urgencias (v93)**: checkbox *Necesita acogida/adopción urgente* en el formulario
   (campo `urgente`; la columna la auto-añaden `appendToSheet`/`updateSheetRow`),
   insignia roja **Urgente** en tarjeta y ficha (+ campo *Prioridad*) y **orden
@@ -186,8 +192,10 @@ en PDF, texto de uso del Almacén** → v92 snackbar con `status` + ámbar → v
 urgencia + `.form-input` → v94 selector de grupo (sustituye al datalist) → v95
 auditoría UI/UX (contraste AA en toasts/badge, `_esPrioritario`, pills flex,
 checkbox nativo 44px, zoom iOS) → **v96 filtro de urgentes, `.btn-primary` con
-contraste AA, pantalla de Registro de actividad, horas de voluntariado, 4ª tarjeta
-«Otras Especies», Analítica en Reportes y anti-doble-tap en fases**.
+contraste AA, pantalla de Registro de actividad, horas de voluntariado, Analítica
+en Reportes y anti-doble-tap en fases** → **v97 especies domésticas (ficha animal,
+alta de camada y filtro de especie dinámico) y retirada de la encuesta «Otras
+Especies» del front y del generador**.
 Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
@@ -199,12 +207,14 @@ Detalle commit a commit en `git log`.
    `Code.gs` desplegado ya trae la auto-creación de columnas (punto 1).
 4. Ejecutar Descartar-2025 en Reportes una vez.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
-6. *(Opcional)* Activar la encuesta **Otras Especies**: crear el Google Form y
-   rellenar `FORM_OTRAS_ESPECIES_ID` + `SHEET_OTRAS_ESPECIES_ID` en `.env`,
-   `node scripts/gen-config.js` (emite la entrada `otras-especies` en `Config.gs`)
-   y *Nueva versión* en el editor.
 
 ## Futuro desarrollo (no empezado)
+Encuesta **Otras Especies** (hoy retirada del front y de `gen-config`): crear el
+Google Form duplicando el de pre-adopción, rellenar `FORM_OTRAS_ESPECIES_ID` +
+`SHEET_OTRAS_ESPECIES_ID` en `.env`, `node scripts/gen-config.js` (el generador
+volverá a emitir la entrada `otras-especies` cuando exista el form id), *Nueva
+versión* en el editor y reintroducir la 4ª tarjeta del hub, la ruta
+`#encuestas-otras` y el export de Reportes.
 Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), WhatsApp
 (`wa.me`), portal público con datos de aquí,
 endpoint agregado `dashboard`, push notifications, fusión de duplicados, lector de
