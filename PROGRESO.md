@@ -17,7 +17,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (142 tests en verde, lógica pura sin DOM).
+- `npm test` — `node --test tests/*.test.js` (152 tests en verde, lógica pura sin DOM).
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
 
 ## Arquitectura
@@ -27,7 +27,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v98`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v99`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -100,6 +100,13 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   tiene *Registrar horas* → suma sobre `horas_mes` y sella `ultima_actividad`
   (columnas ya existentes, sin columnas nuevas) + botón *Reiniciar mes*; la lista
   muestra la columna *Horas/mes* y ambas acciones dejan traza en el log.
+  **Ficha (v99)**: héroe compacto (avatar 72px con `flex-shrink:0` + nombre + badges
+  + email/teléfono) y **todos los campos a ancho completo debajo** — la foto ya no
+  va en columna y no desplaza los datos. **Al editar se sustituye la ficha por el
+  solo formulario** (`_renderForm` guarda la anterior en `detailEl._prevHTML` y
+  `cancelForm` la restaura); antes el form convivía con la ficha vieja debajo.
+  Reglas puras `_renderFormMode`/`_formCancelAction` (compartidas con Familias y
+  Adopciones, que usan el mismo `_renderForm`).
 - **Lista negra**: CRUD con aviso en fichas coincidentes.
 - **Donaciones / Gastos / Recordatorios / Seguimiento**: CRUD completos. **Gastos con
   factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura») en **carpeta
@@ -202,7 +209,9 @@ contraste AA, pantalla de Registro de actividad, horas de voluntariado, Analíti
 en Reportes y anti-doble-tap en fases** → **v97 especies domésticas (ficha animal,
 alta de camada y filtro de especie dinámico) y retirada de la encuesta «Otras
 Especies» del front y del generador** → **v98 errores de login anónimos (sin
-mencionar el proveedor de autenticación)**.
+mencionar el proveedor de autenticación)** → **v99 ficha de socio con héroe
+compacto (la foto no desplaza los campos) y edición que sustituye la ficha por el
+solo formulario**.
 Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)

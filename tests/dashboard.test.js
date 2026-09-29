@@ -987,3 +987,55 @@ describe('_especiesDomesticas: opciones del selector de especie', () => {
     assert.ok(l.every(s => typeof s === 'string' && s.trim() !== ''));
   });
 });
+
+describe('_renderFormMode: desde donde se abre el form', () => {
+  it('listado visible -> from-list (se oculta la lista)', () => {
+    assert.equal(Dashboard._renderFormMode(false, false), 'from-list');
+    assert.equal(Dashboard._renderFormMode(false, true), 'from-list');
+  });
+
+  it('listado oculto + ficha abierta -> from-detail (solo form)', () => {
+    assert.equal(Dashboard._renderFormMode(true, true), 'from-detail');
+  });
+
+  it('sin listado ni ficha -> none (no se pinta nada)', () => {
+    assert.equal(Dashboard._renderFormMode(true, false), 'none');
+  });
+});
+
+describe('_formCancelAction: que pasa al cancelar/guardar', () => {
+  it('form abierto desde la ficha -> restaura la ficha', () => {
+    assert.equal(Dashboard._formCancelAction({ active: true, hasPrev: true, hasForm: true, listHidden: true }), 'restore');
+  });
+
+  it('form abierto desde la lista -> cierra la ficha y vuelve al listado', () => {
+    assert.equal(Dashboard._formCancelAction({ active: true, hasPrev: false, hasForm: true, listHidden: true }), 'clear-detail');
+  });
+
+  it('ficha abierta sin form -> no toca la ficha', () => {
+    assert.equal(Dashboard._formCancelAction({ active: true, hasPrev: false, hasForm: false, listHidden: true }), 'clear-container');
+  });
+
+  it('sin ficha activa -> limpia el contenedor de forms', () => {
+    assert.equal(Dashboard._formCancelAction({ active: false }), 'clear-container');
+    assert.equal(Dashboard._formCancelAction(), 'clear-container');
+  });
+
+  it('form con la lista visible (caso raro) -> solo quita el form', () => {
+    assert.equal(Dashboard._formCancelAction({ active: true, hasPrev: false, hasForm: true, listHidden: false }), 'remove-form');
+  });
+});
+
+describe('_inicialesNombre: avatar del hero de socio', () => {
+  it('primera letra en mayusculas', () => {
+    assert.equal(Dashboard._inicialesNombre('marta garcia'), 'M');
+    assert.equal(Dashboard._inicialesNombre('  izon '), 'I');
+  });
+
+  it('vacio o nulo -> interrogacion', () => {
+    assert.equal(Dashboard._inicialesNombre(''), '?');
+    assert.equal(Dashboard._inicialesNombre(null), '?');
+    assert.equal(Dashboard._inicialesNombre(undefined), '?');
+    assert.equal(Dashboard._inicialesNombre('   '), '?');
+  });
+});

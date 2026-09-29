@@ -462,21 +462,62 @@ const Dashboard = {
     try { btn.focus({ preventScroll: true }); } catch (err) { try { btn.focus(); } catch (e2) {} }
   },
 
+  // Reglas de transicion ficha <-> formulario (puras, testeable).
+  // 'from-list'   : se abre desde el listado (se oculta la lista).
+  // 'from-detail' : se abre desde la ficha (la ficha se sustituye por el form).
+  _renderFormMode(listHidden, detailActive) {
+    if (!listHidden) return 'from-list';
+    return detailActive ? 'from-detail' : 'none';
+  },
+
+  // Que hace Cancelar/Guardar tras un form (pura, testeable):
+  // 'restore'       -> volver a la ficha anterior (form abierto desde la ficha)
+  // 'clear-detail'  -> cerrar la ficha y volver al listado (form abierto desde la lista)
+  // 'remove-form'   -> quitar el form sin tocar el resto
+  // 'clear-container' -> limpiar el contenedor de forms suelto
+  _formCancelAction(opts) {
+    const o = opts || {};
+    if (!o.active) return 'clear-container';
+    if (o.hasPrev) return 'restore';
+    if (o.hasForm && o.listHidden) return 'clear-detail';
+    if (o.hasForm) return 'remove-form';
+    return 'clear-container';
+  },
+
   cancelForm(pageId) {
     const page = document.getElementById('page-' + pageId);
     if (!page) return;
     const listContainer = page.querySelector('.page-list-container');
     const detailContainer = page.querySelector('.page-detail-container');
-    if (detailContainer && detailContainer.classList.contains('active')) {
-      const formCard = detailContainer.querySelector('.form-card');
-      if (formCard && listContainer && listContainer.classList.contains('hidden')) {
-        detailContainer.classList.remove('active');
-        detailContainer.innerHTML = '';
-        listContainer.classList.remove('hidden');
-        return;
-      }
-      if (formCard) formCard.remove();
+    const active = !!(detailContainer && detailContainer.classList.contains('active'));
+    const listHidden = !!listContainer && listContainer.classList.contains('hidden');
+    const formCard = detailContainer ? detailContainer.querySelector('.form-card') : null;
+    const action = this._formCancelAction({
+      active,
+      hasPrev: !!(detailContainer && detailContainer._prevHTML),
+      hasForm: !!formCard,
+      listHidden
+    });
+    // El form se abrio desde la ficha: se restaura la ficha anterior
+    // (el form la habia sustituido; antes convivia con ella).
+    if (action === 'restore') {
+      const prev = detailContainer._prevHTML;
+      detailContainer._prevHTML = null;
+      detailContainer.classList.add('active');
+      if (listContainer) listContainer.classList.add('hidden');
+      detailContainer.innerHTML = prev;
+      this.injectIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
     }
+    if (action === 'clear-detail' && listContainer) {
+      detailContainer.classList.remove('active');
+      detailContainer.innerHTML = '';
+      detailContainer._prevHTML = null;
+      listContainer.classList.remove('hidden');
+      return;
+    }
+    if (action === 'remove-form' && formCard) formCard.remove();
     const fc = page.querySelector('[id$="-form-container"]');
     if (fc) fc.innerHTML = '';
   },
@@ -490,23 +531,33 @@ const Dashboard = {
     page.querySelectorAll('[id$="-form-container"]').forEach(fc => { fc.innerHTML = ''; });
     const listContainer = page.querySelector('.page-list-container');
     const detailContainer = page.querySelector('.page-detail-container');
-    if (listContainer && !listContainer.classList.contains('hidden')) {
+    const mode = this._renderFormMode(
+      // Sin listado (imposible) se comporta como si estuviera oculto.
+      !listContainer || listContainer.classList.contains('hidden'),
+      !!(detailContainer && detailContainer.classList.contains('active'))
+    );
+    if (mode === 'from-list' && listContainer) {
       listContainer.classList.add('hidden');
       if (detailContainer) {
         detailContainer.classList.add('active');
+        detailContainer._prevHTML = null;
         detailContainer.innerHTML = `<div class="detail-actions"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button></div>${html}`;
         detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       return;
     }
-    if (detailContainer && detailContainer.classList.contains('active')) {
-      const prevForm = detailContainer.querySelector('.form-card');
-      if (prevForm) prevForm.remove();
-      const backBtn = detailContainer.querySelector('.detail-actions');
-      if (backBtn) backBtn.insertAdjacentHTML('afterend', html);
-      else detailContainer.insertAdjacentHTML('afterbegin', html);
+    if (mode === 'from-detail') {
+      // Editar desde la ficha: se muestra SOLO el formulario. La ficha se
+      // guarda para restaurarla en cancelForm (antes seguia por debajo).
+      if (!detailContainer._prevHTML) detailContainer._prevHTML = detailContainer.innerHTML;
+      const titleEl = detailContainer.querySelector('.detail-actions span');
+      const title = titleEl ? titleEl.innerHTML : '';
+      detailContainer.innerHTML = `<div class="detail-actions" style="margin-bottom:20px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button><span style="font-weight:700;font-size:1rem;color:var(--gray-900)">${title}</span></div>${html}`;
       const formCard = detailContainer.querySelector('.form-card');
       if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      this.injectIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   },
 
@@ -544,6 +595,7 @@ const Dashboard = {
     if (!listEl || !detailEl) return;
     listEl.classList.add('hidden');
     detailEl.classList.add('active');
+    detailEl._prevHTML = null;
     detailEl.innerHTML = `
       <div class="detail-actions" style="margin-bottom:20px">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
@@ -560,7 +612,7 @@ const Dashboard = {
     const listEl = page.querySelector('.page-list-container');
     const detailEl = page.querySelector('.page-detail-container');
     if (listEl) listEl.classList.remove('hidden');
-    if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; }
+    if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; }
   },
 
   // ==================== DASHBOARD HOME ====================
@@ -3928,12 +3980,23 @@ const Dashboard = {
     this.showSnackbar(isEdit ? 'Socio actualizado' : 'Socio creado', 'success');
   },
 
+  _inicialesNombre(nombre) {
+    const t = String(nombre || '').trim();
+    return (t.charAt(0) || '?').toUpperCase();
+  },
+
   async viewSocio(id) {
     await this._ensureListas(['apadrinamientos', 'animales']);
     const s = this._byId(this.socios, id);
     if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const esVol = s.tipo === 'Voluntario' || s.tipo === 'Ambos';
-    const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
+    const esSocio = s.tipo === 'Socio' || s.tipo === 'Ambos';
+    // Hero compacto: la foto acompana solo al nombre y badges; los campos
+    // van a ancho completo debajo (antes la foto empujaba toda la ficha).
+    const fotoHero = s.foto
+      ? `<img src="${this._esc(s.foto)}" alt="${this._esc(s.nombre)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);flex-shrink:0">`
+      : `<div style="width:72px;height:72px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--primary);flex-shrink:0">${this._esc(this._inicialesNombre(s.nombre))}</div>`;
+    const cuotaEstado = esSocio ? this._cuotaEstado(s) : null;
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioFormById('${s.id}')">${Icons.pencil} Editar</button>
@@ -3941,21 +4004,29 @@ const Dashboard = {
         <button class="btn btn-sm ${s.activo?'btn-outline-green':'btn-primary'}" onclick="Dashboard.toggleSocio('${s.id}')">${s.activo?'Desactivar':'Activar'}</button>
         <button class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" onclick="Dashboard.showCarnet('${s.id}')">${Icons.download} Ver Carnet</button>
       </div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
-        <div>${fotoHtml}</div>
-        <div style="flex:1;min-width:min(200px,100%)">
-          <div class="detail-section"><div class="detail-section-title">Informacion del Socio</div>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+        ${fotoHero}
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:1.15rem;font-weight:800;color:var(--gray-900)">${this._esc(s.nombre)}</div>
+          <div class="animal-card-pills" style="margin:4px 0">
+            <span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span>
+            <span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span>
+            ${cuotaEstado?`<span class="estado-badge ${cuotaEstado.cls}">${cuotaEstado.label}</span>`:''}
+            ${esVol?`<span class="estado-badge en_proceso">${s.horas_mes||0} h/mes</span>`:''}
+          </div>
+          <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(s.email||'')}${s.telefono?` &middot; ${this._esc(s.telefono)}`:''}</div>
+        </div>
+      </div>
+      <div class="detail-section"><div class="detail-section-title">Informacion del Socio</div>
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
             <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${s.telefono||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
-            ${(s.tipo==='Socio'||s.tipo==='Ambos')?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
+            ${esSocio?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
             <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${this._esc(s.area)||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></div></div>
             <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${s.fecha_registro||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${s.carnet_id||'Sin generar'}</div></div>
-          </div>
-        </div>
       </div>
       <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
         <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
