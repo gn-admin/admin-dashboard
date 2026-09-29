@@ -27,7 +27,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v92`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v93`.
 
 ## Mapa funcional final
 - **Encuestas** (3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -38,6 +38,11 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   especie extensible, grupos, estados (`disponible`, `en_acogida`, `en_adopcion`,
   `adoptado`, `fallecido`), ficha con héroe + secciones plegables (info, publicaciones,
   apadrinamientos, gastos, documentos-dummy, grupo, familia, historial médico).
+  **Urgencias (v93)**: checkbox *Necesita acogida/adopción urgente* en el formulario
+  (campo `urgente`; la columna la auto-añaden `appendToSheet`/`updateSheetRow`),
+  insignia roja **Urgente** en tarjeta y ficha (+ campo *Prioridad*) y **orden
+  urgente-primero** en el selector de asignación y en *Vincular animal*
+  (`_esUrgente`/`_ordenaUrgentes`, sin mutar el original).
   **Grupos unidos por nombre** (opción A): `_normGrupo` normaliza mayúsculas/acentos/
   espacios y `_resolveGrupoId` reutiliza el `grupo_id` existente → alta, edición y
   camada convergen en un mismo grupo; cambiar de nombre saca del grupo anterior.
@@ -160,16 +165,14 @@ en PDF, texto de uso del Almacén**. Detalle commit a commit en `git log`.
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
 2. Secrets `API_URL` (+ `CONTACTO_TELEFONO/EMAIL`) y re-ejecutar workflow tras cambiarlos.
 3. Hojas nuevas con pestaña exacta + acceso API; `id` rellenos (sin celdas vacías).
-   **Pendiente ahora**: crear la hoja **`Grupos`** (nueva hoja de cálculo), copiar el ID
-   a `.env` como `SHEET_GRUPOS_ID=…` y ejecutar `node scripts/gen-config.js`.
-   Mientras no exista, foto/descripción/notas de grupo degradan con aviso
-   (`status:'warning'`), pero renombrar grupo sí aplica a los miembros.
+   Hoja **`Grupos` ya creada** (`SHEET_GRUPOS_ID` en `.env` + `node scripts/gen-config.js`).
+   La columna nueva **`urgente`** de Animales la añade el backend solo si el
+   `Code.gs` desplegado ya trae la auto-creación de columnas (punto 1).
 4. Ejecutar Descartar-2025 en Reportes una vez.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
 
 ## Futuro desarrollo (no empezado)
-Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), **urgencias de
-acogida/adopción** (prioridad por animal, propuesto y aún sin diseñar), WhatsApp
+Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), WhatsApp
 (`wa.me`), portal público con datos de aquí, anti-doble-tap en botones de fase,
 endpoint agregado `dashboard`, push notifications, fusión de duplicados, lector de
 pantalla completo, logo en alta para splash 512, recibos SEPA, colonias felinas CER,

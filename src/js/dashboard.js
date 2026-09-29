@@ -1370,12 +1370,12 @@ const Dashboard = {
     if (!c) { box.innerHTML = '<div style="color:var(--gray-400);font-size:0.85rem">No se pudo crear la candidatura para esta solicitud.</div>'; return; }
     if (c.animal_id) { box.innerHTML = '<div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Animal asignado</span></div></div>'; return; }
     const selKey = surveyId + '-' + responseId;
-    const disp = this.animales.filter(a => a.estado === 'disponible');
+    const disp = this._ordenaUrgentes(this.animales.filter(a => a.estado === 'disponible'));
     const fams = this.familias.filter(f => (f.capacidad || 'Libre') !== 'Ocupada');
     const needsFam = c.tipo === 'acogida';
     box.innerHTML = `
       <div class="detail-field"><div class="detail-question">Animal disponible</div>
-        <select id="asg-animal-${selKey}" class="form-input">${disp.length ? disp.map(a=>`<option value="${a.id}">${this._esc(a.nombre)} (${this._esc(a.especie)} · ${this._esc(a.raza)})</option>`).join('') : `<option value="">(Sin animales disponibles)</option>`}</select>
+        <select id="asg-animal-${selKey}" class="form-input">${disp.length ? disp.map(a=>`<option value="${a.id}">${this._esUrgente(a)?'URGENTE · ':''}${this._esc(a.nombre)} (${this._esc(a.especie)} · ${this._esc(a.raza)})</option>`).join('') : `<option value="">(Sin animales disponibles)</option>`}</select>
       </div>
       ${needsFam ? `<div class="detail-field"><div class="detail-question">Familia de acogida</div><select id="asg-familia-${selKey}" class="form-input">${fams.length ? fams.map(f=>`<option value="${f.id}">${this._esc(f.nombre)}${f.ubicacion?' · '+this._esc(f.ubicacion):''}</option>`).join('') : `<option value="">(Sin familias libres)</option>`}</select></div>` : ''}
       <div style="padding:12px 0 0;border-top:1px solid var(--gray-100);margin-top:8px"><button class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} onclick="Dashboard.asignarCandidatura('${surveyId}','${responseId}')">${Icons.checkCircle} Asignar animal</button></div>`;
@@ -2219,6 +2219,7 @@ const Dashboard = {
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
+              ${this._esUrgente(a)?`<div class="urgente-badge">Urgente</div>`:''}
               <div class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</div>
               ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" onclick="event.stopPropagation();Dashboard.viewGrupo('${a.grupo_id}')" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
@@ -2599,7 +2600,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label>Grupo / Camada</label><input type="text" id="an-grupo" value="${this._esc(grupoVal)}" list="grupo-list" placeholder="Ej: Camada Luna" onchange="Dashboard._prefillGrupo(this.value, ${isEdit?'true':'false'})"><datalist id="grupo-list">${grupos.map(g=>`<option value="${this._esc(g)}">`).join('')}</datalist><p style="font-size:.72rem;color:var(--gray-500)">Al elegir un grupo existente se rellenan especie, raza, edad y sexo.</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
-      <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div></div>
+      <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-urgente" ${this._esUrgente(data)?'checked':''}> Necesita acogida/adopcion urgente</label></div></div>
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
@@ -2712,6 +2713,7 @@ const Dashboard = {
       grupo: gv ? gv : '',
       grupo_obligatorio: document.getElementById('an-grupo-obl').checked,
       apadrinable: document.getElementById('an-apadrinable').checked,
+      urgente: document.getElementById('an-urgente').checked,
       esterilizada: existing?.esterilizada || false,
       vacunas: existing?.vacunas || 'Pendientes',
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
@@ -2776,6 +2778,19 @@ const Dashboard = {
     return ok && (a.estado === 'disponible' || a.estado === 'en_acogida');
   },
 
+  // Animal marcado como urgente (acogida/adopcion prioritaria). La hoja puede
+  // devolver TRUE como boolean, como texto o como 1.
+  _esUrgente(a) {
+    if (!a) return false;
+    const v = a.urgente;
+    return v === true || v === 1 || v === '1' || v === 'TRUE' || v === 'true' || v === 'SI' || v === 'Si';
+  },
+
+  // Urgentes primero; dentro de cada tramo se conserva el orden original.
+  _ordenaUrgentes(lista) {
+    return (lista || []).slice().sort((x, y) => (this._esUrgente(y) ? 1 : 0) - (this._esUrgente(x) ? 1 : 0));
+  },
+
   _apadrinamientosDe(animalId) {
     return (this.apadrinamientos || []).filter(x => String(x.animal_id) === String(animalId));
   },
@@ -2802,7 +2817,7 @@ const Dashboard = {
         ${fotoHero}
         <div style="flex:1;min-width:180px">
           <div style="font-size:1.15rem;font-weight:800;color:var(--gray-900)">${this._esc(a.nombre)}</div>
-          <div style="margin:4px 0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div>
+          <div style="margin:4px 0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span>${this._esUrgente(a)?' <span class="urgente-badge">Urgente</span>':''}</div>
           <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(a.especie||'')} &middot; ${this._esc(a.raza||'')} &middot; ${this._esc(a.edad||'')}</div>
         </div>
       </div>
@@ -2813,6 +2828,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Peso</div><div class="detail-answer">${this._esc(a.peso)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)}</div></div>
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div></div>
+        <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esUrgente(a)?'<span class="urgente-badge">Urgente</span>':'Normal'}</div></div>
         <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}${a.grupo_id?` <button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button><button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button>`:''}</div></div>
         <div class="detail-field"><div class="detail-question">Descripcion</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
       </div>
@@ -3154,7 +3170,7 @@ const Dashboard = {
     await this._ensureListas(['animales']);
     this._renderForm('adopciones', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Adopcion</h3><form onsubmit="Dashboard.saveAdopcion(event,${isEdit?'true':'false'},'${data?.id||''}')">
       <div class="form-row"><div class="form-group"><label>Animal *</label><input type="text" id="ad-animal" value="${this._esc(data?.animal||'')}" required placeholder="Ej: Max (Labrador)"></div><div class="form-group"><label>Adoptante *</label><input type="text" id="ad-adoptante" value="${this._esc(data?.adoptante||'')}" required></div></div>
-      <div class="form-group"><label>Vincular animal (reserva estado)</label><select id="ad-animal-id" onchange="Dashboard._vincularAnimalTexto()"><option value="">Sin vincular (solo texto)</option>${this.animales.map(a=>`<option value="${this._esc(a.id)}" ${String(data?.animal_id||'')===String(a.id)?'selected':''}>${this._esc(a.nombre)} · ${this._esc(a.especie||'')}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Vincular animal (reserva estado)</label><select id="ad-animal-id" onchange="Dashboard._vincularAnimalTexto()"><option value="">Sin vincular (solo texto)</option>${this._ordenaUrgentes(this.animales).map(a=>`<option value="${this._esc(a.id)}" ${String(data?.animal_id||'')===String(a.id)?'selected':''}>${this._esUrgente(a)?'URGENTE · ':''}${this._esc(a.nombre)} · ${this._esc(a.especie||'')}</option>`).join('')}</select></div>
       <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="ad-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="ad-telefono" value="${this._esc(data?.telefono||'')}"></div></div>
       <div class="form-row"><div class="form-group"><label>Fase *</label><select id="ad-fase" required>${fases.map(f=>`<option value="${f}" ${data?.fase===f?'selected':''}>${f}</option>`).join('')}</select></div><div class="form-group"><label>Estado</label><input type="text" id="ad-estado" value="${this._esc(data?.estado||'')}" placeholder="Descripcion del estado actual"></div></div>
       <div class="form-group"><label>Notas</label><textarea id="ad-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div>

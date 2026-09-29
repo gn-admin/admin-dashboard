@@ -761,3 +761,56 @@ describe('_snackTipo: el color depende del status del backend', () => {
     assert.equal(T(new Error('No se pudo subir la foto')), 'error');
   });
 });
+
+describe('_esUrgente: marca de acogida/adopcion prioritaria', () => {
+  const E = (v) => Dashboard._esUrgente({ urgente: v });
+
+  it('acepta todas las formas que puede devolver la hoja', () => {
+    assert.equal(E(true), true);
+    assert.equal(E(1), true);
+    assert.equal(E('1'), true);
+    assert.equal(E('TRUE'), true);
+    assert.equal(E('true'), true);
+    assert.equal(E('SI'), true);
+    assert.equal(E('Si'), true);
+  });
+
+  it('todo lo demas no es urgente', () => {
+    assert.equal(E(false), false);
+    assert.equal(E('FALSE'), false);
+    assert.equal(E(''), false);
+    assert.equal(E(0), false);
+    assert.equal(E(null), false);
+    assert.equal(E(undefined), false);
+    assert.equal(Dashboard._esUrgente(null), false);
+    assert.equal(Dashboard._esUrgente(undefined), false);
+    assert.equal(Dashboard._esUrgente({}), false);
+  });
+});
+
+describe('_ordenaUrgentes: los urgentes salen primero', () => {
+  const A = (id, urgente) => ({ id, urgente, estado: 'disponible' });
+
+  it('sube los urgentes sin reordenar dentro de cada tramo', () => {
+    const lista = [A('a', false), A('b', true), A('c', false), A('d', true), A('e', false)];
+    assert.deepEqual(Dashboard._ordenaUrgentes(lista).map(x => x.id), ['b', 'd', 'a', 'c', 'e']);
+  });
+
+  it('no muta la lista original', () => {
+    const lista = [A('a', false), A('b', true)];
+    Dashboard._ordenaUrgentes(lista);
+    assert.deepEqual(lista.map(x => x.id), ['a', 'b']);
+  });
+
+  it('con cero urgentes ni con lista vacia no rompe', () => {
+    assert.deepEqual(Dashboard._ordenaUrgentes([A('a', false), A('b', false)]).map(x => x.id), ['a', 'b']);
+    assert.deepEqual(Dashboard._ordenaUrgentes([]), []);
+    assert.deepEqual(Dashboard._ordenaUrgentes(null), []);
+    assert.deepEqual(Dashboard._ordenaUrgentes(undefined), []);
+  });
+
+  it('entiende la marca venga como texto de la hoja', () => {
+    const lista = [{ id: 'x' }, { id: 'y', urgente: 'TRUE' }];
+    assert.deepEqual(Dashboard._ordenaUrgentes(lista).map(x => x.id), ['y', 'x']);
+  });
+});
