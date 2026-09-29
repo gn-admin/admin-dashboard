@@ -1,4 +1,4 @@
-# GN-Encuestas / Admin Dashboard — Contexto completo (2026-09-27)
+# GN-Encuestas / Admin Dashboard — Contexto completo (2026-09-29)
 
 > Documento vivo de estado. Sin datos sensibles (sin URLs de exec, claves, IDs ni tokens).
 > Reglas de trabajo en `AGENTS.md`. Puesta en marcha en `README.md`.
@@ -17,11 +17,11 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (117 tests en verde, lógica pura sin DOM).
+- `npm test` — `node --test tests/*.test.js` (142 tests en verde, lógica pura sin DOM).
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
 
 ## Arquitectura
-- `src/`: `index.html` + `js/` (config, icons, auth, api, dashboard ~3600 líneas,
+- `src/`: `index.html` + `js/` (config, icons, auth, api, dashboard ~4700 líneas,
   carnet-generator, pdf-export, app) + `css/styles.css` + `sw.js` + `manifest` + assets.
 - Router por hash (`app.js`). Sin framework ni build de JS.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
@@ -124,7 +124,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   instantáneo desde caché + refresco en fondo.
 - **Guía**: modal por botones (8 pestañas: general, adopción, acogida, **animales
   (camadas y grupos)**, redes, apadrinamiento, gestión, estados) + accesos directos.
-  La de animales lleva **11 pasos** con el paso 3 «Crear un grupo (no hay pantalla
+  La de animales lleva **12 pasos** con el paso 3 «Crear un grupo (no hay pantalla
   aparte)»: los grupos se eligen en el **selector *Grupo / Camada*** (o se crean con
   *Crear grupo nuevo…*, en *Alta de camada* o desde *Editar*), no en una pantalla propia.
 - **Transversal**: login sin flash (`gn_session`), init perezoso con `_ensureListas`,
@@ -215,15 +215,42 @@ Detalle commit a commit en `git log`.
 4. Ejecutar Descartar-2025 en Reportes una vez.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
 
+## Deuda y decisiones abiertas (no bloquean)
+1. **Contraste WCAG AA pendiente**: `.btn-danger` (3,8:1) y `.btn-outline-green`
+   (texto `--primary` sobre blanco, 2,2:1). `AGENTS.md` lo deja a decisión de diseño;
+   solo se corrigió `.btn-primary`.
+2. **Regla de devolución de un grupo obligatorio**: ¿se devuelve el animal a la
+   protectora o solo se marca el caso? Sin definir.
+3. **`docs/` legado desactualizado** (`CHANGELOG` parado en 2026-09-19, `ROLES.md`
+   con roles que ya no existen, `ARQUITECTURA.md` hablando de mock backend y Google
+   login, `CHECKLIST-PRODUCCION.md` sin marcar): decidir si se actualiza, se marca
+   como histórico o se retira del repo. **`PROGRESO.md` + `AGENTS.md` son la fuente
+   de verdad.**
+4. **Sin linter**: `npm run lint` es un `echo` (no hay ESLint/Prettier configurados).
+
 ## Futuro desarrollo (no empezado)
-Encuesta **Otras Especies** (hoy retirada del front y de `gen-config`): crear el
-Google Form duplicando el de pre-adopción, rellenar `FORM_OTRAS_ESPECIES_ID` +
-`SHEET_OTRAS_ESPECIES_ID` en `.env`, `node scripts/gen-config.js` (el generador
-volverá a emitir la entrada `otras-especies` cuando exista el form id), *Nueva
-versión* en el editor y reintroducir la 4ª tarjeta del hub, la ruta
-`#encuestas-otras` y el export de Reportes.
-Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), WhatsApp
-(`wa.me`), portal público con datos de aquí,
-endpoint agregado `dashboard`, push notifications, fusión de duplicados, lector de
-pantalla completo, logo en alta para splash 512, recibos SEPA, colonias felinas CER,
-alta de voluntarios vía Google Form, protocolo automático de recordatorios de entrada.
+
+> **Contexto — Redes/Instagram**: no se lista aquí como mejora porque está **aún por
+> definir**: hoy es un módulo *dummy* local (`TODO Meta` en el código) sin integración
+> real. Antes de programar nada hay que decidir la dirección (conectar Meta / publicar
+> desde el panel / o retirarlo). Solo después tendría sentido tocarlo.
+
+Mejoras candidatas, por orden de encaje:
+
+- **Encuesta «Otras Especies»** (hoy retirada del front y de `gen-config`): crear el
+  Google Form duplicando el de pre-adopción, rellenar `FORM_OTRAS_ESPECIES_ID` +
+  `SHEET_OTRAS_ESPECIES_ID` en `.env`, `node scripts/gen-config.js` (el generador
+  volverá a emitir la entrada `otras-especies` cuando exista el form id), *Nueva
+  versión* en el editor y reintroducir la 4ª tarjeta del hub, la ruta
+  `#encuestas-otras` y el export de Reportes.
+- **WhatsApp** (`wa.me`) desde ficha de solicitud/socio.
+- **Portal público** con datos de aquí (adopciones disponibles, sin datos sensibles).
+- **Endpoint agregado `dashboard`** en el backend para cargar los KPIs en una sola
+  petición (hoy son varias).
+- **Push notifications** (recordatorios de vencimiento, acogidas, etc.).
+- **Fusión de duplicados** (animales/socios con el mismo nombre o email).
+- **Lector de pantalla completo** (lectura cómoda de respuestas largas).
+- **Logo en alta** para el splash de 512 px (hoy solo 180/192/512 del icono).
+- **Recibos SEPA** para cuotas de socios.
+- **Colonias felinas CER** y **alta de voluntarios vía Google Form**.
+- **Protocolo automático de recordatorios de entrada**.
