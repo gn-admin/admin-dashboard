@@ -27,7 +27,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v93`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v94`.
 
 ## Mapa funcional final
 - **Encuestas** (3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -43,6 +43,11 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   insignia roja **Urgente** en tarjeta y ficha (+ campo *Prioridad*) y **orden
   urgente-primero** en el selector de asignación y en *Vincular animal*
   (`_esUrgente`/`_ordenaUrgentes`, sin mutar el original).
+  **Selector de grupo (v94)**: el campo *Grupo / Camada* es ahora un `<select>`
+  (`_listaGrupos` = entidad `grupos` ∪ nombres de animales, unidos por `_normGrupo`,
+  con número de miembros) + *Crear grupo nuevo…*, que despliega el input. Sustituye
+  al `<datalist>`, poco fiable en móvil. Si el nombre tecleado ya existía,
+  `_onChangeGrupoNuevo` selecciona esa opción en lugar de partir el grupo.
   **Grupos unidos por nombre** (opción A): `_normGrupo` normaliza mayúsculas/acentos/
   espacios y `_resolveGrupoId` reutiliza el `grupo_id` existente → alta, edición y
   camada convergen en un mismo grupo; cambiar de nombre saca del grupo anterior.
@@ -96,8 +101,8 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - **Guía**: modal por botones (8 pestañas: general, adopción, acogida, **animales
   (camadas y grupos)**, redes, apadrinamiento, gestión, estados) + accesos directos.
   La de animales lleva **11 pasos** con el paso 3 «Crear un grupo (no hay pantalla
-  aparte)»: los grupos se crean escribiendo el nombre en *Grupo / Camada* (o en
-  *Alta de camada* o desde *Editar*), no en una pantalla propia.
+  aparte)»: los grupos se eligen en el **selector *Grupo / Camada*** (o se crean con
+  *Crear grupo nuevo…*, en *Alta de camada* o desde *Editar*), no en una pantalla propia.
 - **Transversal**: login sin flash (`gn_session`), init perezoso con `_ensureListas`,
   sync offline con cola (`gn_pending_ops` + badge + upsert backend), anti-doble-clic
   en forms (`Guardando...`), semáforo verde/naranja/rojo + glyphs, PWA instalable

@@ -814,3 +814,47 @@ describe('_ordenaUrgentes: los urgentes salen primero', () => {
     assert.deepEqual(Dashboard._ordenaUrgentes(lista).map(x => x.id), ['y', 'x']);
   });
 });
+
+describe('_listaGrupos: opciones del selector de grupo', () => {
+  const conTodo = (animales, grupos, fn) => {
+    const pa = Dashboard.animales, pg = Dashboard.grupos;
+    Dashboard.animales = animales;
+    Dashboard.grupos = grupos || [];
+    try { return fn(); } finally { Dashboard.animales = pa; Dashboard.grupos = pg; }
+  };
+
+  it('une la entidad grupos con los que ya tienen animales, por nombre normalizado', () => {
+    conTodo([
+      { id: 'a1', grupo: 'Camada Luna', grupo_id: 'gpo_1' },
+      { id: 'a2', grupo: 'camada luna', grupo_id: 'gpo_1' },
+      { id: 'a3', grupo: 'Turbo', grupo_id: 'gpo_2' }
+    ], [{ id: 'gpo_9', nombre: 'Huerfanos' }], () => {
+      const l = Dashboard._listaGrupos();
+      assert.deepEqual(l.map(g => g.nombre), ['Camada Luna', 'Huerfanos', 'Turbo']);
+      assert.equal(l.find(g => g.norm === 'camada luna').n, 2);
+      assert.equal(l.find(g => g.norm === 'huerfanos').n, 0);
+      assert.equal(l.find(g => g.norm === 'camada luna').gid, 'gpo_1');
+    });
+  });
+
+  it('sin nombre de grupo no se cuela el id como opcion', () => {
+    conTodo([{ id: 'a1', grupo: '', grupo_id: 'gpo_1' }], [], () => {
+      assert.deepEqual(Dashboard._listaGrupos(), []);
+    });
+  });
+
+  it('animal sin nombre usa el nombre de la fila de la entidad', () => {
+    conTodo([{ id: 'a1', grupo: '', grupo_id: 'gpo_7' }], [{ id: 'gpo_7', nombre: 'Los Setos' }], () => {
+      const l = Dashboard._listaGrupos();
+      assert.equal(l.length, 1);
+      assert.equal(l[0].nombre, 'Los Setos');
+      assert.equal(l[0].n, 1);
+      assert.equal(l[0].gid, 'gpo_7');
+    });
+  });
+
+  it('lista vacia no rompe', () => {
+    conTodo([], null, () => assert.deepEqual(Dashboard._listaGrupos(), []));
+    conTodo(null, undefined, () => assert.deepEqual(Dashboard._listaGrupos(), []));
+  });
+});
