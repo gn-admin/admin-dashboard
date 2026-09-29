@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v95';
+﻿const CACHE_NAME = 'gn-encuestas-v96';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -17,7 +17,7 @@ const STATIC_ASSETS = [
   './assets/icons/logo-nebak.jpg'
 ];
 
-// Install: cache assets estÃ¡ticos
+// Install: cache assets estáticos
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -37,7 +37,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch: cache-first para assets estÃ¡ticos, network-first para API
+// Fetch: cache-first para assets estáticos, network-first para API
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -59,7 +59,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Assets estÃ¡ticos: cache-first
+  // Assets estáticos: cache-first
   event.respondWith(
     caches.match(event.request)
       .then(cached => {

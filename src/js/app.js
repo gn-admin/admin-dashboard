@@ -78,6 +78,7 @@ const App = {
       'encuestas-perros': 'Pre-adopcion Perros',
       'encuestas-gatos': 'Pre-adopcion Gatos',
       'encuestas-acogida': 'Solicitudes de Acogida',
+      'encuestas-otras': 'Otras Especies',
       animales: 'Animales',
       acogidas: 'Familias de Acogida',
       'acogidas-activas': 'Acogidas Activas',
@@ -85,6 +86,7 @@ const App = {
       socios: 'Socios / Voluntarios',
       blacklist: 'Lista Negra',
       reportes: 'Reportes',
+      actividad: 'Registro de actividad',
       redes: 'Redes Sociales',
       donaciones: 'Donaciones',
       almacen: 'Almacén'

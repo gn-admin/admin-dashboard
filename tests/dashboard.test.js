@@ -891,3 +891,76 @@ describe('_listaGrupos: opciones del selector de grupo', () => {
     conTodo(null, undefined, () => assert.deepEqual(Dashboard._listaGrupos(), []));
   });
 });
+
+
+describe('_tsFecha: normaliza fechas de las hojas', () => {
+  const T = (f) => Dashboard._tsFecha(f);
+
+  it('ISO (YYYY-MM-DD) con o sin hora', () => {
+    assert.equal(T('2026-03-05'), Date.UTC(2026, 2, 5));
+    assert.equal(T('2026-03-05T10:20:30.000Z'), Date.UTC(2026, 2, 5));
+  });
+
+  it('dd/mm/aaaa (formato Sheets es-ES)', () => {
+    assert.equal(T('5/3/2026'), Date.UTC(2026, 2, 5));
+    assert.equal(T('05/03/2026'), Date.UTC(2026, 2, 5));
+  });
+
+  it('iso con separador de espacio', () => {
+    assert.equal(T('2026-12-31 23:59:00'), Date.UTC(2026, 11, 31));
+  });
+
+  it('basura o vacio -> 0', () => {
+    assert.equal(T(''), 0);
+    assert.equal(T(null), 0);
+    assert.equal(T(undefined), 0);
+    assert.equal(T('no es fecha'), 0);
+  });
+});
+
+describe('_tipoLogLabel / _tipoLogCls: etiquetas del registro', () => {
+  it('conoce los tipos que escribe _regLog', () => {
+    assert.equal(Dashboard._tipoLogLabel('adopcion'), 'Adopcion');
+    assert.equal(Dashboard._tipoLogLabel('voluntariado'), 'Voluntariado');
+    assert.equal(Dashboard._tipoLogLabel('padrino-convertido'), 'Padrino a socio');
+    assert.equal(Dashboard._tipoLogLabel('apadrinamiento-fin'), 'Fin apadrinamiento');
+  });
+
+  it('tipo desconocido o vacio no deja hueco', () => {
+    assert.equal(Dashboard._tipoLogLabel('pepito'), 'pepito');
+    assert.equal(Dashboard._tipoLogLabel(''), 'General');
+    assert.equal(Dashboard._tipoLogLabel(null), 'General');
+  });
+
+  it('cls: rojo solo para lista negra, ambar para dinero, verde para proceso', () => {
+    assert.equal(Dashboard._tipoLogCls('blacklist'), 'descartada');
+    assert.equal(Dashboard._tipoLogCls('gasto'), 'en_proceso');
+    assert.equal(Dashboard._tipoLogCls('donacion'), 'en_proceso');
+    assert.equal(Dashboard._tipoLogCls('adopcion'), 'aprobada');
+    assert.equal(Dashboard._tipoLogCls('voluntariado'), '');
+    assert.equal(Dashboard._tipoLogCls(undefined), '');
+  });
+});
+
+describe('_busyStart / _busyEnd: anti doble-tap de fase', () => {
+  it('el segundo toque mientras esta en vuelo se ignora', () => {
+    assert.equal(Dashboard._busyStart('fase:a1'), true);
+    assert.equal(Dashboard._busyStart('fase:a1'), false);
+    Dashboard._busyEnd('fase:a1');
+    assert.equal(Dashboard._busyStart('fase:a1'), true);
+    Dashboard._busyEnd('fase:a1');
+  });
+
+  it('llaves distintas no se pisan', () => {
+    assert.equal(Dashboard._busyStart('fase:a1'), true);
+    assert.equal(Dashboard._busyStart('fase:a2'), true);
+    Dashboard._busyEnd('fase:a1');
+    Dashboard._busyEnd('fase:a2');
+    assert.equal(Dashboard._busyStart('fase:a1'), true);
+    Dashboard._busyEnd('fase:a1');
+  });
+
+  it('end sin start no revienta', () => {
+    assert.doesNotThrow(() => Dashboard._busyEnd('nunca-empezo'));
+  });
+});

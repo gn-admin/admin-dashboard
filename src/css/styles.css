@@ -271,14 +271,17 @@ body {
   width: 100%;
 }
 
+/* Blanco sobre --primary (#1FC95B) da 2,2:1 (fallo AA). El boton primario
+   usa un verde oscuro identico en familia (4,7:1) y su hover aun mas (6,6:1);
+   el resto de la estetica (--primary en badges, iconos, bordes) no se toca. */
 .btn-primary {
-  background: var(--primary);
+  background: var(--primary-hover);
   color: var(--white);
   box-shadow: var(--shadow-green);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover);
+  background: #0f6b31;
   transform: translateY(-1px);
 }
 

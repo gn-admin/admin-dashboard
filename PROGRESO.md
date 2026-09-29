@@ -17,7 +17,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (66 tests en verde, lógica pura sin DOM).
+- `npm test` — `node --test tests/*.test.js` (117 tests en verde, lógica pura sin DOM).
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
 
 ## Arquitectura
@@ -27,13 +27,16 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v95`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v96`.
 
 ## Mapa funcional final
-- **Encuestas** (3): listados con filtros/buscador, ficha con estados (`pendiente`,
+- **Encuestas** (3 + 1 opcional «Otras Especies»): listados con filtros/buscador, ficha con estados (`pendiente`,
   `en_proceso`, `aprobada`, `descartada`, clave `survey_id::id`), notas, aprobar→
   candidatura (+auto-familia en acogida), asignar animal/familia, PDF individual y
   completo (portada + KPIs + fichas), chequeo de blacklist, mantenimiento Descartar-2025.
+  El hub móvil pinta **4 tarjetas**; la de *Otras Especies* (`otras-especies`) se
+  activa con `FORM_OTRAS_ESPECIES_ID` en `.env` + regenerar + redeploy, y mientras
+  tanto muestra la ficha `infoOtrasEspecies()` con los pasos.
 - **Animales**: CRUD en modal, alta de camada bulk, foto principal (Drive + thumbnail),
   especie extensible, grupos, estados (`disponible`, `en_acogida`, `en_adopcion`,
   `adoptado`, `fallecido`), ficha con héroe + secciones plegables (info, publicaciones,
@@ -54,6 +57,9 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   `_repairGrupos` (una vez por sesión, al abrir Animales) fusiona por nombre los
   grupos ya partidos y lo persiste con `updateAnimal`. **Export CSV** (`;` + BOM UTF-8)
   de todo el inventario con las columnas `grupo`/`grupo_id` para revisar en Excel.
+  **Filtro «Solo urgentes» (v96)**: tercer `<select>` de Animales
+  (`_currentPrioridadFilter`) combinable con estado y especie, y el listado siempre
+  ordena los urgentes a la cabeza de cada bloque (`_ordenaUrgentes`, sin mutar).
   **UI de grupos**: el listado pinta bloques por grupo (cabecera con collage 2x2 de
   los miembros —o foto propia—, nombre, totales y botón *Ver grupo*) y el resto de
   tarjetas sueltas; la insignia de la tarjeta abre el grupo. Ficha de grupo en
@@ -84,6 +90,10 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   estado (Al día/Pendiente), carnets diferenciados por color con QR. Campo **Área**
   con la opción «Cuidado de acogida» **retirada** (esa gestión vive en su propia
   pestaña); los registros antiguos que la tengan se conservan como opción legada.
+  **Horas de voluntariado (v96)**: la ficha del socio con tipo *Voluntario*/*Ambos*
+  tiene *Registrar horas* → suma sobre `horas_mes` y sella `ultima_actividad`
+  (columnas ya existentes, sin columnas nuevas) + botón *Reiniciar mes*; la lista
+  muestra la columna *Horas/mes* y ambas acciones dejan traza en el log.
 - **Lista negra**: CRUD con aviso en fichas coincidentes.
 - **Donaciones / Gastos / Recordatorios / Seguimiento**: CRUD completos. **Gastos con
   factura adjunta opcional** (PDF/imagen → Drive, enlace «Ver factura») en **carpeta
@@ -93,8 +103,16 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   de uso «Qué se guarda aquí».
 - **Redes**: módulo Instagram en dummy local (plantilla con iconos/tipo/contacto,
   preview, historial con enlace simulado). Corte a real marcado `TODO Meta`.
-- **Reportes**: tasas, resumen por entidad, **memoria anual por ejercicio (tarjeta
-  con selector + descarga PDF)**, exports PDF de encuestas.
+- **Reportes**: tasas, resumen por entidad, **tarjeta Analítica (v96)** —análisis de
+  respuestas por encuesta/estado, duración media de la acogida (`_tsFecha` normaliza
+  ISO, ISO con hora y `dd-mm-aaaa`) y horas de voluntariado con top del mes—,
+  **memoria anual por ejercicio (tarjeta con selector + descarga PDF)**, exports PDF
+  de encuestas.
+- **Registro de actividad**: pantalla `#actividad` (sidebar *Herramientas*, menú *Más*)
+  con buscador, filtro por tipo, tabla y export CSV; alimentada por `_regLog`, que
+  además persiste en `gn_cache_actividad` (la colección no está en `saveLocal()`).
+- **Anti doble-tap**: `avanzarFase`/`retrocederFase`/`avanzarFaseAcogida` protegidos
+  por `_busyStart`/`_busyEnd` (llave por caso, liberada en `finally`).
 - **Dashboard**: tarjeta Hoy, Acción requerida unificada, KPIs clicables con deltas,
   Tesorería (donaciones/gastos/balance/cuotas), barras + embudo, recientes. Pintado
   instantáneo desde caché + refresco en fondo.
@@ -164,7 +182,13 @@ apadrinamientos → gestión (gastos/recordatorios/donaciones/seguimiento/docume
 fallecido + fase Prueba + memoria anual + almacén + menú agrupado → guía por botones →
 a11y/teclado → dashboard Hoy/Acción final → **retirar opción «Cuidado de acogida»
 del Área de socios, factura adjunta al gasto, desenlace `devuelto`, memoria anual
-en PDF, texto de uso del Almacén**. Detalle commit a commit en `git log`.
+en PDF, texto de uso del Almacén** → v92 snackbar con `status` + ámbar → v93 marca de
+urgencia + `.form-input` → v94 selector de grupo (sustituye al datalist) → v95
+auditoría UI/UX (contraste AA en toasts/badge, `_esPrioritario`, pills flex,
+checkbox nativo 44px, zoom iOS) → **v96 filtro de urgentes, `.btn-primary` con
+contraste AA, pantalla de Registro de actividad, horas de voluntariado, 4ª tarjeta
+«Otras Especies», Analítica en Reportes y anti-doble-tap en fases**.
+Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
@@ -175,10 +199,14 @@ en PDF, texto de uso del Almacén**. Detalle commit a commit en `git log`.
    `Code.gs` desplegado ya trae la auto-creación de columnas (punto 1).
 4. Ejecutar Descartar-2025 en Reportes una vez.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
+6. *(Opcional)* Activar la encuesta **Otras Especies**: crear el Google Form y
+   rellenar `FORM_OTRAS_ESPECIES_ID` + `SHEET_OTRAS_ESPECIES_ID` en `.env`,
+   `node scripts/gen-config.js` (emite la entrada `otras-especies` en `Config.gs`)
+   y *Nueva versión* en el editor.
 
 ## Futuro desarrollo (no empezado)
 Redes real (Meta: cuenta Empresa + App + cablear `TODO Meta`), WhatsApp
-(`wa.me`), portal público con datos de aquí, anti-doble-tap en botones de fase,
+(`wa.me`), portal público con datos de aquí,
 endpoint agregado `dashboard`, push notifications, fusión de duplicados, lector de
 pantalla completo, logo en alta para splash 512, recibos SEPA, colonias felinas CER,
 alta de voluntarios vía Google Form, protocolo automático de recordatorios de entrada.

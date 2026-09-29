@@ -5,6 +5,8 @@ const Dashboard = {
   // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
   APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
+  // Prioridad (urgent): 'all' | 'solo' — combinable con estado y especie.
+  _currentPrioridadFilter: 'all',
   _loaded: {}, _loading: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
   async init() {
@@ -71,6 +73,7 @@ const Dashboard = {
       'encuestas-perros': () => this.renderEncuesta(el, 'pre-adopcion-perros'),
       'encuestas-gatos': () => this.renderEncuesta(el, 'pre-adopcion-gatos'),
       'encuestas-acogida': () => this.renderEncuesta(el, 'pre-acogida'),
+      'encuestas-otras': () => this._hayEncuestaOtras() ? this.renderEncuesta(el, 'otras-especies') : this._sinEncuestaOtras(el),
       animales: () => this.renderAnimales(el),
       acogidas: () => this.renderAcogidas(el),
       'acogidas-activas': () => this.renderAcogidasActivas(el),
@@ -78,6 +81,7 @@ const Dashboard = {
       socios: () => this.renderSocios(el),
       blacklist: () => this.renderBlacklist(el),
       reportes: () => this.renderReportes(el),
+      actividad: () => this.renderActividad(el),
       redes: () => this.renderRedes(el),
       donaciones: () => this.renderDonaciones(el),
       almacen: () => this.renderAlmacen(el),
@@ -109,13 +113,14 @@ const Dashboard = {
     set('mas-icon-adopciones', Icons.fileText);
     set('mas-icon-socios', Icons.users);
     set('mas-icon-reportes', Icons.barChart);
+    set('mas-icon-actividad', Icons.activity);
     set('mas-icon-redes', Icons.eye);
     set('mas-icon-donaciones', Icons.trendingUp);
     set('mas-icon-almacen', Icons.box);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, 'encuestas-otras': Icons.paw, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, actividad: Icons.activity, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -847,18 +852,32 @@ const Dashboard = {
   // ==================== ENCUESTAS ====================
   async renderEncuestasHub(el) {
     await this._loadSurveys();
+    const otrasOk = this._hayEncuestaOtras();
     await Promise.all([
       this._loadResponses('pre-adopcion-perros'),
       this._loadResponses('pre-adopcion-gatos'),
       this._loadResponses('pre-acogida'),
+      otrasOk ? this._loadResponses('otras-especies') : null,
       this.loadEstados()
     ]);
     const defs = [
       { surveyId: 'pre-adopcion-perros', page: 'encuestas-perros', icon: Icons.dog, title: 'Pre-adopción Perros' },
       { surveyId: 'pre-adopcion-gatos', page: 'encuestas-gatos', icon: Icons.cat, title: 'Pre-adopción Gatos' },
-      { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' }
+      { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' },
+      { surveyId: 'otras-especies', page: 'encuestas-otras', icon: Icons.paw, title: 'Otras Especies', falta: !otrasOk }
     ];
     const cards = defs.map(d => {
+      if (d.falta) {
+        return `<a class="hub-card" onclick="Dashboard.infoOtrasEspecies()">
+          <div class="hub-card-icon" style="background:var(--gray-100);color:var(--gray-400)">${d.icon}</div>
+          <div class="hub-card-body">
+            <div class="hub-card-title">${d.title}</div>
+            <div class="hub-card-meta">Formulario pendiente de configurar</div>
+            <div class="hub-card-date">Ver como activarla</div>
+          </div>
+          <span class="hub-card-chevron">${Icons.chevronRight}</span>
+        </a>`;
+      }
       const list = this.responses[d.surveyId] || [];
       const activas = list.filter(r => this.getEstado(r.id, d.surveyId) !== 'descartada');
       const pendientes = activas.filter(r => this.getEstado(r.id, d.surveyId) === 'pendiente').length;
@@ -876,6 +895,31 @@ const Dashboard = {
       </a>`;
     }).join('');
     el.innerHTML = `<div class="page-list-container"><div class="hub-grid">${cards}</div></div>`;
+  },
+
+  // La 4ª encuesta (otras especies) solo aparece operativa cuando el backend
+  // la tiene definida; mientras tanto la tarjeta explica como activarla.
+  _hayEncuestaOtras() {
+    return !!(this.surveys || []).some(s => s.id === 'otras-especies');
+  },
+
+  _sinEncuestaOtras(el) {
+    el.innerHTML = `<div class="page-list-container"><div class="empty-state"><div class="empty-state-icon">${Icons.paw}</div>
+      <h3>Encuesta de Otras Especies sin configurar</h3>
+      <p>Esta encuesta aun no tiene formulario asociado en el backend.</p>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.infoOtrasEspecies()">Ver como activarla</button>
+    </div></div><div class="page-detail-container"></div>`;
+  },
+
+  infoOtrasEspecies() {
+    this.showInfoModal('Encuesta · Otras Especies', `
+      <div class="alert-item info" style="margin-bottom:12px">${Icons.info} <span>Esta encuesta es para <b>adopción de animales que no son perro ni gato</b> (conejos, aves, reptiles, roedores...).</span></div>
+      <div class="detail-section"><div class="detail-section-title">Como activarla</div>
+        <div class="detail-field"><div class="detail-question">1. Crea el formulario</div><div class="detail-answer">En Google Forms, duplica la encuesta de pre-adopción y adapta las preguntas a la especie.</div></div>
+        <div class="detail-field"><div class="detail-question">2. Añade las variables en <code>.env</code></div><div class="detail-answer"><code>FORM_OTRAS_ESPECIES_ID</code> y <code>SHEET_OTRAS_ESPECIES_ID</code>.</div></div>
+        <div class="detail-field"><div class="detail-question">3. Regenera la configuración</div><div class="detail-answer"><code>node scripts/gen-config.js</code> (añade la entrada <code>otras-especies</code> a <code>apps-script/Config.gs</code>).</div></div>
+        <div class="detail-field"><div class="detail-question">4. Despliega el backend</div><div class="detail-answer">Pega el <code>Config.gs</code> en el editor de Apps Script y publica una <b>Nueva versión</b>.</div></div>
+      </div>`);
   },
 
   async renderEncuesta(el, surveyId) {
@@ -1537,6 +1581,7 @@ const Dashboard = {
     const row = { id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), fecha: new Date().toISOString(), usuario: Auth.currentUser?.email || 'admin', tipo: tipo, detalle: detalle, entidad: entidad || '', entidad_id: entidadId || '', descripcion: detalle };
     (this.actividad || []).unshift(row);
     this.saveLocal();
+    this._cacheSet('actividad', this.actividad);
     this._apiCreateRow(() => API.createActividad(row), { m: 'createActividad', a: [row] });
   },
 
@@ -2208,10 +2253,15 @@ const Dashboard = {
     this._repairGrupos();
     const filter = this._currentAnimalFilter;
     const especie = this._currentEspecieFilter;
+    const prioridad = this._currentPrioridadFilter;
     let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
     if (especie!=='all') filtered = especie==='otro' ? filtered.filter(a=>!['Perro','Gato'].includes(a.especie)) : filtered.filter(a=>(a.especie||'')===especie);
+    if (prioridad==='solo') filtered = filtered.filter(a=>this._esPrioritario(a));
     const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length, fallecido:this.animales.filter(a=>a.estado==='fallecido').length};
     const nPerros=this.animales.filter(a=>a.especie==='Perro').length, nGatos=this.animales.filter(a=>a.especie==='Gato').length, nOtro=this.animales.filter(a=>a.especie&&!['Perro','Gato'].includes(a.especie)).length;
+    const nUrgentes=this.animales.filter(a=>this._esPrioritario(a)).length;
+    // Los urgentes se adelantan dentro de cada bloque (no muta el original).
+    filtered = this._ordenaUrgentes(filtered);
     const { bloques, sueltos } = this._bloquesDeGrupo(filtered);
     const tarjeta = (a, enBloque) => `
           <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
@@ -2234,7 +2284,7 @@ const Dashboard = {
         </section>`).join('');
     const sueltosHtml = sueltos.length ? `<div class="animal-grid">${sueltos.map(a => tarjeta(a, false)).join('')}</div>` : '';
     const vacio = filtered.length ? '' : (this.animales.length
-      ? `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>Prueba otro estado o cambia la especie.</p></div>`
+      ? `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>${prioridad==='solo' ? 'Ningún animal de este filtro es urgente.' : 'Prueba otro estado o cambia la especie.'}</p></div>`
       : `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
@@ -2254,6 +2304,11 @@ const Dashboard = {
             <option value="Gato" ${especie==='Gato'?'selected':''}>Gatos (${nGatos})</option>
             <option value="otro" ${especie==='otro'?'selected':''}>Otros (${nOtro})</option>
           </select>
+          <select onchange="Dashboard._currentPrioridadFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))" aria-label="Filtrar por prioridad">
+            <option value="all" ${prioridad==='all'?'selected':''}>Prioridad: Todas</option>
+            <option value="solo" ${prioridad==='solo'?'selected':''}>Solo urgentes (${nUrgentes})</option>
+          </select>
+          ${prioridad==='solo'?`<button class="btn btn-outline-green btn-sm" onclick="Dashboard._currentPrioridadFilter='all';Dashboard.renderAnimales(document.getElementById('page-animales'))">Ver todas</button>`:''}
         </div></div>
         <div id="animales-form-container"></div>
         ${bloquesHtml}
@@ -3157,37 +3212,43 @@ const Dashboard = {
   },
 
   async avanzarFaseAcogida(id) {
-    const c = this._byId(this.acogidas, id);
-    if (!c) return;
-    const order = { entrega: 'en_casa', en_casa: 'finalizada' };
-    const next = order[c.fase];
-    if (!next) return;
-    if (next === 'finalizada' && !(await this._confirm('Finalizar la acogida? El animal volvera a Disponible y la familia quedara Libre.', 'Finalizar acogida'))) return;
-    c.fase = next;
-    if (c.fase === 'finalizada') {
-      c.estado = 'finalizada';
-      c.fin = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-      const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
-      if (a) {
-        a.estado = 'disponible';
-        a.acogida_familia = '';
-        this._updateLocalYApi('animales', a);
+    const busyKey = 'fase-acogida:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const c = this._byId(this.acogidas, id);
+      if (!c) return;
+      const order = { entrega: 'en_casa', en_casa: 'finalizada' };
+      const next = order[c.fase];
+      if (!next) return;
+      if (next === 'finalizada' && !(await this._confirm('Finalizar la acogida? El animal volvera a Disponible y la familia quedara Libre.', 'Finalizar acogida'))) return;
+      c.fase = next;
+      if (c.fase === 'finalizada') {
+        c.estado = 'finalizada';
+        c.fin = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
+        if (a) {
+          a.estado = 'disponible';
+          a.acogida_familia = '';
+          this._updateLocalYApi('animales', a);
+        }
+        const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
+        if (fam) {
+          fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
+          if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
+          this._updateLocalYApi('familias', fam);
+        }
+        const sol = this._parseSolicitud(c.solicitud_id);
+        if (sol) await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
+        this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
+        this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'), 'acogida', c.id);
+      } else {
+        this.showSnackbar('Fase actualizada', 'success');
       }
-      const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
-      if (fam) {
-        fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
-        if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
-        this._updateLocalYApi('familias', fam);
-      }
-      const sol = this._parseSolicitud(c.solicitud_id);
-      if (sol) await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
-      this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
-      this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'), 'acogida', c.id);
-    } else {
-      this.showSnackbar('Fase actualizada', 'success');
+      this.saveLocal();
+      this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+    } finally {
+      this._busyEnd(busyKey);
     }
-    this.saveLocal();
-    this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
   },
 
   async deleteAcogida(id) {
@@ -3423,31 +3484,43 @@ const Dashboard = {
   },
 
   async avanzarFase(id) {
-    const p = this._byId(this.adopciones, id);
-    if (!p) return;
-    const fases = this._fasesAdopcion();
-    const idx = fases.indexOf(p.fase);
-    if (idx >= fases.length - 1) return;
-    const newFase = fases[idx + 1];
-    try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
-    catch (err) { this._snackErr(err, 'No se pudo avanzar de fase'); return; }
-    p.fase = newFase;
-    p.estado = `Fase: ${newFase}`;
-    this.viewAdopcion(id);
+    const busyKey = 'fase:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const p = this._byId(this.adopciones, id);
+      if (!p) return;
+      const fases = this._fasesAdopcion();
+      const idx = fases.indexOf(p.fase);
+      if (idx >= fases.length - 1) return;
+      const newFase = fases[idx + 1];
+      try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
+      catch (err) { this._snackErr(err, 'No se pudo avanzar de fase'); return; }
+      p.fase = newFase;
+      p.estado = `Fase: ${newFase}`;
+      this.viewAdopcion(id);
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async retrocederFase(id) {
-    const p = this._byId(this.adopciones, id);
-    if (!p) return;
-    const fases = this._fasesAdopcion();
-    const idx = fases.indexOf(p.fase);
-    if (idx <= 0) return;
-    const newFase = fases[idx - 1];
-    try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
-    catch (err) { this._snackErr(err, 'No se pudo retroceder de fase'); return; }
-    p.fase = newFase;
-    p.estado = `Fase: ${newFase}`;
-    this.viewAdopcion(id);
+    const busyKey = 'fase:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const p = this._byId(this.adopciones, id);
+      if (!p) return;
+      const fases = this._fasesAdopcion();
+      const idx = fases.indexOf(p.fase);
+      if (idx <= 0) return;
+      const newFase = fases[idx - 1];
+      try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
+      catch (err) { this._snackErr(err, 'No se pudo retroceder de fase'); return; }
+      p.fase = newFase;
+      p.estado = `Fase: ${newFase}`;
+      this.viewAdopcion(id);
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // Devolucion: conserva el caso con desenlace y revierte los efectos
@@ -3756,8 +3829,8 @@ const Dashboard = {
       </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)||'—'}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Horas/mes</th><th>Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr onclick="Dashboard.viewSocio('${s.id}')" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)||'—'}</td><td>${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--gray-400)">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3883,6 +3956,7 @@ const Dashboard = {
     await this._ensureListas(['apadrinamientos', 'animales']);
     const s = this._byId(this.socios, id);
     if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
+    const esVol = s.tipo === 'Voluntario' || s.tipo === 'Ambos';
     const fotoHtml = s.foto ? `<img src="${s.foto}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:12px">` : `<div style="width:100px;height:100px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--primary);margin-bottom:12px">${s.nombre?.charAt(0)||'?'}</div>`;
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -3910,6 +3984,7 @@ const Dashboard = {
       <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
         <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
         <div class="detail-field"><div class="detail-question">Ultima actividad</div><div class="detail-answer">${s.ultima_actividad||'Sin registro'}</div></div>
+        ${esVol ? `<div class="detail-field"><div class="detail-question">Registrar horas</div><div class="detail-answer"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="number" min="0" step="0.5" inputmode="decimal" id="hs-horas" class="form-input" style="max-width:120px;margin:0" placeholder="Ej: 2.5" aria-label="Horas a sumar"><button class="btn btn-primary btn-sm" onclick="Dashboard.registrarHoras('${s.id}')">Sumar horas</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.reiniciarHorasMes('${s.id}')">Reiniciar mes</button></div></div></div>` : ''}
       </div>
       ${this._apadrinaFicha(s.id)}`);
   },
@@ -3918,6 +3993,39 @@ const Dashboard = {
     const s = this._byId(this.socios, id);
     if (!s) return;
     CarnetGenerator.showCarnetModal(s);
+  },
+
+  // Horas de voluntariado: se suman sobre `horas_mes` (columna ya existente en
+  // la hoja Socios) y se sellan con `ultima_actividad`; dejan traza en el
+  // registro de actividad. Sin columnas nuevas -> funciona con el backend actual.
+  async registrarHoras(id) {
+    const s = this._byId(this.socios, id);
+    if (!s) return;
+    const input = document.getElementById('hs-horas');
+    const raw = String(input?.value || '').replace(',', '.').trim();
+    const v = Math.round((parseFloat(raw) || 0) * 10) / 10;
+    if (!v || v <= 0) { this.showSnackbar('Indica las horas a sumar', 'warning'); return; }
+    const total = Math.round(((parseFloat(s.horas_mes) || 0) + v) * 10) / 10;
+    const hoy = new Date().toISOString().slice(0, 10);
+    try { await API.updateSocio(id, { horas_mes: total, ultima_actividad: hoy }); }
+    catch (err) { this._snackErr(err, 'No se pudieron registrar las horas: ' + this._errMsg(err)); return; }
+    s.horas_mes = total;
+    s.ultima_actividad = hoy;
+    this._regLog('voluntariado', v + ' h de voluntariado de ' + s.nombre + ' (' + total + ' h este mes)', 'socio', s.id);
+    this.viewSocio(id);
+    this.showSnackbar('+' + v + ' h registradas a ' + s.nombre, 'success');
+  },
+
+  async reiniciarHorasMes(id) {
+    const s = this._byId(this.socios, id);
+    if (!s) return;
+    if (!(await this._confirm('Poner a cero las horas de este mes de ' + s.nombre + '?', 'Reiniciar horas'))) return;
+    try { await API.updateSocio(id, { horas_mes: 0 }); }
+    catch (err) { this._snackErr(err, 'No se pudieron reiniciar las horas: ' + this._errMsg(err)); return; }
+    s.horas_mes = 0;
+    this._regLog('voluntariado', 'Horas del mes reiniciadas de ' + s.nombre, 'socio', s.id);
+    this.viewSocio(id);
+    this.showSnackbar('Contador de horas reiniciado', 'success');
   },
 
   async toggleSocio(id) {
@@ -4192,6 +4300,99 @@ const Dashboard = {
     this.showSnackbar('Artículo eliminado', 'success');
   },
 
+  // ==================== REGISTRO DE ACTIVIDAD ====================
+  _tipoLogLabel(tipo) {
+    const m = {
+      adopcion: 'Adopcion', acogida: 'Acogida', candidatura: 'Candidatura',
+      apadrinamiento: 'Apadrinamiento', 'apadrinamiento-fin': 'Fin apadrinamiento',
+      'padrino-convertido': 'Padrino a socio', gasto: 'Gasto', donacion: 'Donacion',
+      contrato: 'Contrato', seguimiento: 'Seguimiento', blacklist: 'Lista negra',
+      voluntariado: 'Voluntariado'
+    };
+    return m[tipo] || tipo || 'General';
+  },
+
+  _tipoLogCls(tipo) {
+    if (tipo === 'blacklist') return 'descartada';
+    if (tipo === 'gasto' || tipo === 'donacion') return 'en_proceso';
+    if (tipo === 'adopcion' || tipo === 'candidatura' || tipo === 'contrato') return 'aprobada';
+    return '';
+  },
+
+  async renderActividad(el) {
+    await this._loadListBestEffort('actividad', () => API.getActividad());
+    const tv = (f) => { const d = Date.parse(String(f || '').replace(' ', 'T')); return isNaN(d) ? 0 : d; };
+    const rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha));
+    const tipos = Array.from(new Set(rows.map(r => r.tipo).filter(Boolean))).sort();
+    const cuerpo = this._renderActividadTabla(rows);
+    el.innerHTML = `
+      <div class="page-list-container">
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard.filterActividad(this.closest('.page'))"></div>
+          <div class="filter-row">
+            <select onchange="Dashboard.filterActividad(this.closest('.page'))" aria-label="Filtrar por tipo">
+              <option value="">Todos los tipos</option>
+              ${tipos.map(t => `<option value="${this._esc(t)}">${this._esc(this._tipoLogLabel(t))}</option>`).join('')}
+            </select>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('actividad')">${Icons.activity} Actualizar</button>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
+          </div>
+        </div>
+        <div class="list-header"><span class="response-count">${rows.length} registros</span></div>
+        <div class="card"><div class="card-body card-body-flush" id="actividad-tabla">${cuerpo}</div></div>
+      </div>
+      <div class="page-detail-container"></div>`;
+  },
+
+  _renderActividadTabla(rows) {
+    if (!rows.length) {
+      return `<div class="empty-state"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro. Si acabas de desplegar el backend, vuelve a entrar para cargar el historial.</p></div>`;
+    }
+    return `<table class="data-table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>${rows.map(r => `
+      <tr>
+        <td style="white-space:nowrap">${this._esc(this._fmtLogFecha(r.fecha))}</td>
+        <td>${this._esc(r.usuario || '—')}</td>
+        <td><span class="estado-badge ${this._tipoLogCls(r.tipo)}">${this._esc(this._tipoLogLabel(r.tipo))}</span></td>
+        <td>${this._esc(r.detalle || r.descripcion || '')}</td>
+      </tr>`).join('')}</tbody></table>`;
+  },
+
+  _fmtLogFecha(f) {
+    if (!f) return '—';
+    const d = new Date(String(f).replace(' ', 'T'));
+    if (isNaN(d)) return String(f);
+    return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  },
+
+  filterActividad(container) {
+    const q = container?.querySelector('.search-box input')?.value?.toLowerCase() || '';
+    const t = container?.querySelector('.filter-row select')?.value || '';
+    const c = document.getElementById('actividad-tabla');
+    if (!c) return;
+    const tv = (f) => { const d = Date.parse(String(f || '').replace(' ', 'T')); return isNaN(d) ? 0 : d; };
+    let rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha));
+    if (t) rows = rows.filter(r => r.tipo === t);
+    if (q) rows = rows.filter(r => ((r.usuario || '') + ' ' + (r.detalle || '') + ' ' + (r.descripcion || '') + ' ' + (r.tipo || '')).toLowerCase().includes(q));
+    c.innerHTML = rows.length ? this._renderActividadTabla(rows) : `<div class="empty-state"><div class="empty-state-icon">${Icons.search}</div><h3>Sin resultados</h3><p>Prueba con otra palabra o quita el filtro de tipo.</p></div>`;
+    const n = container?.querySelector('.response-count');
+    if (n) n.textContent = rows.length + ' registros';
+  },
+
+  exportActividadCsv() {
+    const tv = (f) => { const d = Date.parse(String(f || '').replace(' ', 'T')); return isNaN(d) ? 0 : d; };
+    const rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha));
+    if (!rows.length) { this.showSnackbar('No hay actividad que exportar', 'warning'); return; }
+    const head = ['fecha', 'usuario', 'tipo', 'detalle', 'entidad', 'entidad_id'];
+    const esc = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+    const csv = [head.join(';')].concat(rows.map(r => head.map(k => esc(r[k])).join(';'))).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'actividad-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    this.showSnackbar('Registro exportado', 'success');
+  },
+
   // ==================== REPORTES ====================
   async renderReportes(el) {
     await this._loadSurveys();
@@ -4201,7 +4402,7 @@ const Dashboard = {
       this._loadList('adopciones', () => API.getAdopciones()),
       this._loadList('socios', () => API.getSocios()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
-      this._ensureListas(['gastos', 'donaciones', 'apadrinamientos']),
+      this._ensureListas(['gastos', 'donaciones', 'apadrinamientos', 'acogidas']),
     ]);
     const all = Object.values(this.responses).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
@@ -4231,6 +4432,7 @@ const Dashboard = {
         <div class="alert-item info">${Icons.users} <span>${this.socios.length} socios (${sociosActivos} activos)</span></div>
         <div class="alert-item info">${Icons.calendar} <span>${this.adopciones.length} adopciones en curso</span></div>
       </div></div>
+      ${this._cardAnalitica()}
       <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Memoria anual</h3></div><div class="card-body">
         <div class="filters-bar" style="margin-bottom:12px"><div class="filter-row">
           <select id="mem-anio" onchange="Dashboard._pintarMemoria()">${this._memoriaAnios().map(y => `<option value="${y}" ${y === new Date().getFullYear() ? 'selected' : ''}>Ejercicio ${y}</option>`).join('')}</select>
@@ -4242,11 +4444,72 @@ const Dashboard = {
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-perros')">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-adopcion-gatos')">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
         <div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('pre-acogida')">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
+        ${this._hayEncuestaOtras() ? `<div class="alert-item info" style="cursor:pointer" onclick="Dashboard.exportSurvey('otras-especies')">${Icons.download} <span>Exportar otras especies (PDF)</span></div>` : ''}
       </div></div>
       <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
         <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>`;
     this._pintarMemoria();
+  },
+
+  // ==================== ANALITICA DE REPORTES ====================
+  // Normaliza fechas de las hojas (ISO, ISO con hora o dd/mm/aaaa) a timestamp.
+  _tsFecha(f) {
+    if (!f) return 0;
+    const s = String(f).trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
+    const d = Date.parse(s.replace(' ', 'T'));
+    return isNaN(d) ? 0 : d;
+  },
+
+  _cardAnalitica() {
+    const orden = ['pendiente', 'en_proceso', 'aprobada', 'finalizada', 'descartada'];
+    const bloquesEnc = (this.surveys || []).map(s => {
+      const list = this.responses[s.id] || [];
+      const chips = orden.map(e => {
+        const n = list.filter(r => this.getEstado(r.id, s.id) === e).length;
+        if (!n) return '';
+        const meta = this.estadoMap[e] || { label: e, cls: '' };
+        return `<span class="estado-badge ${meta.cls}">${n} ${meta.label}</span>`;
+      }).filter(Boolean).join(' ');
+      const descartadas = list.filter(r => this.getEstado(r.id, s.id) === 'descartada').length;
+      const vivas = list.length - descartadas;
+      return `<div class="detail-field"><div class="detail-question">${this._esc(s.name || s.id)}</div><div class="detail-answer"><b>${vivas}</b> vivas de ${list.length} · ${chips || '<span style="color:var(--gray-400)">sin respuestas</span>'}</div></div>`;
+    }).join('');
+
+    const acog = (this.acogidas || []);
+    const cerradas = acog.filter(c => this._tsFecha(c.inicio) > 0 && this._tsFecha(c.fin) > 0);
+    const dias = cerradas.map(c => Math.round((this._tsFecha(c.fin) - this._tsFecha(c.inicio)) / 86400000)).filter(d => d >= 0);
+    const media = dias.length ? Math.round(dias.reduce((a, b) => a + b, 0) / dias.length) : null;
+    const maxDia = dias.length ? Math.max.apply(null, dias) : null;
+    const minDia = dias.length ? Math.min.apply(null, dias) : null;
+    const enCurso = acog.filter(c => c.fase !== 'finalizada' && c.estado !== 'finalizada').length;
+    const acogHtml = [
+      `<div class="detail-field"><div class="detail-question">Duracion media de la acogida</div><div class="detail-answer">${media === null ? '<span style="color:var(--gray-400)">Todavia sin casos finalizados con fechas</span>' : `<b>${media} dias</b> (min ${minDia} · max ${maxDia}) en ${dias.length} casos cerrados`}</div></div>`,
+      `<div class="detail-field"><div class="detail-question">Casos</div><div class="detail-answer">${acog.length} en total · ${enCurso} en curso · ${acog.length - enCurso} cerrados</div></div>`
+    ].join('');
+
+    const vols = (this.socios || []).filter(s => s.tipo === 'Voluntario' || s.tipo === 'Ambos');
+    const horasTotal = Math.round(vols.reduce((a, s) => a + (parseFloat(s.horas_mes) || 0), 0) * 10) / 10;
+    const top = vols
+      .filter(s => (parseFloat(s.horas_mes) || 0) > 0)
+      .sort((a, b) => (parseFloat(b.horas_mes) || 0) - (parseFloat(a.horas_mes) || 0))
+      .slice(0, 5);
+    const volHtml = [
+      `<div class="detail-field"><div class="detail-question">Horas de voluntariado este mes</div><div class="detail-answer"><b>${horasTotal} h</b> de ${vols.length} voluntarios (${vols.filter(s => s.activo).length} activos)</div></div>`,
+      top.length
+        ? `<div class="detail-field"><div class="detail-question">Top del mes</div><div class="detail-answer">${top.map(s => `<span class="estado-badge en_proceso" style="margin:0 6px 6px 0">${this._esc(s.nombre)} · ${parseFloat(s.horas_mes) || 0} h</span>`).join('')}</div></div>`
+        : `<div class="detail-field"><div class="detail-question">Top del mes</div><div class="detail-answer"><span style="color:var(--gray-400)">Sin horas registradas aun. Se dan de alta en la ficha de cada voluntario.</span></div></div>`
+    ].join('');
+
+    return `<div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Analitica</h3></div><div class="card-body">
+      <div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Analisis de respuestas</div>${bloquesEnc || '<div class="detail-field"><div class="detail-answer">Sin encuestas configuradas</div></div>'}</div>
+      <div class="detail-section"><div class="detail-section-title">${Icons.home} Acogidas</div>${acogHtml}</div>
+      <div class="detail-section"><div class="detail-section-title">${Icons.users} Voluntariado</div>${volHtml}</div>
+    </div></div>`;
   },
 
   // ==================== MEMORIA ANUAL ====================
@@ -4370,6 +4633,16 @@ const Dashboard = {
   // Anti-doble-clic en Guardar: deshabilita el boton, pone "Guardando..."
   // y muestra el overlay (con spinner). Devuelve liberador, o null si el
   // form ya esta en curso (segundo submit por Enter) -> el llamante retorna.
+  // Anti doble-tap: mientras una accion de fase sigue en vuelo (incluida la
+  // espera del dialogo de confirmacion) se ignoran los toques repetidos.
+  _busyStart(key) {
+    if (!this._busyOps) this._busyOps = new Set();
+    if (this._busyOps.has(key)) return false;
+    this._busyOps.add(key);
+    return true;
+  },
+  _busyEnd(key) { if (this._busyOps) this._busyOps.delete(key); },
+
   _guardando(form) {
     if (form && form.dataset && form.dataset.guardando === '1') return null;
     const btn = form ? form.querySelector('button[type="submit"]') : null;

@@ -86,6 +86,20 @@ if (typeof module !== 'undefined' && module.exports) {
 writeFile('src/js/config.js', frontConfig);
 
 /* ------------------------- BACKEND: Config.gs ------------------------- */
+// 4ª encuesta (otras especies): solo se emite si el .env trae el formulario.
+// Permite activarla sin tocar el generador: basta con rellenar las variables.
+function otrasEspeciesBlock() {
+  if (!env('FORM_OTRAS_ESPECIES_ID')) return '';
+  return `,
+    'otras-especies': {
+      name: '${env('OTRAS_ESPECIES_NAME', 'Adopcion Otras Especies')}',
+      formId: '${env('FORM_OTRAS_ESPECIES_ID')}',
+      sheetId: '${env('SHEET_OTRAS_ESPECIES_ID')}',
+      sheetName: 'Respuestas de formulario 1',
+      visible: true
+    }`;
+}
+
 function sheetsBlock() {
   const rows = [
     ['estados', 'SHEET_ESTADOS_ID', 'Estados'],
@@ -127,7 +141,7 @@ const backendConfig = `var CONFIG = {
       sheetId: '${env('SHEET_ACOGIDA_ID')}',
       sheetName: 'Respuestas de formulario 1',
       visible: true
-    }
+    }${otrasEspeciesBlock()}
   },
 
   sheets: {
