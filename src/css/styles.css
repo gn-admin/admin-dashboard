@@ -271,9 +271,10 @@ body {
   width: 100%;
 }
 
-/* Blanco sobre --primary (#1FC95B) da 2,2:1 (fallo AA). El boton primario
-   usa un verde oscuro identico en familia (4,7:1) y su hover aun mas (6,6:1);
-   el resto de la estetica (--primary en badges, iconos, bordes) no se toca. */
+/* Blanco sobre --primary (#1FC95B) da 2,2:1 (fallo AA). El boton primario y el
+   outline usan el verde oscuro de la misma familia (4,7:1), con hover aun mas
+   oscuro (6,6:1 y 10,6:1 sobre --primary-lighter); el resto de la estetica
+   (--primary en badges, iconos, bordes) no se toca. */
 .btn-primary {
   background: var(--primary-hover);
   color: var(--white);
@@ -285,23 +286,29 @@ body {
   transform: translateY(-1px);
 }
 
+/* Blanco sobre --primary da 2,2:1: el outline usa el verde oscuro de la misma
+   familia (texto y borde, 4,7:1) y aun mas oscuro en hover sobre fondo claro. */
 .btn-outline-green {
   background: transparent;
-  color: var(--primary);
-  border: 1.5px solid var(--primary);
+  color: var(--primary-hover);
+  border: 1.5px solid var(--primary-hover);
 }
 
 .btn-outline-green:hover:not(:disabled) {
   background: var(--primary-lighter);
+  color: var(--primary-dark);
+  border-color: var(--primary-dark);
 }
 
+/* Blanco sobre --danger (#e74c3c) da 3,8:1: se usa el rojo oscuro del mismo
+   familia (5,4:1) y uno aun mas oscuro en el hover (6,6:1). */
 .btn-danger {
-  background: var(--danger);
+  background: var(--danger-hover);
   color: var(--white);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: var(--danger-hover);
+  background: #a93226;
 }
 
 /* Feedback tactil al pulsar */

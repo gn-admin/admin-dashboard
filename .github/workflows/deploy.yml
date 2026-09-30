@@ -43,6 +43,10 @@ jobs:
           CONTACTO_EMAIL: ${{ secrets.CONTACTO_EMAIL || vars.CONTACTO_EMAIL }}
         run: node scripts/gen-config.js
 
+      # Un test en rojo (logica, contraste o integridad) bloquea el despliegue.
+      - name: Tests
+        run: npm test
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

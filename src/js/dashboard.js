@@ -1645,7 +1645,7 @@ const Dashboard = {
     if (m) {
       d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
       conHora = !!m[4];
-    } else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/))) {
+    } else if ((m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/))) {
       d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
       conHora = !!m[4];
     }
@@ -4499,15 +4499,32 @@ const Dashboard = {
   },
 
   // ==================== ANALITICA DE REPORTES ====================
-  // Normaliza fechas de las hojas (ISO, ISO con hora o dd/mm/aaaa) a timestamp.
-  _tsFecha(f) {
-    if (!f) return 0;
+  // Reconoce fechas de las hojas: ISO (2025-04-13), dd/mm/aaaa, dd-mm-aaaa
+  // y texto es-ES ('13 abr 2025', el formato con el que se guardan las
+  // fechas de acogida). Devuelve {y, m (0-11), d} o null si no es reconocible.
+  _partesFecha(f) {
+    if (!f) return null;
     const s = String(f).trim();
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
-    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1]);
-    const d = Date.parse(s.replace(' ', 'T'));
+    if (m) return { y: +m[1], m: +m[2] - 1, d: +m[3] };
+    m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+    if (m) return { y: +m[3], m: +m[2] - 1, d: +m[1] };
+    m = s.match(/^(\d{1,2})\s+([a-z]{3,4})\.?\s+(\d{4})/i);
+    if (m) {
+      const meses = { ene: 0, feb: 1, mar: 2, abr: 3, may: 4, jun: 5, jul: 6, ago: 7, sep: 8, sept: 8, oct: 9, nov: 10, dic: 11 };
+      const mes = meses[m[2].toLowerCase()];
+      if (mes !== undefined) return { y: +m[3], m: mes, d: +m[1] };
+    }
+    return null;
+  },
+
+  // Normaliza fechas de las hojas (ISO, ISO con hora, dd/mm/aaaa, dd-mm-aaaa
+  // o '13 abr 2025') a timestamp.
+  _tsFecha(f) {
+    if (!f) return 0;
+    const p = this._partesFecha(f);
+    if (p) return Date.UTC(p.y, p.m, p.d);
+    const d = Date.parse(String(f).trim().replace(' ', 'T'));
     return isNaN(d) ? 0 : d;
   },
 
@@ -4601,7 +4618,9 @@ const Dashboard = {
       sociosActivos: (this.socios || []).filter(s => s.activo).length,
       sociosNuevos: sociosNuevos.length,
       apadrinamientosN: apadrinamientos.length,
-      apadrinaTotal: suma(apadrinamientos)
+      // El aporte de un apadrinamiento vive en `aporte_mensual`, no en
+      // `importe` (sin este detalle la memoria salia siempre 0,00 €).
+      apadrinaTotal: apadrinamientos.reduce((t, a) => t + this._importeDe({ importe: a.aporte_mensual ?? a.importe }), 0)
     };
   },
 
@@ -4634,11 +4653,9 @@ const Dashboard = {
 
   _anioFecha(f) {
     if (!f) return null;
+    const p = this._partesFecha(f);
+    if (p) return p.y;
     const s = String(f).trim();
-    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return +m[1];
-    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) return +m[3];
     const d = new Date(s.replace(' ', 'T'));
     return isNaN(d.getTime()) ? null : d.getFullYear();
   },

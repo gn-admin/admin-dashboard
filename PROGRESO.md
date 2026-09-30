@@ -17,7 +17,10 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (152 tests en verde, lógica pura sin DOM).
+- `npm test` — `node --test tests/*.test.js` (**272 tests en verde**, lógica pura sin
+  DOM; 5 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export`).
+  En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
+  **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
 
 ## Arquitectura
@@ -27,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v99`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v100`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -116,11 +119,11 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   de uso «Qué se guarda aquí».
 - **Redes**: módulo Instagram en dummy local (plantilla con iconos/tipo/contacto,
   preview, historial con enlace simulado). Corte a real marcado `TODO Meta`.
-- **Reportes**: tasas, resumen por entidad, **tarjeta Analítica (v96)** —análisis de
-  respuestas por encuesta/estado, duración media de la acogida (`_tsFecha` normaliza
-  ISO, ISO con hora y `dd-mm-aaaa`) y horas de voluntariado con top del mes—,
-  **memoria anual por ejercicio (tarjeta con selector + descarga PDF)**, exports PDF
-  de encuestas.
+- **Reportes**: tasas, resumen por entidad, **tarjeta Analítica** —análisis de
+  respuestas por encuesta/estado, duración media de la acogida (`_partesFecha`
+  entiende ISO, ISO con hora, `dd/mm/aaaa`, `dd-mm-aaaa` y texto es-ES «13 abr 2025»)
+  y horas de voluntariado con top del mes—, **memoria anual por ejercicio (tarjeta
+  con selector + descarga PDF)**, exports PDF de encuestas.
 - **Registro de actividad**: pantalla `#actividad` (sidebar *Herramientas*, menú *Más*)
   con buscador, filtro por tipo, tabla y export CSV; alimentada por `_regLog`, que
   además persiste en `gn_cache_actividad` (la colección no está en `saveLocal()`).
@@ -211,7 +214,12 @@ alta de camada y filtro de especie dinámico) y retirada de la encuesta «Otras
 Especies» del front y del generador** → **v98 errores de login anónimos (sin
 mencionar el proveedor de autenticación)** → **v99 ficha de socio con héroe
 compacto (la foto no desplaza los campos) y edición que sustituye la ficha por el
-solo formulario**.
+solo formulario** → **v100 suite de tests ampliada (152→272) con 3 bugs reales
+corregidos (`_partesFecha` acepta `dd-mm-aaaa` y «13 abr 2025» —el texto es-ES de
+`inicio`/`fin` de las acogidas rompía la duración media de Reportes—;
+`apadrinaTotal` usa `aporte_mensual`, la memoria anual salía 0,00 €; y
+`_fmtFecha` acepta `dd-mm-aaaa`), contraste AA de `.btn-danger` y
+`.btn-outline-green`, tests en CI y `CACHE_NAME` v100**.
 Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
@@ -225,17 +233,19 @@ Detalle commit a commit en `git log`.
 5. Recargar PWA en cada dispositivo tras cada push (SW versionado).
 
 ## Deuda y decisiones abiertas (no bloquean)
-1. **Contraste WCAG AA pendiente**: `.btn-danger` (3,8:1) y `.btn-outline-green`
-   (texto `--primary` sobre blanco, 2,2:1). `AGENTS.md` lo deja a decisión de diseño;
-   solo se corrigió `.btn-primary`.
-2. **Regla de devolución de un grupo obligatorio**: ¿se devuelve el animal a la
+1. **Regla de devolución de un grupo obligatorio**: ¿se devuelve el animal a la
    protectora o solo se marca el caso? Sin definir.
-3. **`docs/` legado desactualizado** (`CHANGELOG` parado en 2026-09-19, `ROLES.md`
+2. **`docs/` legado desactualizado** (`CHANGELOG` parado en 2026-09-19, `ROLES.md`
    con roles que ya no existen, `ARQUITECTURA.md` hablando de mock backend y Google
    login, `CHECKLIST-PRODUCCION.md` sin marcar): decidir si se actualiza, se marca
    como histórico o se retira del repo. **`PROGRESO.md` + `AGENTS.md` son la fuente
    de verdad.**
-4. **Sin linter**: `npm run lint` es un `echo` (no hay ESLint/Prettier configurados).
+3. **Sin linter**: `npm run lint` es un `echo` (no hay ESLint/Prettier configurados).
+4. **`.toast-info` daría 3,15:1**: el tipo `info` de snackbar **no se usa** hoy en el
+   código; si algún día se añade, subirlo a AA (`--primary-hover`/`--danger-hover`).
+
+> Cerrado: **contraste de botones** (`.btn-danger` y `.btn-outline-green` ahora en AA,
+> ver historial v100) y **tests en CI** (el workflow ejecuta `npm test`).
 
 ## Futuro desarrollo (no empezado)
 

@@ -61,3 +61,60 @@ describe('_buildContracto: logo y firmas', () => {
     assert.match(html, /break-inside:avoid/);
   });
 });
+
+describe('_buildMemoria: memoria anual', () => {
+  const m = {
+    year: 2025, altasN: 12, adopcionesN: 5, donacionesN: 3, gastosN: 2,
+    donTotal: 1234.5, gasTotal: 500, balance: 734.5,
+    altas: [{ nombre: 'Luna', especie: 'Perro', raza: 'Mestiza', fecha_ingreso: '2025-04-13', estado: 'adoptado' }],
+    adopciones: [{ animal: 'Luna', adoptante: 'Ana <b>X</b>', fecha: '2025-05-01', fase: 'Cerrado' }],
+    donaciones: [{ fecha: '2025-06-01', donante: 'Anon', importe: '100,5' }],
+    gastos: [{ fecha: '2025-07-01', concepto: 'Vacuna', animal: 'Luna', importe: '50' }],
+    sociosTotal: 30, sociosActivos: 20, sociosNuevos: 4, apadrinamientosN: 2, apadrinaTotal: 45
+  };
+  const html = PdfExport._buildMemoria(m, LOGO);
+
+  it('portada con logo, ejercicio y KPIs', () => {
+    assert.match(html, /data:image\/png;base64,AAA/);
+    assert.match(html, /Memoria anual 2025/);
+    assert.match(html, /Ejercicio 2025/);
+    assert.match(html, /1234,50 €/);
+    assert.match(html, /500,00 €/);
+    assert.match(html, /734,50 €/);
+  });
+
+  it('resumen del ejercicio con totales y apadrinamientos', () => {
+    assert.match(html, /Balance del ejercicio/);
+    assert.match(html, /Apadrinamientos activos/);
+    assert.match(html, /2 · 45,00 €/);
+    assert.match(html, /30 \/ 20/);
+  });
+
+  it('escapa los datos personales', () => {
+    assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
+    assert.doesNotMatch(html, /<b>X<\/b>/);
+  });
+
+  it('pinta las tablas de detalle', () => {
+    assert.match(html, /Adopciones cerradas en el ejercicio/);
+    assert.match(html, /Altas de animales/);
+    assert.match(html, /Mestiza/);
+    assert.match(html, /Vacuna/);
+  });
+
+  it('sin registros pinta los huecos en vez de tablas vacias', () => {
+    const vacio = PdfExport._buildMemoria({ ...m, adopciones: [], altas: [], donaciones: [], gastos: [] }, LOGO);
+    assert.match(vacio, /Sin adopciones registradas en el ejercicio/);
+    assert.match(vacio, /Sin altas de animales en el ejercicio/);
+    assert.match(vacio, /Sin donaciones en el ejercicio/);
+    assert.match(vacio, /Sin gastos en el ejercicio/);
+  });
+});
+
+describe('_label: snake_case a Titulo', () => {
+  it('convierte guiones bajos y capitaliza', () => {
+    assert.equal(PdfExport._label('fecha_creacion'), 'Fecha Creacion');
+    assert.equal(PdfExport._label('nombre'), 'Nombre');
+    assert.equal(PdfExport._label('horas_mes'), 'Horas Mes');
+  });
+});
