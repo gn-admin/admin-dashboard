@@ -1,5 +1,9 @@
 # Flujo de Trabajo - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — describe el flujo por roles de la fase inicial.
+> El flujo real actual (commits a `main`, CI con tests, despliegue automático
+> a GitHub Pages) está en `AGENTS.md`.
+
 ## Regla general
 
 **Todo desarrollo nuevo** pasa por los 4 roles: Arquitecto → Diseñador → Desarrollador → Tester.

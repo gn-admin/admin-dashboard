@@ -1,5 +1,8 @@
 # Roles y Responsabilidades - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — modelo de roles de la fase inicial. Hoy el proyecto
+> lo lleva una sola persona; las reglas vivas están en `AGENTS.md`.
+
 ## Arquitecto de Software
 
 **Objetivo:** Definir la estructura técnica y garantizar seguridad, escalabilidad y mantenibilidad.

@@ -1,5 +1,8 @@
 # Changelog - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — cubre solo la fase inicial del proyecto. El
+> historial real de cambios es el log de git (`git log`).
+
 ## [2026-09-19] - Estructura inicial del proyecto
 - **Tipo:** feature
 - **Roles involucrados:** Arquitecto, Disenador, Desarrollador, Tester

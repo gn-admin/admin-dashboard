@@ -1,5 +1,9 @@
 # Checklist de Producción - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — redactado para la fase inicial. Los checks reales
+> de hoy (tests en CI, contraste AA, `npm test` antes de desplegar) están en
+> `AGENTS.md`.
+
 Marcar cada ítem con [x] cuando esté verificado. Todos deben estar marcados antes de desplegar.
 
 ## Seguridad Backend (Apps Script)

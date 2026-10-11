@@ -1,5 +1,9 @@
 # Arquitectura del Sistema - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — refleja el diseño de la fase inicial (mock backend,
+> login con Google). La arquitectura REAL vigente (Apps Script + Firebase
+> email/contraseña, tests, CI) se describe en `AGENTS.md` y `PROGRESO.md`.
+
 ## Visión general
 
 Aplicación PWA (Progressive Web App) para visualizar respuestas de formularios de Google, con autenticación Firebase y exportación a PDF.

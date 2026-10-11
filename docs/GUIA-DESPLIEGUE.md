@@ -1,5 +1,10 @@
 # Guía de Despliegue - GN-Encuestas
 
+> **DOCUMENTO HISTÓRICO** — cubre la fase inicial (incluye pasos con mock
+> backend que ya no aplica). El despliegue real: `npm run build` + workflow
+> `.github/workflows/deploy.yml` (tests en CI → GitHub Pages); el backend de
+> Apps Script se publica a mano desde el editor.
+
 ## Requisitos previos
 
 - Cuenta de Google (para Apps Script y Google Sheets)
