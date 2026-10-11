@@ -11,6 +11,8 @@
   --warning-light: #fef5e7;
   --info: #3498db;
   --info-light: #ebf5fb;
+  --info-strong: #2563eb;
+  --success: #16a34a;
   --white: #ffffff;
   --black: #191919;
   --gray-50: #f9fafb;
@@ -26,6 +28,10 @@
   --radius: 12px;
   --radius-sm: 8px;
   --radius-lg: 16px;
+  /* Escala tipografica: todo lo que sea <=0.72rem usa estos tokens (no rem sueltos) */
+  --text-2xs: 0.6rem;
+  --text-xs: 0.7rem;
+  --text-sm: 0.75rem;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -454,7 +460,7 @@ body {
 }
 
 .sidebar-brand-sub {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 400;
   color: rgba(255,255,255,0.5);
   line-height: 1.2;
@@ -512,7 +518,7 @@ body {
 }
 
 .sidebar-section-title {
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.2px;
@@ -627,7 +633,7 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   flex-shrink: 0;
 }
 
@@ -647,7 +653,7 @@ body {
 
 .sidebar-user-info .user-role {
   display: block;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   color: rgba(255,255,255,0.5);
   line-height: 1.2;
 }
@@ -719,7 +725,7 @@ body {
   color: white;
   padding: 6px 10px;
   border-radius: 6px;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
@@ -808,7 +814,7 @@ body {
 }
 
 .pending-sync-badge {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--warning);
   background: var(--warning-light);
@@ -915,7 +921,7 @@ body {
 }
 
 .stat-card-change {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--gray-500);
   margin-top: 4px;
 }
@@ -987,7 +993,7 @@ body {
   padding: 10px 16px;
   font-weight: 600;
   color: var(--gray-500);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--gray-200);
@@ -1159,7 +1165,7 @@ body {
 }
 
 .response-date {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--gray-400);
   margin-top: 8px;
 }
@@ -1170,7 +1176,7 @@ body {
   align-items: center;
   padding: 3px 10px;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -1312,7 +1318,7 @@ body {
 }
 
 .detail-field label {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--gray-400);
   text-transform: uppercase;
@@ -1328,7 +1334,7 @@ body {
   padding: 9px 14px;
   background: var(--gray-50);
   border-bottom: 1px solid var(--gray-200);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--gray-500);
   letter-spacing: 0.2px;
@@ -1416,7 +1422,7 @@ body {
 }
 
 .bl-card-meta {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--gray-400);
   margin-top: 8px;
 }
@@ -1623,7 +1629,7 @@ body {
 }
 
 .form-group .error-message {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--danger);
   display: none;
 }
@@ -1718,7 +1724,7 @@ select.form-input {
 }
 
 .bottom-nav-label {
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1770,7 +1776,7 @@ select.form-input {
 }
 
 .mas-menu-sep {
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -1821,7 +1827,7 @@ select.form-input {
 }
 
 .modal-subtitle {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--gray-400);
 }
 
@@ -1865,6 +1871,46 @@ select.form-input {
 .modal-body::-webkit-scrollbar-thumb {
   background: var(--gray-300);
   border-radius: 999px;
+}
+
+/* ===== FOTO DE LA FICHA (avatar clickable -> modal) ===== */
+.foto-hero {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  flex-shrink: 0;
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.foto-hero img {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  display: block;
+}
+
+.foto-hero:hover img {
+  border-color: var(--primary-hover);
+}
+
+.foto-hero:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 3px;
+}
+
+.modal-foto {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 68vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: var(--radius);
+  background: var(--gray-50);
 }
 
 @media (min-width: 768px) {
@@ -1940,7 +1986,7 @@ select.form-input {
 }
 
 .guide-menu-text small {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--gray-500);
 }
 
@@ -2001,7 +2047,7 @@ select.form-input {
   padding: 12px 14px;
   border-radius: var(--radius);
   background: #e8f4fd;
-  color: #2563eb;
+  color: var(--info-strong);
   font-size: 0.85rem;
   line-height: 1.5;
 }
@@ -2082,7 +2128,7 @@ select.form-input {
   align-items: center;
   gap: 4px;
   margin-top: 8px;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--primary-hover);
   background: var(--primary-lighter);
@@ -2166,7 +2212,7 @@ select.form-input {
 }
 
 .guide-index-item small {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--gray-500);
   line-height: 1.4;
 }
@@ -2229,7 +2275,7 @@ select.form-input {
   display: inline-flex;
   padding: 3px 10px;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -2245,7 +2291,7 @@ select.form-input {
   align-items: center;
   padding: 3px 10px;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2287,7 +2333,7 @@ select.form-input {
   border-radius: 12px;
   background: var(--gray-100);
   color: var(--gray-500);
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -2331,7 +2377,7 @@ select.form-input {
 .animal-group-info small {
   display: block;
   margin-top: 2px;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--gray-500);
 }
 
@@ -2374,7 +2420,7 @@ select.form-input {
 }
 
 .animal-collage .collage-ph.perro {
-  background: #e8faf0;
+  background: var(--primary-lighter);
   color: var(--primary-hover);
 }
 
@@ -2475,7 +2521,7 @@ select.form-input {
 
 .grupo-miembro-nombre small {
   display: block;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--gray-500);
 }
 
@@ -2503,7 +2549,7 @@ select.form-input {
   }
 
   .animal-card-breed {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
     margin-bottom: 6px;
     white-space: nowrap;
     overflow: hidden;
@@ -2512,18 +2558,18 @@ select.form-input {
 
   .animal-card-status {
     padding: 2px 7px;
-    font-size: 0.64rem;
+    font-size: var(--text-xs);
   }
 
   .urgente-badge {
     padding: 2px 7px;
-    font-size: 0.66rem;
+    font-size: var(--text-xs);
   }
 
   .animal-group-badge {
     margin-top: 6px;
     padding: 1px 6px;
-    font-size: 0.6rem;
+    font-size: var(--text-2xs);
     max-width: 100%;
   }
 
@@ -2555,7 +2601,7 @@ select.form-input {
   }
 
   .animal-group-info small {
-    font-size: 0.68rem;
+    font-size: var(--text-xs);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2646,7 +2692,7 @@ select.form-input {
 }
 
 .bar-chart-value {
-  font-size: 0.6rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   color: var(--gray-400);
   height: 12px;
@@ -2679,7 +2725,7 @@ select.form-input {
   color: white;
   padding: 3px 8px;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
   opacity: 0;
@@ -2692,7 +2738,7 @@ select.form-input {
 }
 
 .bar-chart-label {
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   color: var(--gray-400);
   margin-top: 4px;
   text-align: center;
@@ -2782,7 +2828,7 @@ select.form-input {
 }
 
 .hub-card-date {
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--gray-400);
   margin-top: 2px;
 }
@@ -3185,7 +3231,7 @@ select.form-input {
   }
 
   .bar-chart-label {
-    font-size: 0.58rem;
+    font-size: var(--text-2xs);
   }
 
   .bar-chart-value {

@@ -318,6 +318,9 @@ const Dashboard = {
     badge.textContent = this._estadoLabel(e);
   },
 
+  // Devuelve true si el estado se guardo en el backend; false si fallo (en
+  // ese caso se revierte el optimista). Los llamantes que pintan exito
+  // (aprobarEncuesta, descartar2025...) deben comprobarlo.
   async setEstado(id, estado, surveyId) {
     const key = (surveyId || '') + '::' + id;
     const anterior = this.states[key];
@@ -326,11 +329,13 @@ const Dashboard = {
     this.showLoading();
     try {
       await API.setEstado(id, surveyId || '', estado);
+      return true;
     } catch (err) {
       console.error('Error setEstado:', err);
       this.states[key] = anterior;
       this._syncCard(surveyId, id);
       this._snackErr(err, 'No se pudo guardar el estado');
+      return false;
     } finally {
       this.hideLoading();
     }
@@ -366,7 +371,8 @@ const Dashboard = {
 
   async aprobarEncuesta(surveyId, id) {
     const tipo = surveyId === 'pre-acogida' ? 'acogida' : 'adopcion';
-    await this.setEstado(id, 'aprobada', surveyId);
+    const ok = await this.setEstado(id, 'aprobada', surveyId);
+    if (!ok) { this.viewDetail(surveyId, id); return; }
     if (!this._candidaturasDe(surveyId, id).length) this._crearCandidatura(surveyId, id, tipo);
     if (surveyId === 'pre-acogida') await this._autoFamiliaDeEncuesta(surveyId, id);
     this.viewDetail(surveyId, id);
@@ -599,7 +605,7 @@ const Dashboard = {
     detailEl.innerHTML = `
       <div class="detail-actions" style="margin-bottom:20px">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
-        <span style="font-weight:700;font-size:1rem;color:var(--gray-900)">${title}</span>
+        <span style="font-weight:700;font-size:1rem;color:var(--gray-900)">${this._esc(title)}</span>
       </div>
       ${contentHTML}`;
     this.injectIcons();
@@ -797,9 +803,9 @@ const Dashboard = {
     return items.map(it => {
       if (it.kind === 'vencimiento') {
         const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
-        return `<tr><td>${this._esc(it.titulo)}<div style="font-size:.72rem;color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button></td></tr>`;
+        return `<tr><td>${this._esc(it.titulo)}<div style="font-size:var(--text-xs);color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button></td></tr>`;
       }
-      return `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')"><td>${this._esc(it.nombre)}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
+      return `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')"><td>${this._esc(it.nombre)}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
     }).join('');
   },
 
@@ -1027,7 +1033,7 @@ const Dashboard = {
     const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${new Date(c.fecha).toLocaleDateString('es-ES')}</div></div>`).join('')}</div>` : '';
     const asig = cands.length ? !!cands[0].animal_id : false;
     const assignBox = e==='aprobada' && !asig ? `<div class="detail-section"><div class="detail-section-title">${Icons.arrowRight} Asignar animal${cands[0]&&cands[0].tipo==='acogida'?' y familia':''}</div><div id="assign-box-${responseId}" style="min-height:70px"><div class="page-loader"><div class="spinner"></div><p>Cargando animales...</p></div></div></div>` : '';
-    this._showDetail(pageId, this._esc((r.nombre||'')+' '+(r.apellidos||'')), `
+    this._showDetail(pageId, (r.nombre||'')+' '+(r.apellidos||''), `
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
         ${actionButtons}
@@ -1035,10 +1041,17 @@ const Dashboard = {
       ${blBanner}
       ${e==='aprobada'?`<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>${asig?'Solicitud aprobada · Animal asignado: '+this._esc(this._animalName(cands[0].animal_id))+'.':'Solicitud aprobada: asigna un animal para continuar.'}</span></div>`:''}
       ${assignBox}
-      ${sections.map(s=>`<div class="detail-section"><div class="detail-section-title">${s.title}</div>${s.fields.map(f=>`<div class="detail-field"><div class="detail-question">${f.label}</div><div class="detail-answer">${f.value??'—'}</div></div>`).join('')}</div>`).join('')}
+      ${this._seccionesHtml(sections)}
       ${candHtml}
       <div class="notes-section"><div class="detail-section-title"><span>${Icons.pencil} Notas</span><button class="btn btn-primary btn-sm" onclick="Dashboard.saveNote('${r.id}','${surveyId}')">Guardar</button></div><textarea id="note-${r.id}" placeholder="Escribe una nota...">${note}</textarea></div>`);
     if (e==='aprobada' && !asig) this._renderAssignForm(surveyId, responseId);
+  },
+
+  // HTML de las secciones de un cuestionario, ya escapeado. El PDF escapa por
+  // su cuenta (pdf-export._esc), por lo que NO se escapea en _buildSections:
+  // aqui, en los puntos de render del front.
+  _seccionesHtml(sections) {
+    return (sections || []).map(s => `<div class="detail-section"><div class="detail-section-title">${this._esc(s.title)}</div>${(s.fields || []).map(f => `<div class="detail-field"><div class="detail-question">${this._esc(f.label)}</div><div class="detail-answer">${this._esc(f.value ?? '—')}</div></div>`).join('')}</div>`).join('');
   },
 
   _animalName(id) { const a=this.animales.find(x=>x.id===id); return a?a.nombre:'(sin animal)'; },
@@ -1074,14 +1087,14 @@ const Dashboard = {
 
   _tutorialMenu() {
     const guides = [
-      ['general', 'Flujo general', 'Vision global del proceso.', Icons.dashboard, '#e8faf0', '#16a34a'],
-      ['adopcion', 'Adopcion (perros/gatos)', 'De la solicitud al contrato firmado.', Icons.heart, '#e8faf0', '#16a34a'],
-      ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, '#ebf5fb', '#2563eb'],
-      ['animales', 'Animales, camadas y grupos', 'Alta individual y alta masiva.', Icons.paw, '#e8faf0', '#16a34a'],
+      ['general', 'Flujo general', 'Vision global del proceso.', Icons.dashboard, 'var(--primary-lighter)', 'var(--success)'],
+      ['adopcion', 'Adopcion (perros/gatos)', 'De la solicitud al contrato firmado.', Icons.heart, 'var(--primary-lighter)', 'var(--success)'],
+      ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, 'var(--info-light)', 'var(--info-strong)'],
+      ['animales', 'Animales, camadas y grupos', 'Alta individual y alta masiva.', Icons.paw, 'var(--primary-lighter)', 'var(--success)'],
       ['redes', 'Redes sociales', 'Plantillas y publicaciones.', Icons.clipboard, '#fce4ec', '#e91e63'],
       ['apadrinamiento', 'Apadrinamiento', 'Padrinos, aportes e historial.', Icons.paw, '#f3e8ff', '#7c3aed'],
-      ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, '#ebf5fb', '#2563eb'],
-      ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, '#e8faf0', '#16a34a']
+      ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, 'var(--info-light)', 'var(--info-strong)'],
+      ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, 'var(--primary-lighter)', 'var(--success)']
     ];
     return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
     <div class="guide-note">${Icons.info} <span>Los estados se pueden mover hacia delante y hacia atras en cualquier momento desde la ficha de cada solicitud.</span></div>
@@ -1100,7 +1113,7 @@ const Dashboard = {
       const cx = cxNum + NUM + 12;
       const branch = i >= 3;
       s += `<rect x="${X}" y="${y}" width="${W}" height="${H}" rx="12" fill="#ffffff" stroke="${branch ? accent : '#d1d5db'}" stroke-width="1.5"/>`;
-      s += `<circle cx="${cxNum}" cy="${cy}" r="${NUM}" fill="${branch ? accent : '#9ca3af'}"/><text x="${cxNum}" y="${cy + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">${i + 1}</text>`;
+      s += `<circle cx="${cxNum}" cy="${cy}" r="${NUM}" fill="${branch ? accent : 'var(--gray-400)'}"/><text x="${cxNum}" y="${cy + 4.5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">${i + 1}</text>`;
       s += `<text x="${cx}" y="${cy - 1}" font-size="13.5" font-weight="700" fill="#1f2937">${n[0]}</text>`;
       if (n[1]) s += `<text x="${cx}" y="${cy + 15}" font-size="10.5" fill="#6b7280">${n[1]}</text>`;
       if (i < nodes.length - 1) {
@@ -1113,8 +1126,8 @@ const Dashboard = {
   },
 
   _guideStep(icon, title, text, loc, green) {
-    const bg = green ? '#e8faf0' : '#ebf5fb';
-    const fg = green ? '#16a34a' : '#2563eb';
+    const bg = green ? 'var(--primary-lighter)' : 'var(--info-light)';
+    const fg = green ? 'var(--success)' : 'var(--info-strong)';
     return `<div class="guide-step"><div class="guide-step-icon" style="background:${bg};color:${fg}">${icon}</div><div class="guide-step-body"><h4>${title}</h4><p>${text}</p>${loc ? `<span class="guide-step-loc">${Icons.mapPin} ${loc}</span>` : ''}</div></div>`;
   },
 
@@ -1137,8 +1150,8 @@ const Dashboard = {
       <div class="guide-note">${Icons.info} <span>La barra de estado del detalle te deja mover la solicitud hacia delante y hacia atras en cualquier momento: <b>Pendiente</b>, <b>En proceso</b>, <b>Aprobar</b> y <b>Descartar</b>.</span></div>
       <div class="guide-note">${Icons.info} <span>Sin red no pasa nada: los cambios se encolan (insignia "N pendientes" arriba) y se envian solos al volver la conexion. El boton <b>Guardar</b> se bloquea con "Guardando..." para no duplicar.</span></div>
       <div class="guide-cols">
-        <div class="guide-card"><div class="guide-card-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora (maximo 1 animal). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
-        <div class="guide-card"><div class="guide-card-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y formalizarlo con el <b>Contrato de adopcion</b> (firma + PDF) desde Adopciones.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora (maximo 1 animal). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y formalizarlo con el <b>Contrato de adopcion</b> (firma + PDF) desde Adopciones.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
       </div>`;
   },
 
@@ -1153,7 +1166,7 @@ const Dashboard = {
         ['Entrega y Prueba', 'Prueba reversible'],
         ['Adoptado', 'animal fuera de disponibles'],
         ['Caso eliminado', 'animal Disponible · solicitud En proceso']
-      ], '#16a34a')}</div>
+      ], 'var(--success)')}</div>
       ${this._guideStep(Icons.dog, '1. La solicitud llega', 'Cada persona que completa la encuesta de pre-adopcion (perros o gatos) aparece en su listado con estado <b>Pendiente</b>. Todo se gestiona desde el detalle de la persona (pulsando sobre ella).', 'Encuestas > Perros / Gatos', true)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'En el detalle puedes leer sus respuestas, dejar una <b>nota</b> y pasarla a <b>En proceso</b> mientras la valoras. Usa el buscador y los filtros para ordenar la lista (pendientes, aprobadas, etc.).', 'Detalle: botones Nota y En proceso', true)}
       ${this._guideStep(Icons.checkCircle, '3. Aprueba o descarta', 'Cuando termines pulsa <b>Aprobar</b>: se crea su candidatura automaticamente y pasa a la lista de aprobados. Con <b>Descartar</b> se aparta. <br><b>Importante:</b> si la solicitud vuelve a Pendiente (o se descarta), deja de ser candidata y ya no podra asignarsele animal.', 'Detalle: botones Aprobar / Descartar', true)}
@@ -1177,7 +1190,7 @@ const Dashboard = {
         ['Seguimiento del caso', 'Entrega → En casa → Finalizada'],
         ['Cierre', 'animal Disponible, familia Libre'],
         ['Caso eliminado', 'animal Disponible · solicitud En proceso']
-      ], '#2563eb')}</div>
+      ], 'var(--info-strong)')}</div>
       ${this._guideStep(Icons.home, '1. La solicitud llega', 'Cada persona que completa la encuesta de <b>pre-acogida</b> aparece en el listado con estado <b>Pendiente</b>.', 'Encuestas > Acogida', false)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'Abre el detalle, lee sus respuestas, deja <b>notas</b> y marca <b>En proceso</b> mientras la valoras.', 'Detalle: botones Nota y En proceso', false)}
       ${this._guideStep(Icons.checkCircle, '3. Aprueba (crea la familia)', 'Al aprobar se crea la <b>familia acogedora</b> a partir de los datos de la encuesta (<b>maximo 1 animal por familia</b>) y la candidatura de la persona. Si ya existe coincidira automaticamente.', 'Detalle: boton Aprobar', false)}
@@ -1196,7 +1209,7 @@ const Dashboard = {
         ['Estado inicial', 'Disponible'],
         ['Ficha animal', 'foto, grupo, hermanos, documentos'],
         ['Sale a adopcion o acogida', 'desde la solicitud aprobada']
-      ], '#16a34a')}</div>
+      ], 'var(--success)')}</div>
       ${this._guideStep(Icons.paw, '1. Donde se crean', 'Entra en <b>Animales</b>: arriba hay dos botones. <b>Nuevo</b> registra un animal a la vez; <b>Alta de camada</b> crea varios de golpe con el mismo grupo. Los filtros de <b>estado</b> y <b>especie</b> ordenan el inventario.', 'Animales', true)}
       ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges <b>Perro</b>, <b>Gato</b> u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
       ${this._guideStep(Icons.users, '3. Crear un grupo (no hay pantalla aparte)', 'Los grupos <b>se crean al dar de alta un animal</b>: en <b>Grupo / Camada</b> elige <b>Crear grupo nuevo...</b> y escribe el nombre (p. ej. <i>Camada Luna Mayo 2026</i>); al guardar ya existe. Si prefieres varios de golpe, usa <b>Alta de camada</b>: el <b>Nombre del grupo</b> crea el grupo y sus N animales a la vez. Tambien puedes crearlo desde la <b>ficha de un animal ya dado de alta</b> con <b>Editar</b>.', 'Animales > Nuevo > Grupo / Camada', true)}
@@ -1252,7 +1265,7 @@ const Dashboard = {
         ['Documento', 'referencia en ficha'],
         ['Memoria anual', 'Reportes por ejercicio'],
         ['Almacen', 'inventario compartido']
-      ], '#2563eb')}</div>
+      ], 'var(--info-strong)')}</div>
       ${this._guideStep(Icons.activity, '1. Gastos veterinarios', 'En la ficha del animal, seccion <b>Gastos</b>: fecha, concepto e importe, con total acumulado.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.calendar, '2. Vencimientos', 'El widget del dashboard avisa (Vencido/Hoy/En N dias). Marca <b>Hecho</b> o elimina desde ahi mismo.', 'Dashboard', false)}
       ${this._guideStep(Icons.heart, '3. Donaciones', 'Pantalla propia con total, alta y baja. Cada donacion queda en su hoja.', 'Donaciones', false)}
@@ -1288,18 +1301,18 @@ const Dashboard = {
   _tutorialIndex() {
     return `
       <div class="guide-index">
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase (Entrega → En casa → Finalizada).</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase (Entrega → En casa → Finalizada).</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:#e8faf0;color:#16a34a">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:#ebf5fb;color:#2563eb">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
@@ -1391,7 +1404,7 @@ const Dashboard = {
     this.showInfoModal('Cuestionario · ' + surveyName, `
       <div class="detail-field"><div class="detail-question">Solicitante</div><div class="detail-answer">${this._esc(((r.nombre || '') + ' ' + (r.apellidos || '')).trim())} · ${this._esc(r.email || '')}</div></div>
       <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span></div></div>
-      ${sections.map(s => `<div class="detail-section"><div class="detail-section-title">${s.title}</div>${s.fields.map(f => `<div class="detail-field"><div class="detail-question">${f.label}</div><div class="detail-answer">${f.value ?? '—'}</div></div>`).join('')}</div>`).join('')}
+      ${this._seccionesHtml(sections)}
       ${note ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><div class="detail-answer">${this._esc(note)}</div></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
@@ -1495,10 +1508,11 @@ const Dashboard = {
       a.estado = 'en_acogida';
       a.acogida_familia = familiaId;
       await this._updateLocalYApi('animales', a);
-      if (fam.capacidad !== 'Ocupada') {
-        fam.capacidad = 'Ocupada';
+      // Solo incrementar si la familia aun tiene hueco (también corrige
+      // familias con datos antiguos marcadas 'Ocupada' con sitio libre).
+      if (this._capacidadFamilia(fam.animales_actuales, fam.max_capacity) === 'Libre') {
         fam.animales_actuales = (fam.animales_actuales || 0) + 1;
-        if (fam.max_capacity && fam.animales_actuales >= parseInt(fam.max_capacity, 10)) fam.capacidad = 'Ocupada';
+        fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
         await this._updateLocalYApi('familias', fam);
       }
       return true;
@@ -1772,7 +1786,7 @@ const Dashboard = {
           <div class="form-row"><div class="form-group"><label>Animal *</label><select id="rd-animal" onchange="Dashboard._rellenarPlantilla()">${this.animales.map(a => `<option value="${this._esc(a.id)}" ${String(a.id) === String(selId) ? 'selected' : ''}>${this._esc(a.nombre)} · ${this._esc(a.especie || '')}</option>`).join('')}</select></div>
           <div class="form-group"><label>Tipo *</label><select id="rd-tipo" onchange="Dashboard._rellenarPlantilla()"><option value="adopcion">Adopcion (contrato)</option><option value="acogida">Acogida (acuerdo temporal)</option></select></div></div>
           <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div>
-          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:.72rem;color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
+          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:var(--text-xs);color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
           <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard._copiarCaption()">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
         </div>
         <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Vista previa</h3></div><div class="card-body"><div id="rd-preview"></div></div></div>
@@ -1815,11 +1829,11 @@ const Dashboard = {
       <div style="border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;max-width:420px">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px">
           <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" style="width:32px;height:32px;border-radius:50%;object-fit:cover">
-          <div><div style="font-weight:700;font-size:.85rem">grupo_nebak</div><div style="font-size:.72rem;color:var(--gray-500)">Publicidad · Simulado</div></div>
+          <div><div style="font-weight:700;font-size:.85rem">grupo_nebak</div><div style="font-size:var(--text-xs);color:var(--gray-500)">Publicidad · Simulado</div></div>
         </div>
         ${foto ? `<img src="${this._esc(foto)}" alt="" style="width:100%;aspect-ratio:1/1;min-height:240px;object-fit:cover;display:block">` : `<div style="aspect-ratio:1/1;min-height:240px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);color:var(--gray-400);font-size:.85rem">Sin foto</div>`}
         <div style="padding:10px 12px;font-size:.85rem;white-space:pre-wrap">${this._esc(cab)}${txt.split('\n').filter(l => l.trim()).length > 1 ? ' <span style="color:var(--gray-500)">...más</span>' : ''}</div>
-        <div style="padding:0 12px 10px;font-size:.72rem;color:var(--gray-400)">Vista previa aproximada · ${this._esc((a && a.nombre) || '')}</div>
+        <div style="padding:0 12px 10px;font-size:var(--text-xs);color:var(--gray-400)">Vista previa aproximada · ${this._esc((a && a.nombre) || '')}</div>
       </div>`;
   },
 
@@ -1829,7 +1843,7 @@ const Dashboard = {
     try {
       await navigator.clipboard.writeText(txt);
       this.showSnackbar('Texto copiado', 'success');
-    } catch (err) { this.showSnackbar('No se pudo copiar', 'error'); }
+    } catch (err) { this._snackErr(err, 'No se pudo copiar'); }
   },
 
   publicarRedes() {
@@ -2095,7 +2109,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="gs-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
       <div class="form-group"><label>Importe (€) *</label><input type="text" id="gs-importe" required placeholder="Ej: 45.50" inputmode="decimal"></div></div>
       <div class="form-group"><label>Concepto *</label><input type="text" id="gs-concepto" required placeholder="Ej: Vacuna rabia"></div>
-      <div class="form-group"><label>Factura / justificante (opcional)</label><input type="file" id="gs-factura" accept="application/pdf,image/*"><p style="font-size:.72rem;color:var(--gray-500)">Se guarda en Drive y queda vinculada al gasto. Requiere conexion.</p></div>
+      <div class="form-group"><label>Factura / justificante (opcional)</label><input type="file" id="gs-factura" accept="application/pdf,image/*"><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en Drive y queda vinculada al gasto. Requiere conexion.</p></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
   },
@@ -2188,7 +2202,7 @@ const Dashboard = {
       <form onsubmit="Dashboard.saveDocumento(event,'${a.id}')">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
       <div class="form-group"><label>Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
-      <div class="form-group"><label>Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:.72rem;color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
+      <div class="form-group"><label>Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Subir y guardar</button></div>
       </form>`);
   },
@@ -2288,10 +2302,10 @@ const Dashboard = {
     const { bloques, sueltos } = this._bloquesDeGrupo(filtered);
     const tarjeta = (a, enBloque) => `
           <div class="animal-card" onclick="Dashboard.viewAnimal('${a.id}')">
-            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
+            ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'var(--primary-lighter)':'var(--info-light)'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
-              <div class="animal-card-breed">${a.raza} &middot; ${a.edad} &middot; ${a.sexo}</div>
+              <div class="animal-card-breed">${this._esc(a.raza)} &middot; ${this._esc(a.edad)} &middot; ${this._esc(a.sexo)}</div>
               <div class="animal-card-pills">${this._esPrioritario(a)?`<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>`:''}<span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div>
               ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" onclick="event.stopPropagation();Dashboard.viewGrupo('${a.grupo_id}')" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
@@ -2616,7 +2630,7 @@ const Dashboard = {
     const nombre = g.nombre || ms[0].grupo || '';
     const fotoActual = this._grupoFoto(gid) || '';
     this.showFormModal('Editar grupo', `<form onsubmit="Dashboard.saveGrupo(event,'${gid}')">
-      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:.72rem;color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label>Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'gr-foto-preview')"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
+      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label>Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'gr-foto-preview')"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="gr-descripcion" rows="2" placeholder="De donde viene la camada, caracteristicas...">${this._esc(g.descripcion || '')}</textarea></div>
       <div class="form-group"><label>Notas</label><textarea id="gr-notas" rows="3" placeholder="Seguimiento, tratamientos, acuerdos...">${this._esc(g.notas || '')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
@@ -2663,7 +2677,7 @@ const Dashboard = {
             payload.foto = 'https://drive.google.com/thumbnail?id=' + up.data.fileId + '&sz=w800';
           }
         }
-      } catch (err) { this.showSnackbar('Foto del grupo no subida: ' + this._errMsg(err), 'warning'); }
+      } catch (err) { this._snackErr(err, 'Foto del grupo no subida: ' + this._errMsg(err)); }
     }
     // La ficha del grupo (foto/descripcion/notas) es auxiliar: si falla se
     // avisa, pero no se bloquea renombrar a los miembros (es lo importante).
@@ -2726,6 +2740,19 @@ const Dashboard = {
     return raw;
   },
 
+  // Avatar de la ficha de animal. Con foto es un boton que abre el modal a
+  // tamaño completo (verFotoAnimal); sin foto, el icono de especie.
+  _fotoHero(a) {
+    const src = a ? this._fotoSrc(a) : '';
+    if (!src) {
+      const perro = a && a.especie === 'Perro';
+      const gato = a && a.especie === 'Gato';
+      return `<div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${perro ? 'var(--primary-lighter)' : 'var(--info-light)'};color:${perro ? 'var(--primary-hover)' : 'var(--info)'};flex-shrink:0">${gato ? Icons.cat : (perro ? Icons.dog : Icons.paw)}</div>`;
+    }
+    const nombre = (a && a.nombre) || '';
+    return `<button type="button" class="foto-hero" title="Ver foto completa" aria-label="Ver foto de ${this._esc(nombre)}" onclick="Dashboard.verFotoAnimal('${this._esc(a.id)}')"><img src="${this._esc(src)}" alt="${this._esc(nombre)}"></button>`;
+  },
+
   // Especies domesticas del selector de la ficha de animal. "Otro..." sigue
   // disponible para cualquier otra; adopcion/acogida de todas ellas se tramita
   // con las encuestas de perros, gatos y acogida (no hay formulario propio).
@@ -2747,12 +2774,12 @@ const Dashboard = {
       + (grupoVal && !enLista ? `<option value="${this._esc(grupoVal)}" selected>${this._esc(grupoVal)}</option>` : '')
       + `<option value="__nuevo__">Crear grupo nuevo...</option>`;
     this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:.72rem;color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
-      <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" onchange="Dashboard._onChangeGrupo(this.value, ${isEdit?'true':'false'})">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" onchange="Dashboard._onChangeGrupoNuevo(${isEdit?'true':'false'})"><p style="font-size:.72rem;color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" onchange="Dashboard._onChangeGrupo(this.value, ${isEdit?'true':'false'})">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" onchange="Dashboard._onChangeGrupoNuevo(${isEdit?'true':'false'})"><p style="font-size:var(--text-xs);color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-urgente" ${this._esUrgente(data)?'checked':''}> Necesita acogida/adopcion urgente</label></div></div>
-      <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:.72rem;color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
+      <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'an-foto-preview')"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:var(--text-xs);color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
@@ -2966,15 +2993,27 @@ const Dashboard = {
     return (list || []).filter(p => p.estado === 'activo').reduce((s, p) => s + (parseFloat(p.aporte_mensual) || 0), 0);
   },
 
+  // Abre la foto de la ficha en modal a tamaño completo. El src usa la
+  // variante grande de Drive (w1600); si esa no carga, se vuelve al tamaño
+  // habitual (w800) con un solo reintento.
+  verFotoAnimal(id) {
+    const a = this._byId(this.animales, id);
+    if (!a) { this.showSnackbar('Animal no encontrado', 'warning'); return; }
+    const grande = this._fotoSrc(a, 'w1600');
+    if (!grande) return;
+    const normal = this._fotoSrc(a);
+    const alt = this._esc(a.nombre || '');
+    const fb = normal && normal !== grande ? ` onerror="this.onerror=null;this.src='${this._esc(normal)}'"` : '';
+    this.showInfoModal(a.nombre || 'Foto', `<img class="modal-foto" src="${this._esc(grande)}" alt="${alt}"${fb}>`);
+  },
+
   async viewAnimal(id) {
     await this._ensureListas(['apadrinamientos', 'gastos', 'documentos']);
     const a = this._byId(this.animales, id);
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
-    const fotoHero = this._fotoSrc(a)
-      ? `<img src="${this._esc(this._fotoSrc(a))}" alt="${this._esc(a.nombre)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);flex-shrink:0">`
-      : `<div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'#e8faf0':'#ebf5fb'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'};flex-shrink:0">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`;
+    const fotoHero = this._fotoHero(a);
     this._showDetail('animales', a.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
@@ -3010,10 +3049,10 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Especialidad</div><div class="detail-answer">${this._esc(foster.especialidad)}</div></div>
       </div>`:''}
       <div class="detail-section"><div class="detail-section-title">${Icons.stethoscope} Historial Medico</div>
-        <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${a.microchip||'—'}</div></div>
-        <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${a.vacunas||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${this._esc(a.microchip||'—')}</div></div>
+        <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas||'—')}</div></div>
         <div class="detail-field"><div class="detail-question">Esterilizado/a</div><div class="detail-answer">${a.esterilizada?'Si':'No'}</div></div>
-        <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${a.fecha_ingreso||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${this._esc(a.fecha_ingreso||'—')}</div></div>
       </div>`);
   },
 
@@ -3090,13 +3129,23 @@ const Dashboard = {
       <div class="page-detail-container"></div>`;
   },
 
+  // Capacidad de una familia acogedora: 'Ocupada' solo cuando ya no cabe
+  // otro animal (animales_actuales >= max_capacity). Antes se marcaba
+  // 'Ocupada' con cualquier animal, lo que dejaba inutil una familia con
+  // max_capacity=2 tras la primera acogida. Si falta el max se asume 1.
+  _capacidadFamilia(actuales, max) {
+    const m = parseInt(max, 10);
+    const tope = m > 0 ? m : 1;
+    return ((actuales || 0) >= tope) ? 'Ocupada' : 'Libre';
+  },
+
   showFamiliaForm(data) {
     const isEdit = !!data;
     this._renderForm('acogidas', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Familia Acogedora</h3><form onsubmit="Dashboard.saveFamilia(event,${isEdit?'true':'false'},'${data?.id||''}')">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="fa-nombre" value="${data?.nombre||''}" required></div><div class="form-group"><label>Email *</label><input type="email" id="fa-email" value="${data?.email||''}" required></div></div>
-      <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="fa-telefono" value="${data?.telefono||''}"></div><div class="form-group"><label>Ubicacion *</label><input type="text" id="fa-ubicacion" value="${data?.ubicacion||''}" required></div></div>
-      <div class="form-row"><div class="form-group"><label>Especialidad</label><input type="text" id="fa-especialidad" value="${data?.especialidad||''}" placeholder="Ej: Gatos, Perros pequenos"></div><div class="form-group"><label>Max animales</label><input type="number" id="fa-max" value="${data?.max_capacity||2}" min="1"></div></div>
-      <div class="form-group"><label>Notas</label><textarea id="fa-notas" rows="2">${data?.notas||''}</textarea></div>
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="fa-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="fa-email" value="${this._esc(data?.email||'')}" required></div></div>
+      <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="fa-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Ubicacion *</label><input type="text" id="fa-ubicacion" value="${this._esc(data?.ubicacion||'')}" required></div></div>
+      <div class="form-row"><div class="form-group"><label>Especialidad</label><input type="text" id="fa-especialidad" value="${this._esc(data?.especialidad||'')}" placeholder="Ej: Gatos, Perros pequenos"></div><div class="form-group"><label>Max animales</label><input type="number" id="fa-max" value="${this._esc(data?.max_capacity||2)}" min="1"></div></div>
+      <div class="form-group"><label>Notas</label><textarea id="fa-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.cancelForm('acogidas')">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
   },
@@ -3213,7 +3262,7 @@ const Dashboard = {
             const n = casos.filter(c => c.fase === ff).length;
             return `<div style="flex:1;min-width:80px;text-align:center;padding:8px 4px;border-radius:8px;background:${n ? 'var(--primary-lighter)' : 'var(--gray-50)'}">
               <div style="font-size:1.2rem;font-weight:800;color:${n ? 'var(--primary-hover)' : 'var(--gray-300)'}">${n}</div>
-              <div style="font-size:0.65rem;color:var(--gray-500);margin-top:2px">${faseLabel[ff]}</div>
+              <div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:2px">${faseLabel[ff]}</div>
             </div>`;
           }).join('')}</div>
         </div></div>
@@ -3231,7 +3280,7 @@ const Dashboard = {
               ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
               ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
               <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${c.id}')">${Icons.trash}</button>
-              ${c.notas ? `<span style="color:var(--gray-400);font-size:0.75rem">${this._esc(c.notas)}</span>` : ''}
+              ${c.notas ? `<span style="color:var(--gray-400);font-size:var(--text-sm)">${this._esc(c.notas)}</span>` : ''}
             </div>
           </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
         </div>
@@ -3262,7 +3311,7 @@ const Dashboard = {
         const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
         if (fam) {
           fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
-          if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
+          fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
           this._updateLocalYApi('familias', fam);
         }
         const sol = this._parseSolicitud(c.solicitud_id);
@@ -3295,7 +3344,7 @@ const Dashboard = {
     const fam = target && target.familia_id ? this._byId(this.familias, target.familia_id) : null;
     if (fam) {
       fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
-      if (fam.animales_actuales === 0) fam.capacidad = 'Libre';
+      fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
       await this._updateLocalYApi('familias', fam);
     }
     await this._rollbackSolicitud(target && target.solicitud_id);
@@ -3317,7 +3366,7 @@ const Dashboard = {
           const count = this.adopciones.filter(p=>p.fase===f).length;
           return `<div style="flex:1;min-width:80px;text-align:center;padding:8px 4px;border-radius:8px;background:${count?'var(--primary-lighter)':'var(--gray-50)'}">
             <div style="font-size:1.2rem;font-weight:800;color:${count?'var(--primary-hover)':'var(--gray-300)'}">${count}</div>
-            <div style="font-size:0.65rem;color:var(--gray-500);margin-top:2px">${f}</div>
+            <div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:2px">${f}</div>
           </div>`;
         }).join('')}</div>
       </div></div>
@@ -3327,10 +3376,10 @@ const Dashboard = {
           <div class="response-card-header">
             <div class="response-avatar" style="background:var(--warning-light);color:var(--warning)">${Icons.heart}</div>
             <div class="response-info">
-              <div class="response-name">${p.animal} <span class="estado-badge ${p.fase==='Contrato'?'en_proceso':'pendiente'}">${p.fase}</span>${p.desenlace==='devuelto'?' <span class="estado-badge descartada">Devuelto</span>':''}</div>
-              <div class="response-email">${p.adoptante} &middot; ${p.estado}</div>
+              <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${p.fase==='Contrato'?'en_proceso':'pendiente'}">${this._esc(p.fase)}</span>${p.desenlace==='devuelto'?' <span class="estado-badge descartada">Devuelto</span>':''}</div>
+              <div class="response-email">${this._esc(p.adoptante)} &middot; ${this._esc(p.estado)}</div>
             </div>
-            <div class="response-date">${p.fecha}</div>
+            <div class="response-date">${this._esc(p.fecha)}</div>
           </div>
         </div>`).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
       </div>
@@ -3490,7 +3539,7 @@ const Dashboard = {
       </div>
       ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Pipeline de Adopcion</div>
-        <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:0.7rem;font-weight:600">${f}</div>`).join('')}</div>
+        <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:var(--text-xs);font-weight:600">${f}</div>`).join('')}</div>
       </div>
       ${contratoHtml}
       ${this._seguimientosFicha(p.id)}
@@ -4020,13 +4069,13 @@ const Dashboard = {
       <div class="detail-section"><div class="detail-section-title">Informacion del Socio</div>
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
-            <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${s.telefono||'—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(s.telefono||'—')}</div></div>
             <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
             ${esSocio?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
             <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${this._esc(s.area)||'—'}</div></div>
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></div></div>
-            <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${s.fecha_registro||'—'}</div></div>
-            <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${s.carnet_id||'Sin generar'}</div></div>
+            <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${this._esc(s.fecha_registro||'—')}</div></div>
+            <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${this._esc(s.carnet_id||'Sin generar')}</div></div>
       </div>
       <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
         <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
@@ -4106,11 +4155,26 @@ const Dashboard = {
 
   filterBlacklist(input) { const c=document.getElementById('blacklist-list-container'); if(c) c.innerHTML=this._renderBlacklistCards(input.value); },
 
+  // Clave estable por fila de la lista negra: usa el id si existe y, si no,
+  // 'idx:<i>' con el indice en la lista COMPLETA. Antes se pasaba el indice
+  // del array ya filtrado por la busqueda, asi que un borrado con filtro
+  // eliminaba otra persona. 'idx:' solo existe en memoria (el backend pide id).
+  _blClave(bl, idx) { return (bl && bl.id) ? String(bl.id) : 'idx:' + idx; },
+  _blPorClave(clave) {
+    const lista = this.blacklist || [];
+    if (clave != null && String(clave).indexOf('idx:') === 0) {
+      const i = Number(String(clave).slice(4));
+      return (Number.isInteger(i) && i >= 0 && i < lista.length) ? { item: lista[i], index: i } : null;
+    }
+    const i = lista.findIndex(b => String(b.id) === String(clave));
+    return i >= 0 ? { item: lista[i], index: i } : null;
+  },
+
   _renderBlacklistCards(search='') {
-    let items=this.blacklist || [];
-    if(search) items=items.filter(bl=>((bl.nombre||'')+' '+(bl.apellidos||'')+' '+(bl.email||'')+' '+(bl.motivo||'')).toLowerCase().includes(search.toLowerCase()));
-    if(!items.length) return '<div class="empty-state"><div class="empty-state-icon">'+Icons.checkCircle+'</div><p>No hay personas en la lista negra</p></div>';
-    return items.map((bl,i)=>`<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showEditBlacklistItem('${this._esc(bl.id||'')}')">${Icons.pencil}</button><button class="btn btn-danger btn-sm" onclick="Dashboard.removeBlacklistItem('${this._esc(bl.id||i)}')">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(new Date(bl.fecha).toLocaleDateString('es-ES')):''}</div></div>`).join('');
+    let idxs=(this.blacklist || []).map((bl,i)=>({bl,i}));
+    if(search) idxs=idxs.filter(({bl})=>((bl.nombre||'')+' '+(bl.apellidos||'')+' '+(bl.email||'')+' '+(bl.motivo||'')).toLowerCase().includes(search.toLowerCase()));
+    if(!idxs.length) return '<div class="empty-state"><div class="empty-state-icon">'+Icons.checkCircle+'</div><p>No hay personas en la lista negra</p></div>';
+    return idxs.map(({bl,i})=>{ const k=this._esc(this._blClave(bl,i)); return `<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showEditBlacklistItem('${k}')">${Icons.pencil}</button><button class="btn btn-danger btn-sm" onclick="Dashboard.removeBlacklistItem('${k}')">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(new Date(bl.fecha).toLocaleDateString('es-ES')):''}</div></div>`; }).join('');
   },
 
   showAddBlacklist() {
@@ -4122,9 +4186,9 @@ const Dashboard = {
   showEditBlacklistItem(id) {
     const c=document.getElementById('blacklist-form-container');
     if(!c) return;
-    const bl = (this.blacklist || []).find(b => String(b.id) === String(id)) || this.blacklist[Number(id)];
-    if (!bl) return;
-    c.innerHTML = this._blacklistFormHTML(bl, id);
+    const hit = this._blPorClave(id);
+    if (!hit) return;
+    c.innerHTML = this._blacklistFormHTML(hit.item, id);
   },
 
   _blacklistFormHTML(data, id) {
@@ -4136,9 +4200,13 @@ const Dashboard = {
     e.preventDefault();
     const finGuardar = this._guardando(e.target);
     if (!finGuardar) return;
-    const prev = id ? (this.blacklist || []).find(b => String(b.id) === String(id)) || this.blacklist[Number(id)] : null;
+    // 'idx:...' = fila antigua sin id: solo existe en local, se crea como
+    // registro nuevo (el backend necesita id). Con id real se actualiza.
+    const claveReal = (id && String(id).indexOf('idx:') !== 0) ? String(id) : '';
+    const hit = claveReal ? this._blPorClave(claveReal) : null;
+    const prev = hit ? hit.item : null;
     const item = {
-      id: prev ? prev.id : ('bl_' + Date.now().toString(36)),
+      id: prev && prev.id ? prev.id : ('bl_' + Date.now().toString(36)),
       nombre: document.getElementById('bl-nombre').value.trim(),
       apellidos: document.getElementById('bl-apellidos').value.trim(),
       email: document.getElementById('bl-email').value.trim(),
@@ -4148,10 +4216,10 @@ const Dashboard = {
       origen: prev ? prev.origen : 'manual',
       fecha: prev ? prev.fecha : new Date().toISOString()
     };
-    try { await (id ? API.updateBlacklist(item.id, item) : API.createBlacklist(item)); }
+    try { await (claveReal ? API.updateBlacklist(item.id, item) : API.createBlacklist(item)); }
     catch (err) { this._snackErr(err, this._errMsg(err)); finGuardar(); return; }
     finGuardar();
-    if (id) { const i = (this.blacklist || []).findIndex(b => String(b.id) === String(item.id)); if (i >= 0) this.blacklist[i] = item; }
+    if (prev) { this.blacklist[hit.index] = item; }
     else { this.blacklist.push(item); }
     this.saveLocal();
     document.getElementById('blacklist-form-container').innerHTML='';
@@ -4162,12 +4230,14 @@ const Dashboard = {
 
   async removeBlacklistItem(id) {
     if (!(await this._confirm('Eliminar esta persona de la lista negra?'))) return;
-    const idx = (this.blacklist || []).findIndex(b => String(b.id) === String(id));
-    const target = idx >= 0 ? this.blacklist[idx] : this.blacklist[Number(id)];
-    if (!target) return;
-    try { await API.deleteBlacklist(target.id); }
-    catch (err) { this._snackErr(err, this._errMsg(err)); return; }
-    this.blacklist.splice(idx >= 0 ? idx : Number(id), 1);
+    const hit = this._blPorClave(id);
+    if (!hit) return;
+    // Sin id no hay fila que borrar en el backend: solo se quita de local.
+    if (hit.item.id) {
+      try { await API.deleteBlacklist(hit.item.id); }
+      catch (err) { this._snackErr(err, this._errMsg(err)); return; }
+    }
+    this.blacklist.splice(hit.index, 1);
     this.saveLocal();
     const lc=document.getElementById('blacklist-list-container'); if(lc) lc.innerHTML=this._renderBlacklistCards();
     this.showSnackbar('Eliminado de la lista negra', 'success');
@@ -4261,7 +4331,7 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
         <div class="list-header"><span class="response-count">${items.length} articulos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:.72rem;color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--gray-400)">Almacén vacío</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--gray-400)">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -4604,7 +4674,10 @@ const Dashboard = {
     const adopciones = (this.adopciones || []).filter(p => enAnio(p.fecha));
     const altas = (this.animales || []).filter(a => enAnio(a.fecha_ingreso));
     const sociosNuevos = (this.socios || []).filter(s => enAnio(s.fecha_registro));
-    const apadrinamientos = (this.apadrinamientos || []).filter(a => String(a.estado || '').toLowerCase() !== 'inactivo');
+    // El estado real de un apadrinamiento vivo es 'activo' (como en
+    // _totalAportes); 'inactivo' no existe en las hojas y el filtro anterior
+    // contaba tambien los finalizados/cancelados.
+    const apadrinamientos = (this.apadrinamientos || []).filter(a => String(a.estado || '').toLowerCase() === 'activo');
     const donTotal = suma(donaciones);
     const gasTotal = suma(gastos);
     return {
@@ -4679,18 +4752,16 @@ const Dashboard = {
     let ok = 0;
     try {
       for (const it of lista) {
-        await API.setEstado(it.id, it.surveyId, 'descartada');
-        this.states[(it.surveyId || '') + '::' + it.id] = 'descartada';
-        this._syncCard(it.surveyId, it.id);
-        ok++;
+        // setEstado ya revierte el estado optimista y pinta el error si falla.
+        if (await this.setEstado(it.id, 'descartada', it.surveyId)) ok++;
       }
-    } catch (err) {
-      this._snackErr(err, 'Descartadas ' + ok + ' de ' + lista.length + ': ' + this._errMsg(err));
     } finally {
       this.hideLoading();
     }
     this.renderReportes(document.getElementById('page-reportes'));
-    this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
+    if (ok === lista.length) this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
+    else if (ok > 0) this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ' solicitudes de 2025', 'error');
+    // Si ok===0 el ultimo setEstado ya mostro el error; no tapar con exito.
   },
 
   // Anti-doble-clic en Guardar: deshabilita el boton, pone "Guardando..."
@@ -4767,7 +4838,6 @@ const Dashboard = {
     }, 5000);
   },
 
-  showError(msg) { this.showSnackbar(msg, 'error'); }
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Dashboard;

@@ -17,8 +17,8 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (**272 tests en verde**, lógica pura sin
-  DOM; 5 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export`).
+- `npm test` — `node --test tests/*.test.js` (**287 tests en verde**, lógica pura sin
+  DOM; 6 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export` / `auth`).
   En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
   **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v100`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v102`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -219,12 +219,37 @@ corregidos (`_partesFecha` acepta `dd-mm-aaaa` y «13 abr 2025» —el texto es-
 `inicio`/`fin` de las acogidas rompía la duración media de Reportes—;
 `apadrinaTotal` usa `aporte_mensual`, la memoria anual salía 0,00 €; y
 `_fmtFecha` acepta `dd-mm-aaaa`), contraste AA de `.btn-danger` y
-`.btn-outline-green`, tests en CI y `CACHE_NAME` v100**.
+`.btn-outline-green`, tests en CI y `CACHE_NAME` v100** → **v101 foto de la ficha
+de animal clickable: el avatar abre un modal con la imagen grande (`_fotoHero` +
+`verFotoAnimal`, src `w1600` con reintento a `w800`, CSS `.foto-hero`/`.modal-foto`)
+y tests 272→275** → **v102 auditoría de seguridad/lógica (P0-P1)**: escapeo XSS en
+el render del cuestionario (`_seccionesHtml`, usado por la ficha y el modal; el PDF
+escapa por su cuenta), en la tarjeta/listado de animales y adopciones, en el formulario
+de familias y en las fichas de animal/socio; `setEstado` devuelve booleano y
+`aprobarEncuesta`/`descartar2025` ya no pintan éxito cuando el backend falla;
+`_memoriaData` cuenta solo apadrinamientos `activo` (antes pasaban los `finalizado`);
+capacidad de familia real con `_capacidadFamilia` (una familia con `max_capacity`=2
+ya no se quedaba «Ocupada» con un animal); lista negra con clave estable
+(`_blClave`/`_blPorClave`: borrar con filtro ya no eliminaba a otra persona);
+`api.js` envía `Authorization: Bearer` **además** del token en query (retirar el
+query al publicar `Code.gs`); `sw.js` precachea `icon-180.png` e ignora no-GET;
+tokens tipográficos (`--text-2xs/xs/sm`) y de color (`--success`, `--info-strong`)
+sustituyendo hex/rem sueltos; `docs/` legado marcado HISTÓRICO; tests 275→287**.
 Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
+   **Importante tras este push**: el front ya manda `Authorization: Bearer` (y de
+   momento también `?token=` por compatibilidad). En cuanto publique el
+   `Code.gs` nuevo se puede retirar el token de la query de `src/js/api.js`
+   (quita el JWT de las URLs de los logs/red). El `Code.gs` local ya lee la
+   cabecera (`getHeader(e,'Authorization')` → fallback `e.parameter.token`).
 2. Secrets `API_URL` (+ `CONTACTO_TELEFONO/EMAIL`) y re-ejecutar workflow tras cambiarlos.
+   El workflow usa `secrets.X || vars.X` (fallback): **se mantiene a propósito**
+   porque no se puede verificar desde el repo si los valores viven en Secrets o
+   en Variables; el repo es público, así que no debe haber nunca valores planos
+   en Variables. Si se confirma que todo está en Secrets, el `|| vars.X` se
+   retira del workflow.
 3. Hojas nuevas con pestaña exacta + acceso API; `id` rellenos (sin celdas vacías).
    Hoja **`Grupos` ya creada** (`SHEET_GRUPOS_ID` en `.env` + `node scripts/gen-config.js`).
    La columna nueva **`urgente`** de Animales la añade el backend solo si el
@@ -235,11 +260,11 @@ Detalle commit a commit en `git log`.
 ## Deuda y decisiones abiertas (no bloquean)
 1. **Regla de devolución de un grupo obligatorio**: ¿se devuelve el animal a la
    protectora o solo se marca el caso? Sin definir.
-2. **`docs/` legado desactualizado** (`CHANGELOG` parado en 2026-09-19, `ROLES.md`
-   con roles que ya no existen, `ARQUITECTURA.md` hablando de mock backend y Google
-   login, `CHECKLIST-PRODUCCION.md` sin marcar): decidir si se actualiza, se marca
-   como histórico o se retira del repo. **`PROGRESO.md` + `AGENTS.md` son la fuente
-   de verdad.**
+2. ~~**`docs/` legado desactualizado**~~ → **cerrado**: `ARQUITECTURA`, `CHANGELOG`,
+   `CHECKLIST-PRODUCCION`, `FLUJO-TRABAJO`, `GUIA-DESPLIEGUE`, `ROLES` y
+   `ESQUEMA-FLUJO-PREADOPCION-ACOGIDA` llevan ahora un encabezado **HISTÓRICO**
+   que remite a `AGENTS.md`/`PROGRESO.md` (la fuente de verdad). No se retiran
+   del repo por si sirven de contexto.
 3. **Sin linter**: `npm run lint` es un `echo` (no hay ESLint/Prettier configurados).
 4. **`.toast-info` daría 3,15:1**: el tipo `info` de snackbar **no se usa** hoy en el
    código; si algún día se añade, subirlo a AA (`--primary-hover`/`--danger-hover`).
@@ -253,9 +278,15 @@ Detalle commit a commit en `git log`.
 > definir**: hoy es un módulo *dummy* local (`TODO Meta` en el código) sin integración
 > real. Antes de programar nada hay que decidir la dirección (conectar Meta / publicar
 > desde el panel / o retirarlo). Solo después tendría sentido tocarlo.
+> **Guía paso a paso del token de Instagram** (Fases 0-6, con huecos para capturas):
+> `docs/GUIA-TOKEN-INSTAGRAM.md`. La integración en el código sería la Fase 7.
 
 Mejoras candidatas, por orden de encaje:
 
+- **Sugerir animales desde las encuestas** — *solo análisis, no implementado*:
+  ver `docs/ANALISIS-ETIQUETAS-ENCUESTA-ANIMAL.md` (diccionario de etiquetas
+  derivado de las columnas reales de los 3 formularios, matriz de compatibilidad
+  y fases 0-3; bloqueador: publicar `Code.gs`).
 - **Encuesta «Otras Especies»** (hoy retirada del front y de `gen-config`): crear el
   Google Form duplicando el de pre-adopción, rellenar `FORM_OTRAS_ESPECIES_ID` +
   `SHEET_OTRAS_ESPECIES_ID` en `.env`, `node scripts/gen-config.js` (el generador

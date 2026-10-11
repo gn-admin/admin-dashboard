@@ -532,8 +532,10 @@ describe('memoria anual', () => {
     assert.equal(m.sociosNuevos, 2);
     assert.equal(m.sociosTotal, 2);
     assert.equal(m.sociosActivos, 1);
-    assert.equal(m.apadrinamientosN, 2);
-    assert.equal(m.apadrinaTotal, 15);
+    // Solo cuenta el estado 'activo' (el filtro anterior dejaba pasar
+    // 'finalizado', que es el estado real de un apadrinamiento cerrado).
+    assert.equal(m.apadrinamientosN, 1);
+    assert.equal(m.apadrinaTotal, 10);
   });
 
   it('_memoriaData de un anio sin datos no rompe', () => {
@@ -652,10 +654,12 @@ describe('utilidades de la guia y del panel', () => {
   it('_guideStep con y sin localizacion', () => {
     const con = Dashboard._guideStep('ICO', 'Titulo', 'Texto', 'Gestion > Animales', true);
     assert.match(con, /guide-step-loc/);
-    assert.match(con, /#e8faf0/);
+    // Los colores van con tokens de :root (no hex sueltos).
+    assert.match(con, /var\(--primary-lighter\)/);
+    assert.match(con, /var\(--success\)/);
     const sin = Dashboard._guideStep('ICO', 'T', 'x');
     assert.doesNotMatch(sin, /guide-step-loc/);
-    assert.match(sin, /#ebf5fb/);
+    assert.match(sin, /var\(--info-light\)/);
   });
 
   it('_flowDiagram dibuja un rectangulo por nodo y cierra el svg', () => {
@@ -673,3 +677,205 @@ describe('utilidades de la guia y del panel', () => {
     assert.equal(Dashboard._errMsg({ error: 'del backend' }), 'del backend');
   });
 });
+
+describe('foto de la ficha: avatar clickable y modal', () => {
+  it('_fotoHero con foto: boton que llama a verFotoAnimal, alt e id escapados', () => {
+    const html = Dashboard._fotoHero({ id: "a'1", nombre: '<b>Luna</b>', especie: 'Perro', foto_drive_id: 'fid1' });
+    assert.match(html, /<button type="button" class="foto-hero"/);
+    assert.match(html, /Dashboard\.verFotoAnimal\('a&#39;1'\)/);
+    assert.match(html, /alt="&lt;b&gt;Luna&lt;\/b&gt;"/);
+    assert.match(html, /thumbnail\?id=fid1&amp;sz=w800/);
+    assert.match(html, /title="Ver foto completa"/);
+    assert.doesNotMatch(html, /<b>Luna/);
+  });
+
+  it('_fotoHero sin foto: icono de especie y sin accion', () => {
+    const perro = Dashboard._fotoHero({ id: 'a2', nombre: 'Toby', especie: 'Perro' });
+    assert.doesNotMatch(perro, /verFotoAnimal/);
+    assert.doesNotMatch(perro, /<img/);
+    assert.ok(perro.includes(Icons.dog), 'perro -> icono perro');
+    const gato = Dashboard._fotoHero({ id: 'a3', especie: 'Gato' });
+    assert.ok(gato.includes(Icons.cat), 'gato -> icono gato');
+    const otro = Dashboard._fotoHero({ id: 'a4', especie: 'Conejo' });
+    assert.ok(otro.includes(Icons.paw), 'otra especie -> icono generico');
+  });
+
+  it('verFotoAnimal: variante grande, reintento y nombre escapado', () => {
+    const realModal = Dashboard.showInfoModal;
+    const realSnack = Dashboard.showSnackbar;
+    let cap = null, snack = null;
+    Dashboard.showInfoModal = (t, html) => { cap = { t, html }; };
+    Dashboard.showSnackbar = m => { snack = m; };
+    try {
+      Dashboard.animales = [{ id: 'a1', nombre: 'Luna <3', especie: 'Perro', foto_drive_id: 'fid1' }];
+      Dashboard.verFotoAnimal('a1');
+      assert.match(cap.html, /class="modal-foto"/);
+      assert.match(cap.html, /sz=w1600/);
+      assert.match(cap.html, /onerror="this\.onerror=null;this\.src='/);
+      assert.match(cap.html, /sz=w800/);
+      assert.doesNotMatch(cap.html, /Luna <3/);
+
+      cap = null;
+      Dashboard.animales = [{ id: 'a2', nombre: 'Toby', especie: 'Perro' }];
+      Dashboard.verFotoAnimal('a2');
+      assert.equal(cap, null, 'sin foto no se abre nada');
+
+      Dashboard.verFotoAnimal('no-existe');
+      assert.ok(snack, 'id desconocido -> snackbar');
+    } finally {
+      Dashboard.showInfoModal = realModal;
+      Dashboard.showSnackbar = realSnack;
+    }
+  });
+});
+
+describe('_seccionesHtml: escapeo en el render del cuestionario', () => {
+  it('escapa label y value (viewDetail y viewCuestionarioModal)', () => {
+    const html = Dashboard._seccionesHtml([{
+      title: 'Cuestionario',
+      fields: [{ label: '<img src=x onerror=alert(1)>', value: '<script>alert(2)</script>' }]
+    }]);
+    assert.doesNotMatch(html, /<img src=x/);
+    assert.doesNotMatch(html, /<script>/);
+    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    assert.match(html, /&lt;script&gt;alert\(2\)&lt;\/script&gt;/);
+  });
+
+  it('value null/undefined pinta el guion y no rompe', () => {
+    const html = Dashboard._seccionesHtml([{ title: 'S', fields: [{ label: 'X', value: null }] }]);
+    assert.match(html, /<div class="detail-answer">—<\/div>/);
+    assert.equal(Dashboard._seccionesHtml(null), '');
+    assert.equal(Dashboard._seccionesHtml([]), '');
+  });
+});
+
+describe('_capacidadFamilia: Libre hasta alcanzar el max', () => {
+  it('con hueco sigue Libre aunque ya tenga animales', () => {
+    assert.equal(Dashboard._capacidadFamilia(0, 2), 'Libre');
+    assert.equal(Dashboard._capacidadFamilia(1, 2), 'Libre');
+    assert.equal(Dashboard._capacidadFamilia('1', '2'), 'Libre');
+  });
+
+  it('al llegar al max pasa a Ocupada', () => {
+    assert.equal(Dashboard._capacidadFamilia(2, 2), 'Ocupada');
+    assert.equal(Dashboard._capacidadFamilia(3, 2), 'Ocupada');
+    assert.equal(Dashboard._capacidadFamilia(1, 1), 'Ocupada');
+  });
+
+  it('sin max interpreta 1 (no deja doble-reservar)', () => {
+    assert.equal(Dashboard._capacidadFamilia(0, undefined), 'Libre');
+    assert.equal(Dashboard._capacidadFamilia(1, undefined), 'Ocupada');
+    assert.equal(Dashboard._capacidadFamilia(1, 'x'), 'Ocupada');
+  });
+});
+
+describe('lista negra: clave estable por fila', () => {
+  beforeEach(() => {
+    Dashboard.blacklist = [
+      { id: 'bl_1', nombre: 'Ana', apellidos: 'Garcia', email: '', motivo: 'Otros' },
+      { nombre: 'Sin', apellidos: 'Id', email: '', motivo: 'Otros' },
+      { id: 'bl_3', nombre: 'Luis', apellidos: 'Perez', email: '', motivo: 'Otros' }
+    ];
+  });
+
+  it('sin id usa idx con el indice de la lista completa', () => {
+    assert.equal(Dashboard._blClave(Dashboard.blacklist[0], 0), 'bl_1');
+    assert.equal(Dashboard._blClave(Dashboard.blacklist[1], 1), 'idx:1');
+  });
+
+  it('las tarjetas filtradas siguen apuntando a la fila real', () => {
+    // Busqueda que solo deja ver a "Luis" (indice real 2, filtrado 0).
+    const html = Dashboard._renderBlacklistCards('luis');
+    assert.match(html, /showEditBlacklistItem\('bl_3'\)/);
+    assert.match(html, /removeBlacklistItem\('bl_3'\)/);
+    assert.doesNotMatch(html, /idx:0/);
+    const html2 = Dashboard._renderBlacklistCards('sin');
+    assert.match(html2, /removeBlacklistItem\('idx:1'\)/, 'la fila sin id mantiene su indice real, no el filtrado');
+  });
+
+  it('_blPorClave resuelve id y idx: y rechaza claves rotas', () => {
+    assert.deepEqual(Dashboard._blPorClave('bl_3'), { item: Dashboard.blacklist[2], index: 2 });
+    assert.deepEqual(Dashboard._blPorClave('idx:1'), { item: Dashboard.blacklist[1], index: 1 });
+    assert.equal(Dashboard._blPorClave('idx:99'), null);
+    assert.equal(Dashboard._blPorClave('idx:zz'), null);
+    assert.equal(Dashboard._blPorClave('no-existe'), null);
+  });
+});
+
+describe('setEstado: booleano y rollback optimista', () => {
+  let stubs;
+  beforeEach(() => {
+    stubs = { snacks: [] };
+    Dashboard.states = { 's1::r1': 'pendiente' };
+    Dashboard._syncCard = () => {};
+    Dashboard.showLoading = () => {};
+    Dashboard.hideLoading = () => {};
+    Dashboard.showSnackbar = (m, t) => stubs.snacks.push({ m, t });
+    Dashboard._snackErr = (err, m) => stubs.snacks.push({ m, t: 'snackErr', status: err && err.status });
+    global.API = { setEstado: async () => ({ status: 'success' }) };
+  });
+  afterEach(() => {
+    delete Dashboard._syncCard;
+    delete Dashboard.showLoading;
+    delete Dashboard.hideLoading;
+    delete Dashboard.showSnackbar;
+    delete Dashboard._snackErr;
+    delete global.API;
+    Dashboard.states = {};
+  });
+
+  it('devuelve true y fija el estado cuando el backend acepta', async () => {
+    assert.equal(await Dashboard.setEstado('r1', 'aprobada', 's1'), true);
+    assert.equal(Dashboard.states['s1::r1'], 'aprobada');
+  });
+
+  it('devuelve false, revierte y no pinta exito si el backend falla', async () => {
+    global.API.setEstado = async () => { const e = new Error('boom'); e.status = 'error'; throw e; };
+    assert.equal(await Dashboard.setEstado('r1', 'aprobada', 's1'), false);
+    assert.equal(Dashboard.states['s1::r1'], 'pendiente', 'revierte al estado anterior');
+    assert.ok(stubs.snacks.some(s => s.t === 'snackErr'), 'el error lo pinta _snackErr');
+  });
+});
+
+describe('aprobarEncuesta: sin exito cuando setEstado falla', () => {
+  let stubs;
+  beforeEach(() => {
+    stubs = { snackbar: [], creadas: 0, vistas: 0 };
+    Dashboard.viewDetail = () => { stubs.vistas++; };
+    Dashboard._crearCandidatura = () => { stubs.creadas++; return {}; };
+    Dashboard._autoFamiliaDeEncuesta = async () => {};
+    Dashboard.showSnackbar = (m, t) => stubs.snackbar.push({ m, t });
+  });
+  afterEach(() => {
+    delete Dashboard.viewDetail;
+    delete Dashboard._crearCandidatura;
+    delete Dashboard._autoFamiliaDeEncuesta;
+    delete Dashboard.showSnackbar;
+  });
+
+  it('si setEstado devuelve false no crea candidatura ni pinta exito', async () => {
+    const realSet = Dashboard.setEstado;
+    Dashboard.setEstado = async () => false;
+    try {
+      await Dashboard.aprobarEncuesta('pre-adopcion-perros', 'r9');
+      assert.equal(stubs.creadas, 0, 'sin candidatura si no se guardo el estado');
+      assert.equal(stubs.vistas, 1, 'si refresca la ficha para ver el error');
+      assert.equal(stubs.snackbar.filter(s => s.t === 'success').length, 0);
+    } finally {
+      Dashboard.setEstado = realSet;
+    }
+  });
+
+  it('si setEstado devuelve true aprueba y pinta exito', async () => {
+    const realSet = Dashboard.setEstado;
+    Dashboard.setEstado = async () => true;
+    try {
+      await Dashboard.aprobarEncuesta('pre-adopcion-perros', 'r9');
+      assert.equal(stubs.creadas, 1);
+      assert.equal(stubs.snackbar.filter(s => s.t === 'success').length, 1);
+    } finally {
+      Dashboard.setEstado = realSet;
+    }
+  });
+});
+

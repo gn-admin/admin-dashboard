@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v100';
+﻿const CACHE_NAME = 'gn-encuestas-v102';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const STATIC_ASSETS = [
   './js/pdf-export.js',
   './js/app.js',
   './manifest.webmanifest',
+  './assets/icons/icon-180.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/logo-nebak.jpg'
@@ -39,6 +40,9 @@ self.addEventListener('activate', event => {
 
 // Fetch: cache-first para assets estáticos, network-first para API
 self.addEventListener('fetch', event => {
+  // Solo GET se cachea/lee de cache; POST/PUT/etc pasan directo a la red
+  // (caches.match con un POST devolveria undefined y romperia el flujo).
+  if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
   // API calls: network-first (no cachear datos de usuario)

@@ -39,17 +39,25 @@ const API = {
     return data;
   },
 
+  // El token viaja en la cabecera Authorization (Code.gs local ya la lee) y,
+  // de momento, TAMBIEN en la query: el backend desplegado es anterior y solo
+  // acepta `?token=`. Retirar el query en cuanto se publique Code.gs (Nueva
+  // version en el editor de Apps Script); hasta entonces no romper prod.
   async _get(endpoint, params = {}) {
     const token = await Auth.getIdToken();
     const qs = new URLSearchParams({ endpoint, ...params, token }).toString();
-    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`);
+    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
     return this._resultado(res);
   },
 
   async _post(endpoint, body = {}) {
     const token = await Auth.getIdToken();
     const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
-      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body)
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body)
     });
     return this._resultado(res);
   },
