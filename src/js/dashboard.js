@@ -427,6 +427,15 @@ const Dashboard = {
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   },
 
+  // Bloquea el scroll del body mientras hay modales abiertos (contador para
+  // apilar). Sin esto, en movil se puede hacer scroll del fondo tras el modal.
+  _modalScrollLock(open) {
+    this._modalLocks = Math.max(0, (this._modalLocks || 0) + (open ? 1 : -1));
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = this._modalLocks > 0 ? 'hidden' : '';
+    }
+  },
+
   _confirm(msg, title) {
     return new Promise(resolve => {
       const modal = document.getElementById('confirm-modal');
@@ -442,6 +451,7 @@ const Dashboard = {
       if (cancel) cancel.onclick = () => this._closeConfirm(false);
       modal.onclick = (e) => { if (e.target === modal) this._closeConfirm(false); };
       modal.style.display = 'flex';
+      this._modalScrollLock(true);
       this._focusModal(modal);
     });
   },
@@ -450,6 +460,7 @@ const Dashboard = {
     const modal = document.getElementById('confirm-modal');
     if (!modal) return;
     modal.style.display = 'none';
+    this._modalScrollLock(false);
     const r = modal._resolve; modal._resolve = null;
     const ok = document.getElementById('confirm-ok');
     const cancel = document.getElementById('confirm-cancel');
@@ -593,23 +604,48 @@ const Dashboard = {
   },
 
   // ==================== INLINE DETAIL SYSTEM ====================
+  // View Transition progresiva: cross-fade si el navegador la soporta y no
+  // hay movimiento reducido; si no, ejecuta fn tal cual (misma guard que
+  // App.navigateTo). En Node (tests) no existe la API y no se toca nada.
+  _withViewTransition(fn) {
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof document !== 'undefined' && document.startViewTransition && !reduce) {
+      document.startViewTransition(fn);
+    } else {
+      fn();
+    }
+  },
+
+  // Anyade temporalmente la clase .list-fresh al contenedor para que las
+  // tarjetas recien pintadas entren con un fadeIn suave. Solo en renders de
+  // pantalla; los filtros no la llaman (asi no parpadea con cada tecla).
+  _animaListado(container) {
+    if (!container) return;
+    container.classList.add('list-fresh');
+    clearTimeout(container._freshT);
+    container._freshT = setTimeout(() => container.classList.remove('list-fresh'), 250);
+  },
+
   _showDetail(pageId, title, contentHTML) {
     const page = document.getElementById('page-' + pageId);
     if (!page) return;
     const listEl = page.querySelector('.page-list-container');
     const detailEl = page.querySelector('.page-detail-container');
     if (!listEl || !detailEl) return;
-    listEl.classList.add('hidden');
-    detailEl.classList.add('active');
-    detailEl._prevHTML = null;
-    detailEl.innerHTML = `
+    this._withViewTransition(() => {
+      listEl.classList.add('hidden');
+      detailEl.classList.add('active');
+      detailEl._prevHTML = null;
+      detailEl.innerHTML = `
       <div class="detail-actions" style="margin-bottom:20px">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
         <span style="font-weight:700;font-size:1rem;color:var(--gray-900)">${this._esc(title)}</span>
       </div>
       ${contentHTML}`;
-    this.injectIcons();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+      this.injectIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   },
 
   _hideDetail(pageId) {
@@ -617,8 +653,14 @@ const Dashboard = {
     if (!page) return;
     const listEl = page.querySelector('.page-list-container');
     const detailEl = page.querySelector('.page-detail-container');
-    if (listEl) listEl.classList.remove('hidden');
-    if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; }
+    if (listEl && listEl.classList.contains('hidden')) {
+      this._withViewTransition(() => {
+        listEl.classList.remove('hidden');
+        if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; }
+      });
+    } else if (detailEl) {
+      detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null;
+    }
   },
 
   // ==================== DASHBOARD HOME ====================
@@ -955,6 +997,7 @@ const Dashboard = {
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
       <div class="page-detail-container"></div>`;
+    this._animaListado(document.getElementById('response-list-' + surveyId));
   },
 
   filterEncuesta(container, surveyId) {
@@ -1354,13 +1397,17 @@ const Dashboard = {
     if (titleEl) titleEl.textContent = title || 'Detalle';
     body.innerHTML = html;
     modal.style.display = 'flex';
+    this._modalScrollLock(true);
     this.injectIcons();
     this._focusModal(modal);
   },
 
   closeInfoModal() {
     const modal = document.getElementById('info-modal');
-    if (modal) modal.style.display = 'none';
+    if (!modal) return;
+    if (modal.style.display === 'none') return;
+    modal.style.display = 'none';
+    this._modalScrollLock(false);
   },
 
   showFormModal(title, html) {
@@ -1371,13 +1418,17 @@ const Dashboard = {
     if (titleEl) titleEl.textContent = title || 'Formulario';
     body.innerHTML = html;
     modal.style.display = 'flex';
+    this._modalScrollLock(true);
     this.injectIcons();
     this._focusModal(modal);
   },
 
   closeFormModal() {
     const modal = document.getElementById('form-modal');
-    if (modal) modal.style.display = 'none';
+    if (!modal) return;
+    if (modal.style.display === 'none') return;
+    modal.style.display = 'none';
+    this._modalScrollLock(false);
   },
 
   async viewCuestionarioModal(surveyId, responseId) {
@@ -2351,6 +2402,7 @@ const Dashboard = {
         ${vacio}
       </div>
       <div class="page-detail-container"></div>`;
+    this._animaListado(el.querySelector('.page-list-container'));
   },
 
   _grupoSize(gid) { return (this.animales||[]).filter(x=>x.grupo_id===gid).length; },
@@ -3127,6 +3179,7 @@ const Dashboard = {
         </div>`).join('') : (this.familias.length ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Sin familias para este filtro</h3><p>Prueba a mostrar todas o libres.</p></div>` : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Aun no hay familias</h3><p>Registra una nueva familia acogedora.</p></div>`)}</div>
       </div>
       <div class="page-detail-container"></div>`;
+    this._animaListado(el.querySelector('.response-list'));
   },
 
   // Capacidad de una familia acogedora: 'Ocupada' solo cuando ya no cabe
@@ -3286,6 +3339,7 @@ const Dashboard = {
         </div>
       </div>
       <div class="page-detail-container"></div>`;
+    this._animaListado(el.querySelector('.response-list'));
   },
 
   async avanzarFaseAcogida(id) {
@@ -3384,6 +3438,7 @@ const Dashboard = {
         </div>`).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
       </div>
       <div class="page-detail-container"></div>`;
+    this._animaListado(el.querySelector('.response-list'));
   },
 
   async showAdopcionForm(data) {
@@ -4151,6 +4206,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." oninput="Dashboard.filterBlacklist(this)"></div><button class="btn btn-primary btn-sm" onclick="Dashboard.showAddBlacklist()">${Icons.plus} Anadir</button></div>
       <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>`;
+    this._animaListado(document.getElementById('blacklist-list-container'));
   },
 
   filterBlacklist(input) { const c=document.getElementById('blacklist-list-container'); if(c) c.innerHTML=this._renderBlacklistCards(input.value); },

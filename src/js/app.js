@@ -64,36 +64,48 @@ const App = {
 
   navigateTo(page) {
     if (this.currentPage === page) return;
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const target = document.getElementById('page-' + page);
-    if (target) {
-      target.classList.add('active');
-      this.currentPage = page;
-    }
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
-    document.querySelectorAll('.bottom-nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
-    const titles = {
-      dashboard: 'Dashboard',
-      encuestas: 'Encuestas',
-      'encuestas-perros': 'Pre-adopcion Perros',
-      'encuestas-gatos': 'Pre-adopcion Gatos',
-      'encuestas-acogida': 'Solicitudes de Acogida',
-      animales: 'Animales',
-      acogidas: 'Familias de Acogida',
-      'acogidas-activas': 'Acogidas Activas',
-      adopciones: 'Adopciones',
-      socios: 'Socios / Voluntarios',
-      blacklist: 'Lista Negra',
-      reportes: 'Reportes',
-      actividad: 'Registro de actividad',
-      redes: 'Redes Sociales',
-      donaciones: 'Donaciones',
-      almacen: 'Almacén'
+    const aplicar = () => {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById('page-' + page);
+      if (target) {
+        target.classList.add('active');
+        this.currentPage = page;
+      }
+      document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+      document.querySelectorAll('.bottom-nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+      const titles = {
+        dashboard: 'Dashboard',
+        encuestas: 'Encuestas',
+        'encuestas-perros': 'Pre-adopcion Perros',
+        'encuestas-gatos': 'Pre-adopcion Gatos',
+        'encuestas-acogida': 'Solicitudes de Acogida',
+        animales: 'Animales',
+        acogidas: 'Familias de Acogida',
+        'acogidas-activas': 'Acogidas Activas',
+        adopciones: 'Adopciones',
+        socios: 'Socios / Voluntarios',
+        blacklist: 'Lista Negra',
+        reportes: 'Reportes',
+        actividad: 'Registro de actividad',
+        redes: 'Redes Sociales',
+        donaciones: 'Donaciones',
+        almacen: 'Almacén'
+      };
+      document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+      this.closeSidebar();
+      this.closeMasMenu();
+      Dashboard.loadPage(page);
     };
-    document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
-    this.closeSidebar();
-    this.closeMasMenu();
-    Dashboard.loadPage(page);
+    // View Transition API (progresiva): cross-fade entre paginas si el
+    // navegador la soporta y no hay movimiento reducido; si no, igual que
+    // siempre. Con guard para que en Node (tests) no se ejecute la rama.
+    const reduce = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (typeof document !== 'undefined' && document.startViewTransition && !reduce) {
+      document.startViewTransition(aplicar);
+    } else {
+      aplicar();
+    }
   },
 
   onHashChange() {

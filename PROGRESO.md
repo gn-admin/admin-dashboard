@@ -17,20 +17,20 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (**287 tests en verde**, lógica pura sin
+- `npm test` — `node --test tests/*.test.js` (**290 tests en verde**, lógica pura sin
   DOM; 6 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export` / `auth`).
   En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
   **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
 - No editar a mano `src/js/config.js` ni `apps-script/Config.gs` (generados, ignorados).
 
 ## Arquitectura
-- `src/`: `index.html` + `js/` (config, icons, auth, api, dashboard ~4700 líneas,
+- `src/`: `index.html` + `js/` (config, icons, auth, api, dashboard ~4900 líneas,
   carnet-generator, pdf-export, app) + `css/styles.css` + `sw.js` + `manifest` + assets.
 - Router por hash (`app.js`). Sin framework ni build de JS.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v102`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v103`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -234,8 +234,16 @@ ya no se quedaba «Ocupada» con un animal); lista negra con clave estable
 `api.js` envía `Authorization: Bearer` **además** del token en query (retirar el
 query al publicar `Code.gs`); `sw.js` precachea `icon-180.png` e ignora no-GET;
 tokens tipográficos (`--text-2xs/xs/sm`) y de color (`--success`, `--info-strong`)
-sustituyendo hex/rem sueltos; `docs/` legado marcado HISTÓRICO; tests 275→287**.
-Detalle commit a commit en `git log`.
+sustituyendo hex/rem sueltos; `docs/` legado marcado HISTÓRICO; tests 275→287** →
+**v103 fluidez (plan A-F)**: ningún `transition: all` (10 a propiedades explícitas)
+con feedback táctil `scale(0.99)` en las tarjetas; `.loading-overlay` siempre
+`display:flex` (fade por opacity en vez de show/hide brusco, sin `backdrop-filter`
+en puntero táctil); scroll-lock de modales con ref-count (`_modalScrollLock` en
+`showInfoModal`/`showFormModal`/`_confirm`); navegación y detalle con View
+Transition progresiva (`_withViewTransition` en `navigateTo`/`_showDetail`/
+`_hideDetail`); entrada sutil de listados con `.list-fresh` + keyframes `cardFade`
+(`_animaListado` solo en renders, nunca en filtros); aria en el overlay de carga;
+tests 287→290**. Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).

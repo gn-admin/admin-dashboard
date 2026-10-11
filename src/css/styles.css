@@ -99,6 +99,20 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Entrada sutil de tarjetas al pintar un listado (la clase .list-fresh la
+   pone el render de pantalla; los filtros no la anyaden, asi que no
+   parpadea con cada tecla). */
+@keyframes cardFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.list-fresh .response-card,
+.list-fresh .animal-card,
+.list-fresh .bl-card {
+  animation: cardFade 0.15s ease-out both;
+}
+
 @keyframes floatOrb {
   from { transform: translate(0, 0) scale(1); }
   to { transform: translate(20px, -15px) scale(1.05); }
@@ -262,7 +276,7 @@ body {
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   font-family: inherit;
   text-decoration: none;
   line-height: 1.4;
@@ -325,6 +339,14 @@ body {
   transform: scale(0.97);
 }
 
+/* Feedback al pulsar tarjetas clicables (en movil no hay hover) */
+.response-card:active,
+.animal-card:active,
+.bl-card:active {
+  transform: scale(0.99);
+  box-shadow: var(--shadow);
+}
+
 /* Foco visible por teclado */
 .btn:focus-visible,
 .btn-icon:focus-visible,
@@ -363,7 +385,7 @@ body {
   color: var(--gray-600);
   border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .btn-icon:hover {
@@ -478,7 +500,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
   flex-shrink: 0;
 }
 
@@ -581,7 +603,7 @@ body {
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 500;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
   white-space: nowrap;
   position: relative;
@@ -672,7 +694,7 @@ body {
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .sidebar-logout:hover {
@@ -793,7 +815,7 @@ body {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
 
 .sidebar-toggle-btn:hover {
@@ -867,7 +889,7 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: all 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .stat-card:hover {
@@ -1113,7 +1135,7 @@ body {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-100);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 
 .response-card:hover {
@@ -1386,7 +1408,7 @@ body {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-100);
   margin-bottom: 12px;
-  transition: all 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .bl-card:hover {
@@ -1492,8 +1514,10 @@ body {
 }
 
 /* ===== LOADING / TOAST ===== */
+/* Overlay de carga: siempre en el DOM (display:flex) y se muestra/oculta
+   con fade; con display:none no hay transicion posible y aparecia de golpe. */
 .loading-overlay {
-  display: none;
+  display: flex;
   position: fixed;
   inset: 0;
   background: rgba(255, 255, 255, 0.8);
@@ -1501,9 +1525,24 @@ body {
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
 .loading-overlay.active {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.15s ease;
+}
+
+/* El blur a pantalla completa es caro en tablet/movil (puntero grueso) */
+@media (pointer: coarse) {
+  .loading-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .spinner {
@@ -2240,7 +2279,7 @@ select.form-input {
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-100);
-  transition: all 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
 .animal-card:hover {

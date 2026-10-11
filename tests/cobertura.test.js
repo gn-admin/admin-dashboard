@@ -879,3 +879,42 @@ describe('aprobarEncuesta: sin exito cuando setEstado falla', () => {
   });
 });
 
+describe('fluidez: scroll-lock de modales y entrada de listados', () => {
+  it('_modalScrollLock cuenta modales apilados y restaura el overflow', () => {
+    const realDoc = global.document;
+    const style = {};
+    global.document = { body: { style } };
+    Dashboard._modalLocks = 0;
+    try {
+      Dashboard._modalScrollLock(true);
+      assert.equal(style.overflow, 'hidden');
+      Dashboard._modalScrollLock(true);
+      Dashboard._modalScrollLock(false);
+      assert.equal(style.overflow, 'hidden', 'sigue oculto mientras quede un modal abierto');
+      Dashboard._modalScrollLock(false);
+      assert.equal(style.overflow, '', 'restaurado al cerrar el ultimo modal');
+      Dashboard._modalScrollLock(false);
+      assert.equal(Dashboard._modalLocks, 0, 'el contador nunca baja de 0');
+    } finally {
+      Dashboard._modalLocks = 0;
+      if (realDoc === undefined) delete global.document; else global.document = realDoc;
+    }
+  });
+
+  it('_animaListado marca .list-fresh y la retira tras el fadeIn', async () => {
+    const cont = { classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } } };
+    Dashboard._animaListado(cont);
+    assert.ok(cont.classList.contains('list-fresh'));
+    await new Promise(r => setTimeout(r, 300));
+    assert.ok(!cont.classList.contains('list-fresh'), 'la clase se retira para no re-montar al filtrar');
+    assert.equal(Dashboard._animaListado(null), undefined, 'sin contenedor no lanza');
+  });
+
+  it('_withViewTransition ejecuta fn tal cual cuando no hay View Transition API', () => {
+    // En Node no existe document.startViewTransition: debe llamar fn directo.
+    let llamado = false;
+    Dashboard._withViewTransition(() => { llamado = true; });
+    assert.equal(llamado, true);
+  });
+});
+

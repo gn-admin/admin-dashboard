@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v102';
+﻿const CACHE_NAME = 'gn-encuestas-v103';
 const STATIC_ASSETS = [
   './',
   './index.html',
