@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v104`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v105`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -247,16 +247,27 @@ tests 287→290** → **v104 hotfix: retirada de la View Transition API** (envol
 `navigateTo`/`_showDetail`/`_hideDetail` en `document.startViewTransition` dejo
 las pantallas y fichas en blanco al no ejecutarse el callback; la navegación
 vuelve a ser directa y `_withViewTransition` es un simple `fn()`; la entrada de
-listados la sigue aportando `.list-fresh`, que es CSS puro). Detalle commit a
-commit en `git log`.
+listados la sigue aportando `.list-fresh`, que es CSS puro) → **v105 hotfix:
+retirada de la cabecera `Authorization` de `api.js`** (se había añadido en v102 y
+recién llegó a prod junto con la fluidez; un header no simple fuerza un preflight
+CORS `OPTIONS` que Apps Script **no** responde con `Access-Control-Allow-Headers`
+→ el navegador bloqueaba **todas** las peticiones GET/POST → «error al cargar» en
+todas las pantallas. El token viaja **solo** en `?token=` —el backend desplegado
+solo lee `e.parameter.token` y responde `ACAO: *`—; migrarlo a cabecera únicamente
+cuando el `Code.gs` esté desplegado con soporte de preflight. Tests: `_get`/`_post`
+afirman `Authorization === undefined`).
+  Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).
-   **Importante tras este push**: el front ya manda `Authorization: Bearer` (y de
-   momento también `?token=` por compatibilidad). En cuanto publique el
-   `Code.gs` nuevo se puede retirar el token de la query de `src/js/api.js`
-   (quita el JWT de las URLs de los logs/red). El `Code.gs` local ya lee la
-   cabecera (`getHeader(e,'Authorization')` → fallback `e.parameter.token`).
+   **Nota**: el `Code.gs` local ya lee `Authorization` (`getHeader(e,'Authorization')`
+   → fallback `e.parameter.token`), pero **no publicarlo todavía sin antes añadir
+   soporte de preflight**: mientras el front no mande la cabecera, el token va
+   **solo** en `?token=` (v105 lo dejó así porque la cabecera rompía prod, véase
+   el detalle de v105 arriba). El flujo correcto es: (a) publicar un `Code.gs` que
+   responda el `OPTIONS` con `Access-Control-Allow-Headers: authorization` y
+   `ACAO` correcto, (b) recién entonces migrar el front a la cabecera y retirar
+   el query (saca el JWT de los logs/red).
 2. Secrets `API_URL` (+ `CONTACTO_TELEFONO/EMAIL`) y re-ejecutar workflow tras cambiarlos.
    El workflow usa `secrets.X || vars.X` (fallback): **se mantiene a propósito**
    porque no se puede verificar desde el repo si los valores viven en Secrets o

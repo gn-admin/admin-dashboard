@@ -39,16 +39,17 @@ const API = {
     return data;
   },
 
-  // El token viaja en la cabecera Authorization (Code.gs local ya la lee) y,
-  // de momento, TAMBIEN en la query: el backend desplegado es anterior y solo
-  // acepta `?token=`. Retirar el query en cuanto se publique Code.gs (Nueva
-  // version en el editor de Apps Script); hasta entonces no romper prod.
+  // El token viaja SOLO en la query (`?token=`): el backend desplegado asi lo
+  // lee y responde `ACAO: *`. NO enviar cabecera `Authorization` mientras el
+  // backend no se publique con soporte de preflight: un header no simple fuerza
+  // un OPTIONS que Apps Script no responde con `Access-Control-Allow-Headers`
+  // y el navegador bloquea TODAS las peticiones (rompia prod con "error al
+  // cargar"). Cuando Code.gs (Nueva version) este desplegado, migrar el token
+  // a la cabecera y retirar el query.
   async _get(endpoint, params = {}) {
     const token = await Auth.getIdToken();
     const qs = new URLSearchParams({ endpoint, ...params, token }).toString();
-    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
+    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`);
     return this._resultado(res);
   },
 
@@ -56,7 +57,7 @@ const API = {
     const token = await Auth.getIdToken();
     const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body)
     });
     return this._resultado(res);

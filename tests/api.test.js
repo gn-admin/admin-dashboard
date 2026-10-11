@@ -115,25 +115,28 @@ describe('API: forma de las peticiones', () => {
     delete global.CONFIG;
   });
 
-  it('_post envia text/plain (nunca application/json) con token, endpoint y Authorization', async () => {
+  it('_post envia text/plain (nunca application/json) con token y endpoint, SIN Authorization', async () => {
     await API._post('animales', { nombre: 'Luna' });
     const c = llamadas[0];
     assert.equal(c.opts.method, 'POST');
     assert.equal(c.opts.headers['Content-Type'], 'text/plain;charset=utf-8');
-    // Cabecera nueva (Code.gs local la lee) + query (backend desplegado aun
-    // solo acepta ?token=; retirar cuando se publique Code.gs).
-    assert.equal(c.opts.headers['Authorization'], 'Bearer TOKEN123');
+    // NO Authorization: un header no simple fuerza un preflight CORS que
+    // Apps Script no responde con Access-Control-Allow-Headers y el navegador
+    // bloquea la peticion (rompia prod con "error al cargar"). El token va en
+    // la query; migrarlo a cabecera solo cuando el backend soporte preflight.
+    assert.equal(c.opts.headers['Authorization'], undefined);
     assert.deepEqual(JSON.parse(c.opts.body), { nombre: 'Luna' });
     assert.match(c.url, /endpoint=animales/);
     assert.match(c.url, /token=TOKEN123/);
   });
 
-  it('_get lleva Authorization y el token en la query y no lleva body', async () => {
+  it('_get lleva el token en la query, sin Authorization y sin body', async () => {
     await API._get('estados');
     const c = llamadas[0];
-    assert.equal(c.opts.method, undefined);
-    assert.equal(c.opts.body, undefined);
-    assert.equal(c.opts.headers['Authorization'], 'Bearer TOKEN123');
+    const opts = c.opts || {};
+    assert.equal(opts.method, undefined);
+    assert.equal(opts.body, undefined);
+    assert.equal(opts.headers, undefined);
     assert.match(c.url, /endpoint=estados/);
     assert.match(c.url, /token=TOKEN123/);
   });
