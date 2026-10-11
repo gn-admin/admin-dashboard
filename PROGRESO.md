@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v103`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v104`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -243,7 +243,12 @@ en puntero táctil); scroll-lock de modales con ref-count (`_modalScrollLock` en
 Transition progresiva (`_withViewTransition` en `navigateTo`/`_showDetail`/
 `_hideDetail`); entrada sutil de listados con `.list-fresh` + keyframes `cardFade`
 (`_animaListado` solo en renders, nunca en filtros); aria en el overlay de carga;
-tests 287→290**. Detalle commit a commit en `git log`.
+tests 287→290** → **v104 hotfix: retirada de la View Transition API** (envolver
+`navigateTo`/`_showDetail`/`_hideDetail` en `document.startViewTransition` dejo
+las pantallas y fichas en blanco al no ejecutarse el callback; la navegación
+vuelve a ser directa y `_withViewTransition` es un simple `fn()`; la entrada de
+listados la sigue aportando `.list-fresh`, que es CSS puro). Detalle commit a
+commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
 1. Pegar `Code.gs`+`Config.gs` + *Nueva versión* (misma implementación).

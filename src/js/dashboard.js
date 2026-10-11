@@ -604,17 +604,13 @@ const Dashboard = {
   },
 
   // ==================== INLINE DETAIL SYSTEM ====================
-  // View Transition progresiva: cross-fade si el navegador la soporta y no
-  // hay movimiento reducido; si no, ejecuta fn tal cual (misma guard que
-  // App.navigateTo). En Node (tests) no existe la API y no se toca nada.
+  // Ejecuta fn directamente. Se probo envolverlo en document.startViewTransition
+  // para un cross-fade, pero con la API presente pero inestable la transicion
+  // fallaba y fn no se llegaba a ejecutar (fichas/detalles en blanco); se
+  // ejecuta siempre de forma directa. La entrada de listados la aporta
+  // _animaListado (CSS puro), sin depender de la View Transition API.
   _withViewTransition(fn) {
-    const reduce = typeof window !== 'undefined' && window.matchMedia
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (typeof document !== 'undefined' && document.startViewTransition && !reduce) {
-      document.startViewTransition(fn);
-    } else {
-      fn();
-    }
+    fn();
   },
 
   // Anyade temporalmente la clase .list-fresh al contenedor para que las

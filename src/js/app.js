@@ -96,16 +96,11 @@ const App = {
       this.closeMasMenu();
       Dashboard.loadPage(page);
     };
-    // View Transition API (progresiva): cross-fade entre paginas si el
-    // navegador la soporta y no hay movimiento reducido; si no, igual que
-    // siempre. Con guard para que en Node (tests) no se ejecute la rama.
-    const reduce = typeof window !== 'undefined' && window.matchMedia
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (typeof document !== 'undefined' && document.startViewTransition && !reduce) {
-      document.startViewTransition(aplicar);
-    } else {
-      aplicar();
-    }
+    // Nota: se probo envolver `aplicar` en document.startViewTransition para
+    // un cross-fade entre paginas, pero en navegadores con la API presente
+    // pero inestable la transicion fallaba y `aplicar` no se llegaba a
+    // ejecutar (pantallas en blanco). Se navega siempre de forma directa.
+    aplicar();
   },
 
   onHashChange() {
