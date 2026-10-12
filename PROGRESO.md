@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v105`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v106`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -255,7 +255,15 @@ CORS `OPTIONS` que Apps Script **no** responde con `Access-Control-Allow-Headers
 todas las pantallas. El token viaja **solo** en `?token=` —el backend desplegado
 solo lee `e.parameter.token` y responde `ACAO: *`—; migrarlo a cabecera únicamente
 cuando el `Code.gs` esté desplegado con soporte de preflight. Tests: `_get`/`_post`
-afirman `Authorization === undefined`).
+afirman `Authorization === undefined`) → **v106: iconos PWA con fondo
+transparente** (`icon-192.png`/`icon-512.png` regenerados desde `logo-nebak.jpg`
+con inundación desde las 4 esquinas + desmatizado del blanco; el JPG tenía fondo
+blanco y la splash del PWA instalado pintaba `background_color` #f4f5f7 con el
+icono encima → **se veía un cuadrado blanco en el centro**; ahora queda solo el
+logo sobre el gris de la app). `theme_color` del manifest alineado con el
+`<meta theme-color>` (#0A431E). `icon-180.png` y `logo-nebak.jpg` se dejan
+opacos a propósito (iOS y el recorte circular del login). Regenerar los iconos
+con `gen_icons.py` si cambia el logo.
   Detalle commit a commit en `git log`.
 
 ## Pendiente lado humano (fuera de git)
