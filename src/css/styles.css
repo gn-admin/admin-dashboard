@@ -193,6 +193,15 @@ body {
   margin-bottom: 16px;
 }
 
+.login-card-logo .login-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  box-shadow: var(--shadow-green);
+}
+
 .login-card-footer {
   margin-top: 20px;
   padding-top: 16px;
