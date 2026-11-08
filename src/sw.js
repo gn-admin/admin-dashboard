@@ -1,10 +1,13 @@
-﻿const CACHE_NAME = 'gn-encuestas-v106';
+﻿const CACHE_NAME = 'gn-encuestas-v118';
+const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './offline.html',
   './css/styles.css',
   './js/config.js',
   './js/icons.js',
+  './js/pwa.js',
   './js/auth.js',
   './js/api.js',
   './js/dashboard.js',
@@ -15,10 +18,12 @@ const STATIC_ASSETS = [
   './assets/icons/icon-180.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
+  './assets/icons/icon-maskable-192.png',
+  './assets/icons/icon-maskable-512.png',
   './assets/icons/logo-nebak.jpg'
 ];
 
-// Install: cache assets estáticos
+// Install: cache assets estaticos
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -38,7 +43,13 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch: cache-first para assets estáticos, network-first para API
+// La pagina puede pedir activar la version nueva sin cerrar la app.
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Fetch: cache-first para assets estaticos, network-first para API y
+// navegacion (con pagina offline de reserva).
 self.addEventListener('fetch', event => {
   // Solo GET se cachea/lee de cache; POST/PUT/etc pasan directo a la red
   // (caches.match con un POST devolveria undefined y romperia el flujo).
@@ -55,6 +66,17 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Navegacion: red primero; si no hay conexion, shell cacheada u offline.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match(event.request)
+          .then(m => m || caches.match(OFFLINE_URL)))
+        .then(res => res || Response.error())
+    );
+    return;
+  }
+
   // CDN de terceros (Firebase/gstatic): network-first, NUNCA cachear.
   // Si firebase-app se cacheara pero firebase-auth no, `firebase` existe
   // pero `firebase.auth` no -> error "firebase.auth is not a function".
@@ -63,7 +85,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Assets estáticos: cache-first
+  // Assets estaticos: cache-first
   event.respondWith(
     caches.match(event.request)
       .then(cached => {

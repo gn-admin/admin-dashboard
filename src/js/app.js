@@ -2,7 +2,8 @@ const App = {
   currentPage: null,
 
   init() {
-    this.registerServiceWorker();
+    if (typeof Pwa !== 'undefined') Pwa.init();
+    else this.registerServiceWorker();
     this.initSidebarCollapse();
     this.initSidebarSections();
     this._routed = false;

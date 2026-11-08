@@ -77,10 +77,10 @@ describe('contraste WCAG AA (pares ya corregidos)', () => {
     });
   });
 
-  it('el toast ambar usa texto oscuro (no blanco)', () => {
-    const d = declaraciones('.toast-error.toast-warning');
-    assert.equal(d.background, '#facc15');
-    assert.equal(d.color, 'var(--black)');
+  it('el toast neutro usa gris y texto oscuro', () => {
+    const d = declaraciones('.toast-error.toast-neutral');
+    assert.equal(d.background, 'var(--gray-200)');
+    assert.equal(d.color, 'var(--gray-800)');
     assert.ok(contraste(d.color, d.background) >= AA);
   });
 
@@ -135,8 +135,34 @@ describe('integridad estatica: clases, ids e iconos', () => {
 
   it('el service worker precachea todos los JS de interfaz', () => {
     const sw = leer('sw.js');
-    const jsUi = ['js/config.js', 'js/icons.js', 'js/auth.js', 'js/api.js', 'js/dashboard.js', 'js/app.js'];
+    const jsUi = ['js/config.js', 'js/icons.js', 'js/pwa.js', 'js/auth.js', 'js/api.js', 'js/dashboard.js', 'js/app.js'];
     const fuera = jsUi.filter(f => !sw.includes(f));
     assert.deepEqual(fuera, [], 'JS sin precachear en sw.js: ' + fuera.join(', '));
+  });
+
+  it('el service worker cachea la pantalla offline y los iconos maskable', () => {
+    const sw = leer('sw.js');
+    ['offline.html', 'icon-maskable-192.png', 'icon-maskable-512.png'].forEach(f => {
+      assert.ok(sw.includes(f), 'Falta en el precache del SW: ' + f);
+    });
+  });
+
+  it('el manifest es instalable (scope, standalone, maskable y atajos)', () => {
+    const mf = JSON.parse(leer('manifest.webmanifest'));
+    assert.equal(mf.display, 'standalone');
+    assert.equal(mf.scope, './');
+    assert.ok(Array.isArray(mf.display_override) && mf.display_override.includes('standalone'));
+    assert.ok(mf.icons.some(i => i.purpose === 'maskable' && i.sizes === '192x192'));
+    assert.ok(mf.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'));
+    assert.ok(Array.isArray(mf.shortcuts) && mf.shortcuts.length >= 3);
+    mf.shortcuts.forEach(s => assert.match(s.url, /^\.\/#/));
+  });
+
+  it('el HTML declara manifest, apple-touch-icon y titulo de app', () => {
+    const html = leer('index.html');
+    assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+    assert.match(html, /rel="apple-touch-icon" href="assets\/icons\/icon-180\.png"/);
+    assert.match(html, /name="apple-mobile-web-app-title"/);
+    assert.match(html, /js\/pwa\.js/);
   });
 });

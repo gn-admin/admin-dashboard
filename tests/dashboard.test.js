@@ -2,7 +2,7 @@
  * Tests unitarios de logica pura del Dashboard (sin DOM ni red).
  * Ejecutar: npm test  (node --test tests/)
  */
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const Dashboard = require('../src/js/dashboard.js');
@@ -727,17 +727,18 @@ describe('grupos: destino al renombrar (fusion si choca)', () => {
 describe('_snackTipo: el color depende del status del backend', () => {
   const T = (e) => Dashboard._snackTipo(e);
 
-  it('respeta los tres status explicitos', () => {
+  it('respeta los cuatro status explicitos', () => {
     assert.equal(T({ status: 'success' }), 'success');
     assert.equal(T({ status: 'warning' }), 'warning');
     assert.equal(T({ status: 'error' }), 'error');
+    assert.equal(T({ status: 'neutral' }), 'neutral');
   });
 
-  it('sin status, error por defecto', () => {
+  it('sin status ni codigo ni mensaje, neutro por defecto', () => {
     assert.equal(T(new Error('boom')), 'error');
     assert.equal(T({ message: 'HTTP 500: Internal Server Error' }), 'error');
-    assert.equal(T(null), 'error');
-    assert.equal(T(undefined), 'error');
+    assert.equal(T(null), 'neutral');
+    assert.equal(T(undefined), 'neutral');
   });
 
   it('hoja sin configurar -> warning, aunque no traiga status', () => {
@@ -1037,5 +1038,77 @@ describe('_inicialesNombre: avatar del hero de socio', () => {
     assert.equal(Dashboard._inicialesNombre(null), '?');
     assert.equal(Dashboard._inicialesNombre(undefined), '?');
     assert.equal(Dashboard._inicialesNombre('   '), '?');
+  });
+});
+describe('home v22: serie, sparkline, donut y variaciones', () => {
+  beforeEach(() => {
+    Dashboard.states = {};
+    Dashboard.responses = {};
+    Dashboard.animales = [];
+  });
+
+  afterEach(() => {
+    Dashboard.states = {};
+    Dashboard.responses = {};
+    Dashboard.animales = [];
+  });
+
+  it('_serieSolicitudes: 12 meses y excluye descartadas', () => {
+    const now = new Date();
+    const dentro = new Date(now.getFullYear(), now.getMonth(), 15).toISOString();
+    Dashboard.responses = {
+      s1: [
+        { id: 'r1', fecha_creacion: dentro, _surveyId: 's1' },
+        { id: 'r2', fecha_creacion: dentro, _surveyId: 's1' },
+        { id: 'r3', fecha_creacion: '', _surveyId: 's1' }
+      ]
+    };
+    Dashboard.states = { 's1::r2': 'descartada' };
+    const serie = Dashboard._serieSolicitudes();
+    assert.equal(serie.length, 12);
+    assert.equal(serie.reduce((a, b) => a + b.count, 0), 1);
+    assert.equal(serie[11].count, 1, 'la solicitud de este mes cae en la ultima columna');
+  });
+
+  it('_sparkline: un punto por valor y vacio sin datos', () => {
+    const svg = Dashboard._sparkline([0, 5, 2]);
+    assert.match(svg, /<svg class="dash-spark-svg"/);
+    assert.equal((svg.match(/,/g) || []).length, 3);
+    assert.equal(Dashboard._sparkline([]), '');
+  });
+
+  it('_donaGradiente: gris sin datos y tramos completos con datos', () => {
+    assert.match(Dashboard._donaGradiente([]), /var\(--gray-200\) 0% 100%/);
+    const grad = Dashboard._donaGradiente([['A', 1, '#111'], ['B', 3, '#222']]);
+    assert.match(grad, /^conic-gradient\(/);
+    assert.match(grad, /#111 0\.00% 25\.00%/);
+    assert.match(grad, /#222 25\.00% 100\.00%/);
+    assert.doesNotMatch(grad, /gray-200/);
+  });
+
+  it('_deltaInfo: sube, baja o sin cambios', () => {
+    assert.deepEqual(Dashboard._deltaInfo(5, 2), { cls: 'up', text: '+3' });
+    assert.deepEqual(Dashboard._deltaInfo(1, 4), { cls: 'down', text: '-3' });
+    assert.deepEqual(Dashboard._deltaInfo(2, 2), { cls: 'flat', text: 'sin cambios' });
+  });
+
+  it('_saludo segun la hora', () => {
+    assert.equal(Dashboard._saludo(5), 'Buenas noches');
+    assert.equal(Dashboard._saludo(8), 'Buenos dias');
+    assert.equal(Dashboard._saludo(15), 'Buenas tardes');
+    assert.equal(Dashboard._saludo(22), 'Buenas noches');
+  });
+
+  it('_eur formatea en euros es-ES', () => {
+    assert.equal(Dashboard._eur(12345.5), '12.345,50 €');
+    assert.equal(Dashboard._eur('7'), '7,00 €');
+    assert.equal(Dashboard._eur(null), '0,00 €');
+  });
+
+  it('_funnelStages comparte el embudo y excluye descartadas', () => {
+    Dashboard.responses = { s1: ['r1', 'r2', 'r3'].map(id => ({ id, _surveyId: 's1' })) };
+    Dashboard.states = { 's1::r1': 'pendiente', 's1::r2': 'en_proceso', 's1::r3': 'descartada' };
+    Dashboard.animales = [{ id: 'a1', estado: 'adoptado' }];
+    assert.deepEqual(Dashboard._funnelStages().map(s => s[1]), [1, 1, 0, 1]);
   });
 });

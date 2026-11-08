@@ -710,42 +710,150 @@ const Dashboard = {
     const cuotasPend = (this.socios || []).filter(s => (this._cuotaEstado(s) || {}).label === 'Pendiente').length;
     const vencidos = (this.recordatorios || []).filter(r => !r.hecho && (this._diasHasta(r.fecha) ?? 99) < 0).length;
     const hoyN = pendientes + vencidos + enProceso;
+    const nombre = (this.userProfile?.name || this.userProfile?.email || 'Grupo Nebak').split(' ')[0];
+    const fechaHoy = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    const serie = this._serieSolicitudes();
+    const totalSerie = serie.reduce((a, b) => a + b.count, 0);
+    const stages = this._funnelStages();
+    const totalEmbudo = stages.reduce((a, s) => a + s[1], 0);
+    const dSol = this._deltaInfo(solNuevas.cur, solNuevas.prev);
+    const dAdop = this._deltaInfo(adopMes.cur, adopMes.prev);
+    const euro = n => this._eur(n);
 
     el.innerHTML = `
-      <div class="card" style="margin-bottom:16px"><div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <div style="font-size:2rem;font-weight:800;color:${vencidos ? 'var(--danger)' : 'var(--primary-hover)'}">${hoyN}</div>
-        <div style="flex:1;min-width:180px"><div style="font-weight:700">Hoy</div><div style="color:var(--gray-500);font-size:.85rem">${hoyN ? `${pendientes} pendientes · ${vencidos} vencidos · ${enProceso} en proceso` : 'Todo al día, sin pendientes'}</div></div>
-        ${hoyN ? `<button class="btn btn-primary btn-sm" onclick="document.getElementById('accion-card')?.scrollIntoView({behavior:'smooth'})">Ver</button>` : ''}
-      </div></div>
-      <div class="stats-grid">
-        <div class="stat-card" style="cursor:pointer" onclick="location.hash='encuestas'"><div class="stat-card-icon green">${Icons.clipboard}</div><div class="stat-card-info"><div class="stat-card-label">Solicitudes (mes)</div><div class="stat-card-value">${solNuevas.cur}</div><div class="stat-card-change">${this._deltaTexto(solNuevas.cur, solNuevas.prev)}</div></div></div>
-        <div class="stat-card" style="cursor:pointer" onclick="Dashboard._currentAnimalFilter='en_acogida';location.hash='animales'"><div class="stat-card-icon blue">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">En Acogida</div><div class="stat-card-value">${enAcogida}</div><div class="stat-card-change">${familiasLibres} familias libres</div></div></div>
-        <div class="stat-card" style="cursor:pointer" onclick="location.hash='adopciones'"><div class="stat-card-icon green">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Adopciones (mes)</div><div class="stat-card-value">${adopMes.cur}</div><div class="stat-card-change">${this._deltaTexto(adopMes.cur, adopMes.prev)}</div></div></div>
-        <div class="stat-card" style="cursor:pointer" onclick="location.hash='animales'"><div class="stat-card-icon blue">${Icons.paw}</div><div class="stat-card-info"><div class="stat-card-label">Apadrinados</div><div class="stat-card-value">${apadActivos.length}</div><div class="stat-card-change">${apadEuros.toFixed(2)} €/mes</div></div></div>
+      <section class="dash-hero">
+        <div class="dash-hero-copy">
+          <span class="dash-hero-eyebrow">Panel de gestion · Grupo Nebak</span>
+          <h2 class="dash-hero-title">${this._saludo()}, ${this._esc(nombre)}</h2>
+          <p class="dash-hero-sub">${this._esc(fechaHoy)} · ${hoyN ? `${hoyN} ${hoyN === 1 ? 'asunto' : 'asuntos'} por resolver` : 'Todo al dia, sin pendientes'}</p>
+          <div class="dash-hero-actions">
+            <a class="dash-hero-btn" href="#animales">${Icons.paw} Ver animales</a>
+            <a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>
+          </div>
+        </div>
+        <div class="dash-hero-stats">
+          <div class="dash-hero-stat"><span class="dash-hero-stat-value">${pendientes}</span><span class="dash-hero-stat-label">Pendientes</span></div>
+          <div class="dash-hero-stat"><span class="dash-hero-stat-value">${enProceso}</span><span class="dash-hero-stat-label">En proceso</span></div>
+          <div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>
+        </div>
+      </section>
+
+      <div class="dash-kpis">
+        <button type="button" class="dash-kpi" onclick="location.hash='encuestas'">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.clipboard}</span><span class="dash-delta ${dSol.cls}">${dSol.text}</span></span>
+          <span class="dash-kpi-value">${solNuevas.cur}</span>
+          <span class="dash-kpi-label">Solicitudes este mes</span>
+          <span class="dash-kpi-foot">${this._sparkline(serie.map(b => b.count))}</span>
+        </button>
+        <button type="button" class="dash-kpi" onclick="Dashboard._currentAnimalFilter='en_acogida';location.hash='animales'">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon blue">${Icons.heart}</span><span class="dash-delta flat">en casa</span></span>
+          <span class="dash-kpi-value">${enAcogida}</span>
+          <span class="dash-kpi-label">Animales en acogida</span>
+          <span class="dash-kpi-foot">${familiasLibres} familias libres</span>
+        </button>
+        <button type="button" class="dash-kpi" onclick="location.hash='adopciones'">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.checkCircle}</span><span class="dash-delta ${dAdop.cls}">${dAdop.text}</span></span>
+          <span class="dash-kpi-value">${adopMes.cur}</span>
+          <span class="dash-kpi-label">Adopciones este mes</span>
+          <span class="dash-kpi-foot">${adopMes.prev} el mes pasado</span>
+        </button>
+        <button type="button" class="dash-kpi" onclick="location.hash='socios'">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon orange">${Icons.users}</span><span class="dash-delta ${cuotasPend ? 'down' : 'up'}">${cuotasPend ? cuotasPend + ' pendientes' : 'al dia'}</span></span>
+          <span class="dash-kpi-value">${apadActivos.length}</span>
+          <span class="dash-kpi-label">Apadrinamientos activos</span>
+          <span class="dash-kpi-foot">${euro(apadEuros)} / mes</span>
+        </button>
       </div>
-      <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Donaciones (mes)</div><div class="stat-card-value">${donMes.cur.toFixed(2)} €</div><div class="stat-card-change">tesorería</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon orange">${Icons.activity}</div><div class="stat-card-info"><div class="stat-card-label">Gastos (mes)</div><div class="stat-card-value">${gastoMes.cur.toFixed(2)} €</div><div class="stat-card-change">veterinarios</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon ${balance >= 0 ? 'green' : 'orange'}">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Balance (mes)</div><div class="stat-card-value">${balance.toFixed(2)} €</div><div class="stat-card-change">donaciones − gastos</div></div></div>
-        <div class="stat-card" style="cursor:pointer" onclick="location.hash='socios'"><div class="stat-card-icon blue">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Cuotas pendientes</div><div class="stat-card-value">${cuotasPend}</div><div class="stat-card-change">revisar en Socios</div></div></div>
-      </div>
-      <div class="card" id="accion-card" style="margin-bottom:16px"><div class="card-header"><h3>Accion requerida</h3><button class="btn btn-primary btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Nuevo</button></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Solicitante</th><th>Estado</th><th></th></tr></thead><tbody>${this._accionRows()}</tbody></table></div></div>
-      <div class="dashboard-grid" style="display:grid;gap:16px;margin-bottom:24px;">
-        <div class="card"><div class="card-header"><h3>Solicitudes por Mes</h3></div><div class="chart-container">${this._buildBarChart()}</div></div>
-        <div class="card"><div class="card-header"><h3>Embudo de adopcion</h3></div><div class="card-body">${this._funnelAdopcion()}</div></div>
-      </div>
-      <div class="card" style="margin-bottom:24px"><div class="card-header"><h3>Solicitudes Recientes</h3></div><div class="card-body-flush"><table class="data-table"><thead><tr><th>Nombre</th><th>Tipo</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${this._recentRows()}</tbody></table></div></div>`;
+
+      <div class="dash-grid">
+        <section class="dash-panel dash-panel--wide">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Solicitudes</h3>
+              <p class="dash-panel-sub">Ultimos 12 meses</p>
+            </div>
+            <span class="dash-panel-total">${totalSerie}<small>recibidas</small></span>
+          </header>
+          <div class="dash-chart">${this._chartSvg(serie)}</div>
+        </section>
+
+        <section class="dash-panel">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Embudo de adopcion</h3>
+              <p class="dash-panel-sub">Estado de los procesos</p>
+            </div>
+          </header>
+          <div class="dash-donut-wrap">
+            <div class="dash-donut" style="background:${this._donaGradiente(stages)}" role="img" aria-label="Distribucion de procesos">
+              <div class="dash-donut-hole">
+                <span class="dash-donut-value">${totalEmbudo}</span>
+                <span class="dash-donut-label">procesos</span>
+              </div>
+            </div>
+            <ul class="dash-legend">
+              ${stages.map(([label, n, color]) => `<li class="dash-legend-item"><span class="dash-legend-dot" style="background:${color}"></span><span class="dash-legend-label">${label}</span><span class="dash-legend-value">${n}</span></li>`).join('')}
+            </ul>
+          </div>
+        </section>
+
+        <section class="dash-panel dash-panel--wide" id="accion-card">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Accion requerida</h3>
+              <p class="dash-panel-sub">Lo que toca hoy</p>
+            </div>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Recordatorio</button>
+          </header>
+          <div class="dash-actions">${this._accionListHtml()}</div>
+        </section>
+
+        <section class="dash-panel">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Tesoro del mes</h3>
+              <p class="dash-panel-sub">Donaciones y gastos</p>
+            </div>
+          </header>
+          <div class="dash-money">
+            <div class="dash-money-row"><span class="dash-money-label">Donaciones</span><span class="dash-money-value dash-money-value--pos">${euro(donMes.cur)}</span></div>
+            <div class="dash-money-row"><span class="dash-money-label">Gastos</span><span class="dash-money-value dash-money-value--neg">${euro(gastoMes.cur)}</span></div>
+            <div class="dash-money-row dash-money-row--total"><span class="dash-money-label">Balance</span><span class="dash-money-value ${balance >= 0 ? 'dash-money-value--pos' : 'dash-money-value--neg'}">${euro(balance)}</span></div>
+          </div>
+          <div class="dash-quick">
+            <a class="dash-quick-card" href="#donaciones"><span class="dash-quick-icon">${Icons.trendingUp}</span><span class="dash-quick-label">Donaciones</span></a>
+            <a class="dash-quick-card" href="#almacen"><span class="dash-quick-icon">${Icons.box}</span><span class="dash-quick-label">Almacen</span></a>
+            <a class="dash-quick-card" href="#actividad"><span class="dash-quick-icon">${Icons.activity}</span><span class="dash-quick-label">Actividad</span></a>
+            <a class="dash-quick-card" href="#acogidas-activas"><span class="dash-quick-icon">${Icons.home}</span><span class="dash-quick-label">Acogidas</span></a>
+          </div>
+        </section>
+
+        <section class="dash-panel dash-panel--full">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Solicitudes recientes</h3>
+              <p class="dash-panel-sub">Ultimas entradas de las encuestas</p>
+            </div>
+            <a class="dash-panel-link" href="#encuestas">Ver todas ${Icons.chevronRight}</a>
+          </header>
+          <div class="dash-recent">${this._recentListHtml()}</div>
+        </section>
+      </div>`;
   },
 
-  _buildBarChart() {
+  // Serie de solicitudes de los ultimos 12 meses (sin descartadas).
+  _serieSolicitudes() {
     const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
     const buckets = [];
     for (let i = 0; i < 12; i++) {
       const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      buckets.push({ key, label: months[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2), count: 0 });
+      buckets.push({
+        key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
+        label: months[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2),
+        count: 0
+      });
     }
     const idx = {};
     buckets.forEach((b, i) => idx[b.key] = i);
@@ -757,16 +865,146 @@ const Dashboard = {
       const k = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
       if (k in idx) buckets[idx[k]].count++;
     });
+    return buckets;
+  },
+
+  // Sparkline SVG minima (sin librerias) para las tarjetas KPI.
+  _sparkline(values, w, h) {
+    const v = (values || []).map(n => Number(n) || 0);
+    if (!v.length) return '';
+    const W = w || 96, H = h || 30, max = Math.max(...v, 1);
+    const step = v.length > 1 ? (W - 4) / (v.length - 1) : 0;
+    const pts = v.map((n, i) => `${(2 + i * step).toFixed(1)},${(H - 3 - (n / max) * (H - 6)).toFixed(1)}`).join(' ');
+    return `<svg class="dash-spark-svg" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${pts}"/></svg>`;
+  },
+
+  // Grafico de area con lineas guia y puntos con tooltip nativo.
+  _chartSvg(buckets) {
+    const W = 560, H = 210, P = 16;
+    const max = Math.max(...buckets.map(b => b.count), 1);
+    const x = i => buckets.length > 1 ? P + i * (W - 2 * P) / (buckets.length - 1) : W / 2;
+    const y = n => H - P - (n / max) * (H - 2 * P);
+    const pts = buckets.map((b, i) => `${x(i).toFixed(1)},${y(b.count).toFixed(1)}`).join(' ');
+    const area = `${P},${H - P} ${pts} ${W - P},${H - P}`;
+    const grid = [0.25, 0.5, 0.75, 1].map(f => {
+      const gy = (H - P - f * (H - 2 * P)).toFixed(1);
+      return `<line class="dash-chart-grid" x1="${P}" x2="${W - P}" y1="${gy}" y2="${gy}"/>`;
+    }).join('');
+    return `<svg class="dash-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Solicitudes de los ultimos 12 meses">
+      <defs><linearGradient id="dashAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1FC95B" stop-opacity="0.35"/><stop offset="100%" stop-color="#1FC95B" stop-opacity="0"/></linearGradient></defs>
+      ${grid}
+      <polygon class="dash-chart-area" points="${area}"/>
+      <polyline class="dash-chart-line" points="${pts}"/>
+      ${buckets.map((b, i) => `<circle class="dash-chart-dot" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="3.5"><title>${b.label}: ${b.count}</title></circle>`).join('')}
+    </svg>
+    <div class="dash-chart-labels">${buckets.map(b => `<span class="dash-chart-label">${b.label}</span>`).join('')}</div>`;
+  },
+
+  // Etapas del embudo (compartidas por el donut y por _funnelAdopcion).
+  _funnelStages() {
+    const acts = Object.values(this.responses).flat().filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
+    const st = (e) => acts.filter(r => this.getEstado(r.id, r._surveyId) === e).length;
+    return [
+      ['Pendientes', st('pendiente'), '#9aa0a6'],
+      ['En proceso', st('en_proceso'), '#3498db'],
+      ['Aprobadas', st('aprobada'), '#1FC95B'],
+      ['Adoptados', (this.animales || []).filter(a => a.estado === 'adoptado').length, '#0A431E']
+    ];
+  },
+
+  // conic-gradient con los tramos del embudo (sin dependencias).
+  _donaGradiente(stages) {
+    const total = (stages || []).reduce((a, s) => a + (Number(s[1]) || 0), 0);
+    if (!total) return 'conic-gradient(var(--gray-200) 0% 100%)';
+    let acc = 0;
+    const parts = [];
+    (stages || []).forEach(([, n, color]) => {
+      const p = (Number(n) || 0) / total * 100;
+      if (p <= 0) return;
+      parts.push(`${color} ${acc.toFixed(2)}% ${(acc + p).toFixed(2)}%`);
+      acc += p;
+    });
+    if (acc < 100) parts.push(`var(--gray-200) ${acc.toFixed(2)}% 100%`);
+    return `conic-gradient(${parts.join(', ')})`;
+  },
+
+  _recentItems(max) {
+    const all = [];
+    this.surveys.forEach(s => (this.responses[s.id] || []).forEach(r => all.push({ ...r, _survey: s.name, _surveyId: s.id })));
+    all.sort((a, b) => (b.fecha_creacion || '').localeCompare(a.fecha_creacion || ''));
+    return all.slice(0, max || 5);
+  },
+
+  _recentListHtml() {
+    const items = this._recentItems(5);
+    if (!items.length) return `<div class="dash-action-empty">Sin solicitudes todavia</div>`;
+    const pageMap = { 'pre-adopcion-perros': 'encuestas-perros', 'pre-adopcion-gatos': 'encuestas-gatos', 'pre-acogida': 'encuestas-acogida' };
+    return items.map(r => {
+      const e = this.getEstado(r.id, r._surveyId);
+      const page = pageMap[r._surveyId] || 'dashboard';
+      const nombre = (((r.nombre || '') + ' ' + (r.apellidos || '')).trim()) || 'Sin nombre';
+      const inicial = nombre.charAt(0).toUpperCase();
+      const d = r.fecha_creacion ? new Date(String(r.fecha_creacion).replace(' ', 'T')).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '';
+      return `<a class="dash-recent-row" href="#${page}">
+        <span class="dash-recent-avatar">${this._esc(inicial)}</span>
+        <span class="dash-recent-main"><span class="dash-recent-name">${this._esc(nombre)}</span><span class="dash-recent-survey">${this._esc(r._survey || '')}</span></span>
+        <span class="estado-badge ${e}">${this._esc(this._estadoLabel(e))}</span>
+        <span class="dash-recent-date">${this._esc(d)}</span>
+      </a>`;
+    }).join('');
+  },
+
+  _accionListHtml() {
+    const items = this._accionItems(6);
+    if (!items.length) return `<div class="dash-action-empty">Todo al dia. No hay nada pendiente.</div>`;
+    return items.map(it => {
+      if (it.kind === 'vencimiento') {
+        const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
+        return `<div class="dash-action">
+          <span class="dash-action-icon orange">${Icons.clock}</span>
+          <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.titulo)}</span><span class="dash-action-sub">Vencimiento · ${this._esc(e.label)}</span></span>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button>
+        </div>`;
+      }
+      return `<div class="dash-action" role="button" tabindex="0" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')">
+        <span class="dash-action-icon">${Icons.clipboard}</span>
+        <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.nombre)}</span><span class="dash-action-sub">${this._esc(it.survey)}</span></span>
+        <span class="dash-action-meta"><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span><span class="dash-action-wait">${this._diasEspera(it.fecha)}</span></span>
+        <span class="dash-action-chevron">${Icons.chevronRight}</span>
+      </div>`;
+    }).join('');
+  },
+
+  // Texto de variacion mes actual vs anterior.
+  _deltaInfo(cur, prev) {
+    const d = (Number(cur) || 0) - (Number(prev) || 0);
+    if (!d) return { cls: 'flat', text: 'sin cambios' };
+    return { cls: d > 0 ? 'up' : 'down', text: (d > 0 ? '+' : '') + d };
+  },
+
+  _saludo(hora) {
+    const h = Number.isFinite(hora) ? hora : new Date().getHours();
+    if (h < 6) return 'Buenas noches';
+    if (h < 13) return 'Buenos dias';
+    if (h < 20) return 'Buenas tardes';
+    return 'Buenas noches';
+  },
+
+  _eur(n) {
+    return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+  },
+
+  _buildBarChart() {
+    const now = new Date();
+    const buckets = this._serieSolicitudes();
     const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
     const max = Math.max(...buckets.map(b => b.count), 1);
     return `<div class="bar-chart">${buckets.map(b=>{const h=(b.count/max*120);return`<div class="bar-chart-col"><div class="bar-chart-value">${b.count}</div><div class="bar-chart-bar" style="height:${h}px${b.key===curKey?';background:var(--primary-hover)':''}"><span class="bar-tooltip">${b.label}: ${b.count}</span></div><span class="bar-chart-label">${b.label}</span></div>`;}).join('')}</div>`;
   },
 
   _recentRows() {
-    const all = [];
-    this.surveys.forEach(s => (this.responses[s.id]||[]).forEach(r => all.push({...r,_survey:s.name,_surveyId:s.id})));
-    all.sort((a,b)=>(b.fecha_creacion||'').localeCompare(a.fecha_creacion||''));
-    return all.slice(0,5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}):'';const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" onclick="location.hash='${page}'"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
+    const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};
+    return this._recentItems(5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?new Date(r.fecha_creacion).toLocaleDateString('es-ES',{day:'2-digit',month:'short'}):'';const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" onclick="location.hash='${page}'"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
   },
 
   // Conteo/suma por mes natural (actual vs anterior) para KPIs.
@@ -848,14 +1086,7 @@ const Dashboard = {
   },
 
   _funnelAdopcion() {
-    const acts = Object.values(this.responses).flat().filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
-    const st = (e) => acts.filter(r => this.getEstado(r.id, r._surveyId) === e).length;
-    const stages = [
-      ['Pendientes', st('pendiente'), '#9aa0a6'],
-      ['En proceso', st('en_proceso'), '#3498db'],
-      ['Aprobadas', st('aprobada'), '#1FC95B'],
-      ['Adoptados', (this.animales || []).filter(a => a.estado === 'adoptado').length, '#0A431E']
-    ];
+    const stages = this._funnelStages();
     const max = Math.max(...stages.map(s => s[1]), 1);
     return stages.map(([label, n, color]) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="width:92px;font-size:.78rem;color:var(--gray-600)">${label}</div><div style="flex:1;background:var(--gray-100);border-radius:6px;height:22px"><div style="width:${Math.round(n / max * 100)}%;background:${color};height:100%;border-radius:6px"></div></div><div style="width:34px;text-align:right;font-weight:800">${n}</div></div>`).join('');
   },
@@ -2786,6 +3017,11 @@ const Dashboard = {
     const m = raw.match(/[?&]id=([A-Za-z0-9_-]+)/) || raw.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=' + size;
     return raw;
+  },
+
+  // Placeholder gris con silueta de pata para imagenes rotas o sin foto.
+  _fotoPlaceholder() {
+    return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f4f5f7'/%3E%3Ccircle cx='100' cy='80' r='28' fill='%23d1d5db'/%3E%3Cellipse cx='100' cy='140' rx='42' ry='32' fill='%23d1d5db'/%3E%3Ccircle cx='72' cy='52' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='128' cy='52' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='58' cy='78' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='142' cy='78' r='11' fill='%23d1d5db'/%3E%3C/svg%3E";
   },
 
   // Avatar de la ficha de animal. Con foto es un boton que abre el modal a
@@ -4812,7 +5048,7 @@ const Dashboard = {
     }
     this.renderReportes(document.getElementById('page-reportes'));
     if (ok === lista.length) this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
-    else if (ok > 0) this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ' solicitudes de 2025', 'error');
+    else if (ok > 0) this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ' solicitudes de 2025', 'warning');
     // Si ok===0 el ultimo setEstado ya mostro el error; no tapar con exito.
   },
 
@@ -4860,11 +5096,17 @@ const Dashboard = {
   // Si el backend no marca `status`, infiere por el mensaje para no pintar de
   // rojo avisos que no son fallos (hoja sin configurar, rate limit, etc.).
   _snackTipo(err) {
-    const st = err && err.status;
-    if (st === 'warning' || st === 'success' || st === 'error') return st;
+    const hasStatus = !!(err && Object.prototype.hasOwnProperty.call(err, 'status'));
+    const st = hasStatus ? err.status : undefined;
+    if (st === 'warning' || st === 'success' || st === 'error' || st === 'neutral') return st;
     if (err && err.code === 429) return 'warning';
     const m = String((err && (err.message || err.error)) || '').toLowerCase();
     if (m && /sin configurar|no configurado|demasiadas peticiones|espera unos segundos/.test(m)) return 'warning';
+    // HTTP con codigo de error explicito -> error (rojo).
+    if (m && /http\s*\d{3}/.test(m)) return 'error';
+    // Si no se puede determinar si fue exito o error (sin status, codigo ni
+    // mensaje), se usa un color neutro (gris) en lugar de rojo para no alarmar.
+    if (!hasStatus && !(err && err.code) && !m) return 'neutral';
     return 'error';
   },
 
@@ -4891,5 +5133,22 @@ const Dashboard = {
   },
 
 };
+
+// Fallback global para imagenes rotas: funciona incluso antes del login.
+// Si un <img> falla al cargar (404, red, Drive sin permisos), se sustituye
+// por un placeholder gris con silueta de pata.
+(function () {
+  if (typeof window === 'undefined' || window.__imgFallbackRegistered) return;
+  window.__imgFallbackRegistered = true;
+  var placeholder = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f4f5f7'/%3E%3Ccircle cx='100' cy='80' r='28' fill='%23d1d5db'/%3E%3Cellipse cx='100' cy='140' rx='42' ry='32' fill='%23d1d5db'/%3E%3Ccircle cx='72' cy='52' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='128' cy='52' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='58' cy='78' r='11' fill='%23d1d5db'/%3E%3Ccircle cx='142' cy='78' r='11' fill='%23d1d5db'/%3E%3C/svg%3E";
+  document.addEventListener('error', function (e) {
+    var t = e.target;
+    if (!t || t.tagName !== 'IMG') return;
+    if (t.classList && t.classList.contains('modal-foto')) return;
+    if (t.dataset && t.dataset.fallback) return;
+    if (t.dataset) t.dataset.fallback = '1';
+    t.src = placeholder;
+  }, true);
+})();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Dashboard;
