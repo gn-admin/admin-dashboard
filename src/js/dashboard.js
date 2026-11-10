@@ -4148,7 +4148,7 @@ const Dashboard = {
         fotoFile: ((this._el('ac-animal-foto') || {}).files || [])[0] || null
       });
       const nuevos = Object.assign({}, datos, {
-        animal: Object.assign({}, datos.animal || {}, { nombre: identidad.nombre, foto: identidad.foto })
+        animal: Object.assign({}, datos.animal || {}, { nombre: identidad.nombre, foto: identidad.foto, raza: identidad.raza || (datos.animal && datos.animal.raza), edad: identidad.edad || (datos.animal && datos.animal.edad), sexo: identidad.sexo || (datos.animal && datos.animal.sexo), microchip: identidad.microchip || (datos.animal && datos.animal.microchip) })
       });
       const res = await this._guardarContratoAcogida(c, nuevos);
       if (res && res.local) this._snackErr(res.err, 'Datos guardados en este dispositivo; se sincronizaran al volver la conexion.');
@@ -4206,7 +4206,7 @@ const Dashboard = {
         <span class="acuerdo-preview-hint">${hint}</span>
         <div class="acuerdo-preview-btns">${acciones}</div>
       </div>
-      ${this._contratoAnimalEditorHtml({ prefix: 'ac-animal', nombre: animalContrato.nombre, foto: animalContrato.foto })}
+      ${this._contratoAnimalEditorHtml({ prefix: 'ac-animal', nombre: animalContrato.nombre, foto: animalContrato.foto, raza: animalContrato.raza || '', edad: animalContrato.edad || '', sexo: animalContrato.sexo || '', microchip: animalContrato.microchip || '' })}
       <div class="acuerdo-preview-tools">
         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.guardarIdentidadContratoAcogida('${this._esc(c.id)}')">${Icons.checkCircle} Guardar foto y nombre</button>
         <span class="acuerdo-preview-hint">Se guardan en la ficha del animal y en la copia del contrato.</span>
@@ -4654,6 +4654,8 @@ const Dashboard = {
         <div class="contrato-animal-editor-foto" id="${prefix}-foto-preview">${fotoHtml}</div>
         <div class="contrato-animal-editor-fields">
           <div class="form-group"><label for="${prefix}-nombre">Nombre en el contrato *</label><input type="text" id="${prefix}-nombre" value="${this._esc(nombre)}" required><div class="form-hint">Si el animal va a tener un nombre nuevo o hay que corregir el actual, cambialo aqui: se actualizara tambien en su ficha y en el caso.</div></div>
+          <div class="form-row"><div class="form-group"><label for="${prefix}-raza">Raza</label><input type="text" id="${prefix}-raza" value="${this._esc(o.raza || '')}" placeholder="Raza"></div><div class="form-group"><label for="${prefix}-edad">Edad</label><input type="text" id="${prefix}-edad" value="${this._esc(o.edad || '')}" placeholder="Ej: 2 años"></div></div>
+          <div class="form-row"><div class="form-group"><label for="${prefix}-sexo">Sexo</label><select id="${prefix}-sexo"><option value="">—</option><option value="Macho" ${o.sexo === 'Macho' ? 'selected' : ''}>Macho</option><option value="Hembra" ${o.sexo === 'Hembra' ? 'selected' : ''}>Hembra</option></select></div><div class="form-group"><label for="${prefix}-microchip">Microchip</label><input type="text" id="${prefix}-microchip" value="${this._esc(o.microchip || '')}" placeholder="Numero de microchip"></div></div>
           <div class="form-group"><label for="${prefix}-foto">Foto del animal ${foto ? '' : '*'}</label><input type="file" id="${prefix}-foto" accept="image/*" onchange="Dashboard._previewFotoAnimalContrato(this,'${prefix}-foto-preview','${prefix}-foto-chip')"><div class="form-hint">${foto ? 'Puedes mantener la foto actual o sustituirla.' : 'Obligatoria: el contrato debe incluir una imagen del animal.'} Se guarda en su ficha.</div></div>
         </div>
       </div>
@@ -4688,6 +4690,11 @@ const Dashboard = {
     const o = opts || {};
     const nombre = String(o.nombre || '').trim();
     if (!nombre) throw new Error('Indica el nombre del animal para el contrato');
+    const prefix = o.prefix || 'ct-animal';
+    const raza = String((this._el(prefix + '-raza') || {}).value || o.raza || '').trim();
+    const edad = String((this._el(prefix + '-edad') || {}).value || o.edad || '').trim();
+    const sexo = String((this._el(prefix + '-sexo') || {}).value || o.sexo || '').trim();
+    const microchip = String((this._el(prefix + '-microchip') || {}).value || o.microchip || '').trim();
     let foto = String(o.fotoActual || '').trim();
     let fotoDriveId = '';
     let fotoUrl = '';
@@ -4707,6 +4714,10 @@ const Dashboard = {
     const a = o.animalId ? this._byId(this.animales, o.animalId) : null;
     if (a) {
       a.nombre = nombre;
+      if (raza) a.raza = raza;
+      if (edad) a.edad = edad;
+      if (sexo) a.sexo = sexo;
+      if (microchip) a.microchip = microchip;
       if (nueva) {
         a.foto_drive_id = fotoDriveId;
         a.foto_url = fotoUrl || foto;
@@ -4736,7 +4747,7 @@ const Dashboard = {
       }
     }
     this.saveLocal();
-    return { nombre, foto, foto_drive_id: fotoDriveId };
+    return { nombre, foto, foto_drive_id: fotoDriveId, raza, edad, sexo, microchip };
   },
 
   // Datos de la entidad para los documentos. Los contratos nuevos guardan una
@@ -5525,14 +5536,14 @@ const Dashboard = {
           </aside>
           <form class="contrato-form-pane" onsubmit="Dashboard.guardarContrato(event,'${adopcionId}')">
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
-            ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '' })}
+            ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
             <div class="form-row"><div class="form-group"><label>Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
 
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Adoptante</div>
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" value="${this._esc(sol.dni || '')}" placeholder="12345678A"></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f1-direccion" value="${this._esc(sol.domicilio || '')}" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f1-email" value="${this._esc(p.email || sol.email || '')}" placeholder="Se usa para enviar el contrato"><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El contrato se enviara a este email y al de Grupo Nebak.</div></div><div class="form-group"><label>Telefono</label><input type="text" id="f1-telefono" value="${this._esc(p.telefono || sol.telefono || '')}"></div></div>
-              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del adoptante *</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
+              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del adoptante *</label><canvas id="f1-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
             </div>
 
             <label class="contrato-acepta contrato-acepta--tutor"><input type="checkbox" id="ct-tutor" onchange="Dashboard._toggleContratoTutor(this.checked)"><span>El adoptante tiene tutor legal o persona de apoyo. Se añadirá una página con sus datos y deberá firmar.</span></label>
@@ -5540,7 +5551,7 @@ const Dashboard = {
             <div class="detail-section" id="contrato-tutor-section" style="display:none"><div class="detail-section-title">Tutor / persona de apoyo</div>
               <div class="detail-section-note">Rellena esta seccion solo si el adoptante tiene tutor legal o una persona de apoyo. Sus datos y su firma apareceran en una pagina nueva del contrato y en el PDF.</div>
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f2-nombre" placeholder="Nombre del tutor o persona de apoyo"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
-              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Firma del tutor *</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div></div>
+              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Firma del tutor *</label><canvas id="f2-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f2-direccion" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
             </div>
@@ -5549,7 +5560,7 @@ const Dashboard = {
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
               <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
               <div class="form-row"><div class="form-group"><label>Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" onchange="Dashboard._previewSelloContrato(this)"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._limpiarSelloContrato()">Quitar sello</button></div>
-              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" onchange="Dashboard._toggleEntidadFirma(this.checked)"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="120" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" onclick="Dashboard._clearFirmaCanvas('entidad-firma')">Limpiar firma</button></div></div>
+              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" onchange="Dashboard._toggleEntidadFirma(this.checked)"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" onclick="Dashboard._clearFirmaCanvas('entidad-firma')">Limpiar firma</button></div></div>
             </div>
             <label class="contrato-acepta"><input type="checkbox" id="ct-enviar" checked><span>Enviar una copia por email al adoptante y a Grupo Nebak al firmar.</span></label>
             <div class="contrato-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeContratoForm()">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.checkCircle} Firmar y guardar</button></div>
@@ -5743,7 +5754,12 @@ const Dashboard = {
         animalId: p.animal_id || '',
         adopcionId,
         p,
+        prefix: 'ct-animal',
         nombre: (this._el('ct-animal-nombre') || {}).value || p.animal,
+        raza: (this._el('ct-animal-raza') || {}).value || this._contratoAnimalDatos(p).raza || '',
+        edad: (this._el('ct-animal-edad') || {}).value || this._contratoAnimalDatos(p).edad || '',
+        sexo: (this._el('ct-animal-sexo') || {}).value || this._contratoAnimalDatos(p).sexo || '',
+        microchip: (this._el('ct-animal-microchip') || {}).value || this._contratoAnimalDatos(p).microchip || '',
         fotoActual: this._contratoAnimalDatos(p).foto,
         fotoFile: ((this._el('ct-animal-foto') || {}).files || [])[0] || null
       });
@@ -5885,7 +5901,7 @@ const Dashboard = {
     this.showFormModal('Foto y nombre del contrato · ' + (p.animal || ''), `
       <form onsubmit="Dashboard.guardarContratoIdentidad(event,'${adopcionId}')">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Corrige el nombre o la foto del animal en el contrato firmado. Tambien se actualizan en su ficha y en el caso.</span></div>
-        ${this._contratoAnimalEditorHtml({ prefix: 'ci-animal', nombre: animal.nombre || '', foto: animal.foto || '' })}
+        ${this._contratoAnimalEditorHtml({ prefix: 'ci-animal', nombre: animal.nombre || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
         <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar cambios</button></div>
       </form>`);
   },
@@ -5903,12 +5919,21 @@ const Dashboard = {
         animalId: p.animal_id || c.animal_id || '',
         adopcionId,
         p,
+        prefix: 'ci-animal',
         nombre: (this._el('ci-animal-nombre') || {}).value || animal.nombre || p.animal,
+        raza: (this._el('ci-animal-raza') || {}).value || animal.raza || '',
+        edad: (this._el('ci-animal-edad') || {}).value || animal.edad || '',
+        sexo: (this._el('ci-animal-sexo') || {}).value || animal.sexo || '',
+        microchip: (this._el('ci-animal-microchip') || {}).value || animal.microchip || '',
         fotoActual: animal.foto || c.animal_foto || '',
         fotoFile: ((this._el('ci-animal-foto') || {}).files || [])[0] || null
       });
       c.animal = identidad.nombre;
       c.animal_foto = identidad.foto;
+      if (identidad.raza) c.raza = identidad.raza;
+      if (identidad.edad) c.edad = identidad.edad;
+      if (identidad.sexo) c.animal_sexo = identidad.sexo;
+      if (identidad.microchip) c.animal_microchip = identidad.microchip;
       await this._updateLocalYApi('contratos', c);
       this.saveLocal();
       this._regLog('contrato', 'Foto y nombre actualizados en el contrato de ' + identidad.nombre, 'contrato', c.id);
