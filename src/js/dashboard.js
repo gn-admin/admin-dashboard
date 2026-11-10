@@ -115,7 +115,7 @@ const Dashboard = {
       socios: () => this.renderSocios(el),
       blacklist: () => this.renderBlacklist(el),
       reportes: () => this.renderReportes(el),
-      actividad: () => this.renderActividad(el),
+      actividad: () => this.renderReportes(el),
       redes: () => this.renderRedes(el),
       donaciones: () => this.renderDonaciones(el),
       almacen: () => this.renderAlmacen(el),
@@ -6765,6 +6765,7 @@ const Dashboard = {
       this._loadList('socios', () => API.getSocios()),
       ...this.surveys.map(s => this._loadResponses(s.id)),
       this._ensureListas(['gastos', 'donaciones', 'apadrinamientos', 'acogidas']),
+      this._loadListBestEffort('actividad', () => API.getActividad()),
     ]);
     const all = Object.values(this.responses).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
@@ -6809,6 +6810,20 @@ const Dashboard = {
       </div></div>
       <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
         <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
+      </div></div>
+      <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
+        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard.filterActividad(this.closest('.page'))"></div>
+          <div class="filter-row">
+            <select onchange="Dashboard.filterActividad(this.closest('.page'))" aria-label="Filtrar por tipo">
+              <option value="">Todos los tipos</option>
+              ${Array.from(new Set((this.actividad||[]).map(r=>r.tipo).filter(Boolean))).sort().map(t => `<option value="${this._esc(t)}">${this._esc(this._tipoLogLabel(t))}</option>`).join('')}
+            </select>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('reportes')">${Icons.activity} Actualizar</button>
+            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
+          </div>
+        </div>
+        <div class="list-header"><span class="response-count">${(this.actividad||[]).length} registros</span></div>
+        <div class="card-body-flush" id="actividad-tabla">${(this.actividad||[]).length ? this._renderActividadTabla([...(this.actividad||[])].sort((a,b)=>{const tv=f=>{const d=Date.parse(String(f||'').replace(' ','T'));return isNaN(d)?0:d;};return tv(b.fecha)-tv(a.fecha);})) : `<div class="empty-state"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro.</p></div>`}</div>
       </div></div>`;
     this._pintarMemoria();
   },

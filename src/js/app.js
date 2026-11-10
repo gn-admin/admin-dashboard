@@ -77,7 +77,7 @@ const App = {
     const p = String(page || '');
     if (p === 'dashboard' || p === 'animales') return p;
     if (p.indexOf('encuestas') === 0) return 'encuestas';
-    const mas = ['acogidas', 'acogidas-activas', 'adopciones', 'socios', 'blacklist', 'reportes', 'actividad', 'redes', 'donaciones', 'almacen'];
+    const mas = ['acogidas', 'acogidas-activas', 'adopciones', 'socios', 'blacklist', 'reportes', 'redes', 'donaciones', 'almacen'];
     return mas.includes(p) ? 'mas' : '';
   },
 
@@ -111,8 +111,7 @@ const App = {
         adopciones: 'Adopciones',
         socios: 'Socios / Voluntarios',
         blacklist: 'Lista Negra',
-        reportes: 'Reportes',
-        actividad: 'Registro de actividad',
+        reportes: 'Reportes y actividad',
         redes: 'Redes Sociales',
         donaciones: 'Donaciones',
         almacen: 'Almacén'
