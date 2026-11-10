@@ -37,6 +37,11 @@ Los valores reales (URL del backend, claves de Firebase, IDs de hojas/formulario
 | `FIREBASE_APP_ID`     | ID de la aplicación web                          |
 | `CONTACTO_TELEFONO`   | Teléfono en plantillas de Redes (opcional)       |
 | `CONTACTO_EMAIL`      | Email en plantillas de Redes (opcional)          |
+| `ASOCIACION_NOMBRE`   | Nombre de la asociación en los contratos (opcional) |
+| `ASOCIACION_CIF`      | CIF de la asociación en los contratos (opcional) |
+| `ASOCIACION_DOMICILIO`| Domicilio social en los contratos (opcional)     |
+| `ASOCIACION_REGISTRO` | Número de registro en los contratos (opcional)   |
+| `ASOCIACION_WEB`      | Web de la asociación en los contratos (opcional) |
 
 (Solo las variables *Frontend* se necesitan en GitHub; las de *Backend Apps Script* son únicamente para regenerar `apps-script/Config.gs` localmente.)
 

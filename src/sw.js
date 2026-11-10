@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v129';
+﻿const CACHE_NAME = 'gn-encuestas-v139';
 const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
@@ -27,7 +27,8 @@ const STATIC_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS))
+      // cache:'reload' evita precachear una version vieja servida por la cache HTTP.
+      .then(cache => cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });

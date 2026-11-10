@@ -53,7 +53,7 @@ const pares = [
   { sel: '.btn-primary', fg: 'var(--white)', bg: 'var(--primary-hover)' },
   { sel: '.btn-primary:hover:not(:disabled)', fg: 'var(--white)', bg: '#0f6b31' },
   { sel: '.toast-error.toast-success', fg: 'var(--white)', bg: 'var(--primary-hover)' },
-  { sel: '.toast-error.toast-error', fg: 'var(--white)', bg: 'var(--danger-hover)' },
+  { sel: '.toast-error.toast-danger', fg: 'var(--white)', bg: 'var(--danger-hover)' },
   { sel: '.urgente-badge', fg: 'var(--white)', bg: 'var(--danger-hover)' },
   { sel: '.btn-danger', fg: 'var(--white)', bg: 'var(--danger-hover)' },
   { sel: '.btn-danger:hover:not(:disabled)', fg: 'var(--white)', bg: '#a93226' },
@@ -77,11 +77,13 @@ describe('contraste WCAG AA (pares ya corregidos)', () => {
     });
   });
 
-  it('el toast neutro usa gris y texto oscuro', () => {
-    const d = declaraciones('.toast-error.toast-neutral');
-    assert.equal(d.background, 'var(--gray-200)');
-    assert.equal(d.color, 'var(--gray-800)');
-    assert.ok(contraste(d.color, d.background) >= AA);
+  it('los toasts warning y neutral usan gris y texto oscuro', () => {
+    ['.toast-error.toast-warning', '.toast-error.toast-neutral'].forEach(sel => {
+      const d = declaraciones(sel);
+      assert.equal(d.background, 'var(--gray-200)', sel);
+      assert.equal(d.color, 'var(--gray-800)', sel);
+      assert.ok(contraste(d.color, d.background) >= AA, sel);
+    });
   });
 
   it('los hexadecimales siguen siendo los documentados', () => {
@@ -151,6 +153,7 @@ describe('integridad estatica: clases, ids e iconos', () => {
     const mf = JSON.parse(leer('manifest.webmanifest'));
     assert.equal(mf.display, 'standalone');
     assert.equal(mf.scope, './');
+    assert.equal(mf.background_color.toLowerCase(), '#ffffff');
     assert.ok(Array.isArray(mf.display_override) && mf.display_override.includes('standalone'));
     assert.ok(mf.icons.some(i => i.purpose === 'maskable' && i.sizes === '192x192'));
     assert.ok(mf.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'));
@@ -177,9 +180,11 @@ describe('integridad estatica: clases, ids e iconos', () => {
     assert.match(CSS, /\.contrato-doc-back/);
   });
 
-  it('el contrato de acogida tiene previsualizacion y firma en papel', () => {
+  it('el contrato de acogida tiene previsualizacion, guardado y firma en papel', () => {
     assert.match(CSS, /\.acuerdo-preview/);
     assert.match(CSS, /\.acuerdo-preview-actions/);
+    assert.match(CSS, /\.acuerdo-preview-btns/);
+    assert.match(CSS, /\.acuerdo-preview-chip\.is-saved/);
     assert.match(CSS, /\.contrato-doc-firma-espacio/);
   });
 });

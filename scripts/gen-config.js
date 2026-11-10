@@ -76,6 +76,16 @@ const CONFIG = {
   contacto: {
     telefono: '${env('CONTACTO_TELEFONO')}',
     email: '${env('CONTACTO_EMAIL')}'
+  },
+
+  // Datos que aparecen en los contratos. Si no se configuran, el documento
+  // solo muestra el nombre y los datos de contacto disponibles.
+  asociacion: {
+    nombre: '${env('ASOCIACION_NOMBRE', 'Asociación Grupo Nebak')}',
+    cif: '${env('ASOCIACION_CIF')}',
+    domicilio: '${env('ASOCIACION_DOMICILIO')}',
+    registro: '${env('ASOCIACION_REGISTRO')}',
+    web: '${env('ASOCIACION_WEB')}'
   }
 };
 

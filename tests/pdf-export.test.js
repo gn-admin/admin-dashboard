@@ -7,7 +7,8 @@ const assert = require('node:assert/strict');
 
 global.Dashboard = {
   getEstado: (id) => (id === 'r2' ? 'aprobada' : 'pendiente'),
-  _buildSections: (row) => [{ title: 'Cuestionario', fields: [{ label: 'P1', value: row.p1 || '' }] }]
+  _buildSections: (row) => [{ title: 'Cuestionario', fields: [{ label: 'P1', value: row.p1 || '' }] }],
+  _terminosAdopcionCuerpo: () => '<div class="contrato-doc-header">Términos y condiciones de adopción responsable</div><div class="contrato-doc-sub">Anexo del contrato</div><h3>1. Objeto</h3><p>Texto de prueba.</p>'
 };
 
 const PdfExport = require('../src/js/pdf-export.js');
@@ -82,12 +83,27 @@ describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
     assert.match(html, /Calle Mayor 1/);
     assert.match(html, /Ana &amp; Luis/);
     assert.doesNotMatch(html, /Ana &amp;amp; Luis/);
-    assert.match(html, /Tutor legal/);
+    assert.match(html, /Tutor \/ persona de apoyo/);
+    assert.match(html, /ANEXO I\. Datos del tutor/);
+    assert.match(html, /page-break/);
     assert.match(html, /Calle Menor 2/);
     assert.match(html, /data:image\/png;base64,TUTOR/);
-    assert.match(html, /Firma de la entidad/);
+    assert.match(html, /SELLO DE LA ENTIDAD/);
+    assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
     assert.match(html, /2026\/11\/10/);
     assert.match(html, /2022\/01\/02/);
+  });
+});
+
+describe('_buildTerminosAdopcion: anexo independiente', () => {
+  const c = { adopcion_id: 'adp3', animal: 'Luna', f1_nombre: 'Ana', f1_dni: '123' };
+  const html = PdfExport._buildTerminosAdopcion(c, LOGO);
+
+  it('genera un documento propio con los terminos y sin rol', () => {
+    assert.match(html, /Términos y condiciones de adopción responsable/);
+    assert.match(html, /Anexo del contrato/);
+    assert.match(html, /Documento 2 de 2|Anexo del contrato/);
+    assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
   });
 });
 

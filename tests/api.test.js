@@ -60,7 +60,7 @@ describe('API._resultado: campo status del backend', () => {
       });
   });
 
-  it('status warning se lanza con err.status=warning (snackbar ambar)', async () => {
+  it('status warning se lanza con err.status=warning (snackbar gris neutro)', async () => {
     await assert.rejects(() => API._resultado(res({ status: 'warning', error: 'Aviso parcial' })),
       (err) => {
         assert.equal(err.message, 'Aviso parcial');

@@ -17,7 +17,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (**330 tests en verde**, lógica pura sin
+- `npm test` — `node --test tests/*.test.js` (**344 tests en verde**, lógica pura sin
   DOM; 6 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export` / `auth`).
   En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
   **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v129`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v138`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -88,7 +88,8 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - **Familias**: CRUD, capacidad/ocupación, borrado con cierre de casos.
 - **Acogidas activas**: ciclo entrega→en_casa→finalizada (con confirmación), borrado
   de caso individual, rollback espejo (animal, familia, solicitud, candidatura) y
-  **contrato de acogida opcional** (documento/PDF para firmar en papel; no bloquea fases).
+  **contrato de acogida opcional** (PDF y copia de datos en `Contratos` para regenerarlo;
+  no bloquea fases).
 - **Adopciones**: pipeline de 7 fases (+/−), contrato con firma en canvas (firmante 1
   obligatorio) + PDF, borrado con rollback en cascada (backend `deleteAdopcionCascade`
   + espejo front), **devolución con motivo** (`desenlace=devuelto`, `motivo_devolucion`,
@@ -137,7 +138,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   al retroceder. El **seguimiento** (1, 3, 6 y 12 meses) se ve en todas las fases y
   calcula sus hitos desde `fecha_entrega` (`_seguimientoHitos`). El modal de contrato,
   a pantalla completa, separa documento y firma y en móvil dedica toda la pantalla al
-  documento; permite enviar el contrato por email a adoptante, titular y Grupo Nebak.
+  documento; permite enviar el contrato por email a adoptante, tutor y Grupo Nebak.
 - **Dashboard**: tarjeta Hoy, Acción requerida unificada, KPIs clicables con deltas,
   Tesorería (donaciones/gastos/balance/cuotas), barras + embudo, recientes. Pintado
   instantáneo desde caché + refresco en fondo.
@@ -171,7 +172,7 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
   si no va bien, `error` (mensaje). `jsonResponse` infiere `status` si el llamante
   no lo pone. `actualizar()` devuelve error explícito en vez de `{data:null}`.
 - `api.js` lanza con `err.status`; el front pinta con `_snackErr(err, msg)`
-  (ámbar en `warning`, rojo en `error`). Hoy emite `warning` el rate-limit (429).
+  (gris neutro en `warning`, rojo en `error`). Hoy emite `warning` el rate-limit (429).
 - POST siempre `Content-Type: text/plain;charset=utf-8` (sin preflight).
 - `appendToSheet` persiste `id` y hace **upsert** (sin duplicados en reintentos);
   auto-añade columnas nuevas. `updateSheetRow` también auto-añade columnas.
@@ -189,7 +190,7 @@ GET/POST: `surveys`, `responses`, `user-profile`, `animales`, `familias`,
 - **Adopciones**: `id, animal, adoptante, email, telefono, fase, estado, notas, fecha, solicitud_id, animal_id, estado_firma` (+ `desenlace, motivo_devolucion, fecha_devolucion` al devolver; el backend añade columnas que falten)
 - **Acogidas**: `id, animal_id, familia_id, animal, familia, fase, estado, inicio, solicitud_id, notas` (+ `fin` al finalizar)
 - **Candidaturas**: `id, solicitud_id, survey_id, response_id, tipo, nombre, email, animal_id, familia_id, estado, fecha`
-- **Contratos**: `id, adopcion_id, animal, animal_id, fecha, ciudad, estado, creado, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma`
+- **Contratos**: `id, tipo, adopcion_id, acogida_id, animal, animal_id, familia_id, familia, inicio, fase, fecha, ciudad, estado, creado, guardado_en, datos_json, especie, raza, edad, f1_nombre, f1_dni, f1_email, f1_telefono, f1_rol, f1_firma, f2_nombre, f2_dni, f2_email, f2_telefono, f2_rol, f2_firma, terminos_aceptados, terminos_version, terminos_fecha, entidad_nombre, entidad_cif, entidad_domicilio, entidad_email, entidad_telefono, entidad_registro, entidad_web` (`f1_rol` se conserva solo por compatibilidad con contratos antiguos; los nuevos no lo usan).
 - **Socios**: `id, nombre, email, telefono, tipo, cuota, ultimo_pago, area, foto, carnet_id, activo, fecha_registro, horas_mes, ultima_actividad` (`activo` booleano real, no texto)
 - **Blacklist**: `id, nombre, apellidos, email, telefono, motivo, notas, origen, fecha`
 - **Actividad**: `id, fecha, usuario, tipo, detalle, entidad, entidad_id, descripcion`
@@ -377,5 +378,59 @@ Mejoras candidatas, por orden de encaje:
 
 ## v129 — contrato de acogida opcional (2026-11-10)
 - En cada caso de **Acogidas activas** hay un botón **Contrato de acogida** que abre una previsualización del documento y permite descargar el PDF. Incluye datos del animal, familia acogedora, inicio, fase y condiciones temporales, con líneas de firma para la familia y la entidad.
-- Es **opcional**: no se guarda en las hojas, no crea columnas nuevas y no condiciona el avance `Entrega → En casa → Finalizada`. Se genera con los datos actuales del caso mediante `Dashboard._contratoAcogidaDatos` y `PdfExport._buildContratoAcogida`.
+- Es **opcional**: no condiciona el avance `Entrega → En casa → Finalizada`. Se genera con los datos actuales del caso mediante `Dashboard._contratoAcogidaDatos` y `PdfExport._buildContratoAcogida`.
 - Tests: **330** en verde. SW `v129`.
+
+## v130 — copia persistida del contrato de acogida (2026-11-10)
+- Al guardar (o descargar sin copia previa) se crea/actualiza una fila en la hoja **Contratos** con `tipo: 'acogida'`, `acogida_id`, metadatos legibles y el snapshot completo en `datos_json`. **No se sube el PDF**: solo quedan los datos necesarios para regenerarlo.
+- Al reabrir el caso se usa el snapshot guardado, de modo que el documento se puede reimprimir aunque el animal o la familia hayan cambiado después. `Actualizar copia` reemplaza el snapshot con los datos actuales.
+- La hoja `Contratos` se comparte con adopciones; `_contratosAdopcion` excluye las copias de acogida de los KPIs. No hay endpoint ni hoja nuevos: el `Code.gs` desplegado debe incluir el auto-alta de columnas (`appendToSheet`/`updateSheetRow`). Tests: **333** en verde. SW `v130`.
+
+## v131 — snackbar de avisos en gris neutro (2026-11-10)
+- Los mensajes `warning` (éxito parcial o `status: warning`) dejan el ámbar y usan el gris neutro del tema (`--gray-200` con texto `--gray-800`), con la misma barra lateral. Éxito sigue verde y error rojo.
+- Se corrigió la clase de tipo del error: `.toast-error.toast-error` también coincidía con la clase base y teñía de rojo todos los snacks; ahora el error usa `toast-danger`.
+- Tests: **333** en verde. SW `v131`.
+
+## v132 — contrato de adopción formal, tutor y términos (2026-11-10)
+- El contrato elimina el rol del adoptante y se estructura con `REUNIDOS`, `EXPONEN` y `CLÁUSULAS`. Incluye datos de la asociación y un sello generado con el logo en la cabecera y en la firma de la entidad.
+- El tutor se activa con un checkbox; si existe, se exige nombre y firma y el PDF le dedica una página de anexo. Adoptante y tutor firman ambos.
+- Se añade el anexo **Términos y condiciones de adopción responsable** (`_terminosAdopcionHtml` / `PdfExport._buildTerminosAdopcion`), enlazado desde `ct-acepta` y descargable en PDF. Al firmar se envía automáticamente (si `ct-enviar` está marcado) un correo con el contrato y el anexo completos en HTML.
+- Nuevas variables opcionales `ASOCIACION_NOMBRE`, `ASOCIACION_CIF`, `ASOCIACION_DOMICILIO`, `ASOCIACION_REGISTRO` y `ASOCIACION_WEB`; si faltan, no se inventan datos. El correo no adjunta PDFs: el backend actual envía HTML y el PDF se imprime desde el navegador.
+- Tests: **338** en verde. SW `v132`.
+
+## v133 — snackbar ambiguo en gris neutro (2026-11-10)
+- `_snackTipo` solo devuelve rojo con `status: 'error'` explícito o un `HTTP NNN` en el mensaje. Cualquier fallo sin clasificar (red caída, `Failed to fetch`, mensajes desconocidos, `status` no reconocido) pasa a `neutral` gris (`--gray-200` con texto `--gray-800`).
+- `showSnackbar(msg)` usa `neutral` por defecto en lugar de `error`, de modo que una llamada sin tipo no pinta un falso error rojo.
+- Tests: **338** en verde. SW `v133`.
+
+## v134 — identidad del animal en contratos y UI de fases (2026-11-10)
+- El contrato de adopción y el de acogida incorporan un bloque de identidad del animal: **nombre editable** (nuevo nombre o corrección) y **foto**. Si el animal no tiene foto, se exige subirla; se guarda en su ficha (`foto_drive_id`, `foto_url`, `foto`) y en el snapshot del contrato. Los contratos ya firmados tienen *Foto / nombre* para corregirlos sin anular la firma.
+- La ficha de adopción muestra cabecera con foto, fase y progreso, además de un stepper accesible (hecho / actual / pendiente) con barra de progreso; las tarjetas de proceso muestran foto del animal, estado del contrato y avance. Las acogidas activas muestran foto, progreso y acceso directo al contrato, que no se guarda ni descarga sin foto; los contratos de adopción antiguos sin foto se completan desde la ficha antes de descargar o enviar.
+- Tests: **344** en verde. SW `v134`.
+
+## v135 — iconos PWA desde el logo del login y splash uniforme (2026-11-10)
+- `scripts/gen_icons.py` regenera `icon-192.png`/`icon-512.png` con recorte circular y esquinas transparentes, `icon-maskable-192.png`/`icon-maskable-512.png` con fondo blanco y el logo en la zona segura, e `icon-180.png` opaco blanco. El manifest mantiene `background_color` `#ffffff`: el splash de Android usa ese color y tanto el icono `any` como el `maskable` se funden con él, sin el cuadrado de color.
+- El logo del login (`logo-nebak.jpg`) sigue siendo la fuente; login y sidebar no cambian.
+- Tests: **344** en verde. SW `v135`.
+
+## v136 — auditoría móvil/tablet: safe-areas, navegación y táctil (2026-11-10)
+- **Safe-area** (`env(safe-area-inset-*)`) en topbar, sidebar, bottom-nav, login, modales y padding inferior del contenido: nada queda bajo el notch ni bajo el indicador de gestos.
+- **Topbar móvil** con título de página visible y truncado; la zona izquierda es flexible y las acciones de la derecha no se encogen. Botones de icono, ojo de contraseña y colapsar sidebar con diana mínima de 44px.
+- **Bottom-nav**: la pestaña padre queda activa con `App._bottomParent(page)` (`encuestas-*` → Encuestas, gestión → Más) y `aria-current`; el menú **Más** es desplazable con altura máxima, respeta la safe-area, marca la página actual y **recupera Reportes**; `aria-expanded`/`aria-controls` describen el desplegable.
+- **Login** con scroll vertical y tarjeta centrada sin recortes; **modales** con altura ajustada al viewport útil; **tablas** (socios/actividad) con tipografía 0.82 y scroll contenido; scroll táctil en pipeline y stepper.
+- El **botón de perfil** queda visible también en tablet/escritorio.
+- Tests: **344** en verde. SW `v136`.
+
+## v137 — cierre de auditoría móvil: menú y scroll de fondo (2026-11-10)
+- `.mas-menu-item` recupera `text-decoration: none`: los enlaces del menú «Más» ya no salen subrayados como enlaces por defecto.
+- Abrir el drawer lateral o el menú «Más» bloquea el scroll del fondo con `Dashboard._modalScrollLock` (el mismo contador que los modales); se libera al cerrar, al navegar y con Escape, que ahora también cierra el drawer.
+- El precache del service worker pide los assets con `cache: 'reload'` para que una actualización no guarde en la caché nueva un CSS/JS viejo servido desde la caché HTTP; `CACHE_NAME` sube a `gn-encuestas-v137`.
+- Tests: **344** en verde. SW `v137`.
+
+## v138 — guia de procesos actualizada (2026-11-10)
+- La guia recoge el flujo real de adopcion: las **7 fases** (Encuesta recibida → Revision → Visita domiciliaria → Contrato → Entrega → Prueba → Seguimiento) con sus requisitos (contrato firmado, fecha + checklist de entrega, prueba registrada e hitos de 1/3/6/12 meses).
+- Contrato: foto y nombre del animal obligatorios, terminos aceptados, tutor opcional y envio por email; el contrato de acogida exige foto y guarda una copia reutilizable (*Actualizar copia*).
+- Acogida: la capacidad de la familia es configurable (`max_capacity`; 1 por defecto) y *Ocupada* solo al llenarla.
+- Anade Registro de actividad, horas de voluntariado y analitica de Reportes, y accesos directos a Reportes y Actividad.
+- El ejemplo de contrato embebido en la guia se retira: incrustar el documento completo bloqueaba el hilo principal en movil. En su lugar, la guia indica donde ver el contrato real (<b>Adopciones > caso > Contrato</b>).
+- Tests: **344** en verde. SW `v138`.

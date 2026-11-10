@@ -193,6 +193,49 @@ const PdfExport = {
     return this._printAsync(`Contrato-Adopcion-${c.adopcion_id || 'signed'}.pdf`, (logo) => this._buildContracto(c, logo));
   },
 
+  exportTerminosAdopcion(c) {
+    return this._printAsync(`Terminos-Adopcion-${c.adopcion_id || 'signed'}.pdf`, (logo) => this._buildTerminosAdopcion(c, logo));
+  },
+
+  _buildTerminosAdopcion(c, logo) {
+    const body = (typeof Dashboard !== 'undefined' && Dashboard._terminosAdopcionCuerpo)
+      ? Dashboard._terminosAdopcionCuerpo({}, c || {}, logo)
+      : '<p>No se pudo cargar el documento de términos y condiciones.</p>';
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+      <title>Términos y condiciones de adopción</title>
+      <style>
+        @page{size:A4;margin:2cm}
+        body{font:11pt/1.6 Arial,sans-serif;color:#191919;padding:0;margin:0}
+        .contrato-doc{font-size:10.5pt;line-height:1.55}
+        .contrato-doc-header{display:flex;align-items:center;gap:16px;padding-bottom:16px;margin-bottom:20px;border-bottom:3px solid #1FC95B;break-inside:avoid}
+        .contrato-doc-header img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B;flex-shrink:0}
+        .contrato-doc-title{font-size:16pt;font-weight:800;color:#191919}
+        .contrato-doc-sub{font-size:9pt;color:#757575}
+        .contrato-doc-meta{display:flex;flex-wrap:wrap;gap:8px 28px;padding:12px 14px;margin-bottom:18px;background:#f9fafb;border:1px solid #e8eaed;border-radius:8px;font-size:9.5pt;break-inside:avoid}
+        .contrato-doc-meta .label{display:block;font-size:7.5pt;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#9aa0a6}
+        .contrato-doc h3{font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e8eaed;break-after:avoid}
+        .contrato-doc p{margin:0 0 9px;text-align:justify}
+        .contrato-doc-entidad{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:12px 14px;margin:0 0 18px;border:1px solid #e8eaed;border-radius:8px;background:#f9fafb;break-inside:avoid}
+        .contrato-doc-entidad-datos{flex:1;min-width:0;font-size:9pt;color:#4b5563;line-height:1.55}
+        .contrato-doc-entidad-datos b{display:block;color:#191919;font-size:10pt}
+        .contrato-doc-entidad-datos span{display:block;overflow-wrap:anywhere}
+        .contrato-doc-entidad-rol{color:#6b7280;font-size:8pt;margin-bottom:4px}
+        .contrato-doc-sello{width:94px;height:94px;flex:0 0 94px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff}
+        .contrato-doc-sello-inner{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px}
+        .contrato-doc-sello img{width:24px;height:24px;border-radius:50%;object-fit:cover}
+        .contrato-doc-sello span{font-size:6.5pt;font-weight:800;line-height:1.15;text-transform:uppercase}
+        .contrato-doc-sello small{font-size:5.5pt;font-weight:700;letter-spacing:.3px}
+        .contrato-doc-firmas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:28px;margin-top:30px;break-inside:avoid}
+        .contrato-doc-firma{padding-top:6px;border-top:1px solid #191919;font-size:9pt;color:#4b5563}
+        .contrato-doc-firma-label{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#6b7280}
+        .contrato-doc-firma b{display:block;margin-top:4px}
+        .contrato-doc-firma small{display:block;margin-top:2px;color:#6b7280}
+        .contrato-doc-firma-img{height:58px;max-width:100%;object-fit:contain;display:block;margin-top:4px}
+        .contrato-doc-sello--firma{margin-top:6px}
+        .contrato-doc-nota{margin-top:18px;padding:10px 12px;border-radius:8px;background:#ebf5fb;color:#374151;font-size:8pt}
+      </style></head><body><div class="contrato-doc">${body}</div></body></html>`;
+  },
+
   _buildContracto(c, logo) {
     const fecha = this._fmtFecha(c.fecha || this._hoy());
     const fmtFecha = f => this._fmtFecha(f);
@@ -204,6 +247,12 @@ const PdfExport = {
     const f2EsEntidad = /entidad|asociaci[oó]n|grupo\s*nebak/i.test(f2Rol + ' ' + f2Nombre);
     const tutor = f2Nombre && !f2EsEntidad ? c : null;
     const entidadFirma = !tutor && c.f2_firma && String(c.f2_firma).startsWith('data:') ? c.f2_firma : '';
+    const ent = (typeof Dashboard !== 'undefined' && Dashboard._contratoEntidadDatos)
+      ? Dashboard._contratoEntidadDatos(c)
+      : { nombre: c.entidad_nombre || 'Asociación Grupo Nebak', cif: c.entidad_cif || '', domicilio: c.entidad_domicilio || '', email: c.entidad_email || '', telefono: c.entidad_telefono || '', registro: c.entidad_registro || '', web: c.entidad_web || '' };
+    const entDato = (label, value) => value ? `<span><b>${this._esc(label)}:</b> ${this._esc(value)}</span>` : '';
+    const sello = `<div class="sello" aria-label="Sello de la entidad"><div class="sello-inner"><img src="${this._esc(logo || this._logoFallback)}" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div></div>`;
+    const entidadHtml = `<div class="entidad"><div class="entidad-datos"><b>${this._esc(ent.nombre)}</b><span class="entidad-rol">Entidad de protección animal</span>${entDato('CIF', ent.cif)}${entDato('Domicilio', ent.domicilio)}${entDato('Registro', ent.registro)}${entDato('Email', ent.email)}${entDato('Teléfono', ent.telefono)}${entDato('Web', ent.web)}</div>${sello}</div>`;
 
     // Los contratos nuevos guardan una copia de los datos del animal al firmar.
     // Para contratos antiguos, o campos nuevos, se completa desde la ficha viva.
@@ -255,7 +304,8 @@ const PdfExport = {
       ? `<img class="animal-photo" src="${this._esc(fotoSrc)}" alt="${this._esc(animal.nombre || 'Animal')}">`
       : '<div class="animal-photo animal-photo--empty">Sin foto</div>';
     const tutorHtml = tutor ? `
-      <h2>3. Tutor o persona de apoyo</h2>
+      <div class="page-break"></div>
+      <h2>ANEXO I. Datos del tutor o persona de apoyo</h2>
       <div class="grid">
         ${field('Nombre', tutor.f2_nombre)}
         ${field('DNI', tutor.f2_dni)}
@@ -264,18 +314,19 @@ const PdfExport = {
         ${field('Email', tutor.f2_email)}
         ${field('Telefono', tutor.f2_telefono)}
       </div>
-      <p class="nota">La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo, y firma este contrato junto al adoptante.</p>` : '';
+      <p class="nota">La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.</p>` : '';
     const firma = (label, nombre, dni, firmaData, alt) => `<div class="signature">
       <div class="sig-label">${this._esc(label)}</div>
       ${firmaData ? `<img class="firma-img" src="${this._esc(firmaData)}" alt="${alt}">` : '<div class="firma-fallback">[Sin firma]</div>'}
       <div class="sig-line">${this._esc(nombre)}${dni ? ' &middot; DNI ' + this._esc(dni) : ''}</div>
     </div>`;
-    const firmaAdoptante = firma(`Firmante 1 · ${c.f1_rol || 'Adoptante'}`, c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma, 'Firma del adoptante');
-    const firmaTutor = tutor ? firma(`Tutor / segundo firmante · ${tutor.f2_rol || 'Tutor'}`, tutor.f2_nombre, tutor.f2_dni, tutor.f2_firma, 'Firma del tutor') : '';
+    const firmaAdoptante = firma('Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma, 'Firma del adoptante');
+    const firmaTutor = tutor ? firma('Tutor / persona de apoyo', tutor.f2_nombre, tutor.f2_dni, tutor.f2_firma, 'Firma del tutor') : '';
     const firmaEntidad = `<div class="signature">
-      <div class="sig-label">Por la entidad</div>
-      ${entidadFirma ? `<img class="firma-img" src="${this._esc(entidadFirma)}" alt="Firma de la entidad">` : '<div class="firma-fallback">[Firma de la entidad]</div>'}
-      <div class="sig-line">Asociacion Grupo Nebak</div>
+      <div class="sig-label">Por la entidad (firma y sello)</div>
+      ${entidadFirma ? `<img class="firma-img" src="${this._esc(entidadFirma)}" alt="Firma de la entidad">` : ''}
+      ${sello}
+      <div class="sig-line">${this._esc(ent.nombre)}</div>
     </div>`;
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -306,14 +357,32 @@ const PdfExport = {
         .firma-img{height:70px;max-width:100%;object-fit:contain;display:block}
         .sig-line{border-top:1px solid #191919;margin-top:8px;padding-top:6px;font-size:9pt;font-weight:600}
         .firma-fallback{height:70px;display:flex;align-items:center;color:#999;font-style:italic}
+        .entidad{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:12px 14px;margin-bottom:18px;background:#f9fafb;border:1px solid #e8eaed;border-radius:8px;break-inside:avoid}
+        .entidad-datos{flex:1;min-width:0;font-size:9pt;color:#4b5563;line-height:1.55}
+        .entidad-datos b{display:block;color:#191919;font-size:10pt}
+        .entidad-datos span{display:block;overflow-wrap:anywhere}
+        .entidad-rol{color:#6b7280;font-size:8pt;margin-bottom:4px}
+        .sello{width:94px;height:94px;flex:0 0 94px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff}
+        .sello-inner{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px}
+        .sello img{width:24px;height:24px;border-radius:50%;object-fit:cover}
+        .sello span{font-size:6.5pt;font-weight:800;line-height:1.15;text-transform:uppercase}
+        .sello small{font-size:5.5pt;font-weight:700;letter-spacing:.3px}
+        .page-break{break-before:page;page-break-before:always}
         .footer{text-align:center;margin-top:32px;padding-top:10px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
       </style></head><body>
       <div class="header">
         <img src="${logo || this._logoFallback}" class="logo" alt="Grupo Nebak">
-        <div><div class="title">Contrato de Adopcion</div><div class="sub">Asociacion Grupo Nebak &middot; Expediente ${this._esc(c.adopcion_id || c.id || '')}</div></div>
+        <div><div class="title">Contrato de Adopcion Responsable</div><div class="sub">${this._esc(ent.nombre)} &middot; Expediente ${this._esc(c.adopcion_id || c.id || '')}</div></div>
       </div>
 
-      <p>En <b>${this._esc(c.ciudad || '[ciudad]')}</b>, a <b>${fecha}</b>, entre la <b>Asociacion Grupo Nebak</b> (en adelante, "la entidad") y <b>${f1Nombre}</b> con DNI <b>${f1Dni}</b>, en calidad de <b>${this._esc(c.f1_rol || 'adoptante')}</b>, ${tutor ? 'con la intervencion de la persona tutora que figura en este documento, ' : ''}se formaliza el presente contrato de adopcion responsable del animal:</p>
+      ${entidadHtml}
+
+      <p>En <b>${this._esc(c.ciudad || '[ciudad]')}</b>, a <b>${fecha}</b>, <b>REUNIDOS</b>.</p>
+      <p>De una parte, <b>${this._esc(ent.nombre)}</b>${ent.cif ? `, con CIF <b>${this._esc(ent.cif)}</b>` : ''}${ent.domicilio ? `, con domicilio en <b>${this._esc(ent.domicilio)}</b>` : ''}, en adelante, <b>la Entidad</b>. De otra parte, <b>${f1Nombre}</b>, con DNI <b>${f1Dni}</b>${c.f1_direccion ? ` y domicilio en <b>${this._esc(c.f1_direccion)}</b>` : ''}, en adelante, <b>el Adoptante</b>${tutor ? `, con la intervencion de <b>${this._esc(tutor.f2_nombre)}</b>, en adelante, <b>el Tutor</b>` : ''}.</p>
+      <p><b>EXPONEN</b></p>
+      <p>I. Que la Entidad es una asociacion de proteccion animal sin animo de lucro dedicada a la acogida, cuidado y adopcion responsable de animales.</p>
+      <p>II. Que el Adoptante desea adoptar al animal <b>${this._esc(animal.nombre || '[animal]')}</b> y se compromete a asumir su cuidado y bienestar durante toda su vida.</p>
+      <p>III. Que ambas partes reconocen tener capacidad suficiente para formalizar este contrato y, a tal efecto, acuerdan las siguientes <b>CLAUSULAS</b>.</p>
 
       <h2>1. Datos de adopcion</h2>
       <div class="animal">
@@ -339,7 +408,6 @@ const PdfExport = {
         ${field('Domicilio', c.f1_direccion)}
         ${field('Email', c.f1_email)}
         ${field('Telefono', c.f1_telefono)}
-        ${field('Rol', c.f1_rol || 'Adoptante')}
       </div>
 
       ${tutorHtml}
@@ -353,7 +421,9 @@ const PdfExport = {
       <div class="clausula"><b>6.</b> El adoptante comunicara a la entidad cualquier cambio de domicilio o telefono, asi como la perdida, robo, desaparicion o fallecimiento del animal.</div>
       <div class="clausula"><b>7.</b> El adoptante permitira las visitas y comprobaciones de seguimiento de la entidad y asumira los gastos derivados del cuidado del animal.</div>
       <div class="clausula"><b>8.</b> El incumplimiento de estas obligaciones facultara a la entidad para recuperar el animal y ejercer las acciones legales que correspondan.</div>
-      ${tutor ? '<div class="clausula"><b>9.</b> La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo, y firma este contrato junto al adoptante.</div>' : ''}
+      <div class="clausula"><b>9.</b> Los datos personales del adoptante y, en su caso, del tutor se utilizan para gestionar la adopcion, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificacion, supresion y oposicion ante la entidad.</div>
+      <div class="clausula"><b>10.</b> El Adoptante declara haber leido y comprendido el documento de terminos y condiciones de adopcion responsable, que forma parte de este contrato, y acepta expresamente todas sus obligaciones.</div>
+      ${tutor ? '<div class="clausula"><b>11.</b> La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.</div>' : ''}
 
       <h2>${tutor ? '5' : '4'}. Firmas</h2>
       <div class="signatures${tutor ? ' signatures--three' : ''}">

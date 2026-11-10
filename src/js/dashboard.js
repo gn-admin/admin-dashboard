@@ -6,7 +6,7 @@ const Dashboard = {
   APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   // Prioridad (urgent): 'all' | 'solo' — combinable con estado y especie.
-  _currentPrioridadFilter: 'all',
+  _currentPrioridadFilter: 'all', _currentAnimalSearch: '', _currentSocioSearch: '',
   _loaded: {}, _loading: {}, _cached: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
 
   async init() {
@@ -936,8 +936,21 @@ const Dashboard = {
     }).catch(() => {});
   },
 
+  _homeDataReady() {
+    if (!Array.isArray(this.surveys) || !this.surveys.length) return false;
+    const hasResponses = !!this._cached.responses
+      || (this.surveys || []).every(s => this._loaded && this._loaded['responses_' + s.id]);
+    const hasStates = !!this._cached.estados || !!(this._loaded && this._loaded.estados);
+    return hasResponses && hasStates;
+  },
   _hasHomeCache() {
-    return !!(this.surveys && this.surveys.length);
+    return this._homeDataReady();
+  },
+  _nombreVisible(profile, user) {
+    const raw = String(profile?.name || profile?.nombre || user?.displayName || profile?.email || user?.email || 'Grupo Nebak').trim();
+    const base = raw.includes('@') ? raw.split('@')[0] : raw;
+    const token = base.split(/[\s._-]+/).filter(Boolean)[0] || 'Grupo Nebak';
+    return token.charAt(0).toUpperCase() + token.slice(1);
   },
 
   async _refreshHome() {
@@ -968,14 +981,14 @@ const Dashboard = {
     const apadActivos = (this.apadrinamientos || []).filter(p => p.estado === 'activo');
     const apadEuros = this._totalAportes(this.apadrinamientos);
     const solNuevas = this._cuentaMes(activas, r => r.fecha_creacion);
-    const adopMes = this._cuentaMes(this.contratos, c => c.fecha);
+    const adopMes = this._cuentaMes(this._contratosAdopcion(), c => c.fecha);
     const donMes = this._sumaMes(this.donaciones, d => d.fecha, d => d.importe);
     const gastoMes = this._sumaMes(this.gastos, g => g.fecha, g => g.importe);
     const balance = donMes.cur - gastoMes.cur;
     const cuotasPend = (this.socios || []).filter(s => (this._cuotaEstado(s) || {}).label === 'Pendiente').length;
     const vencidos = (this.recordatorios || []).filter(r => !r.hecho && (this._diasHasta(r.fecha) ?? 99) < 0).length;
     const hoyN = pendientes + vencidos + enProceso;
-    const nombre = (this.userProfile?.name || this.userProfile?.email || 'Grupo Nebak').split(' ')[0];
+    const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
     const fechaHoy = this._fechaCorta(new Date(), false);
     const serie = this._serieSolicitudes();
     const totalSerie = serie.reduce((a, b) => a + b.count, 0);
@@ -1586,7 +1599,7 @@ const Dashboard = {
   // su cuenta (pdf-export._esc), por lo que NO se escapea en _buildSections:
   // aqui, en los puntos de render del front.
   _seccionesHtml(sections) {
-    return (sections || []).map(s => `<div class="detail-section"><div class="detail-section-title">${this._esc(s.title)}</div>${(s.fields || []).map(f => `<div class="detail-field"><div class="detail-question">${this._esc(f.label)}</div><div class="detail-answer">${this._esc(f.value ?? '—')}</div></div>`).join('')}</div>`).join('');
+    return (sections || []).map(s => `<div class="detail-section detail-section--fields"><div class="detail-section-title">${this._esc(s.title)}</div>${(s.fields || []).map(f => `<div class="detail-field"><div class="detail-question">${this._esc(f.label)}</div><div class="detail-answer">${this._esc(f.value ?? '—')}</div></div>`).join('')}</div>`).join('');
   },
 
   _animalName(id) { const a=this.animales.find(x=>x.id===id); return a?a.nombre:'(sin animal)'; },
@@ -1681,40 +1694,39 @@ const Dashboard = {
         ['Revisa y toma notas', 'Pendiente → En proceso'],
         ['Aprueba o descarta', 'Aprobar crea la candidatura'],
         ['Asigna animal (y familia)', 'desde la ficha de la solicitud'],
-        ['Proceso activo', 'acogida en curso o contrato de adopcion'],
+        ['Proceso por fases', 'contrato, entrega, prueba y seguimiento'],
         ['Cierre', 'adoptado / familia libre']
       ], '#1FC95B')}</div>
       <div class="guide-note">${Icons.info} <span>La barra de estado del detalle te deja mover la solicitud hacia delante y hacia atras en cualquier momento: <b>Pendiente</b>, <b>En proceso</b>, <b>Aprobar</b> y <b>Descartar</b>.</span></div>
       <div class="guide-note">${Icons.info} <span>Sin red no pasa nada: los cambios se encolan (insignia "N pendientes" arriba) y se envian solos al volver la conexion. El boton <b>Guardar</b> se bloquea con "Guardando..." para no duplicar.</span></div>
       <div class="guide-cols">
-        <div class="guide-card"><div class="guide-card-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora (maximo 1 animal). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada. El <b>contrato de acogida</b> es opcional.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
-        <div class="guide-card"><div class="guide-card-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y formalizarlo con el <b>Contrato de adopcion</b> (firma + PDF) desde Adopciones.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora con su capacidad (<b>max. de animales configurable</b>; 1 si no se indica). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada. El <b>contrato de acogida</b> es opcional.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y abrir el caso en <b>Adopciones</b>. El caso avanza por <b>7 fases</b> (Encuesta recibida → Revision → Visita domiciliaria → Contrato → Entrega → Prueba → Seguimiento): el contrato exige <b>foto y nombre del animal</b>, firma y terminos aceptados, y cada fase bloquea el avance hasta cumplir su requisito.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
       </div>`;
   },
 
   _tutorialAdopcion() {
     return `
       <div class="guide-diagram">${this._flowDiagram([
-        ['Solicitud llega', 'encuesta pre-adopcion'],
-        ['Revisa y toma notas', 'Pendiente → En proceso'],
-        ['Aprueba o descarta', 'Aprobar crea la candidatura'],
-        ['Asigna un animal', 'estado → Elegida'],
-        ['Contrato de adopcion', 'firma + PDF'],
-        ['Entrega y Prueba', 'Prueba reversible'],
-        ['Adoptado', 'animal fuera de disponibles'],
-        ['Caso eliminado', 'animal Disponible · solicitud En proceso']
+        ['Encuesta recibida', 'solicitud pre-adopcion'],
+        ['Revision', 'contacto y valoracion'],
+        ['Visita domiciliaria', 'entorno y convivencia'],
+        ['Contrato', 'foto + firma + terminos'],
+        ['Entrega', 'fecha + checklist'],
+        ['Prueba', 'adaptacion 15-30 dias'],
+        ['Seguimiento', 'hitos 1, 3, 6 y 12 meses'],
+        ['Adoptado', 'animal fuera de disponibles']
       ], 'var(--success)')}</div>
       ${this._guideStep(Icons.dog, '1. La solicitud llega', 'Cada persona que completa la encuesta de pre-adopcion (perros o gatos) aparece en su listado con estado <b>Pendiente</b>. Todo se gestiona desde el detalle de la persona (pulsando sobre ella).', 'Encuestas > Perros / Gatos', true)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'En el detalle puedes leer sus respuestas, dejar una <b>nota</b> y pasarla a <b>En proceso</b> mientras la valoras. Usa el buscador y los filtros para ordenar la lista (pendientes, aprobadas, etc.).', 'Detalle: botones Nota y En proceso', true)}
       ${this._guideStep(Icons.checkCircle, '3. Aprueba o descarta', 'Cuando termines pulsa <b>Aprobar</b>: se crea su candidatura automaticamente y pasa a la lista de aprobados. Con <b>Descartar</b> se aparta. <br><b>Importante:</b> si la solicitud vuelve a Pendiente (o se descarta), deja de ser candidata y ya no podra asignarsele animal.', 'Detalle: botones Aprobar / Descartar', true)}
       ${this._guideStep(Icons.paw, '4. Asigna el animal', 'Reabre el detalle de la persona ya aprobada: veras el bloque <b>Asignar animal</b>. Elige un animal disponible y guarda. El estado pasa a <b>Elegida</b> y se crea el caso en Adopciones.', 'Ficha de la solicitud aprobada', true)}
-      ${this._guideStep(Icons.fileText, '5. Contrato de adopcion', 'Entra en <b>Adopciones</b>, abre el caso y pulsa <b>Nuevo contrato</b>: firmante 1 obligatorio (firma dibujada en pantalla), firmante 2 opcional (por defecto Grupo Nebak), fecha y ciudad. Descarga el <b>PDF</b> y guarda.', 'Adopciones > caso', true)}
-      ${this._guideStep(Icons.checkCircle, '6. Cierre', 'Al guardar el contrato el animal queda <b>Adoptado</b> y deja de estar disponible, evitando que se asigne dos veces. Entre <b>Entrega</b> y <b>Seguimiento</b> esta la fase <b>Prueba</b> (periodo de adaptacion); con <b>Retroceder</b> vuelves atras si avanzas por error.', 'Adopciones', true)}
+      ${this._guideStep(Icons.fileText, '5. Contrato de adopcion', 'En <b>Adopciones</b>, abre el caso y pulsa <b>Nuevo contrato</b>. El documento exige la <b>foto del animal</b> (si no tiene, se sube ahi) y permite corregir su <b>nombre</b>; despues se firma en pantalla, se marcan los <b>terminos y condiciones</b> y, si hay tutor, se anaden sus datos y firma. El PDF incluye el anexo de terminos y <b>Enviar por email</b> manda contrato + terminos.', 'Adopciones > caso > Contrato', true)}
+      ${this._guideStep(Icons.checkCircle, '6. Entrega, prueba y seguimiento', 'El caso avanza por el <b>stepper de 7 fases</b> y cada salto tiene requisito: desde <b>Contrato</b> hace falta el contrato firmado; desde <b>Entrega</b>, la fecha y el <b>checklist obligatorio</b> (los opcionales no bloquean); desde <b>Prueba</b>, registrar la adaptacion de <b>15-30 dias</b>. En <b>Seguimiento</b> se marcan los hitos de <b>1, 3, 6 y 12 meses</b>. <b>Retroceder</b> pide confirmacion y conserva los datos.', 'Adopciones > caso > fases', true)}
       ${this._guideStep(Icons.eye, '7. Ver el cuestionario desde el caso', 'En el detalle del caso, el bloque <b>Solicitud de origen</b> tiene el boton <b>Ver cuestionario</b>: abre las respuestas tal cual se ven en Encuestas, con opcion a PDF o a saltar a su ficha.', 'Adopciones > caso', true)}
       ${this._guideStep(Icons.trash, '8. Anular un caso', 'Con <b>Eliminar</b> se borra el caso (y su contrato si lo hay) con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa de Aprobada a <b>En proceso</b> y la candidatura se libera. Puedes reasignar desde cero.', 'Adopciones > caso > Eliminar', false)}
       ${this._guideStep(Icons.plus, '9. Alta manual (sin encuesta)', 'Con <b>Nuevo</b> creas un caso a mano; usa <b>Vincular animal</b> para reservarlo (si no, queda solo texto). El detalle llega del contrato y del cuestionario si lo hay.', 'Adopciones > Nuevo', false)}
-      ${this._guideStep(Icons.eye, '10. Ejemplo de contrato', 'Asi queda el PDF que se descarga al firmar. Revisa que el formato os sirve.', 'Adopciones > Guia', true)}
-      ${this._contratoEjemploHtml()}`;
+      ${this._guideStep(Icons.eye, '10. Ejemplo de contrato', 'El documento real se previsualiza en <b>Adopciones > caso > Contrato</b>: ahi puedes verlo, descargarlo en PDF y enviarlo por email.', 'Adopciones > caso > Contrato', true)}`;
   },
 
   _tutorialAcogida() {
@@ -1722,7 +1734,7 @@ const Dashboard = {
       <div class="guide-diagram">${this._flowDiagram([
         ['Solicitud llega', 'encuesta pre-acogida'],
         ['Revisa y toma notas', 'Pendiente → En proceso'],
-        ['Aprueba: crea la familia', 'maximo 1 animal'],
+        ['Aprueba: crea la familia', 'capacidad configurable'],
         ['Asigna animal y familia', 'estado → Elegida'],
         ['Seguimiento del caso', 'Entrega → En casa → Finalizada'],
         ['Cierre', 'animal Disponible, familia Libre'],
@@ -1730,11 +1742,11 @@ const Dashboard = {
       ], 'var(--info-strong)')}</div>
       ${this._guideStep(Icons.home, '1. La solicitud llega', 'Cada persona que completa la encuesta de <b>pre-acogida</b> aparece en el listado con estado <b>Pendiente</b>.', 'Encuestas > Acogida', false)}
       ${this._guideStep(Icons.clipboard, '2. Revisa la solicitud', 'Abre el detalle, lee sus respuestas, deja <b>notas</b> y marca <b>En proceso</b> mientras la valoras.', 'Detalle: botones Nota y En proceso', false)}
-      ${this._guideStep(Icons.checkCircle, '3. Aprueba (crea la familia)', 'Al aprobar se crea la <b>familia acogedora</b> a partir de los datos de la encuesta (<b>maximo 1 animal por familia</b>) y la candidatura de la persona. Si ya existe coincidira automaticamente.', 'Detalle: boton Aprobar', false)}
+      ${this._guideStep(Icons.checkCircle, '3. Aprueba (crea la familia)', 'Al aprobar se crea la <b>familia acogedora</b> a partir de los datos de la encuesta (con la <b>capacidad</b> de la familia; si no se indica, 1) y la candidatura de la persona. Si ya existe coincidira automaticamente.', 'Detalle: boton Aprobar', false)}
       ${this._guideStep(Icons.paw, '4. Asigna animal y familia', 'En el detalle de la persona aprobada usa el bloque <b>Asignar animal</b>: elige el animal disponible y confirma la familia acogedora (verde = libre). El estado pasa a <b>Elegida</b> y se crea el caso.', 'Ficha de la solicitud aprobada', false)}
       ${this._guideStep(Icons.clock, '5. Seguimiento del caso', 'El caso se controla en <b>Acogidas activas</b> con los botones de fase: <b>Entrega → En casa → Finalizada</b>.', 'Acogidas activas', false)}
-      ${this._guideStep(Icons.fileText, '6. Contrato de acogida (opcional)', 'En cada caso tienes <b>Contrato de acogida</b>: genera un documento con los datos del animal, la familia y las condiciones, listo para imprimir o guardar en PDF y firmar en papel. <b>No es obligatorio</b> ni bloquea las fases.', 'Acogidas activas > Contrato de acogida', false)}
-      ${this._guideStep(Icons.checkCircle, '7. Cierre', 'Al marcar <b>Finalizada</b> (pide confirmacion) el animal vuelve a <b>Disponible</b> y la familia a <b>Libre</b> si no tiene mas animales, lista para otra acogida.', 'Acogidas activas', false)}
+      ${this._guideStep(Icons.fileText, '6. Contrato de acogida (opcional)', 'En cada caso tienes <b>Contrato de acogida</b>: documento con los datos del animal, la familia y las condiciones para firmar en papel. Exige <b>foto del animal</b> (y permite corregir su nombre); se puede <b>guardar una copia de los datos</b> y reemplazarla con <b>Actualizar copia</b> aunque la ficha cambie. <b>No es obligatorio</b> ni bloquea las fases.', 'Acogidas activas > Contrato de acogida', false)}
+      ${this._guideStep(Icons.checkCircle, '7. Cierre', 'Al marcar <b>Finalizada</b> (pide confirmacion) el animal vuelve a <b>Disponible</b> y la familia vuelve a <b>Libre</b> si queda por debajo de su capacidad (Ocupada solo al llenarla), lista para otra acogida.', 'Acogidas activas', false)}
       ${this._guideStep(Icons.trash, '8. Eliminar un caso', 'La papelera de cada tarjeta borra el caso con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa a <b>En proceso</b> y la candidatura se libera. Lo mismo ocurre al eliminar la familia (cierra sus casos activos).', 'Acogidas activas', false)}`;
   },
 
@@ -1749,7 +1761,7 @@ const Dashboard = {
         ['Sale a adopcion o acogida', 'desde la solicitud aprobada']
       ], 'var(--success)')}</div>
       ${this._guideStep(Icons.paw, '1. Donde se crean', 'Entra en <b>Animales</b>: arriba hay dos botones. <b>Nuevo</b> registra un animal a la vez; <b>Alta de camada</b> crea varios de golpe con el mismo grupo. Los filtros de <b>estado</b> y <b>especie</b> ordenan el inventario.', 'Animales', true)}
-      ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges <b>Perro</b>, <b>Gato</b> u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
+      ${this._guideStep(Icons.plus, '2. Nuevo animal', 'Obligatorios: <b>Nombre, Especie, Raza, Sexo</b> y <b>Estado</b>. En Especie eliges entre las <b>10 domesticas</b> (Perro, Gato, Conejo, Hamster, Pajaro, Tortuga, Huron, Cobaya, Erizo, Pez) u <b>Otro...</b> (y escribes la tuya). Edad, peso, microchip y descripcion pueden rellenarse despues con <b>Editar</b>.', 'Animales > Nuevo', true)}
       ${this._guideStep(Icons.users, '3. Crear un grupo (no hay pantalla aparte)', 'Los grupos <b>se crean al dar de alta un animal</b>: en <b>Grupo / Camada</b> elige <b>Crear grupo nuevo...</b> y escribe el nombre (p. ej. <i>Camada Luna Mayo 2026</i>); al guardar ya existe. Si prefieres varios de golpe, usa <b>Alta de camada</b>: el <b>Nombre del grupo</b> crea el grupo y sus N animales a la vez. Tambien puedes crearlo desde la <b>ficha de un animal ya dado de alta</b> con <b>Editar</b>.', 'Animales > Nuevo > Grupo / Camada', true)}
       ${this._guideStep(Icons.checkCircle, '4. Unirse a un grupo existente', '<b>Grupo / Camada</b> es un <b>selector con todos los grupos existentes</b> (con el numero de miembros): no hace falta teclear el nombre. Al elegirlo el animal se une <b>y se rellenan solos especie, raza, edad y sexo</b> con los del primer miembro (solo al crear, no al editar). Dos animales con el mismo nombre (mayusculas y acentos no importan) forman un solo grupo; si escribes un nombre que ya existia, al salir del campo te lo selecciona solo.', 'Nuevo Animal > Grupo / Camada', true)}
       ${this._guideStep(Icons.check, '5. Grupo obligatorio', 'El check <b>Grupo obligatorio</b> marca que el grupo es parte del seguimiento (no un dato decorativo): en la ficha aparece el aviso al lado del nombre. En el alta de camada viene <b>activado</b> por defecto.', 'Nuevo Animal', false)}
@@ -1757,8 +1769,8 @@ const Dashboard = {
       ${this._guideStep(Icons.users, '7. Como se ven los grupos', 'En el listado, un grupo con 2 o mas miembros se pinta como un <b>bloque con cabecera</b>: foto (collage de los miembros o foto propia), nombre, cuantos son, cuantos disponibles y un boton <b>Ver grupo</b>. Dentro estan sus tarjetas. Los grupos de un solo animal salen como tarjeta normal con su insignia, que tambien abre el grupo.', 'Animales', true)}
       ${this._guideStep(Icons.eye, '8. Ficha de grupo', 'Pulsar <b>Ver grupo</b> abre su ficha con <b>foto</b>, descripcion, notas y la lista de miembros con su estado (clic en un miembro abre su ficha). Con <b>Editar grupo</b> cambias nombre, foto, descripcion y notas; <b>renombrar</b> lo aplica a todos los miembros y, si el nombre ya existia, unifica los dos grupos en uno. <b>Anadir animal</b> abre el formulario ya rellenado con los datos del grupo.', 'Animales > Ver grupo', true)}
       ${this._guideStep(Icons.users, '9. Separar del grupo', 'En la ficha del animal, campo <b>Grupo / Camada</b>, los botones <b>Ver grupo</b> y <b>Separar</b>. Separar quita el animal del grupo (con confirmacion): queda con su propia ficha y, si era el ultimo, la ficha del grupo se elimina.', 'Animales > ficha > Grupo / Camada', false)}
-      ${this._guideStep(Icons.heart, '10. Estado, urgencia y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b>, <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones. El check <b>Necesita acogida/adopcion urgente</b> del formulario muestra la insignia roja <b>Urgente</b> y coloca el animal el primero en el selector de asignacion.', 'Animales > ficha > Estado', false)}
-      ${this._guideStep(Icons.clipboard, '11. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
+      ${this._guideStep(Icons.heart, '10. Estado, urgencia y asignacion', 'Estados: <b>Disponible</b>, <b>En acogida</b>, <b>Reservado</b> (reservado por un caso de adopcion), <b>Adoptado</b> y <b>Fallecido</b>. Solo los <b>Disponibles</b> se pueden elegir al asignar animal desde la solicitud aprobada; al firmar el contrato el animal queda <b>Adoptado</b> y deja de salir en las opciones. El check <b>Necesita acogida/adopcion urgente</b> del formulario muestra la insignia roja <b>Urgente</b> y coloca el animal el primero en el selector de asignacion.', 'Animales > ficha > Estado', false)}
+      ${this._guideStep(Icons.clipboard, '11. Foto y seguimiento', 'La <b>foto principal</b> se sube a Drive desde el propio formulario (opcional en la ficha, <b>obligatoria para firmar un contrato</b>) o puedes poner una ruta tipo <code>assets/animales/luna.jpg</code>. Desde la ficha se gestionan ademas apadrinamientos, gastos veterinarios, documentos y publicaciones de Redes.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.paw, '12. Especies admitidas', 'Ademas de <b>Perro</b> y <b>Gato</b> puedes registrar <b>Conejo, Hámster, Pájaro, Tortuga, Hurón, Cobaya, Erizo</b> y <b>Pez</b> (cualquier otra con <b>Otro...</b>). Se gestionan igual: grupos, urgencias, acogida y adopcion. <b>No hay encuesta propia</b>: las solicitudes de cualquier especie se tramitan con las encuestas de <b>perros, gatos</b> y la de <b>acogida</b>.', 'Animales > Nuevo', false)}
       <div class="guide-note">${Icons.info} <span><b>Resumen en una linea:</b> para crear un grupo elige <b>Crear grupo nuevo</b> en el selector <b>Grupo / Camada</b> (o escribe el mismo nombre en dos o mas animales). <b>Los grupos se unen por nombre</b> (mayusculas y acentos no importan), asi que aunque estuvieran partidos, al abrir Animales se corrigen solos. En la cabecera, <b>CSV</b> descarga el inventario con las columnas <b>grupo</b> y <b>grupo_id</b> para revisarlos en Excel.</span></div>`;
   },
@@ -1801,6 +1813,8 @@ const Dashboard = {
         ['Donacion', 'pantalla Donaciones'],
         ['Socio / voluntario', 'cuota + carnet'],
         ['Documento', 'referencia en ficha'],
+        ['Actividad', 'traza + CSV'],
+        ['Horas de voluntariado', 'ficha del socio'],
         ['Memoria anual', 'Reportes por ejercicio'],
         ['Almacen', 'inventario compartido']
       ], 'var(--info-strong)')}</div>
@@ -1810,12 +1824,15 @@ const Dashboard = {
       ${this._guideStep(Icons.users, '4. Socios y voluntarios', 'Perfiles <b>Socio</b>, <b>Voluntario</b> o <b>Ambos</b> (la cuota solo aplica a socios). El carnet cambia de color por perfil.', 'Socios', false)}
       ${this._guideStep(Icons.fileText, '5. Documentos', 'En la ficha, seccion <b>Documentos</b> > <b>Añadir documento</b>: nombre, tipo (Cartilla/Vacunas/Analitica/Otro) y fichero <b>PDF o imagen</b>. Requiere conexion: se sube a la carpeta de Drive y queda enlazado con <b>Ver</b>. Borrar elimina la fila <b>y</b> el fichero de Drive.', 'Animales > ficha', false)}
       ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
-      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Pantalla <b>Almacén</b>: <b>Nuevo</b> con nombre, unidad, cantidad y minimo. Los botones <b>+1/−1</b> descuentan al momento (compartido entre dispositivos). En rojo lo que esta bajo minimo. <b>Editar</b> corrige datos, la papelera elimina.', 'Almacén', false)}`;
+      ${this._guideStep(Icons.clipboard, '7. Almacén', 'Pantalla <b>Almacén</b>: <b>Nuevo</b> con nombre, unidad, cantidad y minimo. Los botones <b>+1/−1</b> descuentan al momento (compartido entre dispositivos). En rojo lo que esta bajo minimo. <b>Editar</b> corrige datos, la papelera elimina.', 'Almacén', false)}
+      ${this._guideStep(Icons.clipboard, '8. Registro de actividad', 'La pantalla <b>Actividad</b> guarda una traza de los cambios importantes (estados, fases, contratos, voluntariado) con filtro y <b>exportacion CSV</b>.', 'Más > Registro de actividad', false)}
+      ${this._guideStep(Icons.users, '9. Horas de voluntariado', 'En la ficha de un socio <b>Voluntario</b> o <b>Ambos</b>, <b>Registrar horas</b> suma al mes y sella la ultima actividad; <b>Reiniciar mes</b> lo pone a cero. La lista de Socios muestra las horas/mes.', 'Socios > ficha', false)}
+      ${this._guideStep(Icons.barChart, '10. Analitica', 'En <b>Reportes</b>, la tarjeta de analitica resume respuestas por encuesta y estado, duracion media de acogidas y horas de voluntariado con el top del mes.', 'Reportes', false)}`;
   },
 
   _contratoEjemploHtml() {
     if (typeof PdfExport === 'undefined') return '';
-    const demo = { adopcion_id: 'EJEMPLO', animal: 'Max (Labrador)', especie: 'Perro', raza: 'Labrador', edad: '2 años', ciudad: 'Irun', fecha: new Date().toISOString().slice(0, 10), f1_nombre: 'Nombre Apellido', f1_dni: '12345678A', f1_rol: 'El adoptante', f1_email: 'ejemplo@email.com', f1_telefono: '600123123', f1_firma: '', f2_nombre: 'Grupo Nebak', f2_rol: 'Entidad', f2_firma: '' };
+    const demo = { adopcion_id: 'EJEMPLO', animal: 'Max (Labrador)', especie: 'Perro', raza: 'Labrador', edad: '2 años', ciudad: 'Irun', fecha: new Date().toISOString().slice(0, 10), f1_nombre: 'Nombre Apellido', f1_dni: '12345678A', f1_email: 'ejemplo@email.com', f1_telefono: '600123123', f1_firma: '', f2_nombre: '', f2_rol: '', f2_firma: '' };
     const html = PdfExport._buildContracto(demo, PdfExport._logoFallback);
     return `<iframe title="Ejemplo de contrato" srcdoc="${html.replace(/"/g, '&quot;')}" style="width:100%;height:420px;border:1px solid var(--gray-200);border-radius:8px;background:#fff;margin-top:8px"></iframe>`;
   },
@@ -1833,7 +1850,10 @@ const Dashboard = {
       <h4 class="guide-subtitle">Que significa cada estado</h4>
       <div class="guide-estados">${estados.map(e=>`<div class="guide-estado"><span class="estado-badge ${e[0]}">${e[1]}</span><p>${e[2]}</p></div>`).join('')}</div>
       <h4 class="guide-subtitle">Estados del animal</h4>
-      <div class="guide-estados">${[['Disponible','Listo para asignar a adopcion, acogida o apadrinamiento.'],['En acogida','Vive con una familia acogedora.'],['En adopcion','Reservado: asignado a un caso de adopcion.'],['Adoptado','Contrato firmado; fuera de disponibles.'],['Fallecido','Baja: conserva el historial pero no se asigna.']].map(e=>`<div class="guide-estado"><span class="estado-badge">${e[0]}</span><p>${e[1]}</p></div>`).join('')}</div>`;
+      <div class="guide-estados">${[['Disponible','Listo para asignar a adopcion, acogida o apadrinamiento.'],['En acogida','Vive con una familia acogedora.'],['En adopcion','Reservado: asignado a un caso de adopcion.'],['Adoptado','Contrato firmado; fuera de disponibles.'],['Fallecido','Baja: conserva el historial pero no se asigna.']].map(e=>`<div class="guide-estado"><span class="estado-badge">${e[0]}</span><p>${e[1]}</p></div>`).join('')}</div>
+      <h4 class="guide-subtitle">Fases de la adopcion</h4>
+      <div class="guide-estados">${[['Encuesta recibida','Solicitud recibida: revisa contacto y animal.'],['Revision','Cuestionario, contacto y valoracion.'],['Visita domiciliaria','Comprueba el entorno donde vivira.'],['Contrato','Obligatorio: foto, firma y terminos.'],['Entrega','Fecha de entrega + checklist.'],['Prueba','Adaptacion de 15-30 dias.'],['Seguimiento','Hitos a 1, 3, 6 y 12 meses.']].map(e=>`<div class="guide-estado"><span class="estado-badge">${e[0]}</span><p>${e[1]}</p></div>`).join('')}</div>
+      <div class="guide-note">${Icons.info} <span><b>Prueba</b> es el periodo corto de adaptacion (15-30 dias); <b>Seguimiento</b> es el acompanamiento a largo plazo. Cada fase bloquea el avance hasta cumplir su requisito.</span></div>`;
   },
 
   _tutorialIndex() {
@@ -1849,6 +1869,8 @@ const Dashboard = {
         <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('reportes')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
+        <button class="guide-index-item" onclick="Dashboard._jumpTo('actividad')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
         <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
@@ -2889,6 +2911,8 @@ const Dashboard = {
     let filtered = filter==='all' ? this.animales : this.animales.filter(a=>a.estado===filter);
     if (especie!=='all') filtered = filtered.filter(a=>(a.especie||'')===especie);
     if (prioridad==='solo') filtered = filtered.filter(a=>this._esPrioritario(a));
+    const qAnimal = String(this._currentAnimalSearch || '').toLowerCase().trim();
+    if (qAnimal) filtered = filtered.filter(a => [a.nombre, a.raza, a.especie, a.microchip, a.grupo].join(' ').toLowerCase().includes(qAnimal));
     const counts = {all:this.animales.length, disponible:this.animales.filter(a=>a.estado==='disponible').length, en_acogida:this.animales.filter(a=>a.estado==='en_acogida').length, en_adopcion:this.animales.filter(a=>a.estado==='en_adopcion').length, adoptado:this.animales.filter(a=>a.estado==='adoptado').length, fallecido:this.animales.filter(a=>a.estado==='fallecido').length};
     const nUrgentes=this.animales.filter(a=>this._esPrioritario(a)).length;
     // Los urgentes se adelantan dentro de cada bloque (no muta el original).
@@ -2920,7 +2944,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportAnimalesCsv()">${Icons.download} CSV</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
-        <div class="filters-bar"><div class="filter-row">
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" oninput="Dashboard.filterAnimales(this)"></div><div class="filter-row">
           <select onchange="Dashboard._currentAnimalFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
@@ -2946,6 +2970,32 @@ const Dashboard = {
       </div>
       <div class="page-detail-container"></div>`;
     this._animaListado(el.querySelector('.page-list-container'));
+  },
+
+  filterAnimales(input) {
+    const q = String(input?.value || '').toLowerCase().trim();
+    this._currentAnimalSearch = q;
+    const page = document.getElementById('page-animales');
+    const cont = page?.querySelector('.page-list-container');
+    if (!cont) return;
+    let visibles = 0;
+    cont.querySelectorAll('.animal-card').forEach(card => {
+      const ok = !q || (card.textContent || '').toLowerCase().includes(q);
+      card.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    });
+    cont.querySelectorAll('.animal-group-block').forEach(b => {
+      const any = [...b.querySelectorAll('.animal-card')].some(c => c.style.display !== 'none');
+      b.style.display = any ? '' : 'none';
+    });
+    const count = cont.querySelector('.response-count');
+    if (count) count.textContent = visibles + (visibles === 1 ? ' animal' : ' animales');
+    let empty = cont.querySelector('.animal-search-empty');
+    if (!q) { if (empty) empty.remove(); return; }
+    if (!visibles) {
+      if (!empty) { empty = document.createElement('div'); empty.className = 'animal-search-empty'; cont.appendChild(empty); }
+      empty.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin resultados</h3><p>Ningun animal coincide con la busqueda.</p></div>`;
+    } else if (empty) empty.remove();
   },
 
   _grupoSize(gid) { return (this.animales||[]).filter(x=>x.grupo_id===gid).length; },
@@ -3622,12 +3672,11 @@ const Dashboard = {
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
         ${fotoHero}
         <div style="flex:1;min-width:180px">
-          <div style="font-size:1.15rem;font-weight:800;color:var(--gray-900)">${this._esc(a.nombre)}</div>
-          <div class="animal-card-pills" style="margin:4px 0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span>${this._esPrioritario(a)?'<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>':''}</div>
-          <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(a.especie||'')} &middot; ${this._esc(a.raza||'')} &middot; ${this._esc(a.edad||'')}</div>
+          <div class="animal-card-pills" style="margin:0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span>${this._esPrioritario(a)?'<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>':''}</div>
+          <div style="font-size:.82rem;color:var(--gray-500);margin-top:4px">${this._esc(a.especie||'')} &middot; ${this._esc(a.raza||'')} &middot; ${this._esc(a.edad||'')}</div>
         </div>
       </div>
-      <div class="detail-section"><div class="detail-section-title">Informacion General</div>
+      <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion General</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
         <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
         <div class="detail-field"><div class="detail-question">Edad</div><div class="detail-answer">${this._esc(a.edad)||'—'}</div></div>
@@ -3803,7 +3852,7 @@ const Dashboard = {
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaFormById('${f.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteFamilia('${f.id}')">${Icons.trash} Eliminar</button>
       </div>
-      <div class="detail-section"><div class="detail-section-title">Informacion de la Familia</div>
+      <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion de la Familia</div>
         <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(f.nombre)}</div></div>
         <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(f.email)}</div></div>
         <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(f.telefono)||'—'}</div></div>
@@ -3845,12 +3894,53 @@ const Dashboard = {
   },
 
   // ==================== ACOGIDAS ACTIVAS ====================
+  _faseAcogidaLabel(f) {
+    return ({ entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' })[f] || f || '';
+  },
+
+  _faseAcogidaCls(f) {
+    return ({ entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' })[f] || '';
+  },
+
+  // Tarjeta de caso de acogida con foto del animal, familia, progreso y
+  // estado del contrato opcional. Mantiene las acciones de fase y borrado.
+  _acogidaCardHtml(c) {
+    const a = c.animal_id ? this._byId(this.animales || [], c.animal_id) : null;
+    const foto = a ? this._fotoSrc(a, 'w200') : '';
+    const guardado = this._contratoAcogidaDe(c.id);
+    const snapshot = guardado && this._contratoAcogidaSnapshot(guardado);
+    const fases = ['entrega', 'en_casa', 'finalizada'];
+    const idx = Math.max(0, fases.indexOf(c.fase));
+    const pct = Math.round((idx / (fases.length - 1)) * 100);
+    return `<div class="acogida-card">
+      <div class="acogida-card-head">
+        <div class="acogida-card-foto">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(c.animal)}">` : Icons.home}</div>
+        <div class="acogida-card-info">
+          <div class="response-name">${this._esc(c.animal)} <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._faseAcogidaLabel(c.fase)}</span>${snapshot ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="response-email">${this._esc(c.familia)} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}</div>
+        </div>
+        <div class="acogida-card-pct">${pct}%</div>
+      </div>
+      <div class="acogida-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+      <div class="acogida-card-actions">
+        ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
+        <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
+        <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash}</button>
+        ${c.notas ? `<span class="acogida-card-nota">${this._esc(c.notas)}</span>` : ''}
+      </div>
+    </div>`;
+  },
+
   async renderAcogidasActivas(el) {
     await Promise.all([
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('familias', () => API.getFamilias())
     ]);
-    await this._loadListBestEffort('acogidas', () => API.getAcogidas());
+    await Promise.all([
+      this._loadListBestEffort('acogidas', () => API.getAcogidas()),
+      this._loadListBestEffort('contratos', () => API.getContratos())
+    ]);
     const casos = (this.acogidas || []).slice().reverse();
     const fases = ['entrega', 'en_casa', 'finalizada'];
     const faseLabel = { entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' };
@@ -3867,24 +3957,7 @@ const Dashboard = {
             </div>`;
           }).join('')}</div>
         </div></div>
-        <div class="response-list">${casos.length ? casos.map(c => `
-          <div class="response-card">
-            <div class="response-card-header">
-              <div class="response-avatar" style="background:var(--primary-lighter);color:var(--primary-hover)">${Icons.home}</div>
-              <div class="response-info">
-                <div class="response-name">${this._esc(c.animal)} <span class="estado-badge ${faseCls[c.fase] || ''}">${faseLabel[c.fase] || c.fase}</span></div>
-                <div class="response-email">${this._esc(c.familia)} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}</div>
-              </div>
-              <div class="response-date">${c.estado}</div>
-            </div>
-            <div style="padding:0 16px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
-              ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
-              <button class="btn btn-sm btn-outline-green" title="Documento opcional; no bloquea el avance de la acogida" onclick="Dashboard.showContratoAcogida('${c.id}')">${Icons.fileText} Contrato de acogida</button>
-              <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${c.id}')">${Icons.trash}</button>
-              ${c.notas ? `<span style="color:var(--gray-400);font-size:var(--text-sm)">${this._esc(c.notas)}</span>` : ''}
-            </div>
-          </div>`).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
+        <div class="response-list">${casos.length ? casos.map(c => this._acogidaCardHtml(c)).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
         </div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3931,9 +4004,9 @@ const Dashboard = {
     }
   },
 
-  // Documento de apoyo para la acogida temporal. Es opcional: no se guarda
-  // como requisito ni condiciona `avanzarFaseAcogida`; se genera al vuelo con
-  // los datos actuales del caso, animal y familia.
+  // Documento de apoyo para la acogida temporal. Es opcional: no condiciona
+  // `avanzarFaseAcogida`. Se genera con los datos actuales y se puede guardar
+  // una copia (snapshot) para reimprimirlo mas adelante.
   _contratoAcogidaDatos(c) {
     const caso = c || {};
     const fam = caso.familia_id ? this._byId(this.familias || [], caso.familia_id) : null;
@@ -3949,6 +4022,8 @@ const Dashboard = {
     const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
     return {
       id: caso.id || '',
+      animal_id: caso.animal_id || '',
+      familia_id: caso.familia_id || '',
       animal: { ...animal, nombre: val(animal && animal.nombre, caso.animal) },
       familia: {
         nombre: val(fam && fam.nombre, caso.familia),
@@ -3965,12 +4040,134 @@ const Dashboard = {
     };
   },
 
+  // Copia persistida del contrato. Se guarda en la hoja Contratos como una
+  // fila mas (tipo 'acogida'), con el snapshot completo en datos_json.
+  _contratoAcogidaDe(acogidaId) {
+    return (this.contratos || []).find(c => c && c.tipo === 'acogida' && String(c.acogida_id) === String(acogidaId)) || null;
+  },
+
+  _contratoAcogidaSnapshot(contrato) {
+    if (!contrato || contrato.tipo !== 'acogida') return null;
+    try {
+      const datos = typeof contrato.datos_json === 'string' ? JSON.parse(contrato.datos_json) : contrato.datos_json;
+      return datos && datos.animal && datos.familia ? datos : null;
+    } catch { return null; }
+  },
+
+  _contratoAcogidaFila(caso, datos) {
+    const existente = this._contratoAcogidaDe(caso.id);
+    return {
+      id: (existente && existente.id) || ('ctr_acg_' + Date.now().toString(36)),
+      tipo: 'acogida',
+      acogida_id: caso.id,
+      animal_id: caso.animal_id || '',
+      familia_id: caso.familia_id || '',
+      animal: (datos && datos.animal && datos.animal.nombre) || caso.animal || '',
+      familia: (datos && datos.familia && datos.familia.nombre) || caso.familia || '',
+      inicio: (datos && datos.inicio) || caso.inicio || '',
+      fase: (datos && datos.fase) || caso.fase || '',
+      ciudad: (datos && datos.ciudad) || '',
+      fecha: (datos && datos.fecha) || '',
+      guardado_en: new Date().toISOString(),
+      estado: 'guardado',
+      datos_json: JSON.stringify(datos || {})
+    };
+  },
+
+  async _guardarContratoAcogida(caso, datos) {
+    if (!caso || !caso.id) return null;
+    if (!this.contratos) this.contratos = [];
+    const fila = this._contratoAcogidaFila(caso, datos);
+    const prev = this._contratoAcogidaDe(caso.id);
+    if (prev) Object.assign(prev, fila);
+    else this.contratos.push(fila);
+    this.saveLocal();
+    this._cacheSet('contratos', this.contratos);
+    try {
+      const res = await API.createContrato(fila);
+      if (prev && res && res.data) Object.assign(prev, res.data);
+      return { fila: prev || (res && res.data) || fila, local: false };
+    } catch (err) {
+      this._enqueueOp({ m: 'createContrato', a: [fila] });
+      return { fila: prev || fila, local: true, err };
+    }
+  },
+
+  async guardarContratoAcogida(id) {
+    const key = 'contrato-acogida:' + id;
+    if (!this._busyStart(key)) return;
+    try {
+      await this._ensureListas(['contratos']);
+      const c = this._byId(this.acogidas, id);
+      if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+      const datos = this._contratoAcogidaDatos(c);
+      const prev = this._contratoAcogidaDe(id);
+      const prevDatos = prev ? this._contratoAcogidaSnapshot(prev) : null;
+      const foto = (datos.animal && datos.animal.foto) || (prevDatos && prevDatos.animal && prevDatos.animal.foto) || '';
+      if (!foto) {
+        this.showSnackbar('El contrato de acogida debe incluir una foto: súbela en el bloque del animal y pulsa Guardar foto y nombre.', 'warning');
+        const inp = this._el('ac-animal-foto');
+        if (inp) inp.focus();
+        return;
+      }
+      datos.animal = Object.assign({}, datos.animal, { foto });
+      const res = await this._guardarContratoAcogida(c, datos);
+      if (!res) return;
+      if (res.local) this._snackErr(res.err, 'Contrato guardado en este dispositivo; se sincronizará al volver la conexión.');
+      else this.showSnackbar('Datos del contrato guardados', 'success');
+      this._regLog('contrato', 'Contrato de acogida guardado para ' + (c.animal || ''), 'contrato', res.fila.id);
+      await this.showContratoAcogida(id);
+    } finally {
+      this._busyEnd(key);
+    }
+  },
+
+  async actualizarContratoAcogida(id) {
+    if (!this._byId(this.acogidas, id)) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+    if (!(await this._confirm('Actualizar la copia guardada? Se reemplazaran los datos del contrato por los actuales.', 'Actualizar contrato'))) return;
+    await this.guardarContratoAcogida(id);
+  },
+
+  // Corrige el nombre o sube la foto del animal desde el contrato de acogida.
+  // Se guarda en la ficha, en el caso y en la copia del contrato.
+  async guardarIdentidadContratoAcogida(id) {
+    const key = 'identidad-acogida:' + id;
+    if (!this._busyStart(key)) return;
+    try {
+      const c = this._byId(this.acogidas, id);
+      if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+      const guardado = this._contratoAcogidaDe(id);
+      const snapshot = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+      const live = this._contratoAcogidaDatos(c);
+      const datos = snapshot || live;
+      const identidad = await this._aplicarIdentidadAnimalContrato({
+        animalId: c.animal_id || '',
+        acogidaId: id,
+        nombre: (this._el('ac-animal-nombre') || {}).value || (datos.animal && datos.animal.nombre) || c.animal,
+        fotoActual: (datos.animal && datos.animal.foto) || (live.animal && live.animal.foto) || '',
+        fotoFile: ((this._el('ac-animal-foto') || {}).files || [])[0] || null
+      });
+      const nuevos = Object.assign({}, datos, {
+        animal: Object.assign({}, datos.animal || {}, { nombre: identidad.nombre, foto: identidad.foto })
+      });
+      const res = await this._guardarContratoAcogida(c, nuevos);
+      if (res && res.local) this._snackErr(res.err, 'Datos guardados en este dispositivo; se sincronizaran al volver la conexion.');
+      else this.showSnackbar('Foto y nombre guardados en el contrato y en la ficha', 'success');
+      this._regLog('contrato', 'Identidad del animal actualizada en contrato de acogida de ' + identidad.nombre, 'contrato', res && res.fila ? res.fila.id : '');
+      await this.showContratoAcogida(id);
+    } catch (err) {
+      this._snackErr(err, 'No se pudieron guardar los datos del animal: ' + this._errMsg(err));
+    } finally {
+      this._busyEnd(key);
+    }
+  },
+
   async showContratoAcogida(id) {
     const inicial = this._byId(this.acogidas, id);
     if (!inicial) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
     const sol = this._parseSolicitud(inicial.solicitud_id);
     await Promise.all([
-      this._ensureListas(['animales', 'familias']),
+      this._ensureListas(['animales', 'familias', 'contratos']),
       // El DNI, domicilio y ciudad suelen venir de la encuesta de acogida;
       // se cargan si esta pantalla se abrio antes que Encuestas.
       sol ? this._loadResponses(sol.surveyId).catch(() => {}) : Promise.resolve()
@@ -3981,13 +4178,38 @@ const Dashboard = {
       this.showSnackbar('No se pudo preparar el contrato de acogida.', 'warning');
       return;
     }
-    const datos = this._contratoAcogidaDatos(c);
-    const body = PdfExport._contratoAcogidaBody(datos, 'assets/icons/logo-nebak.jpg');
+    const guardado = this._contratoAcogidaDe(c.id);
+    const snapshot = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+    const live = this._contratoAcogidaDatos(c);
+    const datos = snapshot || live;
+    // Una copia antigua puede no tener foto: se completa con la ficha viva
+    // para que el documento y el editor siempre muestren una imagen.
+    const animalContrato = Object.assign({}, datos.animal || {}, {
+      nombre: (datos.animal && datos.animal.nombre) || live.animal.nombre || c.animal || '',
+      foto: (datos.animal && datos.animal.foto) || live.animal.foto || ''
+    });
+    const datosContrato = Object.assign({}, datos, { animal: animalContrato });
+    const body = PdfExport._contratoAcogidaBody(datosContrato, 'assets/icons/logo-nebak.jpg');
+    const fechaGuardado = snapshot ? this._fmtFecha(guardado.guardado_en || guardado.fecha) : '';
+    const hint = snapshot
+      ? `Copia guardada${fechaGuardado && fechaGuardado !== '—' ? ' el ' + this._esc(fechaGuardado) : ''}. El PDF se genera con estos datos aunque cambie la ficha; usa Actualizar copia para reemplazarlos.`
+      : 'Documento de apoyo para firmar en papel. Guarda una copia de los datos para poder regenerarlo mas adelante; al descargar el PDF tambien se guarda.';
+    const acciones = snapshot
+      ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.actualizarContratoAcogida('${this._esc(c.id)}')">${Icons.refresh} Actualizar copia</button>
+         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.descargarContratoAcogida('${this._esc(c.id)}')">${Icons.download} Descargar PDF</button>`
+      : `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.guardarContratoAcogida('${this._esc(c.id)}')">${Icons.checkCircle} Guardar contrato</button>
+         <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarContratoAcogida('${this._esc(c.id)}')">${Icons.download} Descargar PDF</button>`;
     this.showInfoModal('Contrato de acogida · ' + (c.animal || 'animal'), `
       <div class="acuerdo-preview-actions">
         <span class="acuerdo-preview-chip">Opcional</span>
-        <span class="acuerdo-preview-hint">Documento de apoyo para firmar en papel. No es obligatorio ni bloquea el avance de la acogida.</span>
-        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.descargarContratoAcogida('${this._esc(c.id)}')">${Icons.download} Descargar PDF</button>
+        <span class="acuerdo-preview-chip ${snapshot ? 'is-saved' : 'is-unsaved'}">${snapshot ? 'Guardado' : 'Sin guardar'}</span>
+        <span class="acuerdo-preview-hint">${hint}</span>
+        <div class="acuerdo-preview-btns">${acciones}</div>
+      </div>
+      ${this._contratoAnimalEditorHtml({ prefix: 'ac-animal', nombre: animalContrato.nombre, foto: animalContrato.foto })}
+      <div class="acuerdo-preview-tools">
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.guardarIdentidadContratoAcogida('${this._esc(c.id)}')">${Icons.checkCircle} Guardar foto y nombre</button>
+        <span class="acuerdo-preview-hint">Se guardan en la ficha del animal y en la copia del contrato.</span>
       </div>
       <div class="acuerdo-preview"><div class="contrato-doc">${body}</div></div>`);
   },
@@ -4000,8 +4222,30 @@ const Dashboard = {
       return;
     }
     // La apertura de la ventana de impresion debe ocurrir en el mismo gesto
-    // del usuario; no esperamos red aqui. Los datos visibles ya estan cargados.
-    PdfExport.exportContratoAcogida(this._contratoAcogidaDatos(c));
+    // del usuario; no esperamos red aqui. La copia local se guarda antes de
+    // que termine la peticion y la cola offline la sincroniza si falla.
+    const guardado = this._contratoAcogidaDe(id);
+    const snapshot = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+    const live = this._contratoAcogidaDatos(c);
+    const datos = snapshot || live;
+    if (snapshot) {
+      datos.animal = Object.assign({}, datos.animal || {}, {
+        nombre: (datos.animal && datos.animal.nombre) || live.animal.nombre || c.animal || '',
+        foto: (datos.animal && datos.animal.foto) || live.animal.foto || ''
+      });
+    }
+    const foto = (datos.animal && datos.animal.foto) || '';
+    if (!foto) {
+      this.showSnackbar('El contrato de acogida debe incluir una foto: súbela en el bloque del animal y pulsa Guardar foto y nombre.', 'warning');
+      return;
+    }
+    datos.animal = Object.assign({}, datos.animal, { foto });
+    if (!snapshot) {
+      this._guardarContratoAcogida(c, datos).then(res => {
+        if (res && res.local) this._snackErr(res.err, 'Contrato generado; la copia se sincronizará al volver la conexión.');
+      }).catch(() => {});
+    }
+    PdfExport.exportContratoAcogida(datos);
   },
 
   async deleteAcogida(id) {
@@ -4033,6 +4277,7 @@ const Dashboard = {
   // ==================== ADOPCIONES CRUD ====================
   async renderAdopciones(el) {
     await this._loadList('adopciones', () => API.getAdopciones());
+    await this._ensureListas(['contratos', 'animales']);
     const fases = this._fasesAdopcion();
     el.innerHTML = `
       <div class="page-list-container">
@@ -4047,20 +4292,30 @@ const Dashboard = {
         }).join('')}</div>
       </div></div>
       <div id="adopciones-form-container"></div>
-      <div class="response-list">${this.adopciones.length ? this.adopciones.map(p=>`
-        <div class="response-card" role="button" tabindex="0" onclick="Dashboard.viewAdopcion('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-          <div class="response-card-header">
-            <div class="response-avatar" style="background:var(--warning-light);color:var(--warning)">${Icons.heart}</div>
-            <div class="response-info">
-              <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${p.fase==='Contrato'?'en_proceso':'pendiente'}">${this._esc(p.fase)}</span>${p.desenlace==='devuelto'?' <span class="estado-badge descartada">Devuelto</span>':''}</div>
-              <div class="response-email">${this._esc(p.adoptante)} &middot; ${this._esc(p.estado)}</div>
-            </div>
-            <div class="response-date">${this._esc(this._fmtFecha(p.fecha))}</div>
-          </div>
-        </div>`).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
+      <div class="response-list">${this.adopciones.length ? this.adopciones.map(p => this._adopcionCardHtml(p)).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
       </div>
       <div class="page-detail-container"></div>`;
     this._animaListado(el.querySelector('.response-list'));
+  },
+
+  // Tarjeta de proceso con foto del animal, estado del contrato y progreso.
+  _adopcionCardHtml(p) {
+    const av = p.animal_id ? this._byId(this.animales || [], p.animal_id) : null;
+    const foto = av ? this._fotoSrc(av, 'w200') : '';
+    const ct = this._contratoDeAdopcion(p.id);
+    const prog = this._faseProgreso(p);
+    const faseCls = p.desenlace === 'devuelto' ? 'descartada' : (p.fase === 'Contrato' ? 'en_proceso' : 'pendiente');
+    return `<div class="response-card proceso-card" role="button" tabindex="0" onclick="Dashboard.viewAdopcion('${p.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+      <div class="response-card-header">
+        <div class="response-avatar proceso-avatar">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
+        <div class="response-info">
+          <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${faseCls}">${this._esc(p.fase)}</span>${ct ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}${p.desenlace === 'devuelto' ? ' <span class="estado-badge descartada">Devuelto</span>' : ''}</div>
+          <div class="response-email">${this._esc(p.adoptante)} &middot; ${this._esc(p.estado)}</div>
+          <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
+        </div>
+        <div class="response-date">${this._esc(this._fmtFecha(p.fecha))}<small>${prog.idx + 1}/${prog.total}</small></div>
+      </div>
+    </div>`;
   },
 
   async showAdopcionForm(data) {
@@ -4188,12 +4443,15 @@ const Dashboard = {
   },
 
   async viewAdopcion(id) {
-    await this._ensureListas(['contratos', 'seguimientos']);
+    await this._ensureListas(['contratos', 'seguimientos', 'animales']);
     const p = this._byId(this.adopciones, id);
     if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const fases = this._fasesAdopcion();
     const currentIdx = fases.indexOf(p.fase);
     const contrato = this._contratoDeAdopcion(p.id);
+    const av = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
+    const foto = av ? this._fotoSrc(av, 'w200') : '';
+    const prog = this._faseProgreso(p);
     const sol = this._parseSolicitud(p.solicitud_id);
     const bloqueo = this._requisitoAvance(p, contrato, this.seguimientos);
     const puedeAvanzar = currentIdx < fases.length - 1;
@@ -4201,6 +4459,15 @@ const Dashboard = {
       ? `<button class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
       : `<button class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}')">${Icons.arrowRight} Avanzar fase</button>`);
     this._showDetail('adopciones', p.animal, `
+      <div class="proceso-hero">
+        <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
+        <div class="proceso-hero-info">
+          <div class="proceso-hero-title">${this._esc(p.animal)} <span class="estado-badge ${p.desenlace === 'devuelto' ? 'descartada' : 'en_proceso'}">${this._esc(p.fase)}</span>${contrato ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="proceso-hero-sub">${this._esc(p.adoptante)} &middot; ${this._esc(this._fmtFecha(p.fecha))}</div>
+          <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
+        </div>
+        <div class="proceso-hero-pct">${prog.pct}%<small>${prog.idx + 1}/${prog.total}</small></div>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         ${avanceBtn}
@@ -4210,16 +4477,19 @@ const Dashboard = {
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar</button>
       </div>
       ${this._faseGuiaHtml(p, contrato)}
-      ${bloqueo ? `<div class="fase-bloqueo">${Icons.lock}<span>${this._esc(bloqueo)}</span></div>` : ''}
-      ${this._seguimientosFicha(p)}
-      <div class="detail-section"><div class="detail-section-title">${Icons.barChart} Pipeline de Adopcion</div>
-        <div style="padding:16px;display:flex;gap:4px;overflow-x:auto">${fases.map((f,i)=>`<div style="flex:1;min-width:60px;text-align:center;padding:8px 4px;border-radius:8px;background:${i<currentIdx?'var(--primary-lighter)':i===currentIdx?'var(--primary)':'var(--gray-50)'};color:${i===currentIdx?'white':i<currentIdx?'var(--primary-hover)':'var(--gray-400)'};font-size:var(--text-xs);font-weight:600">${f}</div>`).join('')}</div>
-        <div style="padding:0 16px 16px;color:var(--gray-600);font-size:var(--text-sm)">${this._esc(this._faseInfo(p.fase).desc)}</div>
-      </div>
-      ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
       ${this._contratoFicha(p, contrato)}
       ${this._entregaFicha(p, contrato)}
       ${this._pruebaFicha(p)}
+      <div class="detail-section"><div class="detail-section-title">${Icons.barChart} Pipeline de adopcion</div>
+        <div class="fase-stepper-head">
+          <div class="fase-stepper-title"><b>Fase ${currentIdx + 1} de ${fases.length}</b><span>${this._esc(p.fase)}</span></div>
+          <div class="fase-progress" role="progressbar" aria-valuenow="${Math.round((currentIdx / Math.max(1, fases.length - 1)) * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round((currentIdx / Math.max(1, fases.length - 1)) * 100)}%"></span></div>
+        </div>
+        ${this._faseStepperHtml(fases, p.fase)}
+        <div class="detail-section-note">${this._esc(this._faseInfo(p.fase).desc)}</div>
+      </div>
+      ${this._seguimientosFicha(p)}
+      ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
       <div class="detail-section"><div class="detail-section-title">Detalles</div>
         <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${p.animal_id ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal)}</a>` : this._esc(p.animal)}</div></div>
         <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
@@ -4246,13 +4516,15 @@ const Dashboard = {
     return `<div class="detail-section"><div class="detail-section-title">${Icons.fileText} Contrato de adopcion</div>
       ${firmado ? `
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Contrato firmado</span> · ${this._fmtFecha(contrato.fecha)}</div></div>
-        <div class="detail-field"><div class="detail-question">Firmante 1</div><div class="detail-answer">${this._esc(contrato.f1_nombre) || '—'} (${this._esc(contrato.f1_rol) || 'Titular'})${contrato.f1_email ? ` · ${this._esc(contrato.f1_email)}` : ''}</div></div>
-        ${contrato.f2_nombre ? `<div class="detail-field"><div class="detail-question">Firmante 2 / titular</div><div class="detail-answer">${this._esc(contrato.f2_nombre)} (${this._esc(contrato.f2_rol) || 'Segundo firmante'})${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
+        <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(contrato.f1_nombre) || '—'}${contrato.f1_email ? ` · ${this._esc(contrato.f1_email)}` : ''}</div></div>
+        ${this._contratoTutor(contrato) ? `<div class="detail-field"><div class="detail-question">Tutor / persona de apoyo</div><div class="detail-answer">${this._esc(contrato.f2_nombre)}${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
         ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
         <div class="detail-actions-inline">
-          <button class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar PDF</button>
+          <button class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar contrato</button>
+          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar términos</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar por email</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoDoc('${p.id}')">${Icons.eye} Ver documento</button>
+          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoIdentidad('${p.id}')">${Icons.pencil} Foto / nombre</button>
           <button class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button>
         </div>`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma.${adelantado ? ' Se firma en la fase Contrato, pero puedes adelantarlo.' : ' Es obligatorio firmarlo para pasar a Entrega.'}</div></div>
@@ -4357,6 +4629,228 @@ const Dashboard = {
     </div>`;
   },
 
+  // Bloque de identidad del animal que comparten los contratos de adopcion y
+  // acogida. La foto y el nombre se guardan en la ficha del animal: si falta
+  // foto, el contrato no se puede cerrar (el documento siempre lleva una).
+  _contratoAnimalEditorHtml(opts) {
+    const o = opts || {};
+    const prefix = o.prefix || 'ct-animal';
+    const nombre = o.nombre || '';
+    const foto = o.foto || '';
+    const paw = (typeof Icons !== 'undefined' && Icons.paw) || '';
+    const fotoHtml = foto
+      ? `<img src="${this._esc(foto)}" alt="${this._esc(nombre || 'Animal')}">`
+      : `<div class="contrato-animal-editor-foto-vacia">${paw}<span>Sin foto</span></div>`;
+    return `<div class="contrato-animal-editor">
+      <div class="contrato-animal-editor-head">
+        <div>
+          <div class="contrato-animal-editor-title">${paw} Animal del contrato</div>
+          <div class="contrato-animal-editor-note">Revisa la identidad que aparecera en el documento. El nombre y la foto se guardan tambien en la ficha del animal.</div>
+        </div>
+        <span class="section-chip" id="${prefix}-foto-chip">${foto ? 'Foto incluida' : 'Falta foto'}</span>
+      </div>
+      <div class="contrato-animal-editor-grid">
+        <div class="contrato-animal-editor-foto" id="${prefix}-foto-preview">${fotoHtml}</div>
+        <div class="contrato-animal-editor-fields">
+          <div class="form-group"><label for="${prefix}-nombre">Nombre en el contrato *</label><input type="text" id="${prefix}-nombre" value="${this._esc(nombre)}" required><div class="form-hint">Si el animal va a tener un nombre nuevo o hay que corregir el actual, cambialo aqui: se actualizara tambien en su ficha y en el caso.</div></div>
+          <div class="form-group"><label for="${prefix}-foto">Foto del animal ${foto ? '' : '*'}</label><input type="file" id="${prefix}-foto" accept="image/*" onchange="Dashboard._previewFotoAnimalContrato(this,'${prefix}-foto-preview','${prefix}-foto-chip')"><div class="form-hint">${foto ? 'Puedes mantener la foto actual o sustituirla.' : 'Obligatoria: el contrato debe incluir una imagen del animal.'} Se guarda en su ficha.</div></div>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  _previewFotoAnimalContrato(input, previewId, chipId) {
+    const preview = this._el(previewId);
+    const chip = this._el(chipId);
+    if (!preview || !input || !input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.innerHTML = `<img src="${e.target.result}" alt="Foto del animal">`;
+      if (chip) chip.textContent = 'Foto nueva';
+    };
+    reader.readAsDataURL(input.files[0]);
+  },
+
+  async _leerImagenContrato(file, maxW, maxH, quality) {
+    if (!file) return null;
+    return new Promise(resolve => {
+      const r = new FileReader();
+      r.onload = async ev => resolve(await this._downscaleImage(ev.target.result, maxW || 900, maxH || 900, quality || 0.8));
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(file);
+    });
+  },
+
+  // Aplica el nombre y la foto del animal al contrato y a la ficha viva.
+  // Devuelve { nombre, foto, foto_drive_id }. Lanza si falta la foto.
+  async _aplicarIdentidadAnimalContrato(opts) {
+    const o = opts || {};
+    const nombre = String(o.nombre || '').trim();
+    if (!nombre) throw new Error('Indica el nombre del animal para el contrato');
+    let foto = String(o.fotoActual || '').trim();
+    let fotoDriveId = '';
+    let fotoUrl = '';
+    let nueva = false;
+    if (o.fotoFile) {
+      const dataUrl = await this._leerImagenContrato(o.fotoFile, 900, 900, 0.8);
+      if (!dataUrl) throw new Error('No se pudo leer la foto seleccionada');
+      const raw = dataUrl.indexOf(',') !== -1 ? dataUrl.split(',')[1] : dataUrl;
+      const up = await API.uploadFotoAnimal(raw, 'animal_' + nombre.replace(/\s+/g, '_') + '_' + Date.now() + '.jpg', 'image/jpeg');
+      if (!up || !up.data || !up.data.fileId) throw new Error('No se pudo subir la foto del animal');
+      fotoDriveId = up.data.fileId;
+      fotoUrl = up.data.webViewLink || up.data.webContentLink || '';
+      foto = 'https://drive.google.com/thumbnail?id=' + fotoDriveId + '&sz=w800';
+      nueva = true;
+    }
+    if (!foto) throw new Error('Sube una foto del animal: el contrato debe incluirla');
+    const a = o.animalId ? this._byId(this.animales, o.animalId) : null;
+    if (a) {
+      a.nombre = nombre;
+      if (nueva) {
+        a.foto_drive_id = fotoDriveId;
+        a.foto_url = fotoUrl || foto;
+        a.foto = foto;
+      } else if (foto && !a.foto) {
+        // Un contrato antiguo puede traer la foto y la ficha no: se copia.
+        const m = foto.match(/[?&]id=([^&]+)/);
+        a.foto_drive_id = m ? decodeURIComponent(m[1]) : '';
+        a.foto_url = foto;
+        a.foto = foto;
+      }
+      await this._updateLocalYApi('animales', a);
+    }
+    if (o.p && o.p.animal !== nombre) {
+      o.p.animal = nombre;
+      if (o.adopcionId) {
+        try { await API.updateAdopcion(o.adopcionId, { animal: nombre }); }
+        catch (err) { this._enqueueOp({ m: 'updateAdopcion', a: [o.adopcionId, { animal: nombre }] }); }
+      }
+    }
+    if (o.acogidaId) {
+      const c = this._byId(this.acogidas, o.acogidaId);
+      if (c) {
+        c.animal = nombre;
+        try { await API.updateAcogida(o.acogidaId, { animal: nombre }); }
+        catch (err) { this._enqueueOp({ m: 'updateAcogida', a: [o.acogidaId, { animal: nombre }] }); }
+      }
+    }
+    this.saveLocal();
+    return { nombre, foto, foto_drive_id: fotoDriveId };
+  },
+
+  // Datos de la entidad para los documentos. Los contratos nuevos guardan una
+  // copia (entidad_*); los antiguos y los borradores usan la configuracion.
+  _contratoEntidadDatos(c) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG) || {};
+    const a = cfg.asociacion || {};
+    const contacto = cfg.contacto || {};
+    const snap = c || {};
+    const val = (...valores) => {
+      for (let i = 0; i < valores.length; i++) {
+        const v = String(valores[i] == null ? '' : valores[i]).trim();
+        if (v) return v;
+      }
+      return '';
+    };
+    return {
+      nombre: val(snap.entidad_nombre, a.nombre, 'Asociación Grupo Nebak'),
+      cif: val(snap.entidad_cif, a.cif),
+      domicilio: val(snap.entidad_domicilio, a.domicilio),
+      email: val(snap.entidad_email, a.email, contacto.email),
+      telefono: val(snap.entidad_telefono, a.telefono, contacto.telefono),
+      registro: val(snap.entidad_registro, a.registro),
+      web: val(snap.entidad_web, a.web)
+    };
+  },
+
+  _contratoEntidadHtml(c, logo) {
+    const e = this._contratoEntidadDatos(c);
+    const dato = (label, value) => value
+      ? `<span><b>${this._esc(label)}:</b> ${this._esc(value)}</span>`
+      : '';
+    const logoSrc = logo || 'assets/icons/logo-nebak.jpg';
+    return `<div class="contrato-doc-entidad">
+      <div class="contrato-doc-entidad-datos">
+        <b>${this._esc(e.nombre)}</b>
+        <span class="contrato-doc-entidad-rol">Entidad de protección animal</span>
+        ${dato('CIF', e.cif)}
+        ${dato('Domicilio', e.domicilio)}
+        ${dato('Registro', e.registro)}
+        ${dato('Email', e.email)}
+        ${dato('Teléfono', e.telefono)}
+        ${dato('Web', e.web)}
+      </div>
+      <div class="contrato-doc-sello" aria-label="Sello de la entidad">
+        <div class="contrato-doc-sello-inner">
+          <img src="${this._esc(logoSrc)}" alt="">
+          <span>${this._esc(e.nombre)}</span>
+          <small>SELLO DE LA ENTIDAD</small>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  // Base comun del documento de "he leido y acepto los terminos". El PDF y el
+  // modal comparten estas clausulas para que no se separen con el tiempo.
+  _terminosAdopcionClausulas() {
+    return [
+      { titulo: 'Objeto', texto: 'Estos términos regulan la adopción responsable del animal identificado en el contrato y forman parte inseparable de él. El adoptante acepta las obligaciones que aquí se recogen.' },
+      { titulo: 'Capacidad y veracidad', texto: 'El adoptante declara ser mayor de edad, tener capacidad legal para asumir esta responsabilidad y que los datos personales facilitados son veraces y están actualizados.' },
+      { titulo: 'Cuidados y bienestar', texto: 'El adoptante se compromete a proporcionar al animal alimentación, agua, refugio, higiene, ejercicio, compañía y un trato respetuoso durante toda su vida, adaptados a su especie y necesidades.' },
+      { titulo: 'Salud veterinaria', texto: 'El adoptante mantendrá el microchip actualizado, las vacunas y desparasitaciones al día, acudirá al veterinario ante cualquier problema de salud y, cuando proceda, esterilizará al animal y aportará el informe acreditativo.' },
+      { titulo: 'Prohibiciones', texto: 'El animal no se utilizará para cría, venta, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos. No permanecerá atado ni encerrado en jaulas, terrazas, patios o garajes.' },
+      { titulo: 'Seguimiento', texto: 'El adoptante acepta el periodo de prueba de 15-30 días y el seguimiento posterior a 1, 3, 6 y 12 meses. Facilitará las visitas, fotografías y comprobaciones necesarias para verificar el bienestar del animal.' },
+      { titulo: 'Gastos', texto: 'Todos los gastos derivados del cuidado del animal (alimentación, veterinario, seguro, identificaciones y otros) corren a cargo del adoptante.' },
+      { titulo: 'Devolución', texto: 'Si el adoptante no puede continuar cuidando al animal, deberá informar a la entidad y devolverlo. Nunca lo abandonará ni lo entregará a terceros sin autorización expresa.' },
+      { titulo: 'Datos personales', texto: 'Los datos del adoptante y del tutor se tratarán para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.' },
+      { titulo: 'Incumplimiento y aceptación', texto: 'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan. El adoptante declara haber leído, comprendido y aceptado estos términos.' }
+    ];
+  },
+
+  _terminosAdopcionCuerpo(p, c, logo) {
+    const cc = c || {};
+    const nombre = cc.f1_nombre || (p && p.adoptante) || '[adoptante]';
+    const animal = cc.animal || (p && p.animal) || '[animal]';
+    const fecha = cc.fecha ? this._fmtFecha(cc.fecha) : '[fecha]';
+    const ent = this._contratoEntidadDatos(cc);
+    const clausulas = this._terminosAdopcionClausulas();
+    const firmaImg = cc.f1_firma && String(cc.f1_firma).indexOf('data:') === 0
+      ? `<img class="contrato-doc-firma-img" src="${this._esc(cc.f1_firma)}" alt="Firma del adoptante">`
+      : '';
+    const logoSrc = logo || 'assets/icons/logo-nebak.jpg';
+    return `<div class="contrato-doc-header">
+        <img src="${this._esc(logoSrc)}" alt="${this._esc(ent.nombre)}">
+        <div><div class="contrato-doc-title">Términos y condiciones de adopción responsable</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión 1.0 (2026/11/10)</div></div>
+      </div>
+      <div class="contrato-doc-meta">
+        <div><span class="label">Adoptante</span><b>${this._esc(nombre)}</b></div>
+        <div><span class="label">Animal</span><b>${this._esc(animal)}</b></div>
+        <div><span class="label">Fecha</span>${this._esc(fecha)}</div>
+        <div><span class="label">Documento</span>Anexo de aceptación</div>
+      </div>
+      <p class="contrato-doc-intro">El presente documento recoge los términos y condiciones que el adoptante declara haber leído y aceptado antes de firmar el contrato de adopción. Forma parte del expediente y se entrega junto al contrato.</p>
+      ${this._contratoEntidadHtml(cc, logo)}
+      ${clausulas.map((x, i) => `<h3>${i + 1}. ${this._esc(x.titulo)}</h3><p>${this._esc(x.texto)}</p>`).join('')}
+      <div class="contrato-doc-firmas contrato-doc-firmas--aceptacion">
+        <div class="contrato-doc-firma">
+          <div class="contrato-doc-firma-label">Aceptado por el adoptante</div>
+          ${firmaImg}
+          <b>${this._esc(nombre)}</b><small>DNI ${this._esc(cc.f1_dni || '—')} · ${this._esc(fecha)}</small>
+        </div>
+        <div class="contrato-doc-firma">
+          <div class="contrato-doc-firma-label">Por la entidad</div>
+          <div class="contrato-doc-sello contrato-doc-sello--firma" aria-label="Sello de la entidad">
+            <div class="contrato-doc-sello-inner"><img src="${this._esc(logoSrc)}" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="contrato-doc-nota">Este anexo de términos y condiciones se envía junto al contrato de adopción. Versión 1.0 · 2026/11/10.</div>`;
+  },
+
+  _terminosAdopcionHtml(p, c, logo) {
+    return `<div class="contrato-doc">${this._terminosAdopcionCuerpo(p, c, logo)}</div>`;
+  },
+
   // Un segundo firmante solo es tutor si no representa a la propia entidad.
   // Asi el bloque de Grupo Nebak se pinta siempre y el tutor no lo sustituye.
   _contratoTutor(c) {
@@ -4377,42 +4871,49 @@ const Dashboard = {
     const fecha = c.fecha ? this._fmtFecha(c.fecha) : '[fecha]';
     const ciudad = c.ciudad || '[ciudad]';
     const tutor = this._contratoTutor(c);
+    const ent = this._contratoEntidadDatos(c);
     const firmaImg = (f, alt) => f && String(f).indexOf('data:') === 0
       ? `<img class="contrato-doc-firma-img" src="${this._esc(f)}" alt="${alt}">`
       : '';
     const f1Block = `<div class="contrato-doc-firma">
-      <div class="contrato-doc-firma-label">Firmante 1 · ${this._esc(c.f1_rol || 'Adoptante')}</div>
+      <div class="contrato-doc-firma-label">Adoptante</div>
       ${firmaImg(c.f1_firma, 'Firma del adoptante')}
       <b>${this._esc(nombre)}</b><small>DNI ${this._esc(c.f1_dni || '—')}</small>
     </div>`;
     const tutorBlock = tutor ? `<div class="contrato-doc-firma">
-      <div class="contrato-doc-firma-label">Tutor / segundo firmante · ${this._esc(c.f2_rol || 'Tutor')}</div>
+      <div class="contrato-doc-firma-label">Tutor / persona de apoyo</div>
       ${firmaImg(c.f2_firma, 'Firma del tutor')}
       <b>${this._esc(c.f2_nombre)}</b><small>DNI ${this._esc(c.f2_dni || '—')}</small>
     </div>` : '';
     const entidadFirma = !tutor ? firmaImg(c.f2_firma, 'Firma de la entidad') : '';
     const entidadBlock = `<div class="contrato-doc-firma">
-      <div class="contrato-doc-firma-label">Por Grupo Nebak</div>
-      ${entidadFirma}<div class="contrato-doc-firma-linea">Asociacion Grupo Nebak</div>
+      <div class="contrato-doc-firma-label">Por la entidad (firma y sello)</div>
+      ${entidadFirma}
+      <div class="contrato-doc-sello contrato-doc-sello--firma" aria-label="Sello de la entidad">
+        <div class="contrato-doc-sello-inner"><img src="assets/icons/logo-nebak.jpg" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
+      </div>
+      <b>${this._esc(ent.nombre)}</b><small>Entidad</small>
     </div>`;
     let n = 1;
     const h = title => `<h3>${n++}. ${title}</h3>`;
     const field = (label, value) => `<div><span class="label">${label}</span>${this._esc(value || '—')}</div>`;
     const tutorHtml = tutor ? `
-      ${h('Tutor o persona de apoyo')}
-      <div class="contrato-doc-grid contrato-doc-tutor">
-        ${field('Nombre', c.f2_nombre)}
-        ${field('DNI', c.f2_dni)}
-        ${field('Relación con el adoptante', c.f2_relacion || c.f2_rol)}
-        ${field('Domicilio', c.f2_direccion)}
-        ${field('Email', c.f2_email)}
-        ${field('Teléfono', c.f2_telefono)}
-      </div>
-      <p>La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo, y firma este contrato junto al adoptante.</p>` : '';
+      <div class="contrato-doc-tutor-page">
+        <h3>Anexo I. Datos del tutor o persona de apoyo</h3>
+        <div class="contrato-doc-grid contrato-doc-tutor">
+          ${field('Nombre', c.f2_nombre)}
+          ${field('DNI', c.f2_dni)}
+          ${field('Relación con el adoptante', c.f2_relacion || c.f2_rol)}
+          ${field('Domicilio', c.f2_direccion)}
+          ${field('Email', c.f2_email)}
+          ${field('Teléfono', c.f2_telefono)}
+        </div>
+        <p>La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.</p>
+      </div>` : '';
     return `<div class="contrato-doc">
       <div class="contrato-doc-header">
         <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak">
-        <div><div class="contrato-doc-title">Contrato de adopcion responsable</div><div class="contrato-doc-sub">Asociacion Grupo Nebak · Documento de ${this._esc(fecha)}</div></div>
+        <div><div class="contrato-doc-title">Contrato de adopcion responsable</div><div class="contrato-doc-sub">${this._esc(ent.nombre)} · Documento de ${this._esc(fecha)}</div></div>
       </div>
       <div class="contrato-doc-meta">
         <div><span class="label">Adoptante</span><b>${this._esc(nombre)}</b></div>
@@ -4420,7 +4921,13 @@ const Dashboard = {
         <div><span class="label">Ciudad</span>${this._esc(ciudad)}</div>
         <div><span class="label">Fecha</span>${this._esc(fecha)}</div>
       </div>
-      <p>Entre la <b>Asociacion Grupo Nebak</b> y <b>${this._esc(nombre)}</b>, se formaliza la adopcion del animal <b>${this._esc(animal)}</b> bajo las siguientes condiciones:</p>
+      ${this._contratoEntidadHtml(c)}
+      <p>En <b>${this._esc(ciudad)}</b>, a <b>${this._esc(fecha)}</b>, <b>REUNIDOS</b>.</p>
+      <p>De una parte, <b>${this._esc(ent.nombre)}</b>${ent.cif ? `, con CIF <b>${this._esc(ent.cif)}</b>` : ''}${ent.domicilio ? `, con domicilio en <b>${this._esc(ent.domicilio)}</b>` : ''}, en adelante, <b>la Entidad</b>. De otra parte, <b>${this._esc(nombre)}</b>, con DNI <b>${this._esc(c.f1_dni || '[DNI]')}</b>${c.f1_direccion ? ` y domicilio en <b>${this._esc(c.f1_direccion)}</b>` : ''}, en adelante, <b>el Adoptante</b>${tutor ? `, con la intervención de <b>${this._esc(tutor.f2_nombre)}</b>, en adelante, <b>el Tutor</b>` : ''}.</p>
+      <p><b>EXPONEN</b></p>
+      <p>I. Que la Entidad es una asociación de protección animal sin ánimo de lucro que se dedica a la acogida, cuidado y adopción responsable de animales.</p>
+      <p>II. Que el Adoptante desea adoptar al animal <b>${this._esc(animal)}</b> y se compromete a asumir su cuidado y bienestar durante toda su vida.</p>
+      <p>III. Que ambas partes reconocen tener capacidad suficiente para formalizar este contrato y, a tal efecto, acuerdan las siguientes <b>CLÁUSULAS</b>.</p>
       ${h('Datos del animal')}
       ${this._contratoAnimalFichaHtml(p, c)}
       ${h('Datos del adoptante')}
@@ -4430,7 +4937,6 @@ const Dashboard = {
         ${field('Domicilio', c.f1_direccion)}
         ${field('Email', c.f1_email)}
         ${field('Teléfono', c.f1_telefono)}
-        ${field('Rol', c.f1_rol || 'Adoptante')}
       </div>
       ${tutorHtml}
       ${h('Objeto')}
@@ -4451,6 +4957,10 @@ const Dashboard = {
       <p>El incumplimiento de estas obligaciones facultara a la entidad para recuperar el animal y ejercer las acciones legales que correspondan.</p>
       ${h('Devolucion')}
       <p>En caso de no poder atender adecuadamente al animal, se compromete a informar a la entidad y a devolverlo, nunca a abandonarlo.</p>
+      ${h('Proteccion de datos')}
+      <p>Los datos personales del adoptante y, en su caso, del tutor se utilizan para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.</p>
+      ${h('Aceptacion')}
+      <p>El Adoptante declara haber leído y comprendido los términos y condiciones anexos, que forman parte de este contrato, y acepta expresamente todas las obligaciones que en él se recogen.</p>
       <div class="contrato-doc-firmas">
         ${f1Block}
         ${tutorBlock}
@@ -4588,6 +5098,26 @@ const Dashboard = {
   },
 
   _faseIdx(fase) { return this._fasesAdopcion().indexOf(fase); },
+
+  // Progreso del caso dentro de la pipeline historica. `pct` se usa para la
+  // barra visual (0% en la primera fase, 100% en Seguimiento).
+  _faseProgreso(p) {
+    const fases = this._fasesAdopcion();
+    const idx = Math.max(0, fases.indexOf(p && p.fase));
+    return { idx, total: fases.length, pct: fases.length > 1 ? Math.round((idx / (fases.length - 1)) * 100) : 0 };
+  },
+
+  // Stepper accesible de fases. `mini` se usa en tarjetas compactas.
+  _faseStepperHtml(fases, actual, opts) {
+    const list = fases || [];
+    const idx = Math.max(0, list.indexOf(actual));
+    const mini = !!(opts && opts.mini);
+    const check = (typeof Icons !== 'undefined' && Icons.check) || '';
+    return `<ol class="fase-stepper${mini ? ' fase-stepper--mini' : ''}" role="list" aria-label="Fases del proceso">${list.map((f, i) => {
+      const estado = i < idx ? 'is-done' : (i === idx ? 'is-current' : 'is-pending');
+      return `<li class="fase-stepper-step ${estado}" role="listitem"${i === idx ? ' aria-current="step"' : ''}><span class="fase-stepper-dot">${i < idx ? check : (i + 1)}</span><span class="fase-stepper-label">${this._esc(f)}</span></li>`;
+    }).join('')}</ol>`;
+  },
 
   // Texto y enfoque de cada fase. `Prueba` es el periodo corto de adaptacion
   // (15-30 dias) y `Seguimiento` el acompanamiento a largo plazo (1, 3, 6 y 12
@@ -4937,8 +5467,14 @@ const Dashboard = {
   },
 
   // ==================== CONTRATOS DE ADOPCION ====================
+  // La hoja Contratos se comparte con las copias de acogida (tipo
+  // 'acogida'); los indicadores y helpers de adopcion deben ignorarlas.
+  _contratosAdopcion() {
+    return (this.contratos || []).filter(c => c && c.tipo !== 'acogida');
+  },
+
   _contratoDeAdopcion(adopcionId) {
-    return (this.contratos || []).find(c => c.adopcion_id === adopcionId);
+    return this._contratosAdopcion().find(c => c.adopcion_id === adopcionId);
   },
 
   _contratoSolicitudDatos(p) {
@@ -4959,8 +5495,6 @@ const Dashboard = {
     const title = document.getElementById('contrato-title');
     if (!modal || !body) return;
     if (title) title.textContent = 'Contrato de adopcion · ' + (p.animal || '');
-    const roles1 = ['El adoptante', 'Titular', 'Tutor', 'Representante'];
-    const roles2 = ['Tutor legal', 'Tutor de apoyo', 'Persona de avanzada edad', 'Segundo firmante'];
     const sol = this._contratoSolicitudDatos(p);
     const animal = this._contratoAnimalDatos(p);
     body.innerHTML = `
@@ -4978,33 +5512,28 @@ const Dashboard = {
           </aside>
           <form class="contrato-form-pane" onsubmit="Dashboard.guardarContrato(event,'${adopcionId}')">
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
-            <div class="contrato-animal-resumen">
-              <div class="contrato-animal-resumen-foto">${animal.foto ? `<img src="${this._esc(animal.foto)}" alt="${this._esc(animal.nombre || 'Animal')}">` : Icons.paw}</div>
-              <div class="contrato-animal-resumen-info">
-                <b>${this._esc(animal.nombre || p.animal || 'Animal')}</b>
-                <span>${this._esc([animal.especie, animal.raza, animal.sexo, animal.microchip ? 'Microchip ' + animal.microchip : ''].filter(Boolean).join(' · ')) || 'Completa la ficha del animal para ver mas datos.'}</span>
-              </div>
-            </div>
+            ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '' })}
             <div class="form-row"><div class="form-group"><label>Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
 
-            <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Firmante 1 · Titular</div>
+            <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Adoptante</div>
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" value="${this._esc(sol.dni || '')}" placeholder="12345678A"></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f1-direccion" value="${this._esc(sol.domicilio || '')}" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f1-email" value="${this._esc(p.email || sol.email || '')}" placeholder="Se usa para enviar el contrato"><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El contrato se enviara a este email y al de Grupo Nebak.</div></div><div class="form-group"><label>Telefono</label><input type="text" id="f1-telefono" value="${this._esc(p.telefono || sol.telefono || '')}"></div></div>
-              <div class="form-row"><div class="form-group"><label>Rol</label><select id="f1-rol">${roles1.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div><div class="form-group"></div></div>
-              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del firmante 1 *</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
+              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del adoptante *</label><canvas id="f1-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
             </div>
 
-            <div class="detail-section"><div class="detail-section-title">Tutor / segundo firmante (opcional)</div>
-              <div class="detail-section-note">Rellena esta seccion solo si el adoptante tiene tutor legal o una persona de apoyo. Sus datos y su firma apareceran en el contrato y en el PDF.</div>
-              <div class="form-row"><div class="form-group"><label>Nombre completo</label><input type="text" id="f2-nombre" placeholder="Nombre del tutor o persona de apoyo"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
-              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Rol</label><select id="f2-rol">${roles2.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div></div>
+            <label class="contrato-acepta contrato-acepta--tutor"><input type="checkbox" id="ct-tutor" onchange="Dashboard._toggleContratoTutor(this.checked)"><span>El adoptante tiene tutor legal o persona de apoyo. Se añadirá una página con sus datos y deberá firmar.</span></label>
+
+            <div class="detail-section" id="contrato-tutor-section" style="display:none"><div class="detail-section-title">Tutor / persona de apoyo</div>
+              <div class="detail-section-note">Rellena esta seccion solo si el adoptante tiene tutor legal o una persona de apoyo. Sus datos y su firma apareceran en una pagina nueva del contrato y en el PDF.</div>
+              <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f2-nombre" placeholder="Nombre del tutor o persona de apoyo"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
+              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Firma del tutor *</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f2-direccion" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
-              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del tutor / segundo firmante</label><canvas id="f2-firma" width="560" height="160" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div>
             </div>
 
-            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leido y acepto los terminos y condiciones del contrato de adopcion responsable.</span></label>
+            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto los <a href="#" class="contrato-link" onclick="event.preventDefault(); event.stopPropagation(); Dashboard.showTerminosAdopcion('${adopcionId}');">términos y condiciones</a> del contrato de adopción responsable.</span></label>
+            <label class="contrato-acepta"><input type="checkbox" id="ct-enviar" checked><span>Enviar una copia por email al adoptante y a Grupo Nebak al firmar.</span></label>
             <div class="contrato-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeContratoForm()">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.checkCircle} Firmar y guardar</button></div>
           </form>
         </div>
@@ -5071,6 +5600,14 @@ const Dashboard = {
     cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   },
 
+  _toggleContratoTutor(show) {
+    const sec = document.getElementById('contrato-tutor-section');
+    if (sec) sec.style.display = show ? '' : 'none';
+    if (!show) {
+      this._clearFirmaCanvas('f2-firma');
+    }
+  },
+
   closeContratoForm() {
     const el = document.getElementById('contrato-modal');
     if (!el) return;
@@ -5095,7 +5632,11 @@ const Dashboard = {
       return;
     }
     const f1Nombre = (document.getElementById('f1-nombre').value || '').trim();
-    if (!f1Nombre) { this.showSnackbar('Indica el nombre del firmante 1', 'warning'); return; }
+    if (!f1Nombre) { this.showSnackbar('Indica el nombre del adoptante', 'warning'); return; }
+    const tutorActivo = !!(document.getElementById('ct-tutor') || {}).checked;
+    const f2Nombre = tutorActivo ? (document.getElementById('f2-nombre').value || '').trim() : '';
+    if (tutorActivo && !f2Nombre) { this.showSnackbar('Indica el nombre del tutor o desmarca la opción de tutor', 'warning'); return; }
+    const enviarCopia = !!(document.getElementById('ct-enviar') || {}).checked;
     const firma = async (id) => {
       const cv = document.getElementById(id);
       if (!cv) return '';
@@ -5118,28 +5659,55 @@ const Dashboard = {
       f1_direccion: document.getElementById('f1-direccion').value.trim(),
       f1_email: document.getElementById('f1-email').value.trim(),
       f1_telefono: document.getElementById('f1-telefono').value.trim(),
-      f1_rol: document.getElementById('f1-rol').value,
       f1_firma: await firma('f1-firma'),
-      f2_nombre: document.getElementById('f2-nombre').value.trim(),
-      f2_dni: document.getElementById('f2-dni').value.trim(),
-      f2_relacion: document.getElementById('f2-relacion').value.trim(),
-      f2_direccion: document.getElementById('f2-direccion').value.trim(),
-      f2_email: document.getElementById('f2-email').value.trim(),
-      f2_telefono: document.getElementById('f2-telefono').value.trim(),
-      f2_rol: document.getElementById('f2-rol').value,
-      f2_firma: await firma('f2-firma'),
+      f2_nombre: f2Nombre,
+      f2_dni: tutorActivo ? document.getElementById('f2-dni').value.trim() : '',
+      f2_relacion: tutorActivo ? document.getElementById('f2-relacion').value.trim() : '',
+      f2_direccion: tutorActivo ? document.getElementById('f2-direccion').value.trim() : '',
+      f2_email: tutorActivo ? document.getElementById('f2-email').value.trim() : '',
+      f2_telefono: tutorActivo ? document.getElementById('f2-telefono').value.trim() : '',
+      f2_rol: tutorActivo ? 'Tutor' : '',
+      f2_firma: tutorActivo ? await firma('f2-firma') : '',
+      terminos_aceptados: true,
+      terminos_version: '1.0',
+      terminos_fecha: new Date().toISOString(),
       estado: 'firmado',
       creado: new Date().toISOString()
     };
-    if (!c.f1_firma) { this.showSnackbar('Falta la firma del firmante 1: dibujala en el recuadro', 'warning'); return; }
+    const entidad = this._contratoEntidadDatos();
+    c.entidad_nombre = entidad.nombre;
+    c.entidad_cif = entidad.cif;
+    c.entidad_domicilio = entidad.domicilio;
+    c.entidad_email = entidad.email;
+    c.entidad_telefono = entidad.telefono;
+    c.entidad_registro = entidad.registro;
+    c.entidad_web = entidad.web;
+    if (!c.f1_firma) { this.showSnackbar('Falta la firma del adoptante: dibujala en el recuadro', 'warning'); return; }
+    if (tutorActivo && !c.f2_firma) { this.showSnackbar('Falta la firma del tutor: dibujala en el recuadro', 'warning'); return; }
     const finGuardar = this._guardando(e.target);
     if (!finGuardar) return;
+    let identidad;
+    try {
+      identidad = await this._aplicarIdentidadAnimalContrato({
+        animalId: p.animal_id || '',
+        adopcionId,
+        p,
+        nombre: (this._el('ct-animal-nombre') || {}).value || p.animal,
+        fotoActual: this._contratoAnimalDatos(p).foto,
+        fotoFile: ((this._el('ct-animal-foto') || {}).files || [])[0] || null
+      });
+    } catch (err) {
+      finGuardar();
+      this._snackErr(err, this._errMsg(err));
+      return;
+    }
+    c.animal = identidad.nombre;
+    c.animal_foto = identidad.foto;
     const a = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     if (a) {
       c.especie = a.especie || '';
       c.raza = a.raza || '';
       c.edad = a.edad || '';
-      c.animal_foto = this._fotoSrc(a, 'w800');
       c.animal_sexo = a.sexo || '';
       c.animal_microchip = a.microchip || '';
       c.animal_fecha_nacimiento = a.fecha_nacimiento || '';
@@ -5150,7 +5718,7 @@ const Dashboard = {
     if (!this.contratos) this.contratos = [];
     this.contratos.push(c);
     this.saveLocal();
-    this._apiCreateRow(() => API.createContrato(c), { m: 'createContrato', a: [c] });
+    await this._apiCreateRow(() => API.createContrato(c), { m: 'createContrato', a: [c] });
     if (p) {
       p.estado = 'Contrato firmado';
       p.estado_firma = 'firmado';
@@ -5160,18 +5728,66 @@ const Dashboard = {
       a.estado = 'adoptado';
       await this._updateLocalYApi('animales', a);
     }
+    let enviado = false;
+    let envioError = null;
+    const to = this._contratoEmails(p).map(x => x.email);
+    if (enviarCopia && to.length) {
+      try {
+        await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
+        enviado = true;
+        this._regLog('contrato', 'Contrato y términos enviados por email (' + to.join(', ') + ')', 'contrato', c.id);
+      } catch (err) { envioError = err; }
+    }
     this.closeContratoForm();
     this.viewAdopcion(adopcionId);
     this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''), 'contrato', c.id);
     finGuardar();
-    this.showSnackbar('Contrato firmado y guardado', 'success');
+    if (envioError) this._snackErr(envioError, 'Contrato firmado, pero no se pudo enviar por email. Puedes reintentarlo desde Enviar por email.');
+    else this.showSnackbar(enviado ? 'Contrato firmado y enviado por email' : 'Contrato firmado y guardado', 'success');
+  },
+
+  // Asegura que el contrato tenga la foto del animal. Los contratos antiguos
+  // pueden no guardarla; se toma de la ficha y se persiste si es posible.
+  async _asegurarFotoContrato(c, adopcionId) {
+    if (!c) return false;
+    if (c.animal_foto) return true;
+    const p = this._byId(this.adopciones, adopcionId || c.adopcion_id);
+    const a = p && p.animal_id ? this._byId(this.animales, p.animal_id) : null;
+    const foto = a ? this._fotoSrc(a, 'w800') : '';
+    if (!foto) return false;
+    c.animal_foto = foto;
+    try { await this._updateLocalYApi('contratos', c); } catch (e) { /* el PDF se genera igual */ }
+    return true;
   },
 
   async descargarContrato(adopcionId) {
-    await this._ensureListas(['contratos']);
+    await this._ensureListas(['contratos', 'animales']);
     const c = this._contratoDeAdopcion(adopcionId);
     if (!c) { this.showSnackbar('No hay contrato firmado', 'warning'); return; }
+    if (!(await this._asegurarFotoContrato(c, adopcionId))) {
+      this.showSnackbar('Este contrato no tiene foto del animal. Añádela con Foto / nombre antes de descargarlo.', 'warning');
+      return;
+    }
     PdfExport.exportContracto(c);
+  },
+
+  async descargarTerminosAdopcion(adopcionId) {
+    await this._ensureListas(['contratos']);
+    const p = this._byId(this.adopciones, adopcionId);
+    const c = this._contratoDeAdopcion(adopcionId) || {};
+    PdfExport.exportTerminosAdopcion(Object.assign({ animal: p && p.animal, f1_nombre: p && p.adoptante }, c));
+  },
+
+  async showTerminosAdopcion(adopcionId) {
+    await this._ensureListas(['contratos']);
+    const p = this._byId(this.adopciones, adopcionId) || {};
+    const c = this._contratoDeAdopcion(adopcionId) || {};
+    this.showInfoModal('Términos y condiciones · adopción', `
+      <div class="terminos-preview-actions">
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${this._esc(adopcionId)}')">${Icons.download} Descargar PDF</button>
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal()">Cerrar</button>
+      </div>
+      ${this._terminosAdopcionHtml(p, c)}`);
   },
 
   // Visor del documento base (o firmado) a pantalla completa, sin el
@@ -5191,7 +5807,8 @@ const Dashboard = {
         <div class="contrato-topbar">
           <div class="contrato-topbar-meta">${Icons.fileText} <span><b>${this._esc(p.animal || 'Animal')}</b> · ${this._esc(p.adoptante || '')}</span> ${c ? '<span class="estado-badge aprobada">Firmado</span>' : '<span class="estado-badge pendiente">Pendiente de firma</span>'}</div>
           <div class="contrato-topbar-actions">
-            ${c ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} PDF</button>` : ''}
+            ${c ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} PDF contrato</button>` : ''}
+            ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} PDF términos</button>` : ''}
             ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar</button>` : ''}
             <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.closeContratoForm()">Cerrar</button>
           </div>
@@ -5204,6 +5821,53 @@ const Dashboard = {
     this._modalScrollLock(true);
     this.injectIcons();
     this._focusModal(modal);
+  },
+
+  // Corrige la foto o el nombre del animal en un contrato ya firmado sin
+  // anular la firma. Se sincroniza con la ficha y con el caso.
+  showContratoIdentidad(adopcionId) {
+    const p = this._byId(this.adopciones, adopcionId);
+    const c = this._contratoDeAdopcion(adopcionId);
+    if (!p || !c) { this.showSnackbar('No hay contrato firmado', 'warning'); return; }
+    const animal = this._contratoAnimalDatos(p, c);
+    this.showFormModal('Foto y nombre del contrato · ' + (p.animal || ''), `
+      <form onsubmit="Dashboard.guardarContratoIdentidad(event,'${adopcionId}')">
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Corrige el nombre o la foto del animal en el contrato firmado. Tambien se actualizan en su ficha y en el caso.</span></div>
+        ${this._contratoAnimalEditorHtml({ prefix: 'ci-animal', nombre: animal.nombre || '', foto: animal.foto || '' })}
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar cambios</button></div>
+      </form>`);
+  },
+
+  async guardarContratoIdentidad(e, adopcionId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const p = this._byId(this.adopciones, adopcionId);
+    const c = this._contratoDeAdopcion(adopcionId);
+    if (!p || !c) { this.showSnackbar('No hay contrato firmado', 'warning'); finGuardar(); return; }
+    try {
+      const animal = this._contratoAnimalDatos(p, c);
+      const identidad = await this._aplicarIdentidadAnimalContrato({
+        animalId: p.animal_id || c.animal_id || '',
+        adopcionId,
+        p,
+        nombre: (this._el('ci-animal-nombre') || {}).value || animal.nombre || p.animal,
+        fotoActual: animal.foto || c.animal_foto || '',
+        fotoFile: ((this._el('ci-animal-foto') || {}).files || [])[0] || null
+      });
+      c.animal = identidad.nombre;
+      c.animal_foto = identidad.foto;
+      await this._updateLocalYApi('contratos', c);
+      this.saveLocal();
+      this._regLog('contrato', 'Foto y nombre actualizados en el contrato de ' + identidad.nombre, 'contrato', c.id);
+      finGuardar();
+      this.closeFormModal();
+      this.viewAdopcion(adopcionId);
+      this.showSnackbar('Contrato actualizado con la nueva foto y nombre', 'success');
+    } catch (err) {
+      finGuardar();
+      this._snackErr(err, 'No se pudo actualizar el contrato: ' + this._errMsg(err));
+    }
   },
 
   // Destinatarios disponibles segun el caso: adoptante (firmante 1), segundo
@@ -5219,8 +5883,8 @@ const Dashboard = {
       if (out.some(x => x.email.toLowerCase() === e.toLowerCase())) return;
       out.push({ email: e, label, checked: true });
     };
-    add(c.f1_email, 'Adoptante (firmante 1)');
-    add(c.f2_email, 'Titular / segundo firmante');
+    add(c.f1_email, 'Adoptante');
+    add(c.f2_email, 'Tutor / persona de apoyo');
     const grupo = ((typeof CONFIG !== 'undefined' && CONFIG.contacto && CONFIG.contacto.email) || (typeof Auth !== 'undefined' && Auth.currentUser && Auth.currentUser.email) || '');
     add(grupo, 'Grupo Nebak (copia)');
     return out;
@@ -5232,8 +5896,8 @@ const Dashboard = {
     const body = [
       'Hola,',
       '',
-      'Adjuntamos el contrato de adopcion de ' + animal + '.',
-      'Tambien puedes descargar el PDF desde el panel de GN-Admin (ficha del caso > Contrato > Descargar PDF).',
+      'Te enviamos el contrato de adopcion de ' + animal + ' y el anexo de terminos y condiciones.',
+      'Puedes descargar ambos PDF desde el panel de GN-Admin (ficha del caso > Contrato > Descargar contrato / Descargar terminos).',
       '',
       'Grupo Nebak'
     ].join('\n');
@@ -5248,15 +5912,19 @@ const Dashboard = {
   },
 
   async showContratoEmailForm(adopcionId) {
-    await this._ensureListas(['contratos']);
+    await this._ensureListas(['contratos', 'animales']);
     const p = this._byId(this.adopciones, adopcionId);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
     const c = this._contratoDeAdopcion(adopcionId);
     if (!c) { this.showSnackbar('Firma el contrato antes de enviarlo', 'warning'); return; }
+    if (!(await this._asegurarFotoContrato(c, adopcionId))) {
+      this.showSnackbar('Este contrato no tiene foto del animal. Añádela con Foto / nombre antes de enviarlo.', 'warning');
+      return;
+    }
     const emails = this._contratoEmails(p);
-    this.showFormModal('Enviar contrato por email · ' + (p.animal || ''), `
+    this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
       <form onsubmit="Dashboard.enviarContratoEmail(event,'${adopcionId}')">
-        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviara a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y titular) y el de Grupo Nebak. Tambien puedes abrirlo en tu cliente de correo y adjuntar el PDF.</span></div>
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y el anexo de términos y condiciones a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
         <div class="form-group"><label>Destinatarios</label>
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>
@@ -5346,7 +6014,9 @@ const Dashboard = {
     const esSocio = s => s.tipo === 'Socio' || s.tipo === 'Ambos';
     const esVol = s => s.tipo === 'Voluntario' || s.tipo === 'Ambos';
     const tipoF = this._currentSocioTipoFilter || 'all';
-    const visibles = tipoF === 'Socio' ? this.socios.filter(esSocio) : (tipoF === 'Voluntario' ? this.socios.filter(esVol) : this.socios);
+    let visibles = tipoF === 'Socio' ? this.socios.filter(esSocio) : (tipoF === 'Voluntario' ? this.socios.filter(esVol) : this.socios);
+    const qSocio = String(this._currentSocioSearch || '').toLowerCase().trim();
+    if (qSocio) visibles = visibles.filter(s => [s.nombre, s.email, s.area, s.tipo].join(' ').toLowerCase().includes(qSocio));
     el.innerHTML = `
       <div class="page-list-container">
         <div class="stats-grid" style="margin-bottom:16px">
@@ -5355,7 +6025,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${visibles.length} registros</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="filter-row">
+      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" oninput="Dashboard.filterSocios(this)"></div><div class="filter-row">
         <select onchange="Dashboard._currentSocioTipoFilter=this.value;Dashboard.renderSocios(document.getElementById('page-socios'))">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
@@ -5369,6 +6039,24 @@ const Dashboard = {
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
+  },
+
+  filterSocios(input) {
+    const q = String(input?.value || '').toLowerCase().trim();
+    this._currentSocioSearch = q;
+    const page = document.getElementById('page-socios');
+    const cont = page?.querySelector('.page-list-container');
+    if (!cont) return;
+    const rows = cont.querySelectorAll('.data-table tbody tr');
+    let visibles = 0;
+    rows.forEach(tr => {
+      if (tr.querySelector('.table-empty')) { tr.style.display = q ? 'none' : ''; return; }
+      const ok = !q || (tr.textContent || '').toLowerCase().includes(q);
+      tr.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    });
+    const count = cont.querySelector('.response-count');
+    if (count) count.textContent = visibles + (visibles === 1 ? ' registro' : ' registros');
   },
 
   showSocioForm(data) {
@@ -5395,6 +6083,10 @@ const Dashboard = {
     const data = this._byId(this.socios, id);
     if (!data) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     this.showSocioForm(data);
+  },
+
+  _el(id) {
+    return typeof document !== 'undefined' ? document.getElementById(id) : null;
   },
 
   _previewFoto(input, previewId) {
@@ -5524,7 +6216,7 @@ const Dashboard = {
           <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(s.email||'')}${s.telefono?` &middot; ${this._esc(s.telefono)}`:''}</div>
         </div>
       </div>
-      <div class="detail-section"><div class="detail-section-title">Informacion del Socio</div>
+      <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion del Socio</div>
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
             <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(s.telefono||'—')}</div></div>
@@ -6260,22 +6952,21 @@ const Dashboard = {
   },
 
   // Clasifica el snack a partir de un error (función pura, testeada en tests/).
-  // 'error' -> rojo, 'warning' -> ambar, 'success' -> verde.
-  // Si el backend no marca `status`, infiere por el mensaje para no pintar de
-  // rojo avisos que no son fallos (hoja sin configurar, rate limit, etc.).
+  // 'error' -> rojo, 'warning' / 'neutral' -> gris neutro, 'success' -> verde.
+  // Solo se pinta rojo cuando el backend marca `status: 'error'` o hay un
+  // codigo HTTP explicito. Cualquier fallo sin clasificar (red caida, mensaje
+  // desconocido) va en gris neutro: nunca un falso error rojo.
   _snackTipo(err) {
-    const hasStatus = !!(err && Object.prototype.hasOwnProperty.call(err, 'status'));
-    const st = hasStatus ? err.status : undefined;
+    const st = err && err.status;
     if (st === 'warning' || st === 'success' || st === 'error' || st === 'neutral') return st;
     if (err && err.code === 429) return 'warning';
     const m = String((err && (err.message || err.error)) || '').toLowerCase();
     if (m && /sin configurar|no configurado|demasiadas peticiones|espera unos segundos/.test(m)) return 'warning';
     // HTTP con codigo de error explicito -> error (rojo).
     if (m && /http\s*\d{3}/.test(m)) return 'error';
-    // Si no se puede determinar si fue exito o error (sin status, codigo ni
-    // mensaje), se usa un color neutro (gris) en lugar de rojo para no alarmar.
-    if (!hasStatus && !(err && err.code) && !m) return 'neutral';
-    return 'error';
+    // Sin status reconocible ni codigo HTTP no se puede afirmar que sea un
+    // fallo del backend: gris neutro (nunca verde).
+    return 'neutral';
   },
 
   // Snack que respeta el `status` que devuelve el backend.
@@ -6283,11 +6974,14 @@ const Dashboard = {
     this.showSnackbar(msg, this._snackTipo(err));
   },
 
-  showSnackbar(msg, type = 'error') {
+  showSnackbar(msg, type = 'neutral') {
     const el = document.getElementById('error-message');
     if (!el) { console.error(msg); return; }
     el.textContent = msg;
-    el.className = 'toast-error toast-' + type;
+    // El tipo 'error' usa toast-danger: usar dos veces toast-error hacia que
+    // el selector de error coincidiera con todos los snacks y los pintaba rojos.
+    const tipo = type === 'error' ? 'danger' : type;
+    el.className = 'toast-error toast-' + tipo;
     el.classList.remove('active');
     void el.offsetWidth;
     el.classList.add('active');

@@ -475,13 +475,21 @@ describe('_anioFecha + _restantes2025', () => {
 });
 
 describe('_hasHomeCache: pinta instantaneo solo con datos', () => {
-  it('false sin encuestas, true con ellas', () => {
+  it('false sin encuestas ni datos, true con cache completo', () => {
     const prev = Dashboard.surveys;
+    const prevCached = Dashboard._cached;
+    const prevLoaded = Dashboard._loaded;
     Dashboard.surveys = [];
+    Dashboard._cached = {};
+    Dashboard._loaded = {};
     assert.equal(Dashboard._hasHomeCache(), false);
     Dashboard.surveys = [{ id: 's1' }];
+    assert.equal(Dashboard._hasHomeCache(), false);
+    Dashboard._cached = { responses: true, estados: true };
     assert.equal(Dashboard._hasHomeCache(), true);
     Dashboard.surveys = prev;
+    Dashboard._cached = prevCached;
+    Dashboard._loaded = prevLoaded;
   });
 });
 
@@ -732,9 +740,10 @@ describe('_snackTipo: el color depende del status del backend', () => {
     assert.equal(T({ status: 'neutral' }), 'neutral');
   });
 
-  it('sin status ni codigo ni mensaje, neutro por defecto', () => {
-    assert.equal(T(new Error('boom')), 'error');
+  it('sin status explicito, gris neutro aunque haya mensaje', () => {
+    assert.equal(T(new Error('boom')), 'neutral');
     assert.equal(T({ message: 'HTTP 500: Internal Server Error' }), 'error');
+    assert.equal(T(new TypeError('Failed to fetch')), 'neutral');
     assert.equal(T(null), 'neutral');
     assert.equal(T(undefined), 'neutral');
   });
@@ -749,15 +758,15 @@ describe('_snackTipo: el color depende del status del backend', () => {
     assert.equal(T({ message: 'Demasiadas peticiones: espera unos segundos y reintenta' }), 'warning');
   });
 
-  it('un status desconocido no se cuela como verde', () => {
-    assert.equal(T({ status: 'ok' }), 'error');
-    assert.equal(T({ status: '' }), 'error');
+  it('un status desconocido no se cuela como verde ni como rojo', () => {
+    assert.equal(T({ status: 'ok' }), 'neutral');
+    assert.equal(T({ status: '' }), 'neutral');
   });
 
-  it('mensaje de fallo normal no se confunde con aviso', () => {
-    assert.equal(T(new Error('El backend no devolvio el registro (id sin sincronizar)')), 'error');
-    assert.equal(T(new Error('Token invalido')), 'error');
-    assert.equal(T(new Error('No se pudo subir la foto')), 'error');
+  it('mensajes sin status no se pintan en rojo', () => {
+    assert.equal(T(new Error('El backend no devolvio el registro (id sin sincronizar)')), 'neutral');
+    assert.equal(T(new Error('Token invalido')), 'neutral');
+    assert.equal(T(new Error('No se pudo subir la foto')), 'neutral');
   });
 });
 
@@ -1230,6 +1239,40 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
     assert.match(html, /DNI 123/);
     assert.match(html, /data:image\/png;base64,AAA/);
   });
+
+  it('_contratoTerminosHtml no muestra el rol del adoptante y añade el sello', () => {
+    const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana', animal: 'Luna' });
+    assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
+    assert.match(html, /SELLO DE LA ENTIDAD/);
+    assert.match(html, /REUNIDOS/);
+    assert.match(html, /EXPONEN/);
+  });
+
+  it('_contratoTerminosHtml pone los datos del tutor en una pagina propia', () => {
+    const html = Dashboard._contratoTerminosHtml(
+      { adoptante: 'Ana', animal: 'Luna' },
+      { f1_nombre: 'Ana', f1_dni: '123', f2_nombre: 'Luis', f2_rol: 'Tutor', f2_dni: '456' }
+    );
+    assert.match(html, /contrato-doc-tutor-page/);
+    assert.match(html, /Anexo I\. Datos del tutor/);
+    assert.match(html, /Tutor \/ persona de apoyo/);
+  });
+
+  it('_terminosAdopcionHtml es un anexo independiente con sus clausulas', () => {
+    const html = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, { f1_dni: '123' });
+    assert.match(html, /Términos y condiciones de adopción responsable/);
+    assert.match(html, /Aceptado por el adoptante/);
+    assert.match(html, /Datos personales/);
+    assert.match(html, /SELLO DE LA ENTIDAD/);
+    assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
+  });
+
+  it('_contratoEntidadDatos usa el nombre por defecto y no inventa CIF', () => {
+    const ent = Dashboard._contratoEntidadDatos({});
+    assert.equal(ent.nombre, 'Asociación Grupo Nebak');
+    assert.equal(ent.cif, '');
+    assert.equal(ent.domicilio, '');
+  });
 });
 
 describe('_contratoTutor: tutor real vs entidad', () => {
@@ -1267,6 +1310,55 @@ describe('_contratoAcogidaDatos: documento opcional de acogida', () => {
       Dashboard.familias = prev.familias;
       Dashboard.responses = prev.responses;
     }
+  });
+});
+
+describe('contratos de acogida: copia persistida y snapshot', () => {
+  let prev;
+
+  beforeEach(() => {
+    prev = Dashboard.contratos;
+    Dashboard.contratos = [];
+  });
+
+  afterEach(() => {
+    Dashboard.contratos = prev;
+  });
+
+  it('_contratoAcogidaDe encuentra solo la copia de acogida y no confunde adopciones', () => {
+    Dashboard.contratos = [
+      { id: 'adop1', adopcion_id: 'ad1', datos_json: '{}' },
+      { id: 'acg1', tipo: 'acogida', acogida_id: 'acg1', datos_json: '{}' }
+    ];
+    assert.equal(Dashboard._contratoAcogidaDe('acg1').id, 'acg1');
+    assert.equal(Dashboard._contratoAcogidaDe('ad1'), null);
+    assert.deepEqual(Dashboard._contratosAdopcion().map(c => c.id), ['adop1']);
+  });
+
+  it('_contratoAcogidaSnapshot parsea datos_json y descarta copias invalidas', () => {
+    const datos = { animal: { nombre: 'Luna' }, familia: { nombre: 'Ana' }, fecha: '2026-11-10' };
+    Dashboard.contratos = [
+      { id: 'acg1', tipo: 'acogida', acogida_id: 'acg1', datos_json: JSON.stringify(datos) },
+      { id: 'acg2', tipo: 'acogida', acogida_id: 'acg2', datos_json: 'no-json' },
+      { id: 'adop1', adopcion_id: 'ad1', datos_json: JSON.stringify(datos) }
+    ];
+    assert.equal(Dashboard._contratoAcogidaSnapshot(Dashboard._contratoAcogidaDe('acg1')).animal.nombre, 'Luna');
+    assert.equal(Dashboard._contratoAcogidaSnapshot(Dashboard._contratoAcogidaDe('acg2')), null);
+    assert.equal(Dashboard._contratoAcogidaSnapshot(Dashboard._contratoAcogidaDe('ad1')), null);
+  });
+
+  it('_contratoAcogidaFila conserva el id y guarda la copia completa', () => {
+    Dashboard.contratos = [{ id: 'ctr_old', tipo: 'acogida', acogida_id: 'acg1' }];
+    const datos = { animal: { nombre: 'Luna' }, familia: { nombre: 'Ana' }, fecha: '2026-11-10' };
+    const fila = Dashboard._contratoAcogidaFila({ id: 'acg1', animal: 'Luna', familia: 'Ana', animal_id: 'a1', familia_id: 'f1' }, datos);
+    assert.equal(fila.id, 'ctr_old');
+    assert.equal(fila.tipo, 'acogida');
+    assert.equal(fila.acogida_id, 'acg1');
+    assert.equal(fila.animal, 'Luna');
+    assert.equal(fila.familia, 'Ana');
+    assert.equal(fila.estado, 'guardado');
+    assert.equal(fila.datos_json, JSON.stringify(datos));
+    assert.match(fila.guardado_en, /^\d{4}-\d{2}-\d{2}T/);
   });
 });
 
@@ -1331,5 +1423,54 @@ describe('multiusuario: identidad y cache no resucita borrados', () => {
     Dashboard.animales = [{ id: 'a1' }, { id: 'a2', nombre: 'Pendiente de subir' }, { id: 'a3', nombre: 'Borrado' }];
     const out = await Dashboard._loadList('animales', async () => ({ data: [{ id: 'a1' }] }), true);
     assert.deepEqual(out.map(a => a.id), ['a1', 'a2']);
+  });
+});
+
+describe('identidad del animal en contratos', () => {
+  it('el editor exige foto cuando el animal no tiene', () => {
+    const html = Dashboard._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: 'Luna <3', foto: '' });
+    assert.match(html, /id="ct-animal-nombre"/);
+    assert.match(html, /id="ct-animal-foto"/);
+    assert.match(html, /Falta foto/);
+    assert.match(html, /Obligatoria/);
+    assert.match(html, /Luna &lt;3/);
+    assert.doesNotMatch(html, /Luna <3/);
+  });
+
+  it('con foto incluida se puede mantener o sustituir', () => {
+    const html = Dashboard._contratoAnimalEditorHtml({ prefix: 'ac-animal', nombre: 'Luna', foto: 'https://drive.google.com/thumbnail?id=f1&sz=w800' });
+    assert.match(html, /Foto incluida/);
+    assert.match(html, /Puedes mantener la foto actual/);
+    assert.match(html, /ac-animal-foto-preview/);
+    assert.doesNotMatch(html, /Obligatoria/);
+  });
+
+  it('_fotoSrc prepara la foto de la ficha para el contrato', () => {
+    assert.equal(Dashboard._fotoSrc({ foto_drive_id: 'abc' }, 'w800'), 'https://drive.google.com/thumbnail?id=abc&sz=w800');
+    assert.equal(Dashboard._fotoSrc({ foto: 'https://x/y.jpg' }, 'w800'), 'https://x/y.jpg');
+    assert.equal(Dashboard._fotoSrc({}, 'w800'), '');
+  });
+});
+
+describe('stepper de fases de adopcion', () => {
+  it('_faseProgreso calcula indice, total y porcentaje', () => {
+    assert.deepEqual(Dashboard._faseProgreso({ fase: 'Encuesta recibida' }), { idx: 0, total: 7, pct: 0 });
+    assert.deepEqual(Dashboard._faseProgreso({ fase: 'Contrato' }), { idx: 3, total: 7, pct: 50 });
+    assert.deepEqual(Dashboard._faseProgreso({ fase: 'Seguimiento' }), { idx: 6, total: 7, pct: 100 });
+  });
+
+  it('marca hechas, actual y pendientes', () => {
+    const html = Dashboard._faseStepperHtml(Dashboard._fasesAdopcion(), 'Entrega');
+    assert.match(html, /aria-current="step"/);
+    assert.equal((html.match(/is-done/g) || []).length, 4);
+    assert.equal((html.match(/is-current/g) || []).length, 1);
+    assert.match(html, /is-pending/);
+    assert.match(html, />Entrega</);
+  });
+
+  it('escapa el nombre de la fase', () => {
+    const html = Dashboard._faseStepperHtml(['<b>A</b>', 'B'], '<b>A</b>');
+    assert.match(html, /&lt;b&gt;A&lt;\/b&gt;/);
+    assert.doesNotMatch(html, /<b>A<\/b>/);
   });
 });

@@ -72,6 +72,15 @@ const App = {
     document.getElementById('login-view').classList.add('active');
   },
 
+  // Pestana de la bottom-nav que corresponde a una pagina (incluye subpaginas).
+  _bottomParent(page) {
+    const p = String(page || '');
+    if (p === 'dashboard' || p === 'animales') return p;
+    if (p.indexOf('encuestas') === 0) return 'encuestas';
+    const mas = ['acogidas', 'acogidas-activas', 'adopciones', 'socios', 'blacklist', 'reportes', 'actividad', 'redes', 'donaciones', 'almacen'];
+    return mas.includes(p) ? 'mas' : '';
+  },
+
   navigateTo(page) {
     if (this.currentPage === page) return;
     const aplicar = () => {
@@ -82,7 +91,14 @@ const App = {
         this.currentPage = page;
       }
       document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
-      document.querySelectorAll('.bottom-nav-item').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+      const bottomParent = this._bottomParent(page);
+      document.querySelectorAll('.bottom-nav-item').forEach(l => {
+        const active = l.id === 'mas-menu-toggle' ? bottomParent === 'mas' : l.dataset.page === bottomParent;
+        l.classList.toggle('active', active);
+        if (active) l.setAttribute('aria-current', 'page');
+        else l.removeAttribute('aria-current');
+      });
+      document.querySelectorAll('.mas-menu-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
       const titles = {
         dashboard: 'Dashboard',
         encuestas: 'Encuestas',
@@ -119,15 +135,27 @@ const App = {
   },
 
   closeSidebar() {
-    document.getElementById('sidebar')?.classList.remove('open');
+    const sidebar = document.getElementById('sidebar');
+    const wasOpen = !!sidebar && sidebar.classList.contains('open');
+    sidebar?.classList.remove('open');
     document.querySelector('.sidebar-overlay')?.classList.remove('active');
+    if (wasOpen) this._lockBg(false);
+  },
+
+  // Bloquea el scroll del fondo mientras drawer o menu cubren la pantalla.
+  _lockBg(open) {
+    if (typeof Dashboard !== 'undefined' && typeof Dashboard._modalScrollLock === 'function') {
+      Dashboard._modalScrollLock(open);
+    }
   },
 
   toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.querySelector('.sidebar-overlay');
+    const willOpen = !!sidebar && !sidebar.classList.contains('open');
     sidebar?.classList.toggle('open');
     overlay?.classList.toggle('active');
+    this._lockBg(willOpen);
   },
 
   toggleSidebarCollapse() {
@@ -170,16 +198,25 @@ const App = {
   toggleMasMenu() {
     const popup = document.getElementById('mas-menu-popup');
     const overlay = document.getElementById('mas-menu-overlay');
+    const toggle = document.getElementById('mas-menu-toggle');
     const isOpen = popup?.style.display === 'block';
     if (isOpen) { this.closeMasMenu(); }
-    else { popup.style.display = 'block'; overlay?.classList.add('active'); }
+    else {
+      popup.style.display = 'block';
+      overlay?.classList.add('active');
+      toggle?.setAttribute('aria-expanded', 'true');
+      this._lockBg(true);
+    }
   },
 
   closeMasMenu() {
     const popup = document.getElementById('mas-menu-popup');
     const overlay = document.getElementById('mas-menu-overlay');
+    const wasOpen = popup?.style.display === 'block';
     if (popup) popup.style.display = 'none';
     overlay?.classList.remove('active');
+    document.getElementById('mas-menu-toggle')?.setAttribute('aria-expanded', 'false');
+    if (wasOpen) this._lockBg(false);
   },
 
   setupEventListeners() {
@@ -238,6 +275,7 @@ const App = {
       if (document.getElementById('profile-modal')?.style.display === 'flex') { Dashboard.closeProfile(); return; }
       if (document.getElementById('tutorial-modal')?.style.display === 'flex') { Dashboard.closeTutorial(); return; }
       this.closeMasMenu();
+      this.closeSidebar();
     });
     document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
     document.getElementById('sidebar-collapse-btn')?.addEventListener('click', () => this.toggleSidebarCollapse());

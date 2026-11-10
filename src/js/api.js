@@ -14,7 +14,7 @@ const API = {
 
   // El backend responde siempre HTTP 200 y marca `status`: 'success' | 'warning'
   // | 'error'. Aqui se respeta: warning y error se lanzan con `err.status` para
-  // que la UI pinte el snackbar ambar o rojo; success devuelve el dato.
+  // que la UI pinte el snackbar gris neutro o rojo; success devuelve el dato.
   async _resultado(res) {
     if (!res.ok) {
       const e = new Error(`HTTP ${res.status}: ${res.statusText}`);
