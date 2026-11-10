@@ -5556,6 +5556,7 @@ const Dashboard = {
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
             ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
             <div class="form-row"><div class="form-group"><label>Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
+            <div class="form-row"><div class="form-group"><label>Donacion del adoptante (€)</label><input type="text" id="ct-donacion" value="50" inputmode="decimal" placeholder="50"><div class="form-hint">Cantidad que el adoptante entrega a Grupo Nebak con la adopcion. Editable; por defecto 50 €.</div></div></div>
 
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Adoptante</div>
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" value="${this._esc(sol.dni || '')}" placeholder="12345678A"></div></div>
@@ -5733,6 +5734,7 @@ const Dashboard = {
       animal_id: p.animal_id || null,
       fecha: document.getElementById('ct-fecha').value || new Date().toISOString().slice(0, 10),
       ciudad: document.getElementById('ct-ciudad').value.trim(),
+      donacion_adoptante: parseFloat(String((document.getElementById('ct-donacion')?.value || '50').replace(',', '.'))) || 50,
       f1_nombre: f1Nombre,
       f1_dni: document.getElementById('f1-dni').value.trim(),
       f1_direccion: document.getElementById('f1-direccion').value.trim(),
@@ -6934,17 +6936,33 @@ const Dashboard = {
     const adopciones = (this.adopciones || []).filter(p => enAnio(p.fecha));
     const altas = (this.animales || []).filter(a => enAnio(a.fecha_ingreso));
     const sociosNuevos = (this.socios || []).filter(s => enAnio(s.fecha_registro));
+    // Donacion pactada en el contrato de adopcion (por defecto 50 EUR). Se
+    // suma al total de donaciones del ejercicio para que la memoria refleje
+    // el dinero aportado por los adoptantes al cerrar la adopcion.
+    const contratosAnio = (this.contratos || []).filter(c => enAnio(c.fecha));
+    const donacionAdopciones = contratosAnio.reduce((t, c) => {
+      const adp = (this.adopciones || []).find(p => p.id === c.adopcion_id);
+      if (adp && adp.desenlace === 'devuelto') return t;
+      const n = parseFloat(String(c.donacion_adoptante != null ? c.donacion_adoptante : 0).replace(',', '.'));
+      return t + (isNaN(n) ? 0 : n);
+    }, 0);
+    const donacionAdopcionesN = contratosAnio.filter(c => {
+      const adp = (this.adopciones || []).find(p => p.id === c.adopcion_id);
+      if (adp && adp.desenlace === 'devuelto') return false;
+      return (parseFloat(String(c.donacion_adoptante != null ? c.donacion_adoptante : 0).replace(',', '.')) || 0) > 0;
+    }).length;
     // El estado real de un apadrinamiento vivo es 'activo' (como en
     // _totalAportes); 'inactivo' no existe en las hojas y el filtro anterior
     // contaba tambien los finalizados/cancelados.
     const apadrinamientos = (this.apadrinamientos || []).filter(a => String(a.estado || '').toLowerCase() === 'activo');
-    const donTotal = suma(donaciones);
+    const donTotal = suma(donaciones) + donacionAdopciones;
     const gasTotal = suma(gastos);
     return {
       year,
       adopciones, adopcionesN: adopciones.length,
       altas, altasN: altas.length,
       donaciones, donacionesN: donaciones.length, donTotal,
+      donacionAdopciones, donacionAdopcionesN,
       gastos, gastosN: gastos.length, gasTotal,
       balance: donTotal - gasTotal,
       sociosTotal: (this.socios || []).length,
@@ -6967,6 +6985,7 @@ const Dashboard = {
         <div>${fila(m.altasN, 'Altas de animales')}</div>
         <div>${fila(m.adopcionesN, 'Adopciones cerradas')}</div>
         <div>${fila(m.donacionesN, 'Donaciones recibidas', this._euros(m.donTotal) + ' €')}</div>
+        <div>${fila(m.donacionAdopcionesN, 'Donaciones por adopcion (contratos)', this._euros(m.donacionAdopciones) + ' €')}</div>
         <div>${fila(m.gastosN, 'Gastos registrados', '−' + this._euros(m.gasTotal) + ' €')}</div>
         <div>${fila(this._euros(m.balance) + ' €', 'Balance del ejercicio')}</div>
         <div>${fila(m.sociosNuevos, 'Socios dados de alta', m.sociosTotal + ' en total · ' + m.sociosActivos + ' activos')}</div>

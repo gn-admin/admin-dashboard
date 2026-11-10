@@ -636,6 +636,7 @@ const PdfExport = {
         <tr><td class="k">Altas de animales registradas</td><td class="v">${m.altasN}</td></tr>
         <tr><td class="k">Adopciones cerradas</td><td class="v">${m.adopcionesN}</td></tr>
         <tr><td class="k">Donaciones recibidas</td><td class="v">${m.donacionesN} · ${eur(m.donTotal)} €</td></tr>
+        <tr><td class="k">Donaciones por adopcion (contratos)</td><td class="v">${m.donacionAdopcionesN} · ${eur(m.donacionAdopciones)} €</td></tr>
         <tr><td class="k">Gastos registrados</td><td class="v">${m.gastosN} · ${eur(m.gasTotal)} €</td></tr>
         <tr class="total-row"><td class="k">Balance del ejercicio</td><td class="v">${eur(m.balance)} €</td></tr>
         <tr><td class="k">Socios dados de alta en el ejercicio</td><td class="v">${m.sociosNuevos}</td></tr>
