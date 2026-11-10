@@ -4524,6 +4524,7 @@ const Dashboard = {
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar términos</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar por email</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoDoc('${p.id}')">${Icons.eye} Ver documento</button>
+          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver términos</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoIdentidad('${p.id}')">${Icons.pencil} Foto / nombre</button>
           <button class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button>
         </div>`
@@ -4780,13 +4781,7 @@ const Dashboard = {
         ${dato('Teléfono', e.telefono)}
         ${dato('Web', e.web)}
       </div>
-      <div class="contrato-doc-sello" aria-label="Sello de la entidad">
-        <div class="contrato-doc-sello-inner">
-          <img src="${this._esc(logoSrc)}" alt="">
-          <span>${this._esc(e.nombre)}</span>
-          <small>SELLO DE LA ENTIDAD</small>
-        </div>
-      </div>
+      ${this._selloHtml(e, logoSrc)}
     </div>`;
   },
 
@@ -4839,9 +4834,7 @@ const Dashboard = {
         </div>
         <div class="contrato-doc-firma">
           <div class="contrato-doc-firma-label">Por la entidad</div>
-          <div class="contrato-doc-sello contrato-doc-sello--firma" aria-label="Sello de la entidad">
-            <div class="contrato-doc-sello-inner"><img src="${this._esc(logoSrc)}" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
-          </div>
+          ${this._selloHtml(ent, logoSrc)}
         </div>
       </div>
       <div class="contrato-doc-nota">Este anexo de términos y condiciones se envía junto al contrato de adopción. Versión 1.0 · 2026/11/10.</div>`;
@@ -4859,6 +4852,26 @@ const Dashboard = {
     const nombre = String(c.f2_nombre || '');
     if (/entidad|asociaci[oó]n|grupo\s*nebak/i.test(rol + ' ' + nombre)) return null;
     return c;
+  },
+
+  // Sello de la entidad: si el usuario ha subido una imagen de sello (o la
+  // config la aporta) se usa esa; si no, se pinta el sello generico con el
+  // logo. Asi el documento refleja el sello real de la asociacion.
+  _selloUrl() {
+    try {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.contrato && CONFIG.contrato.sello_url) || '';
+      return localStorage.getItem('gn_sello_url') || cfg || '';
+    } catch (e) { return ''; }
+  },
+  _selloHtml(ent, logo) {
+    const url = this._selloUrl();
+    const nombre = (ent && ent.nombre) || 'la entidad';
+    if (url) {
+      return `<div class="contrato-doc-sello contrato-doc-sello--img" aria-label="Sello de la entidad"><img src="${this._esc(url)}" alt="Sello de ${this._esc(nombre)}"></div>`;
+    }
+    return `<div class="contrato-doc-sello" aria-label="Sello de la entidad">
+      <div class="contrato-doc-sello-inner"><img src="${this._esc(logo || 'assets/icons/logo-nebak.jpg')}" alt=""><span>${this._esc(nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
+    </div>`;
   },
 
   // Documento base que se muestra en el modal de contrato (terminos y
@@ -4885,13 +4898,13 @@ const Dashboard = {
       ${firmaImg(c.f2_firma, 'Firma del tutor')}
       <b>${this._esc(c.f2_nombre)}</b><small>DNI ${this._esc(c.f2_dni || '—')}</small>
     </div>` : '';
-    const entidadFirma = !tutor ? firmaImg(c.f2_firma, 'Firma de la entidad') : '';
+    const entidadFirma = !tutor
+      ? (c.entidad_firma ? firmaImg(c.entidad_firma, 'Firma de la entidad') : firmaImg(c.f2_firma, 'Firma de la entidad'))
+      : '';
     const entidadBlock = `<div class="contrato-doc-firma">
       <div class="contrato-doc-firma-label">Por la entidad (firma y sello)</div>
       ${entidadFirma}
-      <div class="contrato-doc-sello contrato-doc-sello--firma" aria-label="Sello de la entidad">
-        <div class="contrato-doc-sello-inner"><img src="assets/icons/logo-nebak.jpg" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
-      </div>
+      ${this._selloHtml(ent, 'assets/icons/logo-nebak.jpg')}
       <b>${this._esc(ent.nombre)}</b><small>Entidad</small>
     </div>`;
     let n = 1;
@@ -5533,6 +5546,11 @@ const Dashboard = {
             </div>
 
             <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto los <a href="#" class="contrato-link" onclick="event.preventDefault(); event.stopPropagation(); Dashboard.showTerminosAdopcion('${adopcionId}');">términos y condiciones</a> del contrato de adopción responsable.</span></label>
+            <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
+              <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
+              <div class="form-row"><div class="form-group"><label>Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" onchange="Dashboard._previewSelloContrato(this)"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._limpiarSelloContrato()">Quitar sello</button></div>
+              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" onchange="Dashboard._toggleEntidadFirma(this.checked)"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="120" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" onclick="Dashboard._clearFirmaCanvas('entidad-firma')">Limpiar firma</button></div></div>
+            </div>
             <label class="contrato-acepta"><input type="checkbox" id="ct-enviar" checked><span>Enviar una copia por email al adoptante y a Grupo Nebak al firmar.</span></label>
             <div class="contrato-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeContratoForm()">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.checkCircle} Firmar y guardar</button></div>
           </form>
@@ -5600,6 +5618,37 @@ const Dashboard = {
     cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   },
 
+  _previewSelloContrato(input) {
+    const f = (input && input.files && input.files[0]) || null;
+    const box = document.getElementById('ct-sello-preview');
+    if (!box) return;
+    if (!f) { box.innerHTML = ''; return; }
+    const r = new FileReader();
+    r.onload = () => {
+      const url = String(r.result || '');
+      box.innerHTML = `<img src="${url}" alt="Sello" style="max-height:90px;border:1px solid var(--gray-200);border-radius:8px">`;
+      try { localStorage.setItem('gn_sello_url', url); } catch (e) {}
+    };
+    r.readAsDataURL(f);
+  },
+
+  _limpiarSelloContrato() {
+    try { localStorage.removeItem('gn_sello_url'); } catch (e) {}
+    const inp = document.getElementById('ct-sello');
+    if (inp) inp.value = '';
+    const box = document.getElementById('ct-sello-preview');
+    if (box) box.innerHTML = '';
+  },
+
+  _toggleEntidadFirma(show) {
+    const cv = document.getElementById('entidad-firma');
+    const btn = document.getElementById('entidad-firma-clear');
+    if (cv) cv.style.display = show ? '' : 'none';
+    if (btn) btn.style.display = show ? '' : 'none';
+    if (show) this._setupFirmaCanvas('entidad-firma');
+    else this._clearFirmaCanvas('entidad-firma');
+  },
+
   _toggleContratoTutor(show) {
     const sec = document.getElementById('contrato-tutor-section');
     if (sec) sec.style.display = show ? '' : 'none';
@@ -5637,6 +5686,7 @@ const Dashboard = {
     const f2Nombre = tutorActivo ? (document.getElementById('f2-nombre').value || '').trim() : '';
     if (tutorActivo && !f2Nombre) { this.showSnackbar('Indica el nombre del tutor o desmarca la opción de tutor', 'warning'); return; }
     const enviarCopia = !!(document.getElementById('ct-enviar') || {}).checked;
+    const firmaEntidadActiva = !!(document.getElementById('ct-firma-entidad') || {}).checked;
     const firma = async (id) => {
       const cv = document.getElementById(id);
       if (!cv) return '';
@@ -5668,6 +5718,7 @@ const Dashboard = {
       f2_telefono: tutorActivo ? document.getElementById('f2-telefono').value.trim() : '',
       f2_rol: tutorActivo ? 'Tutor' : '',
       f2_firma: tutorActivo ? await firma('f2-firma') : '',
+      entidad_firma: firmaEntidadActiva ? await firma('entidad-firma') : '',
       terminos_aceptados: true,
       terminos_version: '1.0',
       terminos_fecha: new Date().toISOString(),
@@ -5809,6 +5860,7 @@ const Dashboard = {
           <div class="contrato-topbar-actions">
             ${c ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} PDF contrato</button>` : ''}
             ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} PDF términos</button>` : ''}
+            <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver términos</button>
             ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar</button>` : ''}
             <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.closeContratoForm()">Cerrar</button>
           </div>

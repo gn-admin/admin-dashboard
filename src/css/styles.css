@@ -6957,3 +6957,7 @@ body.pwa-modal-open {
     min-width: 0;
   }
 }
+
+
+.contrato-doc-sello--img { display: inline-block; }
+.contrato-doc-sello--img img { max-width: 100%; max-height: 90px; border-radius: 8px; object-fit: contain; }
