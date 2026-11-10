@@ -1201,14 +1201,35 @@ const Dashboard = {
       const gy = (H - P - f * (H - 2 * P)).toFixed(1);
       return `<line class="dash-chart-grid" x1="${P}" x2="${W - P}" y1="${gy}" y2="${gy}"/>`;
     }).join('');
-    return `<svg class="dash-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Solicitudes de los ultimos 12 meses">
+    return `<div class="dash-chart-wrap"><svg class="dash-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Solicitudes de los ultimos 12 meses">
       <defs><linearGradient id="dashAreaFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1FC95B" stop-opacity="0.35"/><stop offset="100%" stop-color="#1FC95B" stop-opacity="0"/></linearGradient></defs>
       ${grid}
       <polygon class="dash-chart-area" points="${area}"/>
       <polyline class="dash-chart-line" points="${pts}"/>
-      ${buckets.map((b, i) => `<circle class="dash-chart-dot" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="3.5"><title>${b.label}: ${b.count}</title></circle>`).join('')}
+      ${buckets.map((b, i) => `<circle class="dash-chart-dot" data-label="${this._esc(b.label)}" data-count="${b.count}" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="4.5" tabindex="0" role="button" aria-label="${this._esc(b.label)}: ${b.count} solicitudes" onclick="Dashboard._chartTip(this)" onmouseenter="Dashboard._chartTip(this)" onmouseleave="Dashboard._chartTipHide()" onfocus="Dashboard._chartTip(this)" onblur="Dashboard._chartTipHide()"><title>${this._esc(b.label)}: ${b.count}</title></circle>`).join('')}
     </svg>
-    <div class="dash-chart-labels">${buckets.map(b => `<span class="dash-chart-label">${b.label}</span>`).join('')}</div>`;
+    <div class="dash-chart-tooltip" id="dash-chart-tooltip" aria-live="polite"></div>
+    <div class="dash-chart-labels">${buckets.map(b => `<span class="dash-chart-label">${b.label}</span>`).join('')}</div>
+  </div>`;
+  },
+
+  _chartTip(dot) {
+    const tip = document.getElementById('dash-chart-tooltip');
+    if (!tip || !dot) return;
+    const label = dot.getAttribute('data-label') || '';
+    const count = dot.getAttribute('data-count') || '0';
+    const n = parseInt(count, 10) || 0;
+    tip.textContent = label + ': ' + n + ' solicitud' + (n === 1 ? '' : 'es');
+    tip.classList.add('is-visible');
+    const wrap = dot.closest('.dash-chart-wrap');
+    const r = dot.getBoundingClientRect();
+    const wr = wrap ? wrap.getBoundingClientRect() : { left: 0, top: 0 };
+    tip.style.left = (r.left - wr.left + r.width / 2) + 'px';
+    tip.style.top = (r.top - wr.top - 6) + 'px';
+  },
+  _chartTipHide() {
+    const tip = document.getElementById('dash-chart-tooltip');
+    if (tip) tip.classList.remove('is-visible');
   },
 
   // Etapas del embudo (compartidas por el donut y por _funnelAdopcion).
