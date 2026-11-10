@@ -151,7 +151,7 @@ const Dashboard = {
         <div class="skeleton-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:16px 0;gap:12px">
           ${Array.from({ length: 4 }, () => `<div class="skeleton-card" style="min-height:92px"><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>`).join('')}
         </div>
-        <div class="skeleton-grid" style="grid-template-columns:2fr 1fr;gap:12px">
+        <div class="skeleton-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
           <div class="skeleton-card" style="min-height:220px"><div class="skeleton-line skeleton-line--title" style="width:40%"></div><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line"></div></div>
           <div class="skeleton-card" style="min-height:220px"><div class="skeleton-line skeleton-line--title" style="width:50%"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line"></div></div>
         </div>
