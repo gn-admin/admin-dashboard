@@ -41,6 +41,19 @@
   --sidebar-collapsed-width: 64px;
   --topbar-height: 60px;
   --bottomnav-height: 60px;
+  /* Superficies: el vidrio se aplica por capas, nunca a datos ni a inputs */
+  --surface: #ffffff;
+  --surface-soft: #fbfcfd;
+  --surface-muted: #f4f5f7;
+  --surface-border: #e5e9ee;
+  --glass-1: rgba(255, 255, 255, 0.46);
+  --glass-2: rgba(255, 255, 255, 0.64);
+  --glass-3: rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(255, 255, 255, 0.62);
+  --glass-border-strong: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 18px 40px -28px rgba(10, 67, 30, 0.42), 0 1px 2px rgba(17, 24, 39, 0.04);
+  --glass-blur: 16px;
+  --glass-blur-lg: 22px;
 }
 
 *, *::before, *::after {
@@ -504,8 +517,10 @@ body {
   justify-content: center;
   gap: 8px;
   padding: 10px 20px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  color: var(--gray-800);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -518,6 +533,10 @@ body {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--gray-200);
 }
 
 .btn-full {
@@ -717,7 +736,7 @@ body {
 .sidebar-brand-sub {
   font-size: var(--text-xs);
   font-weight: 400;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.68);
   line-height: 1.2;
 }
 
@@ -777,7 +796,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.55);
   padding: 8px 12px 4px;
   font-weight: 600;
   white-space: nowrap;
@@ -832,7 +851,7 @@ body {
   gap: 10px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: rgba(255,255,255,0.65);
+  color: rgba(255,255,255,0.8);
   text-decoration: none;
   font-size: 0.85rem;
   font-weight: 500;
@@ -893,6 +912,8 @@ body {
 }
 
 .sidebar-user-info {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -900,6 +921,9 @@ body {
 
 .sidebar-user-info .user-name {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--white);
@@ -908,8 +932,11 @@ body {
 
 .sidebar-user-info .user-role {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--text-xs);
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.68);
   line-height: 1.2;
 }
 
@@ -1019,10 +1046,9 @@ body {
   position: sticky;
   top: 0;
   height: var(--topbar-height);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--gray-200);
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1086,6 +1112,11 @@ body {
   color: var(--gray-600);
 }
 
+#refresh-btn.is-loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .mobile-logout-btn {
   display: none;
 }
@@ -1131,25 +1162,25 @@ body {
 }
 
 .stat-card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   background: var(--primary-lighter);
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .stat-card-icon.green {
   background: var(--primary-lighter);
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .stat-card-icon.orange {
   background: #fff3e0;
-  color: #f57c00;
+  color: #b45309;
 }
 
 .stat-card-icon.blue {
@@ -1403,12 +1434,18 @@ body {
 }
 
 .response-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--gray-800);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.response-name .estado-badge {
+  flex-shrink: 0;
 }
 
 .response-email {
@@ -1516,9 +1553,17 @@ body {
 }
 
 .detail-actions {
-  margin-left: auto;
   display: flex;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: 0;
+  margin-bottom: 18px;
+}
+
+.detail-header .detail-actions {
+  margin-left: auto;
+  margin-bottom: 0;
 }
 
 .detail-section {
@@ -1849,6 +1894,97 @@ body {
   font-size: 0.85rem;
 }
 
+/* Esqueletos de carga: sustituyen la pantalla en blanco mientras llega la
+   primera respuesta. El contenido real entra encima sin bloquear la app. */
+.page-skeleton {
+  padding: 8px 0 20px;
+}
+
+.skeleton-line,
+.skeleton-chip {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 45%, var(--gray-200) 65%);
+  background-size: 220% 100%;
+  border-radius: 7px;
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 12px;
+  max-width: 100%;
+  margin-bottom: 10px;
+}
+
+.skeleton-line--title {
+  width: min(340px, 68%);
+  height: 27px;
+  margin-bottom: 12px;
+}
+
+.skeleton-line--sub {
+  width: min(230px, 46%);
+  height: 12px;
+}
+
+.skeleton-line--short {
+  width: 38%;
+}
+
+.skeleton-line--medium {
+  width: 72%;
+}
+
+.skeleton-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 16px;
+}
+
+.skeleton-chip {
+  width: 94px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.skeleton-chip--wide {
+  width: 150px;
+  margin-left: auto;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.skeleton-card {
+  min-height: 122px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.modal-loading {
+  padding: 4px 0 10px;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (max-width: 767px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skeleton-chip--wide {
+    margin-left: 0;
+  }
+}
+
 /* ===== FORM GROUPS ===== */
 .form-group {
   display: flex;
@@ -1988,7 +2124,7 @@ select.form-input {
 
 .bottom-nav-item:hover,
 .bottom-nav-item.active {
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .bottom-nav-icon {
@@ -2196,6 +2332,830 @@ select.form-input {
   .modal-box {
     border-radius: var(--radius);
   }
+}
+
+/* ===== CONTRATO DE ADOPCION: PANTALLA COMPLETA ===== */
+/* El contrato es un documento largo (terminos + firmas): se abre a pantalla
+   completa para poder leerlo y firmarlo comodo en cualquier dispositivo. */
+.modal-overlay--full {
+  align-items: stretch;
+  padding: 0;
+  height: 100dvh;
+  background: rgba(9, 24, 15, 0.62);
+}
+
+.modal-box--full {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100%;
+  max-height: 100dvh;
+  border-radius: 0;
+  background: var(--white);
+  animation: modalFade 0.18s ease-out;
+}
+
+/* Cabecera compacta del contrato: el documento manda. */
+.modal-box--full .modal-header {
+  padding: 10px 18px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-box--full .modal-header h3 {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--gray-900);
+}
+
+.modal-body--full {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* El vidrio del dashboard no debe aplicarse al documento: se lee peor. */
+.modal-box--full,
+.modal-box--full .modal-body {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.contrato-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.contrato-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--gray-100);
+  background: var(--gray-50);
+}
+
+.contrato-topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--gray-600);
+}
+
+.contrato-topbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contrato-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.contrato-doc-pane {
+  display: none;
+  flex: 1 1 56%;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px clamp(20px, 4vw, 48px);
+  background: var(--gray-50);
+  border-right: 1px solid var(--gray-100);
+}
+
+.contrato-doc-pane.is-open {
+  display: block;
+}
+
+.contrato-form-pane {
+  flex: 1 1 44%;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px clamp(16px, 3vw, 28px) 32px;
+}
+
+@media (min-width: 1024px) {
+  .contrato-doc-pane {
+    display: block;
+  }
+
+  /* En escritorio el documento ya esta siempre visible: el boton de
+     alternar solo tendria sentido en movil/tablet. */
+  #contrato-doc-toggle {
+    display: none;
+  }
+}
+
+.contrato-doc {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--gray-800);
+}
+
+.contrato-doc-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 3px solid var(--primary);
+}
+
+.contrato-doc-header img,
+.contrato-doc-header .contrato-doc-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  flex-shrink: 0;
+}
+
+.contrato-doc-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--gray-900);
+}
+
+.contrato-doc-sub {
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+}
+
+.contrato-doc h3 {
+  margin: 20px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--primary-hover);
+}
+
+.contrato-doc p {
+  margin: 0 0 10px;
+  text-align: justify;
+}
+
+.contrato-doc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
+  font-size: var(--text-sm);
+}
+
+.contrato-doc-grid .label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
+.contrato-doc-animal {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.contrato-doc-foto {
+  flex: 0 0 132px;
+  width: 132px;
+  height: 132px;
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--gray-50);
+}
+
+.contrato-doc-foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.contrato-doc-foto-vacia {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  color: var(--gray-400);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+.contrato-doc-datos {
+  flex: 1;
+  min-width: 0;
+}
+
+.contrato-doc-tutor {
+  padding: 12px;
+  border: 1px solid var(--gray-100);
+  border-radius: 10px;
+  background: var(--gray-50);
+}
+
+.contrato-animal-resumen {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--gray-50);
+}
+
+.contrato-animal-resumen-foto {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--primary-hover);
+}
+
+.contrato-animal-resumen-foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.contrato-animal-resumen-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--gray-600);
+}
+
+.contrato-animal-resumen-info b {
+  font-size: var(--text-sm);
+  color: var(--gray-900);
+}
+
+.contrato-animal-resumen-info span {
+  overflow-wrap: anywhere;
+}
+
+.contrato-doc-firmas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 24px;
+  margin-top: 28px;
+}
+
+@media (max-width: 640px) {
+  .contrato-doc-animal {
+    flex-direction: column;
+  }
+
+  .contrato-doc-foto {
+    flex: 0 0 auto;
+    width: min(100%, 240px);
+    height: 200px;
+  }
+}
+
+.contrato-doc-firma {
+  padding-top: 6px;
+  border-top: 1px solid var(--gray-400);
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+}
+
+.contrato-doc-nota {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--info-light);
+  color: var(--gray-700);
+  font-size: var(--text-xs);
+}
+
+/* Contrato de acogida: se abre en el modal de informacion para revisarlo
+   antes de imprimir. El documento es opcional y no se guarda como estado. */
+.acuerdo-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.acuerdo-preview-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--info-light);
+  color: var(--info-strong);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.acuerdo-preview-hint {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--gray-600);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.acuerdo-preview-actions .btn {
+  margin-left: auto;
+}
+
+.acuerdo-preview {
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: var(--gray-50);
+}
+
+.acuerdo-preview .contrato-doc {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.acuerdo-preview .contrato-doc-grid > div,
+.acuerdo-preview .contrato-doc-meta > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.contrato-doc-firma-espacio {
+  height: 54px;
+  border-bottom: 1px solid var(--gray-400);
+}
+
+@media (max-width: 640px) {
+  .acuerdo-preview {
+    padding: 10px;
+  }
+
+  .acuerdo-preview-hint {
+    flex-basis: 100%;
+  }
+
+  .acuerdo-preview-actions .btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+.contrato-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  margin-top: 8px;
+  border-top: 1px solid var(--gray-100);
+}
+
+.contrato-acepta {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin: 12px 0;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--gray-50);
+  font-size: var(--text-sm);
+  color: var(--gray-700);
+}
+
+.contrato-acepta input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--primary-hover);
+}
+
+/* El formulario del contrato se lee como un formulario, no como una pila de
+   paneles de cristal dentro del modal. */
+.contrato-form-pane .detail-section {
+  margin: 0 0 12px;
+  padding: 0 0 6px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.contrato-form-pane .detail-section-title {
+  padding: 12px 14px 0;
+  margin-bottom: 0;
+}
+
+.contrato-form-pane .detail-field {
+  padding: 8px 14px;
+}
+
+.contrato-form-pane .form-row {
+  gap: 12px;
+}
+
+.contrato-form-pane .alert-item {
+  margin-top: 0;
+}
+
+.contrato-actions {
+  position: sticky;
+  bottom: -1px;
+  z-index: 2;
+  padding: 12px 0 0;
+  background: var(--white);
+  box-shadow: 0 -10px 20px -18px rgba(0, 0, 0, 0.45);
+}
+
+.contrato-doc-back {
+  display: none;
+  margin-bottom: 12px;
+}
+
+.contrato-doc-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+  margin: 16px 0 20px;
+  padding: 12px 14px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-100);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+}
+
+.contrato-doc-meta .label {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
+.contrato-doc-firma-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 4px;
+}
+
+.contrato-doc-firma small {
+  display: block;
+  margin-top: 2px;
+  color: var(--gray-500);
+  font-size: var(--text-2xs);
+}
+
+.contrato-doc-firma-img {
+  display: block;
+  max-width: 100%;
+  max-height: 64px;
+  margin: 6px 0 4px;
+  object-fit: contain;
+}
+
+.contrato-doc-firma-linea {
+  min-height: 64px;
+  display: flex;
+  align-items: flex-end;
+  color: var(--gray-500);
+  font-size: var(--text-xs);
+}
+
+/* En movil el documento ocupa toda la pantalla y el formulario se oculta:
+   antes ambos paneles se comprimian al 56/44% y el formulario era ilegible. */
+@media (max-width: 1023px) {
+  .contrato-layout {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .contrato-doc-pane {
+    flex: 0 0 auto;
+    border-right: 0;
+    overflow: visible;
+  }
+
+  .contrato-shell.doc-open .contrato-form-pane {
+    display: none;
+  }
+
+  .contrato-shell.doc-open .contrato-doc-pane {
+    display: block;
+    flex: 1 1 auto;
+  }
+
+  .contrato-doc-back {
+    display: inline-flex;
+  }
+
+  .contrato-topbar {
+    padding: 10px 14px;
+  }
+
+  .contrato-form-pane {
+    padding: 16px 14px 28px;
+  }
+
+  .contrato-doc {
+    padding: 18px 16px;
+  }
+}
+
+.contrato-layout--doc,
+.contrato-shell--readonly .contrato-layout {
+  overflow-y: auto;
+}
+
+.contrato-doc-pane--full {
+  display: block;
+  flex: 1 1 100%;
+  border-right: 0;
+}
+
+.detail-actions-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 16px 16px;
+}
+
+.section-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+}
+
+.detail-section-note {
+  padding: 0 16px 8px;
+  color: var(--gray-600);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.fase-bloqueo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid #fde68a;
+  border-left: 4px solid var(--warning);
+  border-radius: 10px;
+  background: var(--warning-light);
+  color: var(--gray-800);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.fase-bloqueo svg {
+  flex-shrink: 0;
+  color: #a16207;
+}
+
+.fase-bloqueo--inline {
+  margin: 0 16px 12px;
+}
+
+.check-progress {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+}
+
+.seguimiento-hitos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+@media (min-width: 768px) {
+  .seguimiento-hitos {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.seguimiento-hito {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.seguimiento-hito.hecho {
+  background: var(--primary-lighter);
+  border-color: #bbf7d0;
+}
+
+.seguimiento-hito-mes {
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--gray-900);
+}
+
+.seguimiento-hito-fecha {
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+}
+
+.seguimiento-hito .estado-badge {
+  align-self: flex-start;
+}
+
+.prueba-row {
+  border-left: 3px solid var(--primary-lighter);
+  margin: 0 16px 10px;
+  border-radius: 0 10px 10px 0;
+  background: var(--gray-50);
+}
+
+/* ===== FASES DE ADOPCION: GUIA Y CHECKLISTS ===== */
+.fase-guia {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.fase-guia.warning {
+  background: var(--warning-light);
+  border-color: #fde68a;
+}
+
+.fase-guia.success {
+  background: var(--primary-lighter);
+  border-color: #bbf7d0;
+}
+
+.fase-guia.info {
+  background: var(--info-light);
+  border-color: #bfdbfe;
+}
+
+.fase-guia-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--primary-hover);
+}
+
+.fase-guia-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fase-guia-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.fase-guia-text {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--gray-600);
+}
+
+.check-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .check-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--white);
+  font-size: var(--text-sm);
+  color: var(--gray-700);
+  cursor: pointer;
+}
+
+.check-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  margin-top: 2px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--primary-hover);
+}
+
+.check-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-ok,
+.chip-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.chip-ok {
+  background: var(--primary-lighter);
+  color: var(--primary-hover);
+}
+
+.chip-pending {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+
+.entrega-foto {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
 }
 
 /* ===== GUIA DE PROCESOS (TUTORIAL) ===== */
@@ -3075,13 +4035,13 @@ select.form-input {
 .hub-card-icon {
   width: 50px;
   height: 50px;
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   background: var(--primary-lighter);
-  color: var(--primary);
+  color: var(--primary-hover);
 }
 
 .hub-card-body {
@@ -3473,7 +4433,7 @@ select.form-input {
   }
 
   .stats-grid {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   }
 
   .animal-grid {
@@ -4599,7 +5559,7 @@ select.form-input {
   color: var(--gray-500);
 }
 
-/* ===== GLASSMORPHISM (desktop/tablet fino) ===== */
+/* ===== FONDO DECORATIVO (orbes para el vidrio) ===== */
 /* Fondo con orbes suaves para que el vidrio tenga algo que desenfocar.
    Solo en pantallas grandes; en movil se desactiva por rendimiento. */
 body::before {
@@ -4620,73 +5580,6 @@ body::before {
   }
 }
 
-/* Vidrio solo en punteros finos y pantallas >=768px (evita blur en movil/tablet tactil). */
-@media (min-width: 768px) and (pointer: fine) {
-  @supports (backdrop-filter: blur(1px)) {
-    .sidebar {
-      background: rgba(10, 67, 30, 0.72);
-      backdrop-filter: blur(16px) saturate(140%);
-      -webkit-backdrop-filter: blur(16px) saturate(140%);
-      border-right: 1px solid rgba(255, 255, 255, 0.12);
-    }
-
-    .topbar {
-      background: rgba(255, 255, 255, 0.58);
-      backdrop-filter: blur(14px) saturate(140%);
-      -webkit-backdrop-filter: blur(14px) saturate(140%);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.45);
-    }
-
-    .card,
-    .stat-card,
-    .dash-panel,
-    .modal-box,
-    .mas-menu-popup,
-    .hub-card {
-      background: rgba(255, 255, 255, 0.58);
-      backdrop-filter: blur(14px) saturate(135%);
-      -webkit-backdrop-filter: blur(14px) saturate(135%);
-      border-color: rgba(255, 255, 255, 0.5);
-      box-shadow: 0 10px 30px -18px rgba(10, 67, 30, 0.22), 0 1px 2px rgba(0, 0, 0, 0.04);
-    }
-
-    .response-card,
-    .animal-card,
-    .bl-card {
-      background: rgba(255, 255, 255, 0.55);
-      backdrop-filter: blur(12px) saturate(130%);
-      -webkit-backdrop-filter: blur(12px) saturate(130%);
-      border-color: rgba(255, 255, 255, 0.45);
-    }
-
-    .form-card,
-    .detail-section {
-      background: rgba(255, 255, 255, 0.5);
-      backdrop-filter: blur(12px) saturate(130%);
-      -webkit-backdrop-filter: blur(12px) saturate(130%);
-    }
-
-    .form-input,
-    .form-control,
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    input[type="date"],
-    input[type="number"],
-    select,
-    textarea {
-      background: rgba(255, 255, 255, 0.62);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-
-    .dash-hero {
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-  }
-}
-
 /* Login: los inputs del formulario son solidos (no vidrio) */
 .login-card input,
 .login-card select,
@@ -4695,6 +5588,648 @@ body::before {
   border: 1px solid var(--gray-200) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+/* ===== SISTEMA DE SUPERFICIES Y GLASSMORPHISM (v124) ===== */
+/*
+  Reglas del sistema:
+  1. Nivel 0: fondo y orbes. No lleva interfaz encima.
+  2. Nivel 1 (chrome): sidebar, topbar, bottom-nav. Vidrio solo con puntero
+     fino y >=768px; en tactil/movil, superficie solida por rendimiento.
+  3. Nivel 2 (contenedores): tarjetas, paneles, fichas y filtros. Vidrio
+     suave; el contenido interior (campos, tablas, documentos) es SIEMPRE
+     opaco para garantizar contraste y legibilidad.
+  4. Nivel 3 (overlays): modales y menus. Vidrio mas opaco (--glass-3) con
+     blur alto; el documento de contrato queda solido.
+  Nunca se anida blur dentro de blur: los hijos de un panel de vidrio usan
+  superficie solida o translucida sin backdrop-filter.
+*/
+
+body {
+  background-color: var(--surface-muted);
+}
+
+/* Fallback y base tactil: todo lo que puede ser vidrio tiene superficie solida. */
+.stat-card,
+.card,
+.dash-kpi,
+.dash-panel,
+.response-card,
+.animal-card,
+.bl-card,
+.hub-card,
+.animal-group-block,
+.form-card,
+.detail-section,
+.notes-section,
+.modal-box,
+.mas-menu-popup {
+  border-color: var(--surface-border);
+}
+
+.stat-card,
+.dash-kpi {
+  border-radius: var(--radius-lg);
+}
+
+.dash-kpi,
+.detail-section,
+.notes-section,
+.form-card {
+  background: var(--surface);
+}
+
+.detail-section {
+  padding: 18px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 18px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.detail-section > .detail-section-title:first-child {
+  margin-top: 0;
+}
+
+.notes-section {
+  padding: 18px;
+}
+
+.form-card > h3,
+.card-header h3 {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--gray-900);
+}
+
+.form-card > h3 {
+  margin-bottom: 18px;
+}
+
+.form-group input:not([type="checkbox"]):not([type="radio"]),
+.form-group select,
+.form-group textarea,
+.form-input,
+.search-box input,
+.filter-row select,
+.notes-section textarea {
+  background-color: var(--surface);
+}
+
+/* Los datos no son decorativos: tablas y fichas se leen sobre opaco. */
+.detail-field,
+.detail-question,
+.data-table {
+  background-color: var(--surface);
+}
+
+.data-table th {
+  background: var(--surface-muted);
+}
+
+.card-body-flush {
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  min-width: 540px;
+}
+
+.table-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--gray-500);
+}
+
+/* Los listados respiran: filtros agrupados y cabeceras sin saltos. */
+.page-list-container > .filters-bar {
+  padding: 12px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.list-header {
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 40px;
+}
+
+.list-header h2 {
+  letter-spacing: -0.01em;
+}
+
+/* Un vacio tambien es una superficie, no un hueco sin terminar. */
+.empty-state {
+  padding: 40px 24px;
+  background: var(--surface);
+  border: 1px dashed var(--gray-300);
+  border-radius: var(--radius);
+}
+
+.response-list > .empty-state,
+.animal-grid > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.empty-state p {
+  max-width: 46ch;
+  margin: 0 auto;
+  line-height: 1.55;
+}
+
+/* Toolbar de ficha: titulo y acciones en una sola linea legible. */
+.detail-toolbar-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+/* Focus visible en superficies clicables (no solo en botones). */
+.response-card:focus-visible,
+.animal-card:focus-visible,
+.bl-card:focus-visible,
+.hub-card:focus-visible,
+.dash-kpi:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}
+
+/* Indicador de seccion activa en la barra inferior movil. */
+.bottom-nav-item {
+  position: relative;
+}
+
+.bottom-nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--primary-hover);
+}
+
+/* ===== PIPELINE DE FASES ===== */
+.pipeline-card .card-body {
+  padding: 12px;
+}
+
+.pipeline {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.pipeline-step {
+  flex: 1 0 84px;
+  min-width: 84px;
+  padding: 10px 8px;
+  text-align: center;
+  border: 1px solid var(--gray-100);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.pipeline-step.is-active {
+  border-color: var(--primary-light);
+  background: var(--primary-lighter);
+}
+
+.pipeline-value {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--gray-300);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipeline-step.is-active .pipeline-value {
+  color: var(--primary-hover);
+}
+
+.pipeline-label {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+/* ===== PERFIL ===== */
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0 20px;
+  text-align: center;
+}
+
+.profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--primary-lighter);
+  color: var(--primary-hover);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.profile-name {
+  max-width: 100%;
+  margin-top: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  overflow-wrap: anywhere;
+}
+
+.profile-email {
+  max-width: 100%;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  overflow-wrap: anywhere;
+}
+
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-actions .btn {
+  width: 100%;
+}
+
+/* ===== MODALES: CABECERA FIJA Y PIE DE ACCIONES ===== */
+.modal-box {
+  max-height: 90dvh;
+  border: 1px solid var(--surface-border);
+  overflow: hidden;
+}
+
+.modal-body {
+  min-height: 0;
+}
+
+.modal-header {
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  line-height: 1.3;
+}
+
+.modal-body {
+  overscroll-behavior: contain;
+}
+
+.modal-footer {
+  flex-shrink: 0;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--surface-border);
+  background: var(--surface-soft);
+}
+
+/* Los formularios dentro de un modal mantienen visible Guardar/Cancelar. */
+.modal-body--form {
+  padding-bottom: 0;
+}
+
+.modal-body--form .form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 20px -20px 0;
+  padding: 14px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--surface-border);
+}
+
+/* En un modal no se anidan paneles de vidrio: el contenido va sobre opaco. */
+.modal-body .detail-section {
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.contrato-form-pane .detail-section,
+.contrato-doc .detail-section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ===== VIDRIO: SOLO ESCRITORIO CON PUNTERO FINO ===== */
+@media (min-width: 768px) and (pointer: fine) {
+  .topbar {
+    background: rgba(255, 255, 255, 0.68);
+    border-bottom-color: var(--glass-border);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  }
+
+  .sidebar {
+    background: linear-gradient(180deg, rgba(10, 67, 30, 0.88) 0%, rgba(13, 82, 37, 0.84) 50%, rgba(21, 134, 61, 0.78) 100%);
+    border-right: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px) saturate(135%);
+    -webkit-backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .stat-card,
+  .card,
+  .dash-kpi,
+  .dash-panel,
+  .response-card,
+  .animal-card,
+  .bl-card,
+  .hub-card,
+  .animal-group-block {
+    background: var(--glass-1);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  }
+
+  .form-card,
+  .detail-section,
+  .notes-section,
+  .mas-menu-popup,
+  .page-list-container > .filters-bar {
+    background: var(--glass-2);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  }
+
+  .modal-box {
+    background: var(--glass-3);
+    border-color: var(--glass-border-strong);
+    box-shadow: 0 30px 70px -32px rgba(10, 67, 30, 0.5), var(--shadow-lg);
+    backdrop-filter: blur(var(--glass-blur-lg)) saturate(145%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(145%);
+  }
+
+  .modal-overlay {
+    background: rgba(9, 24, 15, 0.45);
+  }
+
+  /* Datos y controles permanecen opacos aunque el contenedor sea vidrio. */
+  .detail-field,
+  .detail-question,
+  .data-table,
+  .data-table th,
+  .form-group input:not([type="checkbox"]):not([type="radio"]),
+  .form-group select,
+  .form-group textarea,
+  .form-input,
+  .search-box input,
+  .filter-row select,
+  .notes-section textarea {
+    background-color: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .modal-body .detail-section {
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .modal-body--form .form-actions {
+    background: var(--glass-3);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* El contrato y los documentos se leen sobre papel, no sobre vidrio. */
+  .modal-box.modal-box--full,
+  .modal-box.modal-box--full .modal-body,
+  .contrato-doc {
+    background: var(--white);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ===== SIN BLUR EN MOVIL O PUNTERO GRUESO (rendimiento) ===== */
+@media (max-width: 767px), (pointer: coarse) {
+  .topbar,
+  .bottom-nav,
+  .sidebar,
+  .stat-card,
+  .card,
+  .dash-kpi,
+  .dash-panel,
+  .response-card,
+  .animal-card,
+  .bl-card,
+  .hub-card,
+  .animal-group-block,
+  .form-card,
+  .detail-section,
+  .notes-section,
+  .page-list-container > .filters-bar,
+  .modal-box,
+  .mas-menu-popup {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .topbar,
+  .bottom-nav,
+  .stat-card,
+  .dash-kpi,
+  .dash-panel,
+  .response-card,
+  .animal-card,
+  .bl-card,
+  .hub-card,
+  .animal-group-block,
+  .form-card,
+  .detail-section,
+  .notes-section,
+  .page-list-container > .filters-bar,
+  .modal-box,
+  .mas-menu-popup {
+    background: var(--surface);
+  }
+
+  .modal-overlay {
+    background: rgba(9, 24, 15, 0.55);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .stat-card,
+  .card,
+  .dash-kpi,
+  .dash-panel,
+  .response-card,
+  .animal-card,
+  .bl-card,
+  .hub-card,
+  .animal-group-block,
+  .form-card,
+  .detail-section,
+  .notes-section,
+  .page-list-container > .filters-bar,
+  .modal-box,
+  .mas-menu-popup {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .sidebar {
+    background: linear-gradient(180deg, #0A431E 0%, #0d5225 50%, #15863D 100%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar,
+  .stat-card,
+  .card,
+  .dash-kpi,
+  .dash-panel,
+  .response-card,
+  .animal-card,
+  .bl-card,
+  .hub-card,
+  .animal-group-block,
+  .form-card,
+  .detail-section,
+  .notes-section,
+  .page-list-container > .filters-bar,
+  .modal-box,
+  .mas-menu-popup {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ===== AJUSTES MOVILES DE LOS NUEVOS COMPONENTES ===== */
+@media (max-width: 767px) {
+  .detail-section {
+    padding: 16px;
+  }
+
+  .modal-box {
+    max-height: 92dvh;
+  }
+
+  .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-body--form {
+    padding-bottom: 0;
+  }
+
+  .modal-body--form .form-actions {
+    margin: 20px -16px 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+  }
+
+  .detail-toolbar-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .pipeline-step {
+    flex-basis: 92px;
+  }
+}
+
+/* ===== LEGIBILIDAD DE METADATOS Y GRAFICOS ===== */
+/* gray-400 sobre blanco no llega a AA para texto normal: los metadatos
+   pasan a gray-500. Los estados usan la variante oscura de su color. */
+.response-email,
+.response-date,
+.detail-meta,
+.detail-field label,
+.animal-card-breed,
+.hub-card-date,
+.bl-card-email,
+.bl-card-meta,
+.empty-state,
+.empty-state p,
+.dash-chart-label {
+  color: var(--gray-500);
+}
+
+.stat-card-change.up {
+  color: var(--primary-hover);
+}
+
+/* El aviso de sincronizacion pendiente es ambar, no verde: no debe
+   confundirse con un exito. */
+.pending-sync-badge {
+  color: #b45309;
+  border-color: #b45309;
+}
+
+.estado-badge.pendiente {
+  color: #b45309;
+}
+
+.estado-badge.en_proceso {
+  color: var(--info-strong);
+}
+
+.estado-badge.descartada {
+  color: var(--danger-hover);
+}
+
+.dash-spark-svg polyline,
+.dash-chart-line,
+.dash-chart-dot {
+  stroke: var(--primary-hover);
+}
+
+/* PWA: el modal tambien bloquea el fondo */
+body.pwa-modal-open {
+  overflow: hidden;
 }
 
 /* ===== PRINT ===== */

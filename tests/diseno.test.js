@@ -93,9 +93,9 @@ describe('contraste WCAG AA (pares ya corregidos)', () => {
 
 describe('integridad estatica: clases, ids e iconos', () => {
   const okClase = c => /^[a-z][a-z0-9-]*$/i.test(c);
-  // Se usan sin regla propia a proposito: .btn-text la estila el selector
-  // descendiente #login-submit-btn.loading span y .modal-footer lleva style inline.
-  const SIN_REGLA_PROPIA = new Set(['btn-text', 'modal-footer']);
+  // Se usa sin regla propia a proposito: .btn-text la estila el selector
+  // descendiente #login-submit-btn.loading span.
+  const SIN_REGLA_PROPIA = new Set(['btn-text']);
 
   it('toda clase usada en JS/HTML de interfaz existe en el CSS', () => {
     const cssClases = new Set([...CSS.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].map(m => m[1]));
@@ -164,5 +164,22 @@ describe('integridad estatica: clases, ids e iconos', () => {
     assert.match(html, /rel="apple-touch-icon" href="assets\/icons\/icon-180\.png"/);
     assert.match(html, /name="apple-mobile-web-app-title"/);
     assert.match(html, /js\/pwa\.js/);
+  });
+
+  it('el contrato de adopcion se abre a pantalla completa', () => {
+    const html = leer('index.html');
+    assert.match(html, /id="contrato-modal"[^>]*modal-overlay--full|modal-overlay--full[^>]*id="contrato-modal"/);
+    assert.match(html, /modal-box--full/);
+    assert.match(CSS, /\.modal-box--full/);
+    assert.match(CSS, /\.contrato-layout/);
+    assert.match(CSS, /\.contrato-shell\.doc-open \.contrato-form-pane/);
+    assert.match(CSS, /height:\s*100dvh/);
+    assert.match(CSS, /\.contrato-doc-back/);
+  });
+
+  it('el contrato de acogida tiene previsualizacion y firma en papel', () => {
+    assert.match(CSS, /\.acuerdo-preview/);
+    assert.match(CSS, /\.acuerdo-preview-actions/);
+    assert.match(CSS, /\.contrato-doc-firma-espacio/);
   });
 });

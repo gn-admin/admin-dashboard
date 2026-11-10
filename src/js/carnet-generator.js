@@ -141,7 +141,10 @@ const CarnetGenerator = {
     ctx.fillStyle = '#aff3c7';
     ctx.font = '11px Inter, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('ID: ' + (socio.carnet_id || socio.id) + '  |  ' + new Date().toLocaleDateString('es-ES'), width/2, height - 20);
+    const hoy = (typeof Dashboard !== 'undefined' && Dashboard._fechaCorta)
+      ? Dashboard._fechaCorta(new Date(), false)
+      : new Date().toISOString().slice(0, 10).replace(/-/g, '/');
+    ctx.fillText('ID: ' + (socio.carnet_id || socio.id) + '  |  ' + hoy, width/2, height - 20);
 
     return canvas;
   },

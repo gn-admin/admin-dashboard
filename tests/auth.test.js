@@ -2,7 +2,7 @@
  * Tests del mensaje de login (puro, sin DOM ni red).
  * Ejecutar: npm test  (node --test tests/*.test.js)
  */
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const Auth = require('../src/js/auth.js');
@@ -91,5 +91,66 @@ describe('loginWithEmail: relanza siempre un error sanitizado', () => {
       if (originalFirebase === undefined) delete global.firebase;
       else global.firebase = originalFirebase;
     }
+  });
+});
+
+describe('_syncUserStorage: cada cuenta tiene su propia cache', () => {
+  let previa;
+  let storage;
+
+  const memoria = () => {
+    const s = {
+      getItem(k) { return Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null; },
+      setItem(k, v) { s[k] = String(v); },
+      removeItem(k) { delete s[k]; }
+    };
+    return s;
+  };
+
+  beforeEach(() => {
+    previa = global.localStorage;
+    storage = memoria();
+    global.localStorage = storage;
+  });
+
+  afterEach(() => {
+    if (previa === undefined) delete global.localStorage;
+    else global.localStorage = previa;
+  });
+
+  it('borra datos y cache al cambiar de cuenta, sin tocar preferencias', () => {
+    storage.setItem('gn_animales', '[{"id":"a1"}]');
+    storage.setItem('gn_cache_animales', '[{"id":"a1"}]');
+    storage.setItem('gn_pending_ops', '[{"m":"createAnimal"}]');
+    storage.setItem('gn_sidebar_sections', '["gestion"]');
+    storage.setItem('gn_session', '1');
+
+    assert.equal(Auth._syncUserStorage({ uid: 'u1' }), true);
+    assert.equal(storage.getItem('gn_data_uid'), 'u1');
+    assert.equal(storage.getItem('gn_animales'), null);
+    assert.equal(storage.getItem('gn_cache_animales'), null);
+    assert.equal(storage.getItem('gn_pending_ops'), null);
+    assert.equal(storage.getItem('gn_sidebar_sections'), '["gestion"]');
+    assert.equal(storage.getItem('gn_session'), '1');
+
+    storage.setItem('gn_animales', '[{"id":"a2"}]');
+    assert.equal(Auth._syncUserStorage({ uid: 'u2' }), true);
+    assert.equal(storage.getItem('gn_data_uid'), 'u2');
+    assert.equal(storage.getItem('gn_animales'), null);
+  });
+
+  it('mantiene la cache si la cuenta no cambia', () => {
+    storage.setItem('gn_data_uid', 'u1');
+    storage.setItem('gn_animales', '[{"id":"a1"}]');
+    assert.equal(Auth._syncUserStorage({ uid: 'u1' }), false);
+    assert.equal(storage.getItem('gn_animales'), '[{"id":"a1"}]');
+  });
+
+  it('limpia tambien al cerrar sesion', () => {
+    storage.setItem('gn_data_uid', 'u1');
+    storage.setItem('gn_familias', '[{"id":"f1"}]');
+    assert.equal(Auth._syncUserStorage(null), true);
+    assert.equal(storage.getItem('gn_data_uid'), null);
+    assert.equal(storage.getItem('gn_familias'), null);
   });
 });

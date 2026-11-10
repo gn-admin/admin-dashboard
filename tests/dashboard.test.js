@@ -138,27 +138,25 @@ describe('estados y etiquetas', () => {
 });
 
 describe('_fmtFecha: fechas legibles, resto intacto', () => {
-  it('ISO con hora -> fecha + hora', () => {
-    const r = Dashboard._fmtFecha('2026-09-24T10:30:00.000Z');
-    assert.match(r, /2026/);
-    assert.match(r, /24/);
+  it('ISO con hora -> AAAA/MM/DD hh:mm AM/PM', () => {
+    assert.equal(Dashboard._fmtFecha('2026-09-24T10:30:00.000Z'), '2026/09/24 10:30 AM');
+    assert.equal(Dashboard._fmtFecha('2026-09-24T15:05:00'), '2026/09/24 03:05 PM');
+    assert.equal(Dashboard._fmtFecha('2026-09-24T00:05:00'), '2026/09/24 12:05 AM');
+    assert.equal(Dashboard._fmtFecha('2026-09-24T12:05:00'), '2026/09/24 12:05 PM');
   });
 
-  it('ISO solo fecha -> sin hora', () => {
-    const r = Dashboard._fmtFecha('2026-09-24');
-    assert.match(r, /2026/);
-    assert.doesNotMatch(r, /:/);
+  it('ISO solo fecha -> AAAA/MM/DD sin hora', () => {
+    assert.equal(Dashboard._fmtFecha('2026-09-24'), '2026/09/24');
+    assert.doesNotMatch(Dashboard._fmtFecha('2026-09-24'), /:/);
   });
 
-  it('timestamp es-ES de Forms -> legible', () => {
-    const r = Dashboard._fmtFecha('24/09/2026 10:30:00');
-    assert.match(r, /2026/);
-    assert.match(r, /10:30/);
+  it('timestamp es-ES de Forms -> AAAA/MM/DD hh:mm AM/PM', () => {
+    assert.equal(Dashboard._fmtFecha('24/09/2026 10:30:00'), '2026/09/24 10:30 AM');
+    assert.equal(Dashboard._fmtFecha('13 abr 2025'), '2025/04/13');
   });
 
   it('objeto Date -> legible', () => {
-    const r = Dashboard._fmtFecha(new Date(2026, 8, 24, 10, 30));
-    assert.match(r, /2026/);
+    assert.equal(Dashboard._fmtFecha(new Date(2026, 8, 24, 10, 30)), '2026/09/24 10:30 AM');
   });
 
   it('vacio -> raya', () => {
@@ -1110,5 +1108,228 @@ describe('home v22: serie, sparkline, donut y variaciones', () => {
     Dashboard.states = { 's1::r1': 'pendiente', 's1::r2': 'en_proceso', 's1::r3': 'descartada' };
     Dashboard.animales = [{ id: 'a1', estado: 'adoptado' }];
     assert.deepEqual(Dashboard._funnelStages().map(s => s[1]), [1, 1, 0, 1]);
+  });
+});
+
+describe('fases de adopcion: requisitos, checklists y contrato', () => {
+  it('_fasesAdopcion mantiene el orden historico', () => {
+    assert.deepEqual(Dashboard._fasesAdopcion(), [
+      'Encuesta recibida', 'Revision', 'Visita domiciliaria', 'Contrato', 'Entrega', 'Prueba', 'Seguimiento'
+    ]);
+    assert.equal(Dashboard._faseIdx('Entrega'), 4);
+    assert.equal(Dashboard._faseIdx('No existe'), -1);
+  });
+
+  it('_faseInfo distingue Prueba (adaptacion) de Seguimiento (largo plazo)', () => {
+    assert.match(Dashboard._faseInfo('Prueba').desc, /adaptacion/i);
+    assert.match(Dashboard._faseInfo('Seguimiento').desc, /largo plazo/i);
+    assert.equal(Dashboard._faseInfo('Contrato').tono, 'warning');
+    assert.equal(Dashboard._faseInfo('Seguimiento').tono, 'success');
+  });
+
+  it('_requisitoAvance: sin contrato no se pasa de Contrato', () => {
+    assert.match(Dashboard._requisitoAvance({ fase: 'Contrato' }, null), /Firma el contrato/);
+    assert.equal(Dashboard._requisitoAvance({ fase: 'Contrato' }, { id: 'ctr_1' }), null);
+    assert.equal(Dashboard._requisitoAvance({ fase: 'Revision' }, null), null);
+  });
+
+  it('_requisitoAvance: la entrega exige fecha y checklist completo', () => {
+    const completo = {};
+    Dashboard._entregaChecklist().filter(x => !x.opcional).forEach(x => { completo[x.id] = true; });
+    assert.match(Dashboard._requisitoAvance({ fase: 'Entrega' }, { id: 'ctr_1' }), /fecha de entrega/);
+    assert.match(Dashboard._requisitoAvance({ fase: 'Entrega', fecha_entrega: '2025-04-13' }, { id: 'ctr_1' }), /checklist/i);
+    assert.match(Dashboard._requisitoAvance({ fase: 'Entrega', fecha_entrega: '2025-04-13', entrega_checklist: JSON.stringify({ contrato: true }) }, { id: 'ctr_1' }), /checklist/i);
+    assert.equal(Dashboard._requisitoAvance({ fase: 'Entrega', fecha_entrega: '2025-04-13', entrega_checklist: JSON.stringify(completo) }, { id: 'ctr_1' }), null);
+  });
+
+  it('_requisitoAvance: la prueba de adaptacion es obligatoria antes de Seguimiento', () => {
+    const p = { id: 'ad1', fase: 'Prueba' };
+    assert.match(Dashboard._requisitoAvance(p, { id: 'ctr_1' }, []), /prueba/i);
+    assert.equal(Dashboard._requisitoAvance(p, { id: 'ctr_1' }, [{ adopcion_id: 'ad1', tipo: 'Prueba' }]), null);
+  });
+
+  it('_entregaFaltantes ignora los items opcionales', () => {
+    const completo = {};
+    Dashboard._entregaChecklist().filter(x => !x.opcional).forEach(x => { completo[x.id] = true; });
+    completo.esterilizacion = false;
+    assert.deepEqual(Dashboard._entregaFaltantes({ entrega_checklist: JSON.stringify(completo) }), []);
+    assert.ok(Dashboard._entregaFaltantes({ entrega_checklist: '{}' }).length > 0);
+  });
+
+  it('_sumaMeses y _seguimientoHitos calculan 1, 3, 6 y 12 meses desde la entrega', () => {
+    assert.equal(Dashboard._sumaMeses('2025-01-15', 1), '2025-02-15');
+    const hitos = Dashboard._seguimientoHitos(
+      { id: 'ad1', fecha_entrega: '2025-01-15' },
+      [{ adopcion_id: 'ad1', tipo: 'Seguimiento', hito: '1m', fecha: '2025-02-15' }]
+    );
+    assert.equal(hitos.length, 4);
+    assert.equal(hitos[0].fecha, '2025-02-15');
+    assert.equal(hitos[0].hecho, true);
+    assert.equal(hitos[1].fecha, '2025-04-15');
+    assert.equal(hitos[1].hecho, false);
+    assert.equal(Dashboard._seguimientoHitos({ id: 'ad1' })[0].fecha, '');
+  });
+
+  it('_entregaChecklist y _pruebaChecklist tienen ids unicos', () => {
+    const entrega = Dashboard._entregaChecklist();
+    const prueba = Dashboard._pruebaChecklist();
+    assert.ok(entrega.length >= 8);
+    assert.ok(prueba.length >= 6);
+    assert.equal(new Set(entrega.map(x => x.id)).size, entrega.length);
+    assert.equal(new Set(prueba.map(x => x.id)).size, prueba.length);
+    assert.ok(entrega.some(x => /contrato/i.test(x.label)));
+  });
+
+  it('_checklistMarks tolera JSON, objetos y basura', () => {
+    assert.deepEqual(Dashboard._checklistMarks('{"a":true}'), { a: true });
+    assert.deepEqual(Dashboard._checklistMarks({ b: true }), { b: true });
+    assert.deepEqual(Dashboard._checklistMarks('{roto'), {});
+    assert.deepEqual(Dashboard._checklistMarks(''), {});
+  });
+
+  it('_faseGuia avisa cuando falta el contrato o la entrega', () => {
+    const g1 = Dashboard._faseGuia({ fase: 'Contrato' }, null);
+    assert.equal(g1.tono, 'warning');
+    assert.equal(g1.cta, 'contrato');
+    const g2 = Dashboard._faseGuia({ fase: 'Contrato' }, { id: 'ctr_1' });
+    assert.equal(g2.tono, 'success');
+    const g3 = Dashboard._faseGuia({ fase: 'Entrega' }, { id: 'ctr_1' });
+    assert.equal(g3.cta, 'entrega');
+    assert.match(g3.text, /Registra la fecha/);
+  });
+
+  it('_mailtoHref codifica destinatarios, asunto y cuerpo', () => {
+    const href = Dashboard._mailtoHref({ animal: 'Luna' }, ['a@x.com', 'b@y.com'], {});
+    assert.match(href, /^mailto:a@x\.com,b@y\.com\?subject=/);
+    assert.match(href, /Luna/);
+    assert.ok(href.includes('mailto:'));
+  });
+
+  it('_debeOfrecerMailto reconoce endpoint ausente o no configurado', () => {
+    assert.equal(Dashboard._debeOfrecerMailto(new Error('Endpoint no encontrado')), true);
+    assert.equal(Dashboard._debeOfrecerMailto(new Error('HTTP 404: Not Found')), true);
+    assert.equal(Dashboard._debeOfrecerMailto(new Error('Cloud no configurado')), true);
+    assert.equal(Dashboard._debeOfrecerMailto(new Error('Token invalido')), false);
+    assert.equal(Dashboard._debeOfrecerMailto(null), false);
+  });
+
+  it('_contratoTerminosHtml incluye clausulas y escapa los nombres', () => {
+    const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana <b>X</b>', animal: 'Luna' });
+    assert.match(html, /Contrato de adopcion responsable/);
+    assert.match(html, /seguimiento posterior a la adopcion/);
+    assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
+    assert.doesNotMatch(html, /<b>X<\/b>/);
+  });
+
+  it('_contratoTerminosHtml muestra datos y firmas cuando hay contrato', () => {
+    const html = Dashboard._contratoTerminosHtml(
+      { adoptante: 'Ana', animal: 'Luna' },
+      { f1_nombre: 'Ana', f1_dni: '123', fecha: '2025-04-13', ciudad: 'Madrid', f1_firma: 'data:image/png;base64,AAA' }
+    );
+    assert.match(html, /Documento firmado/);
+    assert.match(html, /DNI 123/);
+    assert.match(html, /data:image\/png;base64,AAA/);
+  });
+});
+
+describe('_contratoTutor: tutor real vs entidad', () => {
+  it('distingue al tutor de la entidad y no confunde el segundo firmante', () => {
+    assert.equal(Dashboard._contratoTutor({ f2_nombre: 'Luis', f2_rol: 'Tutor legal' }).f2_nombre, 'Luis');
+    assert.equal(Dashboard._contratoTutor({ f2_nombre: 'Grupo Nebak', f2_rol: 'Entidad' }), null);
+    assert.equal(Dashboard._contratoTutor({}), null);
+  });
+});
+
+describe('_contratoAcogidaDatos: documento opcional de acogida', () => {
+  it('mezcla caso, animal, familia y datos de la solicitud', () => {
+    const prev = { animales: Dashboard.animales, familias: Dashboard.familias, responses: Dashboard.responses };
+    try {
+      Dashboard.animales = [{ id: 'a1', nombre: 'Luna', especie: 'Perro', raza: 'Mestiza', foto: 'assets/luna.jpg' }];
+      Dashboard.familias = [{ id: 'f1', nombre: 'Ana', email: 'ana@x.es', telefono: '600123123', ubicacion: 'Irun' }];
+      Dashboard.responses = { 'pre-acogida': [{ id: 'r1', dni: '12345678A', direccion: 'Calle Mayor 1', ciudad: 'Irun' }] };
+      const d = Dashboard._contratoAcogidaDatos({
+        id: 'acg1', animal_id: 'a1', familia_id: 'f1', animal: 'Luna', familia: 'Ana',
+        solicitud_id: 'pre-acogida::r1', inicio: '2026-01-02', fase: 'en_casa'
+      });
+      assert.equal(d.id, 'acg1');
+      assert.equal(d.animal.nombre, 'Luna');
+      assert.equal(d.animal.especie, 'Perro');
+      assert.equal(d.familia.nombre, 'Ana');
+      assert.equal(d.familia.dni, '12345678A');
+      assert.equal(d.familia.direccion, 'Calle Mayor 1');
+      assert.equal(d.familia.telefono, '600123123');
+      assert.equal(d.ciudad, 'Irun');
+      assert.equal(d.inicio, '2026-01-02');
+      assert.equal(d.fase, 'en_casa');
+      assert.match(d.fecha, /^\d{4}-\d{2}-\d{2}$/);
+    } finally {
+      Dashboard.animales = prev.animales;
+      Dashboard.familias = prev.familias;
+      Dashboard.responses = prev.responses;
+    }
+  });
+});
+
+describe('multiusuario: identidad y cache no resucita borrados', () => {
+  const G = globalThis;
+  let previa;
+  let storage;
+
+  const memoria = () => ({
+    _d: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this._d, k) ? this._d[k] : null; },
+    setItem(k, v) { this._d[k] = String(v); },
+    removeItem(k) { delete this._d[k]; }
+  });
+
+  beforeEach(() => {
+    previa = G.localStorage;
+    storage = memoria();
+    G.localStorage = storage;
+    Dashboard._userUid = 'u1';
+    Dashboard._loaded = {};
+    Dashboard._loading = {};
+    Dashboard._cached = {};
+  });
+
+  afterEach(() => {
+    if (previa === undefined) delete G.localStorage;
+    else G.localStorage = previa;
+    Dashboard.animales = [];
+    Dashboard._userUid = null;
+    Dashboard._loaded = {};
+    Dashboard._loading = {};
+    Dashboard._cached = {};
+  });
+
+  it('_identity usa la cuenta actual y traduce el rol', () => {
+    const u = Dashboard._identity(null, { name: 'Ana Pérez', email: 'ana@example.com', role: 'admin' });
+    assert.equal(u.name, 'Ana Pérez');
+    assert.equal(u.roleLabel, 'Administrador');
+    assert.equal(u.avatar, 'A');
+    assert.equal(Dashboard._roleLabel('usuario'), 'Usuario');
+  });
+
+  it('_pendingKey relaciona los metodos de API con su lista', () => {
+    assert.equal(Dashboard._pendingKey('createAnimal'), 'animales');
+    assert.equal(Dashboard._pendingKey('updateContrato'), 'contratos');
+    assert.equal(Dashboard._pendingKey('deleteBlacklist'), 'blacklist');
+    assert.equal(Dashboard._pendingKey('createActividad'), '');
+  });
+
+  it('_loadList descarta una fila que ya no existe en el servidor', async () => {
+    storage.setItem('gn_data_uid', 'u1');
+    Dashboard.animales = [{ id: 'a1', nombre: 'Servidor viejo' }, { id: 'a2', nombre: 'Borrado por otro usuario' }];
+    const out = await Dashboard._loadList('animales', async () => ({ data: [{ id: 'a1', nombre: 'Servidor' }] }), true);
+    assert.deepEqual(out.map(a => a.id), ['a1']);
+    assert.equal(out[0].nombre, 'Servidor');
+  });
+
+  it('_loadList conserva solo la fila local con una operacion pendiente', async () => {
+    storage.setItem('gn_data_uid', 'u1');
+    storage.setItem('gn_pending_ops', JSON.stringify([{ m: 'createAnimal', a: [{ id: 'a2' }], uid: 'u1' }]));
+    Dashboard.animales = [{ id: 'a1' }, { id: 'a2', nombre: 'Pendiente de subir' }, { id: 'a3', nombre: 'Borrado' }];
+    const out = await Dashboard._loadList('animales', async () => ({ data: [{ id: 'a1' }] }), true);
+    assert.deepEqual(out.map(a => a.id), ['a1', 'a2']);
   });
 });

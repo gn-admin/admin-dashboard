@@ -104,6 +104,7 @@ const backendConfig = `var CONFIG = {
   DRIVE_FOTOS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FOTOS_FOLDER_ID', '')}',
   DRIVE_DOCS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_DOCS_FOLDER_ID', '')}',
   DRIVE_FACTURAS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FACTURAS_FOLDER_ID', '')}',
+  CONTACT_EMAIL: '${env('CONTACTO_EMAIL', '')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario' },
 
   surveys: {

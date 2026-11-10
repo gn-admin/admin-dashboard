@@ -109,6 +109,7 @@ const API = {
   async createContrato(data) { return this._post('contratos', data); },
   async updateContrato(id, data) { const r = await this._post('update-contrato', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteContrato(id) { return this._post('delete-contrato', { id }); },
+  async sendContratoEmail(data) { return this._post('send-contrato-email', data); },
 
   // Gastos veterinarios (CRUD)
   async getGastos() { return this._get('gastos'); },

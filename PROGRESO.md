@@ -17,7 +17,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (**290 tests en verde**, lógica pura sin
+- `npm test` — `node --test tests/*.test.js` (**330 tests en verde**, lógica pura sin
   DOM; 6 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export` / `auth`).
   En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
   **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v106`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v129`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -87,7 +87,8 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   el listado) y se hidrata desde caché.
 - **Familias**: CRUD, capacidad/ocupación, borrado con cierre de casos.
 - **Acogidas activas**: ciclo entrega→en_casa→finalizada (con confirmación), borrado
-  de caso individual, rollback espejo (animal, familia, solicitud, candidatura).
+  de caso individual, rollback espejo (animal, familia, solicitud, candidatura) y
+  **contrato de acogida opcional** (documento/PDF para firmar en papel; no bloquea fases).
 - **Adopciones**: pipeline de 7 fases (+/−), contrato con firma en canvas (firmante 1
   obligatorio) + PDF, borrado con rollback en cascada (backend `deleteAdopcionCascade`
   + espejo front), **devolución con motivo** (`desenlace=devuelto`, `motivo_devolucion`,
@@ -129,6 +130,14 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
   además persiste en `gn_cache_actividad` (la colección no está en `saveLocal()`).
 - **Anti doble-tap**: `avanzarFase`/`retrocederFase`/`avanzarFaseAcogida` protegidos
   por `_busyStart`/`_busyEnd` (llave por caso, liberada en `finally`).
+- **Fases de adopción**: contrato obligatorio para salir de `Contrato`; entrega con
+  `fecha_entrega` y checklist obligatorio completo (`_entregaFaltantes`; los ítems
+  opcionales no bloquean) para pasar a `Prueba`; prueba de adaptación registrada para
+  pasar a `Seguimiento`; tarjeta guía, botón de avance bloqueado con candado y aviso
+  al retroceder. El **seguimiento** (1, 3, 6 y 12 meses) se ve en todas las fases y
+  calcula sus hitos desde `fecha_entrega` (`_seguimientoHitos`). El modal de contrato,
+  a pantalla completa, separa documento y firma y en móvil dedica toda la pantalla al
+  documento; permite enviar el contrato por email a adoptante, titular y Grupo Nebak.
 - **Dashboard**: tarjeta Hoy, Acción requerida unificada, KPIs clicables con deltas,
   Tesorería (donaciones/gastos/balance/cuotas), barras + embudo, recientes. Pintado
   instantáneo desde caché + refresco en fondo.
@@ -336,3 +345,37 @@ Mejoras candidatas, por orden de encaje:
 - **Recibos SEPA** para cuotas de socios.
 - **Colonias felinas CER** y **alta de voluntarios vía Google Form**.
 - **Protocolo automático de recordatorios de entrada**.
+
+## v125 — carga percibida (2026-11-09)
+- **Cache-first**: `_hydrateCache` hidrata todas las listas cacheadas y marca `_cached`;
+  `_loadSurveys`/`_loadResponses`/`_loadList`/`loadEstados`/`loadNotas` pintan la copia
+  local al instante y revalidan en segundo plano (si no hay caché, esperan red).
+- **Arranque**: `init` ya no espera al perfil ni a encuestas/estados/notas para ocultar
+  el overlay; el perfil y los datos llegan después. `showDashboard` navega sin bloquearse.
+- **Esqueletos**: `loadPage` pinta `.page-skeleton` (título, filtros y tarjetas) y el
+  home usa el mismo patrón; el cuestionario abre el modal al instante con
+  `_modalSkeleton` en vez del overlay global. `_refreshHome` fuerza red para repintar
+  cuando llegan datos frescos. SW `v125`.
+
+## v126 — contrato completo (2026-11-10)
+- El **PDF de contrato** y el documento del modal incluyen la **foto del animal**, su ficha completa (especie, raza, sexo, edad, nacimiento, microchip, peso, esterilización y reseñas), los datos del **adoptante** y, si existe, los del **tutor** (relación, DNI, domicilio, email, teléfono y firma).
+- `_contratoTutor` distingue un tutor real de un segundo firmante que representa a la entidad; las firmas muestran siempre adoptante, tutor (si existe) y Grupo Nebak.
+- `_printAsync` espera a que carguen el logo y la foto antes de abrir la impresión, con timeout para no bloquear el PDF. SW `v126`.
+
+## v127 — multiusuario y refresco (2026-11-10)
+- **Aislamiento por cuenta**: `Auth._syncUserStorage` guarda `gn_data_uid` y borra datos, `gn_cache_*` y operaciones pendientes al cambiar de cuenta, conservando solo preferencias de interfaz. `Dashboard.setUser`/`resetUserState` limpia memoria, DOM y modales; `_canPersistUserData` evita que una pestaña con la cuenta anterior escriba caché o encola operaciones bajo la cuenta nueva.
+- **Borrados remotos**: `_loadList` ya no concatena toda la caché local; solo conserva registros ausentes en servidor si tienen una operación pendiente (`_pendingLocalIds`). Así una fila borrada desde otra sesión no reaparece.
+- **Refresco manual**: `Dashboard.refreshData` recarga encuestas, estados, notas, respuestas y todas las listas forzando red, repinta la página actual y se expone en el botón `#refresh-btn` de la topbar (spinner/estado deshabilitado).
+- **Identidad y estilos**: nombre/email/rol se toman del perfil o de la cuenta Firebase actual, con rol traducido; el sidebar trunca nombres largos con elipsis (`flex:1` + `min-width:0`), el perfil envuelve emails/nombres largos y el topbar mantiene el refresco visible en 360, 768 y 1440 px.
+- **Verificación**: 325 tests en verde; prueba en navegador con dos cuentas simuladas (A→B sin datos residuales, refresco tras cambio remoto) y medición de overflow en los tres anchos. SW `v127`.
+- **Pendiente de decisión**: el backend sigue sin roles/allowlist (cualquier cuenta Firebase verificada es admin) y no hay control de concurrencia (gana la última escritura). No se tocó Redes/Meta, pendiente de API.
+
+## v128 — formato estándar de fechas (2026-11-10)
+- `Dashboard._fmtFecha` y `_fechaCorta` unifican la presentación en `AAAA/MM/DD` y, si el dato incluye hora, `hh:mm AM/PM` (12 horas con AM/PM). Se mantiene la lectura de ISO, `dd/mm/aaaa`, `dd-mm-aaaa` y texto es-ES antiguo (`13 abr 2025`).
+- Se aplica a fichas, listados, actividad, acogidas, adopciones, socios, lista negra, contratos, informes PDF y carnet. El almacenamiento sigue en ISO; no se migran datos.
+- Tests actualizados y verdes (**325**). SW `v128`.
+
+## v129 — contrato de acogida opcional (2026-11-10)
+- En cada caso de **Acogidas activas** hay un botón **Contrato de acogida** que abre una previsualización del documento y permite descargar el PDF. Incluye datos del animal, familia acogedora, inicio, fase y condiciones temporales, con líneas de firma para la familia y la entidad.
+- Es **opcional**: no se guarda en las hojas, no crea columnas nuevas y no condiciona el avance `Entrega → En casa → Finalizada`. Se genera con los datos actuales del caso mediante `Dashboard._contratoAcogidaDatos` y `PdfExport._buildContratoAcogida`.
+- Tests: **330** en verde. SW `v129`.

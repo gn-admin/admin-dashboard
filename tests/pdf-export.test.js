@@ -62,6 +62,73 @@ describe('_buildContracto: logo y firmas', () => {
   });
 });
 
+describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
+  const c = {
+    adopcion_id: 'adp2', ciudad: 'Irun', fecha: '2026-11-10',
+    animal: 'Luna', animal_foto: 'data:image/jpeg;base64,FOTO',
+    especie: 'Perro', raza: 'Mestiza', animal_sexo: 'Hembra', animal_microchip: 'CHIP-123',
+    animal_fecha_nacimiento: '2022-01-02', animal_peso: '12', animal_esterilizada: true,
+    animal_descripcion: 'Negra con una mancha blanca',
+    f1_nombre: 'Ana & Luis', f1_dni: '111', f1_direccion: 'Calle Mayor 1', f1_email: 'ana@example.com', f1_telefono: '600111111',
+    f2_nombre: 'Luis', f2_rol: 'Tutor legal', f2_relacion: 'Padre', f2_dni: '222', f2_direccion: 'Calle Menor 2', f2_email: 'luis@example.com', f2_telefono: '600222222',
+    f2_firma: 'data:image/png;base64,TUTOR'
+  };
+  const html = PdfExport._buildContracto(c, LOGO);
+
+  it('incluye foto, ficha completa, adoptante, tutor y firma de la entidad', () => {
+    assert.match(html, /data:image\/jpeg;base64,FOTO/);
+    assert.match(html, /CHIP-123/);
+    assert.match(html, /Negra con una mancha blanca/);
+    assert.match(html, /Calle Mayor 1/);
+    assert.match(html, /Ana &amp; Luis/);
+    assert.doesNotMatch(html, /Ana &amp;amp; Luis/);
+    assert.match(html, /Tutor legal/);
+    assert.match(html, /Calle Menor 2/);
+    assert.match(html, /data:image\/png;base64,TUTOR/);
+    assert.match(html, /Firma de la entidad/);
+    assert.match(html, /2026\/11\/10/);
+    assert.match(html, /2022\/01\/02/);
+  });
+});
+
+describe('_buildContratoAcogida: documento opcional', () => {
+  const c = {
+    id: 'acg1', ciudad: 'Irun', fecha: '2026-11-10', inicio: '2026-10-01', fase: 'en_casa',
+    animal: {
+      nombre: 'Luna', foto: 'data:image/jpeg;base64,FOTO', especie: 'Perro', raza: 'Mestiza',
+      sexo: 'Hembra', edad: '2 años', microchip: 'CHIP-123', fecha_nacimiento: '2024-01-02',
+      peso: '12', esterilizada: true, descripcion: 'Muy sociable'
+    },
+    familia: {
+      nombre: 'Ana <b>X</b>', dni: '12345678A', direccion: 'Calle Mayor 1',
+      email: 'ana@x.es', telefono: '600123123', ubicacion: 'Irun'
+    }
+  };
+  const html = PdfExport._buildContratoAcogida(c, LOGO);
+
+  it('incluye datos del animal, familia, condiciones y firmas', () => {
+    assert.match(html, /Contrato de acogida temporal/);
+    assert.match(html, /data:image\/jpeg;base64,FOTO/);
+    assert.match(html, /Calle Mayor 1/);
+    assert.match(html, /CHIP-123/);
+    assert.match(html, /2026\/11\/10/);
+    assert.match(html, /2026\/10\/01/);
+    assert.match(html, /Firmas/);
+    assert.match(html, /contrato-doc-firma-espacio/);
+  });
+
+  it('deja claro que es opcional y no bloquea la acogida', () => {
+    assert.match(html, /Documento opcional/);
+    assert.match(html, /No es obligatorio/);
+    assert.match(html, /no bloquea el avance de la acogida/);
+  });
+
+  it('escapa los datos personales', () => {
+    assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
+    assert.doesNotMatch(html, /<b>X<\/b>/);
+  });
+});
+
 describe('_buildMemoria: memoria anual', () => {
   const m = {
     year: 2025, altasN: 12, adopcionesN: 5, donacionesN: 3, gastosN: 2,

@@ -405,13 +405,14 @@ describe('fechas: ISO, dd/mm/aaaa y dd-mm-aaaa', () => {
   });
 
   it('_fmtFecha formatea ISO con y sin hora', () => {
-    assert.equal(Dashboard._fmtFecha('2025-04-13'), '13 abr 2025');
-    assert.equal(Dashboard._fmtFecha('2025-04-13T10:30:00'), '13 abr 2025 10:30');
-    assert.equal(Dashboard._fmtFecha('13/04/2025'), '13 abr 2025');
+    assert.equal(Dashboard._fmtFecha('2025-04-13'), '2025/04/13');
+    assert.equal(Dashboard._fmtFecha('2025-04-13T10:30:00'), '2025/04/13 10:30 AM');
+    assert.equal(Dashboard._fmtFecha('13/04/2025'), '2025/04/13');
+    assert.equal(Dashboard._fmtFecha('13 abr 2025'), '2025/04/13');
   });
 
   it('_fmtFecha formatea dd-mm-aaaa en vez de devolverlo crudo', () => {
-    assert.equal(Dashboard._fmtFecha('13-04-2025'), '13 abr 2025');
+    assert.equal(Dashboard._fmtFecha('13-04-2025'), '2025/04/13');
   });
 
   it('_fmtFecha vacio -> raya y basura se respeta tal cual', () => {
@@ -422,8 +423,8 @@ describe('fechas: ISO, dd/mm/aaaa y dd-mm-aaaa', () => {
 
   it('_fechaCorta con y sin hora', () => {
     const d = new Date(2025, 3, 13, 9, 5);
-    assert.equal(Dashboard._fechaCorta(d), '13 abr 2025');
-    assert.equal(Dashboard._fechaCorta(d, true), '13 abr 2025 09:05');
+    assert.equal(Dashboard._fechaCorta(d), '2025/04/13');
+    assert.equal(Dashboard._fechaCorta(d, true), '2025/04/13 09:05 AM');
   });
 
   it('_partesFecha reconoce ISO, con guiones, con barras y texto es-ES', () => {
@@ -575,7 +576,7 @@ describe('listas de detalle: blacklist y actividad', () => {
   it('_fmtLogFecha formatea o devuelve la raya', () => {
     assert.equal(Dashboard._fmtLogFecha(''), '—');
     assert.equal(Dashboard._fmtLogFecha(null), '—');
-    assert.match(Dashboard._fmtLogFecha('2025-04-13 10:30:00'), /13 abr 2025/);
+    assert.equal(Dashboard._fmtLogFecha('2025-04-13 10:30:00'), '2025/04/13 10:30 AM');
     assert.equal(Dashboard._fmtLogFecha('otracosa'), 'otracosa');
   });
 

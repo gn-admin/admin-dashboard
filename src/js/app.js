@@ -51,6 +51,13 @@ const App = {
     this._routed = true;
     document.getElementById('login-view').classList.remove('active');
     document.getElementById('dashboard-view').classList.add('active');
+    // Si Firebase cambia de cuenta, no se puede reutilizar ni la cache ni el
+    // DOM de la cuenta anterior. `setUser` devuelve true solo en ese cambio.
+    const uid = (typeof Auth !== 'undefined' && Auth.currentUser) ? Auth.currentUser.uid : '';
+    const changed = typeof Dashboard !== 'undefined' && typeof Dashboard.setUser === 'function'
+      ? Dashboard.setUser(uid)
+      : false;
+    if (changed) this.currentPage = null;
     await Dashboard.init();
     const hash = location.hash.replace('#', '') || 'dashboard';
     this.navigateTo(hash);
@@ -58,6 +65,8 @@ const App = {
 
   showLogin() {
     this._routed = true;
+    if (typeof Dashboard !== 'undefined' && typeof Dashboard.setUser === 'function') Dashboard.setUser(null);
+    this.currentPage = null;
     document.getElementById('loading')?.classList.remove('active');
     document.getElementById('dashboard-view').classList.remove('active');
     document.getElementById('login-view').classList.add('active');

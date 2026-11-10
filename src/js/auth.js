@@ -2,11 +2,18 @@ const Auth = {
   currentUser: null,
   _listeners: [],
   _resolved: false,
+  _userKeys: [
+    'gn_responses_all', 'gn_animales', 'gn_familias', 'gn_adopciones', 'gn_socios',
+    'gn_blacklist', 'gn_candidaturas', 'gn_contratos', 'gn_acogidas', 'gn_actividad',
+    'gn_publicaciones', 'gn_apadrinamientos', 'gn_gastos', 'gn_recordatorios',
+    'gn_donaciones', 'gn_seguimientos', 'gn_documentos', 'gn_inventario', 'gn_pending_ops'
+  ],
 
   init() {
     this._loadFirebaseSDK().then(() => {
       firebase.initializeApp(CONFIG.firebase);
       firebase.auth().onAuthStateChanged(user => {
+        this._syncUserStorage(user);
         this._resolved = true;
         this.currentUser = user ? {
           uid: user.uid,
@@ -41,6 +48,7 @@ const Auth = {
       throw e;
     }
     const fbUser = result.user;
+    this._syncUserStorage(fbUser);
     this.currentUser = {
       uid: fbUser.uid,
       email: fbUser.email,
@@ -52,12 +60,38 @@ const Auth = {
   },
 
   async logout() {
-    await firebase.auth().signOut();
+    try { await firebase.auth().signOut(); } catch { /* la sesion local se limpia igualmente */ }
     this.currentUser = null;
     try { localStorage.removeItem('gn_session'); } catch {}
-    ['gn_responses_all','gn_animales','gn_familias','gn_adopciones','gn_socios','gn_blacklist','gn_candidaturas','gn_contratos','gn_acogidas','gn_actividad','gn_publicaciones','gn_apadrinamientos','gn_gastos','gn_recordatorios','gn_donaciones','gn_seguimientos','gn_documentos','gn_inventario','gn_pending_ops'].forEach(k => localStorage.removeItem(k));
-    try { Object.keys(localStorage).filter(k => k.indexOf('gn_cache_') === 0).forEach(k => localStorage.removeItem(k)); } catch {}
+    this._clearUserData();
+    try { localStorage.removeItem('gn_data_uid'); } catch {}
     this._notifyListeners();
+  },
+
+  // Borra los datos de la cuenta activa del navegador. Se conservan solo las
+  // preferencias de interfaz (sidebar, tema, etc.).
+  _clearUserData() {
+    this._userKeys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.indexOf('gn_cache_') === 0)
+        .forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    } catch {}
+  },
+
+  // Si la cuenta activa cambia, la cache local de la anterior no puede
+  // reutilizarse: se borra antes de avisar a la app. Devuelve true si cambio.
+  _syncUserStorage(user) {
+    const uid = user && user.uid ? String(user.uid) : '';
+    let prev = '';
+    try { prev = localStorage.getItem('gn_data_uid') || ''; } catch {}
+    if (uid === prev) return false;
+    this._clearUserData();
+    try {
+      if (uid) localStorage.setItem('gn_data_uid', uid);
+      else localStorage.removeItem('gn_data_uid');
+    } catch {}
+    return true;
   },
 
   async getIdToken() {

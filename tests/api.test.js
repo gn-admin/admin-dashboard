@@ -153,6 +153,13 @@ describe('API: forma de las peticiones', () => {
       { response_id: 'resp_2', survey_id: 'pre-acogida', nota: 'texto' });
   });
 
+  it('sendContratoEmail hace POST a send-contrato-email', async () => {
+    await API.sendContratoEmail({ contrato_id: 'ctr_1', adopcion_id: 'ad1', to: ['a@x.com'] });
+    assert.match(llamadas[0].url, /endpoint=send-contrato-email/);
+    assert.deepEqual(JSON.parse(llamadas[0].opts.body),
+      { contrato_id: 'ctr_1', adopcion_id: 'ad1', to: ['a@x.com'] });
+  });
+
   it('updateXxx exige registro devuelto (si no, el id no esta sincronizado)', async () => {
     global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ status: 'success', data: null }) });
     await assert.rejects(() => API.updateAnimal('a1', { estado: 'adoptado' }), /id sin sincronizar/);
