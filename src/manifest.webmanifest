@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "GN-Admin | Grupo Nebak",
-  "short_name": "GN Admin",
+  "name": "Grupo Nebak",
+  "short_name": "Grupo Nebak",
   "description": "Panel de gestion de Grupo Nebak: encuestas, animales, acogidas, adopciones, socios y reportes.",
   "lang": "es",
   "dir": "ltr",

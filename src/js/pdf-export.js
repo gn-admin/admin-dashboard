@@ -185,7 +185,7 @@ const PdfExport = {
         <div class="kpis">${dist}</div>
       </div>
       ${pages}
-      <div class="footer">Generado por GN-Admin · Grupo Nebak · ${fecha} · Documento confidencial</div>
+      <div class="footer">Generado por Grupo Nebak · Grupo Nebak · ${fecha} · Documento confidencial</div>
     </body></html>`;
   },
 
@@ -432,7 +432,7 @@ const PdfExport = {
         ${firmaEntidad}
       </div>
 
-      <div class="footer">Generado por GN-Admin · Grupo Nebak · ${this._hoy()}</div>
+      <div class="footer">Generado por Grupo Nebak · Grupo Nebak · ${this._hoy()}</div>
     </body></html>`;
   },
 
@@ -651,7 +651,7 @@ const PdfExport = {
       ${tabla('Gastos', ['Fecha', 'Concepto', 'Animal', 'Importe'], tblGas) || '<div class="vacio">Sin gastos en el ejercicio.</div>'}
       <table class="resumen"><tr class="total-row"><td class="k">Total gastos</td><td class="v">${eur(m.gasTotal)} €</td></tr></table>
 
-      <div class="footer">Generado por GN-Admin · Grupo Nebak · Memoria del ejercicio ${m.year} · Documento confidencial</div>
+      <div class="footer">Generado por Grupo Nebak · Grupo Nebak · Memoria del ejercicio ${m.year} · Documento confidencial</div>
     </body></html>`;
   },
 

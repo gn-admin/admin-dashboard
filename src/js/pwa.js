@@ -31,7 +31,7 @@ const Pwa = {
       this._installed = true;
       this.closeGuide();
       this.refresh();
-      this._toast('GN Admin instalada. Abrela desde tu pantalla de inicio.', 'success');
+      this._toast('Grupo Nebak instalada. Abrela desde tu pantalla de inicio.', 'success');
     });
 
     document.getElementById('pwa-install-btn')?.addEventListener('click', () => this.install());
@@ -112,17 +112,17 @@ const Pwa = {
         ]
       : [
           'Abre el menu del navegador (los tres puntos).',
-          'Elige <strong>Instalar aplicacion</strong> o <strong>Instalar GN Admin</strong>.',
+          'Elige <strong>Instalar aplicacion</strong> o <strong>Instalar Grupo Nebak</strong>.',
           'Confirma con <strong>Instalar</strong>.',
           'La app se abrira en su propia ventana, sin barra del navegador.'
         ];
     body.innerHTML = `
       <div class="pwa-guide">
-        <p class="pwa-guide-lead">Instala GN Admin para abrirla a pantalla completa, con su icono y acceso directo, sin pasar por el navegador.</p>
+        <p class="pwa-guide-lead">Instala Grupo Nebak para abrirla a pantalla completa, con su icono y acceso directo, sin pasar por el navegador.</p>
         <div class="pwa-guide-brand">
           <img src="assets/icons/icon-192.png" alt="" class="pwa-guide-logo">
           <div>
-            <div class="pwa-guide-name">GN Admin</div>
+            <div class="pwa-guide-name">Grupo Nebak</div>
             <div class="pwa-guide-meta">Grupo Nebak</div>
           </div>
         </div>

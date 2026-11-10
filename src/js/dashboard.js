@@ -5974,7 +5974,7 @@ const Dashboard = {
       'Hola,',
       '',
       'Te enviamos el contrato de adopcion de ' + animal + ' y el anexo de terminos y condiciones.',
-      'Puedes descargar ambos PDF desde el panel de GN-Admin (ficha del caso > Contrato > Descargar contrato / Descargar terminos).',
+      'Puedes descargar ambos PDF desde el panel de Grupo Nebak (ficha del caso > Contrato > Descargar contrato / Descargar terminos).',
       '',
       'Grupo Nebak'
     ].join('\n');
