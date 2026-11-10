@@ -141,7 +141,23 @@ const Dashboard = {
   // Esqueleto contextual mientras llega la primera respuesta. Mantiene la
   // sensacion de avance (en vez de una pantalla vacia) y reserva el layout.
   _pageSkeleton(page) {
-    const cards = page === 'dashboard' ? 4 : 3;
+    if (page === 'dashboard') {
+      return `<div class="page-skeleton" role="status" aria-label="Cargando dashboard">
+        <div>
+          <div class="skeleton-line skeleton-line--title"></div>
+          <div class="skeleton-line skeleton-line--sub"></div>
+          <div class="skeleton-toolbar" style="margin:12px 0 4px"><span class="skeleton-chip"></span><span class="skeleton-chip"></span></div>
+        </div>
+        <div class="skeleton-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:16px 0;gap:12px">
+          ${Array.from({ length: 4 }, () => `<div class="skeleton-card" style="min-height:92px"><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line skeleton-line--medium"></div></div>`).join('')}
+        </div>
+        <div class="skeleton-grid" style="grid-template-columns:2fr 1fr;gap:12px">
+          <div class="skeleton-card" style="min-height:220px"><div class="skeleton-line skeleton-line--title" style="width:40%"></div><div class="skeleton-line"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--medium"></div><div class="skeleton-line"></div></div>
+          <div class="skeleton-card" style="min-height:220px"><div class="skeleton-line skeleton-line--title" style="width:50%"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line"></div></div>
+        </div>
+      </div>`;
+    }
+    const cards = 3;
     return `<div class="page-skeleton" role="status" aria-label="Cargando contenido">
       <div class="skeleton-line skeleton-line--title"></div>
       <div class="skeleton-line skeleton-line--sub"></div>
