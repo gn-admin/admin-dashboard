@@ -4144,6 +4144,7 @@ const Dashboard = {
         animalId: c.animal_id || '',
         acogidaId: id,
         nombre: (this._el('ac-animal-nombre') || {}).value || (datos.animal && datos.animal.nombre) || c.animal,
+        actualizarFicha: !!(this._el('ac-animal-actualizar') || {}).checked,
         fotoActual: (datos.animal && datos.animal.foto) || (live.animal && live.animal.foto) || '',
         fotoFile: ((this._el('ac-animal-foto') || {}).files || [])[0] || null
       });
@@ -4653,6 +4654,7 @@ const Dashboard = {
       <div class="contrato-animal-editor-grid">
         <div class="contrato-animal-editor-foto" id="${prefix}-foto-preview">${fotoHtml}</div>
         <div class="contrato-animal-editor-fields">
+          <label class="contrato-acepta" style="margin:0 0 10px"><input type="checkbox" id="${prefix}-actualizar" checked><span>Actualizar la ficha del animal con estos datos (nombre, raza, edad, sexo, microchip y foto)</span></label>
           <div class="form-group"><label for="${prefix}-nombre">Nombre en el contrato *</label><input type="text" id="${prefix}-nombre" value="${this._esc(nombre)}" required><div class="form-hint">Si el animal va a tener un nombre nuevo o hay que corregir el actual, cambialo aqui: se actualizara tambien en su ficha y en el caso.</div></div>
           <div class="form-row"><div class="form-group"><label for="${prefix}-raza">Raza</label><input type="text" id="${prefix}-raza" value="${this._esc(o.raza || '')}" placeholder="Raza"></div><div class="form-group"><label for="${prefix}-edad">Edad</label><input type="text" id="${prefix}-edad" value="${this._esc(o.edad || '')}" placeholder="Ej: 2 años"></div></div>
           <div class="form-row"><div class="form-group"><label for="${prefix}-sexo">Sexo</label><select id="${prefix}-sexo"><option value="">—</option><option value="Macho" ${o.sexo === 'Macho' ? 'selected' : ''}>Macho</option><option value="Hembra" ${o.sexo === 'Hembra' ? 'selected' : ''}>Hembra</option></select></div><div class="form-group"><label for="${prefix}-microchip">Microchip</label><input type="text" id="${prefix}-microchip" value="${this._esc(o.microchip || '')}" placeholder="Numero de microchip"></div></div>
@@ -4712,7 +4714,7 @@ const Dashboard = {
     }
     if (!foto) throw new Error('Sube una foto del animal: el contrato debe incluirla');
     const a = o.animalId ? this._byId(this.animales, o.animalId) : null;
-    if (a) {
+    if (a && o.actualizarFicha !== false) {
       a.nombre = nombre;
       if (raza) a.raza = raza;
       if (edad) a.edad = edad;
@@ -5761,6 +5763,7 @@ const Dashboard = {
         sexo: (this._el('ct-animal-sexo') || {}).value || this._contratoAnimalDatos(p).sexo || '',
         microchip: (this._el('ct-animal-microchip') || {}).value || this._contratoAnimalDatos(p).microchip || '',
         fotoActual: this._contratoAnimalDatos(p).foto,
+        actualizarFicha: !!(this._el('ct-animal-actualizar') || {}).checked,
         fotoFile: ((this._el('ct-animal-foto') || {}).files || [])[0] || null
       });
     } catch (err) {
@@ -5926,6 +5929,7 @@ const Dashboard = {
         sexo: (this._el('ci-animal-sexo') || {}).value || animal.sexo || '',
         microchip: (this._el('ci-animal-microchip') || {}).value || animal.microchip || '',
         fotoActual: animal.foto || c.animal_foto || '',
+        actualizarFicha: true,
         fotoFile: ((this._el('ci-animal-foto') || {}).files || [])[0] || null
       });
       c.animal = identidad.nombre;
