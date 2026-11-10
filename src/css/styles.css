@@ -6978,3 +6978,13 @@ body.pwa-modal-open {
 .dash-chart-tooltip.is-visible { opacity: 1; }
 .dash-chart-dot { cursor: pointer; }
 .dash-chart-dot:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+
+/* ===== CONTENIDO CENTRADO EN ESCRITORIO/TABLET ===== */
+@media (min-width: 768px) {
+  .main-content {
+    max-width: 1240px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
