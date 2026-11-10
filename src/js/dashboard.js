@@ -4576,10 +4576,10 @@ const Dashboard = {
         ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
         <div class="detail-actions-inline">
           <button class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar contrato</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar términos</button>
+          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar cláusulas</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar por email</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoDoc('${p.id}')">${Icons.eye} Ver documento</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver términos</button>
+          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver cláusulas</button>
           <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoIdentidad('${p.id}')">${Icons.pencil} Foto / nombre</button>
           <button class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button>
         </div>`
@@ -4865,6 +4865,9 @@ const Dashboard = {
       { titulo: 'Gastos', texto: 'Todos los gastos derivados del cuidado del animal (alimentación, veterinario, seguro, identificaciones y otros) corren a cargo del adoptante.' },
       { titulo: 'Devolución', texto: 'Si el adoptante no puede continuar cuidando al animal, deberá informar a la entidad y devolverlo. Nunca lo abandonará ni lo entregará a terceros sin autorización expresa.' },
       { titulo: 'Datos personales', texto: 'Los datos del adoptante y del tutor se tratarán para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.' },
+      { titulo: 'Microchip y titularidad', texto: 'Durante el periodo de adaptacion (15-30 dias) el microchip podra permanecer a nombre de la entidad, lo que permite a la protectora reclamar al animal en caso de incumplimiento. Tras ese periodo se transferira la titularidad al adoptante.' },
+      { titulo: 'Prohibicion de cesion', texto: 'No podra vender, regalar, ceder ni prestar el animal a terceros sin autorizacion expresa y por escrito de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak para su devolucion.' },
+      { titulo: 'Informacion veterinaria', texto: 'Informara a la entidad si el veterinario le indica que el animal padece alguna enfermedad o le recomienda la eutanasia, para que la entidad pueda dar su opinion al respecto.' },
       { titulo: 'Incumplimiento y aceptación', texto: 'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan. El adoptante declara haber leído, comprendido y aceptado estos términos.' }
     ];
   },
@@ -4882,7 +4885,7 @@ const Dashboard = {
     const logoSrc = logo || 'assets/icons/logo-nebak.jpg';
     return `<div class="contrato-doc-header">
         <img src="${this._esc(logoSrc)}" alt="${this._esc(ent.nombre)}">
-        <div><div class="contrato-doc-title">Términos y condiciones de adopción responsable</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión 1.0 (2026/11/10)</div></div>
+        <div><div class="contrato-doc-title">Cláusulas de adopción responsable</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión 1.0 (2026/11/10)</div></div>
       </div>
       <div class="contrato-doc-meta">
         <div><span class="label">Adoptante</span><b>${this._esc(nombre)}</b></div>
@@ -4890,7 +4893,7 @@ const Dashboard = {
         <div><span class="label">Fecha</span>${this._esc(fecha)}</div>
         <div><span class="label">Documento</span>Anexo de aceptación</div>
       </div>
-      <p class="contrato-doc-intro">El presente documento recoge los términos y condiciones que el adoptante declara haber leído y aceptado antes de firmar el contrato de adopción. Forma parte del expediente y se entrega junto al contrato.</p>
+      <p class="contrato-doc-intro">El presente documento recoge los cláusulas de adopción que el adoptante declara haber leído y aceptado antes de firmar el contrato. Forma parte del expediente y se entrega junto al contrato.</p>
       ${this._contratoEntidadHtml(cc, logo)}
       ${clausulas.map((x, i) => `<h3>${i + 1}. ${this._esc(x.titulo)}</h3><p>${this._esc(x.texto)}</p>`).join('')}
       <div class="contrato-doc-firmas contrato-doc-firmas--aceptacion">
@@ -4904,7 +4907,7 @@ const Dashboard = {
           ${this._selloHtml(ent, logoSrc)}
         </div>
       </div>
-      <div class="contrato-doc-nota">Este anexo de términos y condiciones se envía junto al contrato de adopción. Versión 1.0 · 2026/11/10.</div>`;
+      <div class="contrato-doc-nota">Este anexo de cláusulas de adopción se envía junto al contrato de adopción. Versión 1.0 · 2026/11/10.</div>`;
   },
 
   _terminosAdopcionHtml(p, c, logo) {
@@ -5029,6 +5032,12 @@ const Dashboard = {
       <p>No se podra vender, regalar ni ceder el animal a terceros sin autorizacion expresa de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak.</p>
       ${h('Identificacion y salud')}
       <p>Mantendra el microchip actualizado, las vacunas y desparasitaciones al dia, y facilitara el acceso a la cartilla sanitaria. Si procede, se compromete a esterilizar al animal y a aportar el informe veterinario.</p>
+      ${h('Microchip y titularidad')}
+      <p>Durante el periodo de adaptacion (15-30 dias) el microchip podra permanecer a nombre de la entidad, lo que permite a la protectora reclamar al animal en caso de incumplimiento. Tras ese periodo se transferira la titularidad al adoptante.</p>
+      ${h('Prohibicion de cesion')}
+      <p>No podra vender, regalar, ceder ni prestar el animal a terceros sin autorizacion expresa y por escrito de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak para su devolucion.</p>
+      ${h('Informacion veterinaria')}
+      <p>Informara a la entidad si el veterinario le indica que el animal padece alguna enfermedad o le recomienda la eutanasia, para que la entidad pueda dar su opinion al respecto.</p>
       ${h('Seguimiento')}
       <p>El adoptante acepta el seguimiento posterior a la adopcion: periodo de prueba de 15-30 dias y contactos de seguimiento a 1, 3, 6 y 12 meses. Facilitara las comprobaciones necesarias para verificar el bienestar del animal.</p>
       ${h('Gastos')}
@@ -5040,7 +5049,7 @@ const Dashboard = {
       ${h('Proteccion de datos')}
       <p>Los datos personales del adoptante y, en su caso, del tutor se utilizan para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.</p>
       ${h('Aceptacion')}
-      <p>El Adoptante declara haber leído y comprendido los términos y condiciones anexos, que forman parte de este contrato, y acepta expresamente todas las obligaciones que en él se recogen.</p>
+      <p>El Adoptante declara haber leído y comprendido los cláusulas anexas, que forman parte de este contrato, y acepta expresamente todas las obligaciones que en él se recogen.</p>
       <div class="contrato-doc-firmas">
         ${f1Block}
         ${tutorBlock}
@@ -5613,7 +5622,7 @@ const Dashboard = {
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
             </div>
 
-            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto los <a href="#" class="contrato-link" onclick="event.preventDefault(); event.stopPropagation(); Dashboard.showTerminosAdopcion('${adopcionId}');">términos y condiciones</a> del contrato de adopción responsable.</span></label>
+            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto las <a href="#" class="contrato-link" onclick="event.preventDefault(); event.stopPropagation(); Dashboard.showTerminosAdopcion('${adopcionId}');">cláusulas de adopción</a> del contrato de adopción responsable.</span></label>
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
               <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
               <div class="form-row"><div class="form-group"><label>Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" onchange="Dashboard._previewSelloContrato(this)"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._limpiarSelloContrato()">Quitar sello</button></div>
@@ -5908,7 +5917,7 @@ const Dashboard = {
     await this._ensureListas(['contratos']);
     const p = this._byId(this.adopciones, adopcionId) || {};
     const c = this._contratoDeAdopcion(adopcionId) || {};
-    this.showInfoModal('Términos y condiciones · adopción', `
+    this.showInfoModal('Cláusulas de adopción', `
       <div class="terminos-preview-actions">
         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${this._esc(adopcionId)}')">${Icons.download} Descargar PDF</button>
         <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal()">Cerrar</button>
@@ -5934,8 +5943,8 @@ const Dashboard = {
           <div class="contrato-topbar-meta">${Icons.fileText} <span><b>${this._esc(p.animal || 'Animal')}</b> · ${this._esc(p.adoptante || '')}</span> ${c ? '<span class="estado-badge aprobada">Firmado</span>' : '<span class="estado-badge pendiente">Pendiente de firma</span>'}</div>
           <div class="contrato-topbar-actions">
             ${c ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} PDF contrato</button>` : ''}
-            ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} PDF términos</button>` : ''}
-            <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver términos</button>
+            ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} PDF cláusulas</button>` : ''}
+            <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver cláusulas</button>
             ${c ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar</button>` : ''}
             <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.closeContratoForm()">Cerrar</button>
           </div>
@@ -6033,7 +6042,7 @@ const Dashboard = {
     const body = [
       'Hola,',
       '',
-      'Te enviamos el contrato de adopcion de ' + animal + ' y el anexo de terminos y condiciones.',
+      'Te enviamos el contrato de adopcion de ' + animal + ' y el anexo de clausulas de adopcion.',
       'Puedes descargar ambos PDF desde el panel de Grupo Nebak (ficha del caso > Contrato > Descargar contrato / Descargar terminos).',
       '',
       'Grupo Nebak'
@@ -6061,7 +6070,7 @@ const Dashboard = {
     const emails = this._contratoEmails(p);
     this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
       <form onsubmit="Dashboard.enviarContratoEmail(event,'${adopcionId}')">
-        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y el anexo de términos y condiciones a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y el anexo de cláusulas de adopción a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
         <div class="form-group"><label>Destinatarios</label>
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>

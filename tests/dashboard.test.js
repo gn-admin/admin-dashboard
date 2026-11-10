@@ -1260,7 +1260,7 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
 
   it('_terminosAdopcionHtml es un anexo independiente con sus clausulas', () => {
     const html = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, { f1_dni: '123' });
-    assert.match(html, /Términos y condiciones de adopción responsable/);
+    assert.match(html, /Cláusulas de adopción responsable/);
     assert.match(html, /Aceptado por el adoptante/);
     assert.match(html, /Datos personales/);
     assert.match(html, /SELLO DE LA ENTIDAD/);

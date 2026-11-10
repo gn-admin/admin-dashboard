@@ -200,9 +200,9 @@ const PdfExport = {
   _buildTerminosAdopcion(c, logo) {
     const body = (typeof Dashboard !== 'undefined' && Dashboard._terminosAdopcionCuerpo)
       ? Dashboard._terminosAdopcionCuerpo({}, c || {}, logo)
-      : '<p>No se pudo cargar el documento de términos y condiciones.</p>';
+      : '<p>No se pudo cargar el documento de cláusulas de adopción.</p>';
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>Términos y condiciones de adopción</title>
+      <title>Cláusulas de adopción</title>
       <style>
         @page{size:A4;margin:2cm}
         body{font:11pt/1.6 Arial,sans-serif;color:#191919;padding:0;margin:0}

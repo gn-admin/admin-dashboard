@@ -5529,6 +5529,8 @@ select.form-input {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  min-height: 40px;
+  padding: 6px 4px;
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--primary-hover);
