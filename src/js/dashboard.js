@@ -942,8 +942,12 @@ const Dashboard = {
   async renderDashboardHome(el) {
     if (!this._hasHomeCache()) {
       el.innerHTML = this._pageSkeleton('dashboard');
-      await this._refreshHome();
+      await this._refreshHomeTier1(true);
       this._paintHome(el);
+      // Los datos secundarios llegan despues y repintan la home.
+      this._refreshHomeTier2(true).then(() => {
+        if (document.getElementById('page-dashboard')?.classList.contains('active')) this._paintHome(el);
+      }).catch(() => {});
       return;
     }
     this._paintHome(el);
@@ -969,22 +973,35 @@ const Dashboard = {
     return token.charAt(0).toUpperCase() + token.slice(1);
   },
 
-  async _refreshHome() {
+  async _refreshHomeTier1(force) {
+    // Datos criticos para pintar el home: encuestas, estados, animales,
+    // familias y respuestas. Se cargan primero para que la home aparezca
+    // rapido aunque el resto tarde.
+    await this._loadSurveys(force);
+    await Promise.all([
+      this.loadEstados(force),
+      this._loadList('animales', () => API.getAnimales(), force),
+      this._loadList('familias', () => API.getFamilias(), force),
+      ...this.surveys.map(s => this._loadResponses(s.id, force)),
+    ]);
+  },
+  async _refreshHomeTier2(force) {
+    // Datos secundarios (best-effort): no bloquean el primer pintado.
+    await Promise.all([
+      this._loadListBestEffort('recordatorios', () => API.getRecordatorios(), force),
+      this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos(), force),
+      this._loadListBestEffort('donaciones', () => API.getDonaciones(), force),
+      this._loadListBestEffort('gastos', () => API.getGastos(), force),
+      this._loadListBestEffort('socios', () => API.getSocios(), force),
+      this._loadListBestEffort('contratos', () => API.getContratos(), force),
+      this._ensureListas(['candidaturas', 'acogidas'], force),
+    ]);
+  },
+  async _refreshHome(force) {
     // Fuerza red: si ya se pinto cache, esto corre en segundo plano y
     // repinta al terminar; si no hay cache, el esqueleto espera esta promesa.
-    await this._loadSurveys(true);
-    await Promise.all([
-      this.loadEstados(true),
-      this._loadList('animales', () => API.getAnimales(), true),
-      this._loadList('familias', () => API.getFamilias(), true),
-      this._loadListBestEffort('recordatorios', () => API.getRecordatorios(), true),
-      this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos(), true),
-      this._loadListBestEffort('donaciones', () => API.getDonaciones(), true),
-      this._loadListBestEffort('gastos', () => API.getGastos(), true),
-      this._loadListBestEffort('socios', () => API.getSocios(), true),
-      this._loadListBestEffort('contratos', () => API.getContratos(), true),
-      ...this.surveys.map(s => this._loadResponses(s.id, true)),
-    ]);
+    await this._refreshHomeTier1(force);
+    await this._refreshHomeTier2(force);
   },
 
   _paintHome(el) {
