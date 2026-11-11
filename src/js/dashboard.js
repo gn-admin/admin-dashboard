@@ -659,13 +659,18 @@ const Dashboard = {
   async cambiarEstado(btn, id, estado, surveyId) {
     const fin = this._btnBusy(btn, 'Guardando...');
     const enFicha = !!(btn && btn.closest('.page-detail-container'));
-    const ok = await this.setEstado(id, estado, surveyId);
-    fin();
-    if (ok) {
-      if (enFicha) this.viewDetail(surveyId, id);
-      this.showSnackbar('Estado actualizado: ' + this._estadoLabel(estado), 'success');
+    this.showLoading();
+    try {
+      const ok = await this.setEstado(id, estado, surveyId);
+      if (ok) {
+        if (enFicha) this.viewDetail(surveyId, id);
+        this.showSnackbar('Estado actualizado: ' + this._estadoLabel(estado), 'success');
+      }
+      return ok;
+    } finally {
+      fin();
+      this.hideLoading();
     }
-    return ok;
   },
 
   // ==================== CANDIDATURAS / FLUJO COMPLETO ====================
@@ -4369,6 +4374,7 @@ const Dashboard = {
     const busyKey = 'fase-acogida:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Actualizando...');
+    this.showLoading();
     try {
       const c = this._byId(this.acogidas, id);
       if (!c) return;
@@ -4407,6 +4413,7 @@ const Dashboard = {
       if (abierta) this.viewAcogida(id, { ready: true });
     } finally {
       fin();
+      this.hideLoading();
       this._busyEnd(busyKey);
     }
   },
@@ -5750,6 +5757,7 @@ const Dashboard = {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Avanzando...');
+    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -5776,6 +5784,7 @@ const Dashboard = {
       this.showSnackbar('Fase actualizada: ' + newFase, 'success');
     } finally {
       fin();
+      this.hideLoading();
       this._busyEnd(busyKey);
     }
   },
@@ -5784,6 +5793,7 @@ const Dashboard = {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Retrocediendo...');
+    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -5816,6 +5826,7 @@ const Dashboard = {
       this.showSnackbar('Fase actualizada: ' + prev, 'success');
     } finally {
       fin();
+      this.hideLoading();
       this._busyEnd(busyKey);
     }
   },
