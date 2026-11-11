@@ -679,9 +679,10 @@ const Dashboard = {
   async cambiarEstado(btn, id, estado, surveyId) {
     const fin = this._btnBusy(btn, 'Guardando...');
     const enFicha = !!(btn && btn.closest('.page-detail-container'));
-    this.showLoading();
     try {
+      this.showLoading();
       const ok = await this.setEstado(id, estado, surveyId);
+      this.hideLoading();
       if (ok) {
         if (enFicha) this.viewDetail(surveyId, id);
         this.showSnackbar('Estado actualizado: ' + this._estadoLabel(estado), 'success');
@@ -4674,7 +4675,6 @@ const Dashboard = {
     const busyKey = 'fase-acogida:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Actualizando...');
-    this.showLoading();
     try {
       const c = this._byId(this.acogidas, id);
       if (!c) return;
@@ -4682,6 +4682,7 @@ const Dashboard = {
       const next = order[c.fase];
       if (!next) return;
       if (next === 'finalizada' && !(await this._confirm('Finalizar la acogida? El animal volvera a Disponible y la familia quedara Libre.', 'Finalizar acogida'))) return;
+      this.showLoading();
       c.fase = next;
       if (c.fase === 'finalizada') {
         c.estado = 'finalizada';
@@ -6057,7 +6058,6 @@ const Dashboard = {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Avanzando...');
-    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -6070,6 +6070,7 @@ const Dashboard = {
       const bloqueo = this._requisitoAvance(p, this._contratoDeAdopcion(id), this.seguimientos);
       if (bloqueo) { this.showSnackbar(bloqueo, 'warning'); return; }
       const newFase = fases[idx + 1];
+      this.showLoading();
       try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
       catch (err) { this._snackErr(err, 'No se pudo avanzar de fase'); return; }
       p.fase = newFase;
@@ -6093,7 +6094,6 @@ const Dashboard = {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Retrocediendo...');
-    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -6114,6 +6114,7 @@ const Dashboard = {
         'Si, retroceder'
       );
       if (!ok) return;
+      this.showLoading();
       try { await API.updateAdopcion(id, { fase: prev, estado: `Fase: ${prev}` }); }
       catch (err) { this._snackErr(err, 'No se pudo retroceder de fase'); return; }
       p.fase = prev;
