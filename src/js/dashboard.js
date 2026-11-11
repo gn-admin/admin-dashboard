@@ -1,7 +1,7 @@
 const Dashboard = {
   surveys: [], responses: {}, states: {}, blacklist: [], notes: {}, userProfile: null, _userUid: null,
   animales: [], familias: [], adopciones: [], socios: [], actividad: [], publicaciones: [], apadrinamientos: [],
-  gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [], inventario: [],
+  gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [], inventario: [], historialFasesAdopcion: [],
   // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
   APADRINAMIENTOS_REMOTE: true,
   _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
@@ -72,6 +72,7 @@ const Dashboard = {
       recordatorios: () => API.getRecordatorios(),
       donaciones: () => API.getDonaciones(),
       seguimientos: () => API.getSeguimientos(),
+      historialFasesAdopcion: () => API.getHistorialFasesAdopcion(),
       animales: () => API.getAnimales(),
       familias: () => API.getFamilias(),
       adopciones: () => API.getAdopciones(),
@@ -98,7 +99,7 @@ const Dashboard = {
         this._ensureListas([
           'animales', 'familias', 'adopciones', 'socios', 'blacklist', 'candidaturas',
           'acogidas', 'contratos', 'apadrinamientos', 'gastos', 'recordatorios',
-          'donaciones', 'seguimientos', 'documentos', 'inventario', 'grupos', 'actividad'
+          'donaciones', 'seguimientos', 'documentos', 'inventario', 'grupos', 'actividad', 'historialFasesAdopcion'
         ], true)
       ]);
       await Promise.all(this._surveyIds().map(sid => this._loadResponses(sid, true)));
@@ -281,6 +282,7 @@ const Dashboard = {
     this.seguimientos = [];
     this.documentos = [];
     this.inventario = [];
+    this.historialFasesAdopcion = [];
     this.userProfile = null;
     this._loaded = {};
     this._loading = {};
@@ -332,6 +334,7 @@ const Dashboard = {
     try { this.recordatorios = norm(JSON.parse(localStorage.getItem('gn_recordatorios') || '[]')); } catch { this.recordatorios = []; }
     try { this.donaciones = norm(JSON.parse(localStorage.getItem('gn_donaciones') || '[]')); } catch { this.donaciones = []; }
     try { this.seguimientos = norm(JSON.parse(localStorage.getItem('gn_seguimientos') || '[]')); } catch { this.seguimientos = []; }
+    try { this.historialFasesAdopcion = norm(JSON.parse(localStorage.getItem('gn_historial_fases_adopcion') || '[]')); } catch { this.historialFasesAdopcion = []; }
     try { this.documentos = JSON.parse(localStorage.getItem('gn_documentos') || '[]'); } catch { this.documentos = []; }
     try { this.inventario = norm(JSON.parse(localStorage.getItem('gn_inventario') || '[]')); } catch { this.inventario = []; }
   },
@@ -359,6 +362,7 @@ const Dashboard = {
     localStorage.setItem('gn_recordatorios', JSON.stringify(this.recordatorios || []));
     localStorage.setItem('gn_donaciones', JSON.stringify(this.donaciones || []));
     localStorage.setItem('gn_seguimientos', JSON.stringify(this.seguimientos || []));
+    localStorage.setItem('gn_historial_fases_adopcion', JSON.stringify(this.historialFasesAdopcion || []));
     localStorage.setItem('gn_documentos', JSON.stringify(this.documentos || []));
     localStorage.setItem('gn_inventario', JSON.stringify(this.inventario || []));
   },
@@ -414,6 +418,7 @@ const Dashboard = {
     h('recordatorios', this._cacheGet('recordatorios'));
     h('donaciones', this._cacheGet('donaciones'));
     h('seguimientos', this._cacheGet('seguimientos'));
+    h('historialFasesAdopcion', this._cacheGet('historialFasesAdopcion'));
     h('documentos', this._cacheGet('documentos'));
     h('inventario', this._cacheGet('inventario'));
     // Listas que loadLocal ya rescato de localStorage: se pueden pintar al
@@ -5206,7 +5211,7 @@ const Dashboard = {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const detailKey = 'adopcion:' + id;
-    const faltan = ['contratos', 'seguimientos', 'animales'].filter(k => !this._loaded[k]);
+    const faltan = ['contratos', 'seguimientos', 'animales', 'historialFasesAdopcion'].filter(k => !this._loaded[k]);
     if (faltan.length && !(opts && opts.ready)) {
       // Se pinta ya con lo que hay en memoria y se repinta cuando llega el
       // resto: abrir una ficha no espera a la red.
@@ -5223,17 +5228,19 @@ const Dashboard = {
     const sol = this._parseSolicitud(p.solicitud_id);
     const bloqueo = this._requisitoAvance(p, contrato, this.seguimientos);
     const puedeAvanzar = currentIdx < fases.length - 1;
-    const avanceBtn = !puedeAvanzar ? '' : (bloqueo
+    const avanceBtn = (!puedeAvanzar || devuelto || anulado) ? '' : (bloqueo
       ? `<button type="button" class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
-      : `<button type="button" class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}',this)">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
+      : `<button type="button" class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.showAvanzarFaseForm('${p.id}')">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
     // Cada bloque aparece cuando ya tiene sentido en el flujo.
     const verContrato = !!contrato || currentIdx >= this._faseIdx('Visita domiciliaria');
     const verEntrega = !!p.fecha_entrega || currentIdx >= this._faseIdx('Entrega');
     const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= this._faseIdx('Prueba');
     const devuelto = p.desenlace === 'devuelto';
+    const anulado = p.desenlace === 'anulado';
+    const puedeDevolucion = !devuelto && !anulado && (currentIdx >= this._faseIdx('Entrega') || !!p.fecha_entrega);
     const devueltoBanner = devuelto
       ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso devuelto</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El animal está disponible para una nueva adopción.</span></div>`
-      : '';
+      : (anulado ? `<div class="alert-item warning" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso anulado</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El caso se conserva en el historial.</span></div>` : '');
     this._showDetail('adopciones', p.animal, `
       <div class="proceso-hero">
         <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
@@ -5248,16 +5255,17 @@ const Dashboard = {
       <div class="detail-actions-wrap">
         <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         ${avanceBtn}
-        ${currentIdx > 0 ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}',this)">${Icons.arrowLeft} Retroceder</button>` : ''}
-        ${p.desenlace !== 'anulado' ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" onclick="Dashboard.anularCaso('${p.id}')">${Icons.ban} Anular caso</button>` : ''}
+        ${currentIdx > 0 && !devuelto && !anulado ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showRetrocederFaseForm('${p.id}')">${Icons.arrowLeft} Retroceder</button>` : ''}
+        ${!anulado && !devuelto ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" onclick="Dashboard.showAnularCasoForm('${p.id}')">${Icons.ban} Anular caso</button>` : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
       ${this._faseStepperCardHtml(p, fases, currentIdx)}
+      ${this._historialFasesAdopcionHtml(p)}
       ${verContrato ? this._contratoFicha(p, contrato) : ''}
       ${verEntrega ? this._entregaFicha(p, contrato) : ''}
       ${verPrueba ? this._pruebaFicha(p) : ''}
       ${this._seguimientosFicha(p)}
-      ${this._notasFichaHtml('adopcion', p.id, { title: 'Notas del caso' })}
+      ${this._notasFichaHtml('adopcion', p.id, { title: 'Notas generales del caso' })}
       <details class="detail-collapse">
         <summary>${Icons.info} Datos del caso y solicitud de origen</summary>
         <div class="detail-collapse-body">
@@ -5272,7 +5280,7 @@ const Dashboard = {
           </div>
           ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
           <div class="detail-actions-inline detail-actions-inline--danger">
-            ${devuelto ? '' : `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>`}
+            ${puedeDevolucion ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>` : ''}
           </div>
         </div>
       </details>`, detailKey);
@@ -5289,6 +5297,103 @@ const Dashboard = {
       ${this._faseStepperHtml(fases, p.fase)}
       <div class="detail-section-note">${this._esc(this._faseInfo(p.fase).desc)}</div>
     </div>`;
+  },
+
+  _fmtFechaHora(v) {
+    if (!v) return '';
+    try {
+      const d = new Date(String(v).replace(' ', 'T'));
+      if (isNaN(d.getTime())) return this._fmtFecha(v);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return this._fmtFecha(v); }
+  },
+
+  _historialFasesAdopcionHtml(p) {
+    const id = p && p.id;
+    const eventos = (this._historialFasesDe(id) || []).slice().sort((a, b) => String(a.fecha || a.created_at || '').localeCompare(String(b.fecha || b.created_at || '')));
+    const fases = this._fasesAdopcion();
+    const actual = p ? p.fase : '';
+    const actualIdx = Math.max(0, fases.indexOf(actual));
+
+    const esc = (s) => this._esc(s);
+    const fmtFecha = (v) => this._fmtFechaHora(v) || this._fmtFecha(v) || 'No registrado';
+    const badge = (txt, cls) => `<span class="estado-badge ${cls || ''}">${esc(txt)}</span>`;
+
+    let body = '';
+    if (!eventos.length) {
+      // Estado legacy: sin historial persistido. Mostramos info conocida sin inventar cierres.
+      const conocidos = [];
+      if (p && p.fecha) conocidos.push(`<div class="detail-field"><div class="detail-question">Inicio del caso</div><div class="detail-answer">${esc(this._fmtFecha(p.fecha))} · <span style="color:var(--gray-500)">Usuario no registrado (histórico)</span></div></div>`);
+      if (p && p.fecha_entrega) conocidos.push(`<div class="detail-field"><div class="detail-question">Entrega registrada</div><div class="detail-answer">${esc(this._fmtFecha(p.fecha_entrega))} · <span style="color:var(--gray-500)">Usuario no registrado (histórico)</span></div></div>`);
+      if (p && p.desenlace === 'anulado') conocidos.push(`<div class="detail-field"><div class="detail-question">Anulación</div><div class="detail-answer">${esc(this._fmtFecha(p.fecha_devolucion))} · ${esc(p.motivo_devolucion || 'Sin motivo')} · <span style="color:var(--gray-500)">Usuario no registrado (histórico)</span></div></div>`);
+      if (p && p.desenlace === 'devuelto') conocidos.push(`<div class="detail-field"><div class="detail-question">Devolución</div><div class="detail-answer">${esc(this._fmtFecha(p.fecha_devolucion))} · ${esc(p.motivo_devolucion || 'Sin motivo')} · <span style="color:var(--gray-500)">Usuario no registrado (histórico)</span></div></div>`);
+      body = `
+        <div class="alert-item info" style="margin:0 0 12px">${Icons.info} <span>Aún no hay historial por fases registrado para este caso. A partir de ahora, cada avance, retroceso, anulación o nota de fase guardará <b>quién</b>, <b>cuándo</b> y la <b>nota</b> (o “Sin nota”).</span></div>
+        ${conocidos.join('') || `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-500)">Sin eventos registrados.</div></div>`}
+        <div class="detail-field" style="margin-top:8px"><div class="detail-question">Fase actual</div><div class="detail-answer">${badge(actual || '—', p && p.desenlace === 'anulado' ? 'descartada' : 'en_proceso')} · En curso · <span style="color:var(--gray-500)">Cierre pendiente al cambiar de fase</span></div></div>`;
+    } else {
+      const items = eventos.map(ev => {
+        const accion = ev.accion || 'evento';
+        const esNota = accion === 'nota';
+        const fase = ev.fase || ev.fase_origen || '—';
+        const destino = ev.fase_destino ? ` → ${esc(ev.fase_destino)}` : '';
+        const titulo = esNota ? `Nota de fase: ${esc(fase)}` : `${esc(this._historialEventoLabel(ev))}: ${esc(fase)}${destino}`;
+        const cls = accion === 'anulacion' || accion === 'devolucion' ? 'descartada' : (accion === 'retroceso' ? 'pendiente' : (accion === 'avance' ? 'aprobada' : 'en_proceso'));
+        const notaTxt = (ev.nota && String(ev.nota).trim()) ? esc(ev.nota) : '<span style="color:var(--gray-500)">Sin nota</span>';
+        const usuario = ev.usuario ? esc(ev.usuario) : '<span style="color:var(--gray-500)">Usuario no registrado</span>';
+        const fecha = fmtFecha(ev.fecha || ev.created_at);
+        return `<article class="nota-item fase-hist-item fase-hist-item--${esc(accion)}">
+          <div class="nota-avatar" aria-hidden="true">${esc(String(ev.usuario || 'U').charAt(0).toUpperCase() || 'U')}</div>
+          <div class="nota-cuerpo">
+            <div class="nota-head">
+              <span class="nota-autor">${titulo}</span>
+              ${badge(this._historialEventoLabel(ev), cls)}
+            </div>
+            <div class="nota-fecha" style="margin:2px 0 6px;color:var(--gray-500);font-size:var(--text-xs)"><b>Quién:</b> ${usuario} · <b>Fecha:</b> ${esc(fecha)}</div>
+            <div class="nota-texto"><b>Nota:</b> ${notaTxt}</div>
+          </div>
+        </article>`;
+      }).join('');
+      body = `<div class="notas-timeline fase-hist-timeline">${items}</div>
+        <div class="detail-field" style="margin-top:8px"><div class="detail-question">Fase actual</div><div class="detail-answer">${badge(actual || '—', p && (p.desenlace === 'anulado' || p.desenlace === 'devuelto') ? 'descartada' : 'en_proceso')} · ${p && (p.desenlace === 'anulado' || p.desenlace === 'devuelto') ? 'Caso cerrado' : 'En curso'}${p && !(p.desenlace === 'anulado' || p.desenlace === 'devuelto') ? ' · <span style="color:var(--gray-500)">Se registrará cierre al avanzar, retroceder o anular</span>' : ''}</div></div>`;
+    }
+
+    const puedeNota = p && !p.desenlace;
+    const notaAccion = puedeNota ? `<div style="padding:0 16px 16px"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showNotaFaseForm('${esc(id)}')">${Icons.pencil} Añadir nota a la fase actual</button></div>` : '';
+    return `<div class="detail-section historial-fases-panel">
+      <div class="detail-section-title">${Icons.activity} Historial por fases</div>
+      <div class="detail-section-note">Registro acumulativo por fases: cada evento guarda quién lo realizó, fecha y nota (o “Sin nota”). Los datos históricos anteriores pueden no tener usuario/fecha de cierre registrados.</div>
+      <div style="padding:0 16px 8px">${body}</div>
+      ${notaAccion}
+    </div>`;
+  },
+
+  showNotaFaseForm(adopcionId) {
+    const p = this._byId(this.adopciones, adopcionId);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden añadir notas de fase.', 'warning'); return; }
+    this.showFormModal('Nota de fase · ' + (p.fase || ''), `
+      <form onsubmit="Dashboard.guardarNotaFase(event,'${adopcionId}')">
+        <div class="form-group"><label>Fase actual</label><input type="text" value="${this._esc(p.fase || '')}" disabled></div>
+        <div class="form-group"><label>Nota</label><textarea id="hf-nota" rows="4" placeholder="Escribe una nota para esta fase (opcional pero recomendada)"></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Se guardará con tu usuario y la fecha/hora actual.</div></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Guardar nota</button></div>
+      </form>`);
+  },
+
+  async guardarNotaFase(e, adopcionId) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const p = this._byId(this.adopciones, adopcionId);
+    if (!p) { finGuardar(); this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    const nota = (document.getElementById('hf-nota')?.value || '').trim();
+    await this._registrarHistorialFase({ adopcion_id: p.id, fase: p.fase || '', accion: 'nota', nota, usuario: this._usuarioActual(), fecha: new Date().toISOString(), fase_origen: p.fase || '', fase_destino: p.fase || '' });
+    this.saveLocal();
+    finGuardar();
+    this.closeFormModal();
+    this.viewAdopcion(adopcionId, { ready: true });
+    this.showSnackbar('Nota de fase guardada', 'success');
   },
 
   _checklistMarks(raw) {
@@ -5919,6 +6024,52 @@ const Dashboard = {
     return ['Encuesta recibida', 'Revision', 'Visita domiciliaria', 'Contrato', 'Entrega', 'Prueba', 'Seguimiento'];
   },
 
+  _usuarioActual() {
+    try {
+      if (typeof Auth !== 'undefined' && Auth.currentUser) {
+        return Auth.currentUser.name || Auth.currentUser.email || 'Usuario';
+      }
+    } catch {}
+    try {
+      if (this.userProfile && (this.userProfile.name || this.userProfile.email)) {
+        return this.userProfile.name || this.userProfile.email;
+      }
+    } catch {}
+    return 'Usuario';
+  },
+
+  _historialFasesDe(adopcionId) {
+    return (this.historialFasesAdopcion || []).filter(h => String(h.adopcion_id) === String(adopcionId));
+  },
+
+  _historialEventoLabel(ev) {
+    const map = { avance: 'Avance', retroceso: 'Retroceso', anulacion: 'Anulación', devolucion: 'Devolución', nota: 'Nota' };
+    return map[ev && ev.accion] || (ev && ev.accion) || 'Evento';
+  },
+
+  async _registrarHistorialFase(data) {
+    const row = Object.assign({
+      id: 'hfa_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      fecha: new Date().toISOString(),
+      usuario: this._usuarioActual(),
+      nota: '',
+      fase_origen: '',
+      fase_destino: '',
+      accion: 'evento',
+      created_at: new Date().toISOString()
+    }, data || {});
+    if (!Array.isArray(this.historialFasesAdopcion)) this.historialFasesAdopcion = [];
+    this.historialFasesAdopcion.push(row);
+    this.saveLocal();
+    try {
+      await API.createHistorialFaseAdopcion(row);
+    } catch (err) {
+      // Se mantiene en local y se reintentará en flujos manuales si aplica; no bloquear UX principal
+      console.warn('No se pudo guardar historial de fase en backend:', err);
+    }
+    return row;
+  },
+
   _faseIdx(fase) { return this._fasesAdopcion().indexOf(fase); },
 
   // Progreso del caso dentro de la pipeline historica. `pct` se usa para la
@@ -6086,92 +6237,147 @@ const Dashboard = {
   },
 
   async avanzarFase(id, btn) {
+    // Compat: se mantiene por si hay llamadas antiguas; el flujo principal usa modal.
+    return this.showAvanzarFaseForm(id);
+  },
+
+  async showAvanzarFaseForm(id) {
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado', 'warning'); return; }
+    const fases = this._fasesAdopcion();
+    const idx = fases.indexOf(p.fase);
+    if (idx >= fases.length - 1) return;
+    await this._ensureListas(['contratos', 'seguimientos', 'historialFasesAdopcion']);
+    const bloqueo = this._requisitoAvance(p, this._contratoDeAdopcion(id), this.seguimientos);
+    if (bloqueo) { this.showSnackbar(bloqueo, 'warning'); return; }
+    const next = fases[idx + 1];
+    this.showFormModal('Avanzar fase · ' + (p.animal || ''), `
+      <form onsubmit="Dashboard.guardarAvanceFase(event,'${id}')">
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Vas a cerrar <b>${this._esc(p.fase)}</b> y avanzar a <b>${this._esc(next)}</b>. Se guardará quién realiza el cambio y la fecha de cierre de la fase.</span></div>
+        <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Siguiente fase</div><div class="detail-answer">${this._esc(next)}</div></div></div>
+        <div class="form-group"><label>Nota de cierre de fase (opcional)</label><textarea id="af-nota" rows="4" placeholder="Observaciones, acuerdos, incidencias... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.arrowRight} Confirmar avance</button></div>
+      </form>`);
+  },
+
+  async guardarAvanceFase(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const busyKey = 'fase:' + id;
-    if (!this._busyStart(busyKey)) return;
-    const fin = this._btnBusy(btn, 'Avanzando...');
+    if (!this._busyStart(busyKey)) { finGuardar(); return; }
+    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
-      if (!p) return;
+      if (!p) throw new Error('Caso no encontrado');
       const fases = this._fasesAdopcion();
       const idx = fases.indexOf(p.fase);
-      if (idx >= fases.length - 1) return;
-      // Contrato firmado y entrega registrada son obligatorios: no se puede
-      // saltar la formalizacion ni la entrega fisica.
-      await this._ensureListas(['contratos', 'seguimientos']);
+      if (idx >= fases.length - 1) throw new Error('Ya estás en la última fase');
+      await this._ensureListas(['contratos', 'seguimientos', 'historialFasesAdopcion']);
       const bloqueo = this._requisitoAvance(p, this._contratoDeAdopcion(id), this.seguimientos);
       if (bloqueo) { this.showSnackbar(bloqueo, 'warning'); return; }
+      const prevFase = p.fase;
       const newFase = fases[idx + 1];
-      this.showLoading();
+      const nota = (document.getElementById('af-nota')?.value || '').trim();
       try { await API.updateAdopcion(id, { fase: newFase, estado: `Fase: ${newFase}` }); }
       catch (err) { this._snackErr(err, 'No se pudo avanzar de fase'); return; }
       p.fase = newFase;
       p.estado = `Fase: ${newFase}`;
+      await this._registrarHistorialFase({ adopcion_id: id, fase: prevFase, accion: 'avance', nota, usuario: this._usuarioActual(), fecha: new Date().toISOString(), fase_origen: prevFase, fase_destino: newFase });
       this._regLog('adopcion', 'Fase avanzada a ' + newFase + ' (' + (p.animal || '') + ')', 'adopcion', id);
-      // La lista de fondo tambien se actualiza (pipeline y tarjeta) y, si la
-      // ficha estaba abierta, se reabre con la fase nueva.
+      this.saveLocal();
+      finGuardar();
+      this.closeFormModal();
       const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
       const lista = document.getElementById('page-adopciones');
       if (lista) await this.renderAdopciones(lista);
       if (abierta) this.viewAdopcion(id, { ready: true });
       this.showSnackbar('Fase actualizada: ' + newFase, 'success');
+    } catch (err) {
+      this._snackErr(err, 'No se pudo avanzar de fase: ' + this._errMsg(err));
     } finally {
-      fin();
       this.hideLoading();
       this._busyEnd(busyKey);
     }
   },
 
   async retrocederFase(id, btn) {
+    // Compat: redirige al modal
+    return this.showRetrocederFaseForm(id);
+  },
+
+  async showRetrocederFaseForm(id) {
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado', 'warning'); return; }
+    const fases = this._fasesAdopcion();
+    const idx = fases.indexOf(p.fase);
+    if (idx <= 0) return;
+    const prev = fases[idx - 1];
+    await this._ensureListas(['contratos', 'historialFasesAdopcion']);
+    const conserva = [];
+    if (this._contratoDeAdopcion(id)) conserva.push('contrato firmado');
+    if (p.fecha_entrega) conserva.push('entrega registrada');
+    const extra = conserva.length
+      ? 'Se conservan los datos ya registrados (' + conserva.join(' y ') + '), pero el caso volverá a una fase anterior.'
+      : 'No se borran datos, pero el caso volverá a la fase anterior.';
+    this.showFormModal('Retroceder fase · ' + (p.animal || ''), `
+      <form onsubmit="Dashboard.guardarRetrocesoFase(event,'${id}')">
+        <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>Vas a retroceder de <b>${this._esc(p.fase)}</b> a <b>${this._esc(prev)}</b>. ${this._esc(extra)} Se guardará quién realiza el cambio y la fecha.</span></div>
+        <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Fase destino</div><div class="detail-answer">${this._esc(prev)}</div></div></div>
+        <div class="form-group"><label>Nota del retroceso (opcional)</label><textarea id="rf-nota" rows="4" placeholder="Motivo del retroceso, observaciones... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.arrowLeft} Confirmar retroceso</button></div>
+      </form>`);
+  },
+
+  async guardarRetrocesoFase(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
     const busyKey = 'fase:' + id;
-    if (!this._busyStart(busyKey)) return;
-    const fin = this._btnBusy(btn, 'Retrocediendo...');
+    if (!this._busyStart(busyKey)) { finGuardar(); return; }
+    this.showLoading();
     try {
       const p = this._byId(this.adopciones, id);
-      if (!p) return;
+      if (!p) throw new Error('Caso no encontrado');
       const fases = this._fasesAdopcion();
       const idx = fases.indexOf(p.fase);
-      if (idx <= 0) return;
+      if (idx <= 0) throw new Error('Ya estás en la primera fase');
+      const prevFase = p.fase;
       const prev = fases[idx - 1];
-      await this._ensureListas(['contratos']);
-      const conserva = [];
-      if (this._contratoDeAdopcion(id)) conserva.push('contrato firmado');
-      if (p.fecha_entrega) conserva.push('entrega registrada');
-      const extra = conserva.length
-        ? ' Se conservan los datos ya registrados (' + conserva.join(' y ') + '), pero el caso volvera a una fase anterior.'
-        : ' No se borran datos, pero el caso volvera a la fase anterior.';
-      const ok = await this._confirm(
-        '¿Seguro que quieres retroceder de "' + p.fase + '" a "' + prev + '"?' + extra + ' Puede afectar al seguimiento del caso.',
-        'Retroceder de fase',
-        'Si, retroceder'
-      );
-      if (!ok) return;
-      this.showLoading();
+      const nota = (document.getElementById('rf-nota')?.value || '').trim();
       try { await API.updateAdopcion(id, { fase: prev, estado: `Fase: ${prev}` }); }
       catch (err) { this._snackErr(err, 'No se pudo retroceder de fase'); return; }
       p.fase = prev;
       p.estado = `Fase: ${prev}`;
+      await this._registrarHistorialFase({ adopcion_id: id, fase: prevFase, accion: 'retroceso', nota, usuario: this._usuarioActual(), fecha: new Date().toISOString(), fase_origen: prevFase, fase_destino: prev });
       this._regLog('adopcion', 'Fase retrocedida a ' + prev + ' (' + (p.animal || '') + ')', 'adopcion', id);
+      this.saveLocal();
+      finGuardar();
+      this.closeFormModal();
       const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
       const lista = document.getElementById('page-adopciones');
       if (lista) await this.renderAdopciones(lista);
       if (abierta) this.viewAdopcion(id, { ready: true });
       this.showSnackbar('Fase actualizada: ' + prev, 'success');
+    } catch (err) {
+      this._snackErr(err, 'No se pudo retroceder de fase: ' + this._errMsg(err));
     } finally {
-      fin();
       this.hideLoading();
       this._busyEnd(busyKey);
     }
   },
 
   // Devolucion: conserva el caso con desenlace y revierte los efectos
-  // (animal a Disponible, solicitud a En proceso) sin borrar nada.
   showDevolucionForm(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
-    this.showFormModal('Registrar devolución · ' + p.animal, `
+    this.showFormModal('Registrar devolución · ' + (p.animal || ''), `
       <form onsubmit="Dashboard.guardarDevolucion(event,'${id}')">
-        <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: queda con desenlace <b>Devuelto</b>. El animal vuelve a <b>Disponible</b> y la solicitud a <b>En proceso</b>, para que pueda volver a adoptarse.</span></div>
-        <div class="form-group"><label>Motivo de la devolucion *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej: El adoptante se ha mudado y no puede continuar con la adaptacion"></textarea></div>
+        <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: quedará con desenlace <b>Devuelto</b> y se conservará en el historial. El animal volverá a <b>Disponible</b> y la solicitud a <b>En proceso</b>.</span></div>
+        <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase || '—')}</div></div><div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante || '—')}</div></div></div>
+        <div class="form-group"><label>Motivo de la devolución *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej.: No se ha adaptado al hogar, cambio de circunstancias del adoptante..."></textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Registrar devolución</button></div>
       </form>`);
   },
@@ -6183,20 +6389,25 @@ const Dashboard = {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); finGuardar(); return; }
     const motivo = (document.getElementById('dv-motivo').value || '').trim();
-    if (!motivo) { this.showSnackbar('Indica el motivo de la devolucion', 'warning'); finGuardar(); return; }
+    if (!motivo) { this.showSnackbar('Indica el motivo de la devolución', 'warning'); finGuardar(); return; }
+    const faseOrigen = p.fase || '';
     const data = { desenlace: 'devuelto', motivo_devolucion: motivo, fecha_devolucion: new Date().toISOString().slice(0, 10), estado: 'Devuelto' };
     try { await API.updateAdopcion(id, data); }
     catch (err) { this._snackErr(err, 'No se pudo registrar: ' + this._errMsg(err)); finGuardar(); return; }
     Object.assign(p, data);
-    await this._ensureListas(['contratos']);
+    await this._ensureListas(['contratos', 'historialFasesAdopcion']);
+    await this._registrarHistorialFase({ adopcion_id: id, fase: faseOrigen, accion: 'devolucion', nota: motivo, usuario: this._usuarioActual(), fecha: new Date().toISOString(), fase_origen: faseOrigen, fase_destino: 'Devuelto' });
     await this._liberarAnimal(p.animal_id, id);
     await this._rollbackSolicitud(p.solicitud_id);
     this.saveLocal();
     finGuardar();
     this.closeFormModal();
-    this.viewAdopcion(id);
-    this.renderAdopciones(document.getElementById('page-adopciones'));
-    this.showSnackbar('Devolucion registrada: el animal vuelve a Disponible', 'success');
+    const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
+    const lista = document.getElementById('page-adopciones');
+    if (lista) await this.renderAdopciones(lista);
+    if (abierta) this.viewAdopcion(id, { ready: true }); else this.viewAdopcion(id);
+    this._regLog('adopcion', 'Devolución registrada (' + (p.animal || '') + ')', 'adopcion', id);
+    this.showSnackbar('Devolución registrada: el animal vuelve a Disponible', 'success');
   },
 
   _seguimientosFicha(adopcionIdOrP) {
@@ -6287,44 +6498,70 @@ const Dashboard = {
   },
 
   async anularCaso(id) {
+    // Compat: redirige al modal
+    return this.showAnularCasoForm(id);
+  },
+
+  showAnularCasoForm(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
-    if (p.desenlace === 'anulado') { this.showSnackbar('Este caso ya esta anulado', 'warning'); return; }
-    const motivo = prompt('Motivo de anulacion (obligatorio):');
-    if (!motivo || !motivo.trim()) { this.showSnackbar('Debes indicar un motivo', 'warning'); return; }
-    const ok = await this._confirm(
-      'Anular este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso. El caso se conservara en el historial con el motivo indicado.',
-      'Anular caso',
-      'Si, anular'
-    );
-    if (!ok) return;
-    this._busyStart('anular:' + id);
-    const fin = this._btnBusy(document.querySelector('[data-anular="' + id + '"]'), 'Anulando...');
+    if (p.desenlace === 'anulado') { this.showSnackbar('Este caso ya está anulado', 'warning'); return; }
+    if (p.desenlace === 'devuelto') { this.showSnackbar('Este caso ya está devuelto', 'warning'); return; }
+    this.showFormModal('Anular caso · ' + (p.animal || ''), `
+      <form onsubmit="Dashboard.guardarAnulacionCaso(event,'${id}')">
+        <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>Vas a <b>anular</b> este caso. El caso se conservará en el historial con el motivo indicado. El animal volverá a <b>Disponible</b> y la solicitud/candidatura se liberarán según corresponda.</span></div>
+        <div class="detail-section" style="margin-bottom:12px">
+          <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${this._esc(p.animal || '—')}</div></div>
+          <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante || '—')}</div></div>
+          <div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase || '—')}</div></div>
+          <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado || '—')}</div></div>
+        </div>
+        <div class="form-group"><label>Motivo de anulación *</label><textarea id="an-motivo" rows="4" required placeholder="Indica por qué se anula el caso..."></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El motivo es obligatorio y quedará registrado en el historial.</div></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-danger">${Icons.ban} Anular caso</button></div>
+      </form>`);
+  },
+
+  async guardarAnulacionCaso(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); finGuardar(); return; }
+    if (p.desenlace === 'anulado') { this.showSnackbar('Este caso ya está anulado', 'warning'); finGuardar(); return; }
+    const motivo = (document.getElementById('an-motivo')?.value || '').trim();
+    if (!motivo) { this.showSnackbar('Debes indicar un motivo', 'warning'); finGuardar(); return; }
+    const busyKey = 'anular:' + id;
+    if (!this._busyStart(busyKey)) { finGuardar(); return; }
     this.showLoading();
     try {
+      const faseOrigen = p.fase || '';
       const data = {
         desenlace: 'anulado',
-        motivo_devolucion: motivo.trim(),
+        motivo_devolucion: motivo,
         fecha_devolucion: new Date().toISOString().slice(0, 10),
         estado: 'Anulado'
       };
       try { await API.updateAdopcion(id, data); }
       catch (err) { this._snackErr(err, 'No se pudo anular: ' + this._errMsg(err)); return; }
       Object.assign(p, data);
-      // Rollback: liberar animal, solicitud, candidatura
+      await this._ensureListas(['historialFasesAdopcion']);
+      await this._registrarHistorialFase({ adopcion_id: id, fase: faseOrigen, accion: 'anulacion', nota: motivo, usuario: this._usuarioActual(), fecha: new Date().toISOString(), fase_origen: faseOrigen, fase_destino: 'Anulado' });
       await this._liberarAnimal(p.animal_id, id);
       await this._rollbackSolicitud(p.solicitud_id);
       this.saveLocal();
+      finGuardar();
+      this.closeFormModal();
       const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
       const lista = document.getElementById('page-adopciones');
       if (lista) await this.renderAdopciones(lista);
-      if (abierta) this.viewAdopcion(id, { ready: true });
+      if (abierta) this.viewAdopcion(id, { ready: true }); else this.viewAdopcion(id);
       this.showSnackbar('Caso anulado. Animal disponible de nuevo.', 'success');
-      this._regLog('adopcion', 'Caso anulado: ' + motivo.trim() + ' (' + (p.animal || '') + ')', 'adopcion', id);
+      this._regLog('adopcion', 'Caso anulado: ' + motivo + ' (' + (p.animal || '') + ')', 'adopcion', id);
+    } catch (err) {
+      this._snackErr(err, 'No se pudo anular: ' + this._errMsg(err));
     } finally {
-      fin();
       this.hideLoading();
-      this._busyEnd('anular:' + id);
+      this._busyEnd(busyKey);
     }
   },
 

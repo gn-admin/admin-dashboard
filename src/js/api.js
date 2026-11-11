@@ -135,6 +135,12 @@ const API = {
   async updateSeguimiento(id, data) { const r = await this._post('update-seguimiento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteSeguimiento(id) { return this._post('delete-seguimiento', { id }); },
 
+  // Historial por fases de adopciones (append-only, trazabilidad)
+  async getHistorialFasesAdopcion() { return this._get('historial-fases-adopcion'); },
+  async createHistorialFaseAdopcion(data) { return this._post('historial-fases-adopcion', data); },
+  async updateHistorialFaseAdopcion(id, data) { const r = await this._post('update-historial-fase-adopcion', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
+  async deleteHistorialFaseAdopcion(id) { return this._post('delete-historial-fase-adopcion', { id }); },
+
   // Socios (CRUD)
   async getSocios() { return this._get('socios'); },
   async createSocio(data) { return this._post('socios', data); },
