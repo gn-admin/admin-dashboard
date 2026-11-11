@@ -5275,7 +5275,7 @@ const Dashboard = {
           ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
           <div class="detail-actions-inline detail-actions-inline--danger">
             ${devuelto ? '' : `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>`}
-            <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar caso</button>
+            ${p.fase === 'Encuesta recibida' && !contrato && !(this.seguimientos || []).some(s => String(s.adopcion_id) === String(p.id)) ? `<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar caso (solo si vacio)</button>` : ''}
           </div>
         </div>
       </details>`, detailKey);
