@@ -989,12 +989,12 @@ const Dashboard = {
         <div class="empty-state-icon">${Icons.fileText}</div>
         <h4>Sin fotos ni videos</h4>
         <p>Añade hasta 19 fotos o videos a la galería de este animal.</p>
-      <div class="galeria-progress" style="display:none">
-        <div class="progress-text">Subiendo 0 de 0...</div>
-        <div class="progress-bar-track">
-          <div class="progress-bar" style="width:0%"></div>
+        <div class="galeria-progress" style="display:none">
+          <div class="progress-text">Subiendo 0 de 0...</div>
+          <div class="progress-bar-track">
+            <div class="progress-bar" style="width:0%"></div>
+          </div>
         </div>
-      </div>
         <div class="galeria-actions" style="margin-top:12px">
           <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
           <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
@@ -1026,11 +1026,18 @@ const Dashboard = {
         ` : ''}
         <div class="galeria-dots">${dots}</div>
       </div>
+      <div class="galeria-progress" style="display:none">
+        <div class="progress-text">Subiendo 0 de 0...</div>
+        <div class="progress-bar-track">
+          <div class="progress-bar" style="width:0%"></div>
+        </div>
+      </div>
       <div class="galeria-actions">
         ${total < 19 ? `
           <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
           <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
         ` : '<span class="galeria-limite">Límite de 19 archivos alcanzado</span>'}
+        ${total > 0 ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaUsarComoPrincipal('${this._esc(animalId)}')">Usar como principal</button>` : ''}
         ${total > 0 ? `<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard._galeriaBorrar('${this._esc(animalId)}')">Borrar actual</button>` : ''}
       </div>
     `;
@@ -1225,6 +1232,32 @@ const Dashboard = {
       this.showSnackbar('Archivo borrado', 'success');
     } catch (err) {
       this._snackErr(err, 'Error al borrar archivo');
+    }
+  },
+
+  async _galeriaUsarComoPrincipal(animalId) {
+    const fotos = this._galeriaFotos(animalId);
+    const idx = this._galeriaIndex(animalId);
+    const current = fotos[idx];
+    if (!current) return;
+    const a = this._byId(this.animales, animalId);
+    if (!a) return;
+    const ok = await this._confirm('¿Usar esta foto como foto principal del animal?', 'Foto principal', 'Usar');
+    if (!ok) return;
+    try {
+      // Actualizar la ficha del animal con la nueva foto
+      a.foto = current.url;
+      a.foto_url = current.url;
+      a.foto_drive_id = current.file_id;
+      await API.updateAnimal(animalId, { foto: current.url, foto_url: current.url, foto_drive_id: current.file_id });
+      this.saveLocal();
+      // Re-renderizar la ficha
+      if (this._detailVigente('animales', 'animal:' + animalId)) {
+        this.viewAnimal(animalId, { ready: true });
+      }
+      this.showSnackbar('Foto principal actualizada', 'success');
+    } catch (err) {
+      this._snackErr(err, 'Error al actualizar foto principal');
     }
   },
 
