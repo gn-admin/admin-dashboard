@@ -343,6 +343,11 @@ const Dashboard = {
     </div>`;
   },
 
+  // Identidad actual: nombre, email y avatar, priorizando el perfil guardado.
+  _currentUser() {
+    return this._identity(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+  },
+
   // Identidad visible: perfil del backend o, mientras llega, la cuenta de
   // Firebase. Sirve para que un cambio de usuario no muestre el nombre viejo.
   _identity(profile, authUser) {
