@@ -3187,7 +3187,7 @@ const Dashboard = {
   _renderRedesHistorial() {
     const items = (this.publicaciones || []).slice().reverse();
     if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
-    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver</a> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
   },
 
   async borrarPublicacion(id) {
@@ -3200,7 +3200,7 @@ const Dashboard = {
   _publicacionesFicha(animalId) {
     const pubs = this._publicacionesDe(animalId);
     const items = pubs.length
-      ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
+      ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin publicaciones todavia</div></div>`;
     const badgePubs = pubs.length ? ` · ${pubs.length}` : '';
     return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div>`);
@@ -3432,7 +3432,7 @@ const Dashboard = {
     const list = this._gastosDe(animalId);
     const total = this._totalGastos(list);
     const rows = list.length
-      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener">${Icons.fileText} Ver factura</a>` : ''} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener noreferrer">${Icons.fileText} Ver factura</a>` : ''} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
     const badgeGastos = list.length ? ` · ${total.toFixed(2)} €` : '';
     return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div>`);
@@ -3526,7 +3526,7 @@ const Dashboard = {
   _documentosFicha(animalId) {
     const list = this._documentosDe(animalId);
     const rows = list.length
-      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener noreferrer">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
     const badgeDocs = list.length ? ` · ${list.length}` : '';
     return this._collapsibleSection('docs', `${Icons.fileText} Documentos${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir documento</button></div>`);
@@ -5523,7 +5523,7 @@ const Dashboard = {
     const faltan = this._entregaFaltantes(p);
     const chips = this._entregaChecklist().map(it => `<span class="${marcas[it.id] ? 'chip-ok' : 'chip-pending'}">${marcas[it.id] ? Icons.check : Icons.x} ${this._esc(it.label)}${it.opcional ? ' (opcional)' : ''}</span>`).join('');
     const foto = p.entrega_foto_url
-      ? `<div class="detail-field"><div class="detail-question">Foto de la entrega</div><div class="detail-answer"><a href="${this._esc(p.entrega_foto_url)}" target="_blank" rel="noopener"><img class="entrega-foto" src="${this._esc(p.entrega_foto_url)}" alt="Foto de la entrega"></a></div></div>`
+      ? `<div class="detail-field"><div class="detail-question">Foto de la entrega</div><div class="detail-answer"><a href="${this._esc(p.entrega_foto_url)}" target="_blank" rel="noopener noreferrer"><img class="entrega-foto" src="${this._esc(p.entrega_foto_url)}" alt="Foto de la entrega"></a></div></div>`
       : '';
     return `<div class="detail-section"><div class="detail-section-title">${Icons.home} Entrega</div>
       ${fecha ? `

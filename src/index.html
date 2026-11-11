@@ -109,7 +109,7 @@
           <span class="sidebar-brand-name">Grupo Nebak</span>
           <span class="sidebar-brand-sub">Panel de administracion</span>
         </div>
-        <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Colapsar menu"></button>
+        <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Colapsar menu"></button>
       </div>
 
       <nav class="sidebar-nav">
@@ -119,7 +119,7 @@
         </a>
 
         <div class="sidebar-section" data-section="encuestas">
-          <button class="sidebar-section-title sidebar-section-toggle" data-section-toggle="encuestas" aria-expanded="true"><span>Encuestas</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <button type="button" class="sidebar-section-title sidebar-section-toggle" data-section-toggle="encuestas" aria-expanded="true"><span>Encuestas</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
           <a class="sidebar-link" data-page="encuestas-perros" data-tooltip="Pre-adopcion Perros" href="#encuestas-perros">
             <span class="sidebar-link-icon"></span>
             <span class="sidebar-link-text">Pre-adopcion Perros</span>
@@ -135,7 +135,7 @@
         </div>
 
         <div class="sidebar-section" data-section="gestion">
-          <button class="sidebar-section-title sidebar-section-toggle" data-section-toggle="gestion" aria-expanded="true"><span>Gestion</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <button type="button" class="sidebar-section-title sidebar-section-toggle" data-section-toggle="gestion" aria-expanded="true"><span>Gestion</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
           <a class="sidebar-link" data-page="animales" data-tooltip="Animales" href="#animales">
             <span class="sidebar-link-icon"></span>
             <span class="sidebar-link-text">Animales</span>
@@ -159,7 +159,7 @@
         </div>
 
         <div class="sidebar-section" data-section="herramientas">
-          <button class="sidebar-section-title sidebar-section-toggle" data-section-toggle="herramientas" aria-expanded="true"><span>Herramientas</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <button type="button" class="sidebar-section-title sidebar-section-toggle" data-section-toggle="herramientas" aria-expanded="true"><span>Herramientas</span><svg class="section-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
           <a class="sidebar-link" data-page="blacklist" data-tooltip="Lista Negra" href="#blacklist">
             <span class="sidebar-link-icon"></span>
             <span class="sidebar-link-text">Lista Negra</span>
@@ -192,7 +192,7 @@
             <span class="user-role" id="sidebar-user-role">Administrador</span>
           </div>
         </div>
-        <button id="logout-btn" class="sidebar-logout" title="Cerrar sesion">
+        <button type="button" id="logout-btn" class="sidebar-logout" title="Cerrar sesion">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span class="logout-text">Cerrar sesion</span>
         </button>
@@ -202,17 +202,17 @@
     <div class="main-wrapper">
       <header class="topbar">
         <div class="topbar-left">
-          <button id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" aria-label="Mi perfil" onclick="Dashboard.showProfile()"></button>
-          <button id="sidebar-toggle" class="btn-icon sidebar-toggle-btn" aria-label="Abrir o cerrar menu lateral"></button>
+          <button type="button" id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" aria-label="Mi perfil" onclick="Dashboard.showProfile()"></button>
+          <button type="button" id="sidebar-toggle" class="btn-icon sidebar-toggle-btn" aria-label="Abrir o cerrar menu lateral"></button>
           <h1 id="page-title" class="topbar-title">Dashboard</h1>
         </div>
         <div class="topbar-right">
-          <button id="pwa-install-btn" class="btn-icon pwa-install-btn" title="Instalar app" aria-label="Instalar app" style="display:none"></button>
-          <button id="refresh-btn" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos" onclick="Dashboard.refreshData()"></button>
-          <button id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" aria-label="Guia de procesos" onclick="Dashboard.showTutorial()"></button>
+          <button type="button" id="pwa-install-btn" class="btn-icon pwa-install-btn" title="Instalar app" aria-label="Instalar app" style="display:none"></button>
+          <button type="button" id="refresh-btn" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos" onclick="Dashboard.refreshData()"></button>
+          <button type="button" id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" aria-label="Guia de procesos" onclick="Dashboard.showTutorial()"></button>
           <span class="pending-sync-badge" style="display:none"></span>
           <span class="topbar-user-name" id="topbar-user-name"></span>
-          <button id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion" aria-label="Cerrar sesion">
+          <button type="button" id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion" aria-label="Cerrar sesion">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
@@ -298,7 +298,7 @@
             <h3 id="tutorial-title" style="margin:0">Guia de procesos</h3>
             <span class="modal-subtitle">Como funciona el flujo de acogida y adopcion</span>
           </div>
-          <button class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar guia de procesos" onclick="Dashboard.closeTutorial()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar guia de procesos" onclick="Dashboard.closeTutorial()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -310,7 +310,7 @@
       <div class="modal-box">
         <div class="modal-header">
           <h3 id="profile-title">Mi perfil</h3>
-          <button class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar perfil" onclick="Dashboard.closeProfile()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar perfil" onclick="Dashboard.closeProfile()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -325,8 +325,8 @@
         </div>
         <div class="modal-body"><p id="confirm-message" style="margin:0"></p></div>
         <div class="modal-footer" style="display:flex;gap:12px;justify-content:flex-end">
-          <button class="btn btn-outline-green btn-sm" id="confirm-cancel">Cancelar</button>
-          <button class="btn btn-danger btn-sm" id="confirm-ok">Confirmar</button>
+          <button type="button" class="btn btn-outline-green btn-sm" id="confirm-cancel">Cancelar</button>
+          <button type="button" class="btn btn-danger btn-sm" id="confirm-ok">Confirmar</button>
         </div>
       </div>
     </div>
@@ -334,7 +334,7 @@
       <div class="modal-box modal-box--full">
         <div class="modal-header">
           <h3 id="contrato-title">Contrato de adopcion</h3>
-          <button class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar contrato" onclick="Dashboard.closeContratoForm()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar contrato" onclick="Dashboard.closeContratoForm()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -345,7 +345,7 @@
       <div class="modal-box modal-box--wide">
         <div class="modal-header">
           <h3 id="info-title">Detalle</h3>
-          <button class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar detalle" onclick="Dashboard.closeInfoModal()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar detalle" onclick="Dashboard.closeInfoModal()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -356,7 +356,7 @@
       <div class="modal-box modal-box--wide">
         <div class="modal-header">
           <h3 id="form-title">Formulario</h3>
-          <button class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar formulario" onclick="Dashboard.closeFormModal()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar formulario" onclick="Dashboard.closeFormModal()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -369,7 +369,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="pwa-title">Instalar Grupo Nebak</h3>
-        <button class="btn-icon modal-close" id="pwa-modal-close" title="Cerrar" aria-label="Cerrar">
+        <button type="button" class="btn-icon modal-close" id="pwa-modal-close" title="Cerrar" aria-label="Cerrar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
