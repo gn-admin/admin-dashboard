@@ -986,6 +986,12 @@ const Dashboard = {
         <div class="empty-state-icon">${Icons.fileText}</div>
         <h4>Sin fotos ni videos</h4>
         <p>Añade hasta 19 fotos o videos a la galería de este animal.</p>
+      <div class="galeria-progress" style="display:none">
+        <div class="progress-text">Subiendo 0 de 0...</div>
+        <div class="progress-bar-track">
+          <div class="progress-bar" style="width:0%"></div>
+        </div>
+      </div>
         <div class="galeria-actions" style="margin-top:12px">
           <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
           <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
@@ -1057,52 +1063,89 @@ const Dashboard = {
 
   async _galeriaSubir(animalId, tipo) {
     const fotos = this._galeriaFotos(animalId);
-    if (fotos.length >= 19) {
-      this.showSnackbar('Límite de 19 archivos alcanzado', 'warning');
+    const restantes = 19 - fotos.length;
+    if (restantes <= 0) {
+      this.showSnackbar("Limite de 19 archivos alcanzado", "warning");
       return;
     }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = tipo === 'video' ? 'video/mp4,video/webm' : 'image/*';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = tipo === "video" ? "video/mp4,video/webm" : "image/*";
+    input.multiple = true;
     input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (file.size > 5 * 1024 * 1024) {
-        this.showSnackbar('El archivo supera los 5MB', 'warning');
-        return;
+      const files = Array.from(e.target.files || []).slice(0, restantes);
+      if (!files.length) return;
+      const invalidos = files.filter(f => f.size > 5 * 1024 * 1024);
+      if (invalidos.length) {
+        this.showSnackbar(invalidos.length + " archivo(s) superan 5MB y se omitiran", "warning");
       }
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64 = ev.target.result;
-        const nombre = file.name || (tipo === 'video' ? 'video' : 'foto') + '_' + Date.now();
-        const mimeType = file.type || (tipo === 'video' ? 'video/mp4' : 'image/jpeg');
-        try {
-          const r = await API.uploadDocumento(base64, nombre, mimeType, 'galeria-' + tipo);
-          if (r && r.data) {
-            if (!this.documentos) this.documentos = [];
-            this.documentos.push({
-              id: r.data.fileId || 'doc_' + Date.now(),
-              animal_id: animalId,
-              tipo: 'galeria-' + tipo,
-              nombre: nombre,
-              url: r.data.webContentLink || r.data.webViewLink,
-              file_id: r.data.fileId,
-              fecha: new Date().toISOString()
-            });
-            this.saveLocal();
-            this._galeriaSetIndex(animalId, this._galeriaFotos(animalId).length - 1);
-            this._galeriaRepintar(animalId);
-            this.showSnackbar('Archivo añadido a la galería', 'success');
-          }
-        } catch (err) {
-          this._snackErr(err, 'Error al subir archivo');
+      const validos = files.filter(f => f.size <= 5 * 1024 * 1024);
+      if (!validos.length) return;
+      const progressEl = document.querySelector("[data-animal=\"" + animalId + "\"]")?.parentElement?.querySelector(".galeria-progress");
+      if (progressEl) {
+        progressEl.style.display = "block";
+        const txt = progressEl.querySelector(".progress-text");
+        const bar = progressEl.querySelector(".progress-bar");
+        if (txt) txt.textContent = "Subiendo 0 de " + validos.length + "...";
+        if (bar) bar.style.width = "0%";
+      }
+      const LOTE = 3;
+      let subidos = 0;
+      for (let i = 0; i < validos.length; i += LOTE) {
+        const lote = validos.slice(i, i + LOTE);
+        const resultados = await Promise.allSettled(lote.map(async (file) => {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+              try {
+                const base64 = ev.target.result;
+                const nombre = file.name || (tipo === "video" ? "video" : "foto") + "_" + Date.now();
+                const mimeType = file.type || (tipo === "video" ? "video/mp4" : "image/jpeg");
+                const r = await API.uploadDocumento(base64, nombre, mimeType, "galeria-" + tipo);
+                if (r && r.data) {
+                  if (!this.documentos) this.documentos = [];
+                  this.documentos.push({
+                    id: r.data.fileId || "doc_" + Date.now(),
+                    animal_id: animalId,
+                    tipo: "galeria-" + tipo,
+                    nombre: nombre,
+                    url: r.data.webContentLink || r.data.webViewLink,
+                    file_id: r.data.fileId,
+                    fecha: new Date().toISOString()
+                  });
+                  resolve(true);
+                } else {
+                  reject(new Error("Sin respuesta del servidor"));
+                }
+              } catch (err) {
+                reject(err);
+              }
+            };
+            reader.readAsDataURL(file);
+          });
+        }));
+        subidos += resultados.filter(r => r.status === "fulfilled").length;
+        const fallidos = resultados.filter(r => r.status === "rejected").length;
+        if (fallidos > 0) {
+          this.showSnackbar(fallidos + " archivo(s) fallaron", "warning");
         }
-      };
-      reader.readAsDataURL(file);
+        if (progressEl) {
+          const pct = Math.round((subidos / validos.length) * 100);
+          const txt = progressEl.querySelector(".progress-text");
+          const bar = progressEl.querySelector(".progress-bar");
+          if (txt) txt.textContent = "Subiendo " + subidos + " de " + validos.length + "...";
+          if (bar) bar.style.width = pct + "%";
+        }
+        this.saveLocal();
+        this._galeriaRepintar(animalId);
+      }
+      if (progressEl) {
+        setTimeout(() => { progressEl.style.display = "none"; }, 1000);
+      }
+      this.showSnackbar(subidos + " archivo(s) anadidos a la galeria", "success");
     };
     input.click();
   },
-
   async _galeriaBorrar(animalId) {
     const fotos = this._galeriaFotos(animalId);
     const idx = this._galeriaIndex(animalId);
@@ -3899,7 +3942,7 @@ const Dashboard = {
       return `<div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${perro ? 'var(--primary-lighter)' : 'var(--info-light)'};color:${perro ? 'var(--primary-hover)' : 'var(--info)'};flex-shrink:0">${gato ? Icons.cat : (perro ? Icons.dog : Icons.paw)}</div>`;
     }
     const nombre = (a && a.nombre) || '';
-    return `<button type="button" class="foto-hero" title="Ver foto completa" aria-label="Ver foto de ${this._esc(nombre)}" onclick="Dashboard.verFotoAnimal('${this._esc(a.id)}')"><img src="${this._esc(src)}" alt="${this._esc(nombre)}"></button>`;
+    return `<button type="button" class="foto-hero" title="Ver foto completa" aria-label="Ver foto de ${this._esc(nombre)}" onclick="Dashboard.verFotoAnimal('${this._esc(a.id)}')" style="position:relative"><img src="${this._esc(src)}" alt="${this._esc(nombre)}"><span class="foto-principal-badge">Principal</span></button>`;
   },
 
   // Especies domesticas del selector de la ficha de animal. "Otro..." sigue

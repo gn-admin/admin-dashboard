@@ -7324,6 +7324,22 @@ body.pwa-modal-open {
 
 .notas-panel .detail-section-title { margin-bottom: 12px; }
 
+/* Badge "Principal" en foto del héroe */
+.foto-principal-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: var(--primary, #1FC95B);
+  color: #fff;
+  font-size: var(--text-2xs, 0.625rem);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm, 4px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
 /* ============================================================ */
 /* Galería de fotos/videos en ficha de animal                    */
 /* ============================================================ */
@@ -7458,6 +7474,38 @@ body.pwa-modal-open {
   color: var(--gray-500, #6b7280);
   font-size: var(--text-sm, 0.875rem);
   padding: 8px;
+}
+
+/* Barra de progreso para subida multiple */
+.galeria-progress {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--surface, #fff);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--glass-border, #e5e7eb);
+  display: none;
+}
+
+.progress-text {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--gray-600, #4b5563);
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.progress-bar-track {
+  height: 6px;
+  background: var(--gray-200, #e5e7eb);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--primary, #1FC95B);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
 }
 
 /* Móvil: carrusel full-width */
