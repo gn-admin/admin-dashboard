@@ -963,14 +963,13 @@ const Dashboard = {
 
   // ==================== GALERIA DE FOTOS/VIDEOS (animal) ====================
   // Usa la hoja "Documentos" con tipo 'galeria-foto' / 'galeria-video'.
-  // Limite de 19 archivos por animal. Fotos funcionan sin cambio en .gs;
-  // videos requieren que Code.gs acepte video/* (ya aplicado).
+  // Límite de 10 archivos por animal.
 
   _galeriaFotos(animalId) {
     return (this.documentos || []).filter(d =>
       String(d.animal_id) === String(animalId) &&
       (d.tipo === 'galeria-foto' || d.tipo === 'galeria-video')
-    ).sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0));
+    ).sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0) || String(a.fecha || '').localeCompare(String(b.fecha || '')));
   },
 
   _galeriaIndex(animalId) {
@@ -986,19 +985,18 @@ const Dashboard = {
 
   _galeriaHtml(animalId) {
     const fotos = this._galeriaFotos(animalId);
-    const idx = this._galeriaIndex(animalId);
+    const idx = Math.min(this._galeriaIndex(animalId), Math.max(0, fotos.length - 1));
+    this._galeriaSetIndex(animalId, Math.max(0, idx));
     const total = fotos.length;
 
     if (!total) {
       return `<div class="galeria-vacio">
         <div class="empty-state-icon">${Icons.fileText}</div>
         <h4>Sin fotos ni videos</h4>
-        <p>Añade hasta 19 fotos o videos a la galería de este animal.</p>
+        <p>Añade hasta 10 fotos o videos a la galería de este animal.</p>
         <div class="galeria-progress" style="display:none">
           <div class="progress-text">Subiendo 0 de 0...</div>
-          <div class="progress-bar-track">
-            <div class="progress-bar" style="width:0%"></div>
-          </div>
+          <div class="progress-bar-track"><div class="progress-bar" style="width:0%"></div></div>
         </div>
         <div class="galeria-actions" style="margin-top:12px">
           <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
@@ -1011,38 +1009,36 @@ const Dashboard = {
       `<button type="button" class="galeria-dot ${i === idx ? 'galeria-dot--active' : ''}" onclick="Dashboard._galeriaIr('${this._esc(animalId)}', ${i})" aria-label="Ir a ${i + 1}"></button>`
     ).join('');
 
-    const slides = fotos.map(f => {
+    const slides = fotos.map((f, i) => {
       const isVideo = f.tipo === 'galeria-video';
+      const url = f.url || f.webViewLink || f.webContentLink || '';
       const media = isVideo
-        ? `<video controls preload="metadata" poster="${this._esc(f.poster || '')}" style="max-width:100%;max-height:100%"><source src="${this._esc(f.url)}" type="video/mp4">Tu navegador no soporta video.</video>`
-        : `<img src="${this._esc(f.url)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain" loading="lazy">`;
+        ? `<video controls preload="metadata" style="max-width:100%;max-height:100%"><source src="${this._esc(url)}">Tu navegador no soporta video.</video>`
+        : `<img src="${this._esc(url)}" alt="Archivo ${i + 1} de la galería" style="max-width:100%;max-height:100%;object-fit:contain" loading="lazy">`;
       return `<div class="galeria-slide">${media}</div>`;
     }).join('');
 
     return `
-      <div class="galeria-carrusel" data-animal="${this._esc(animalId)}" tabindex="0" role="region" aria-label="Galería de fotos" style="outline:none">
+      <div class="galeria-carrusel" data-animal="${this._esc(animalId)}" tabindex="0" role="region" aria-label="Galería de fotos y videos" style="outline:none">
         <div class="galeria-counter">${idx + 1} de ${total}</div>
         <div class="galeria-track" style="transform: translateX(-${idx * 100}%)">
           ${slides}
         </div>
         ${total > 1 ? `
-          <button type="button" class="galeria-btn galeria-btn--prev" onclick="Dashboard._galeriaPrev('${this._esc(animalId)}')" aria-label="Anterior">◀</button>
-          <button type="button" class="galeria-btn galeria-btn--next" onclick="Dashboard._galeriaNext('${this._esc(animalId)}')" aria-label="Siguiente">▶</button>
+          <button type="button" class="galeria-btn galeria-btn--prev" onclick="Dashboard._galeriaPrev('${this._esc(animalId)}')" aria-label="Anterior">&#10094;</button>
+          <button type="button" class="galeria-btn galeria-btn--next" onclick="Dashboard._galeriaNext('${this._esc(animalId)}')" aria-label="Siguiente">&#10095;</button>
         ` : ''}
         <div class="galeria-dots">${dots}</div>
       </div>
       <div class="galeria-progress" style="display:none">
         <div class="progress-text">Subiendo 0 de 0...</div>
-        <div class="progress-bar-track">
-          <div class="progress-bar" style="width:0%"></div>
-        </div>
+        <div class="progress-bar-track"><div class="progress-bar" style="width:0%"></div></div>
       </div>
       <div class="galeria-actions">
-        ${total < 19 ? `
+        ${total < 10 ? `
           <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
           <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
-        ` : '<span class="galeria-limite">Límite de 19 archivos alcanzado</span>'}
-        ${total > 0 ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaUsarComoPrincipal('${this._esc(animalId)}')">Usar como principal</button>` : ''}
+        ` : '<span class="galeria-limite">Límite de 10 archivos alcanzado</span>'}
         ${total > 0 ? `<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard._galeriaBorrar('${this._esc(animalId)}')">Borrar actual</button>` : ''}
       </div>
     `;
@@ -1071,7 +1067,7 @@ const Dashboard = {
     this._galeriaRepintar(animalId);
   },
 
-  // Swipe + teclado para el carrusel de galería (Fase 3)
+  // Swipe + teclado para el carrusel de galería
   _galeriaSwipeInit() {
     if (this._galeriaSwipeHook) return;
     this._galeriaSwipeHook = true;
@@ -1091,12 +1087,12 @@ const Dashboard = {
       if (!swiping || !carousel) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      // Solo swipe horizontal (evitar conflicto con scroll vertical)
       if (Math.abs(dy) > Math.abs(dx)) { swiping = false; return; }
       const track = carousel.querySelector('.galeria-track');
       if (track) {
-        const idx = parseInt(carousel.dataset.animal ? this._galeriaIndex(carousel.dataset.animal) : 0, 10) || 0;
-        track.style.transform = 'translateX(' + (-idx * 100 + (dx / carousel.offsetWidth * 100)) + '%)';
+        const animalId = carousel.dataset.animal;
+        const idx = animalId ? this._galeriaIndex(animalId) : 0;
+        track.style.transform = 'translateX(' + (-idx * 100 + (dx / (carousel.offsetWidth || 1) * 100)) + '%)';
         track.style.transition = 'none';
       }
     }, { passive: true });
@@ -1107,18 +1103,13 @@ const Dashboard = {
       const dx = e.changedTouches[0].clientX - startX;
       const animalId = carousel.dataset.animal;
       const track = carousel.querySelector('.galeria-track');
-      if (track) {
-        track.style.transition = '';
-        track.style.transform = '';
-      }
+      if (track) { track.style.transition = ''; track.style.transform = ''; }
       if (Math.abs(dx) > 50 && animalId) {
-        if (dx > 0) this._galeriaPrev(animalId);
-        else this._galeriaNext(animalId);
+        if (dx > 0) this._galeriaPrev(animalId); else this._galeriaNext(animalId);
       }
       carousel = null;
     }, { passive: true });
 
-    // Teclado: flechas izquierda/derecha
     document.addEventListener('keydown', (e) => {
       const c = document.activeElement?.closest?.('.galeria-carrusel') || document.querySelector('.galeria-carrusel:focus-within');
       if (!c) return;
@@ -1130,95 +1121,112 @@ const Dashboard = {
   },
 
   _galeriaRepintar(animalId) {
-    const cont = document.querySelector(`[data-animal="${animalId}"]`)?.closest('.detail-section-body, .collapsible-body');
-    if (cont) cont.innerHTML = this._galeriaHtml(animalId);
+    const el = document.querySelector(`[data-animal="${animalId}"]`);
+    if (el) el.innerHTML = this._galeriaHtml(animalId);
+    // Actualizar contador en el título de la sección si existe
+    try {
+      const sec = el ? el.closest('[data-sec]') : null;
+      if (sec) {
+        const title = sec.querySelector('.detail-section-title');
+        if (title) title.innerHTML = `${Icons.fileText} Galería (${this._galeriaFotos(animalId).length}/10)`;
+      }
+    } catch {}
   },
 
   async _galeriaSubir(animalId, tipo) {
+    const a = this._byId(this.animales, animalId);
+    if (!a) { this.showSnackbar('Animal no encontrado', 'warning'); return; }
+    await this._ensureListas(['documentos']);
     const fotos = this._galeriaFotos(animalId);
-    const restantes = 19 - fotos.length;
+    const restantes = 10 - fotos.length;
     if (restantes <= 0) {
-      this.showSnackbar("Limite de 19 archivos alcanzado", "warning");
+      this.showSnackbar('Límite de 10 archivos alcanzado', 'warning');
       return;
     }
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = tipo === "video" ? "video/mp4,video/webm" : "image/*";
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = tipo === 'video' ? 'video/mp4,video/webm' : 'image/*';
     input.multiple = true;
     input.onchange = async (e) => {
       const files = Array.from(e.target.files || []).slice(0, restantes);
       if (!files.length) return;
       const invalidos = files.filter(f => f.size > 5 * 1024 * 1024);
-      if (invalidos.length) {
-        this.showSnackbar(invalidos.length + " archivo(s) superan 5MB y se omitiran", "warning");
-      }
+      if (invalidos.length) this.showSnackbar(invalidos.length + ' archivo(s) superan 5MB y se omitirán', 'warning');
       const validos = files.filter(f => f.size <= 5 * 1024 * 1024);
       if (!validos.length) return;
-      const progressEl = document.querySelector("[data-animal=\"" + animalId + "\"]")?.parentElement?.querySelector(".galeria-progress");
-      if (progressEl) {
-        progressEl.style.display = "block";
-        const txt = progressEl.querySelector(".progress-text");
-        const bar = progressEl.querySelector(".progress-bar");
-        if (txt) txt.textContent = "Subiendo 0 de " + validos.length + "...";
-        if (bar) bar.style.width = "0%";
-      }
+
+      const cont = document.querySelector(`[data-animal="${animalId}"]`);
+      const progressEl = cont ? cont.querySelector('.galeria-progress') : null;
+      const setProgress = (done, totalCount, visible) => {
+        if (!progressEl) return;
+        progressEl.style.display = visible ? 'block' : 'none';
+        const txt = progressEl.querySelector('.progress-text');
+        const bar = progressEl.querySelector('.progress-bar');
+        if (txt) txt.textContent = 'Subiendo ' + done + ' de ' + totalCount + '...';
+        if (bar) bar.style.width = (totalCount ? Math.round((done / totalCount) * 100) : 0) + '%';
+      };
+      setProgress(0, validos.length, true);
+
       const LOTE = 3;
       let subidos = 0;
+      let fallidos = 0;
       for (let i = 0; i < validos.length; i += LOTE) {
         const lote = validos.slice(i, i + LOTE);
-        const resultados = await Promise.allSettled(lote.map(async (file) => {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = async (ev) => {
+        const resultados = await Promise.allSettled(lote.map((file) => new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+          reader.onload = async (ev) => {
+            try {
+              const raw = ev.target.result;
+              if (!raw) throw new Error('Archivo vacío');
+              const base64 = String(raw).indexOf(',') !== -1 ? String(raw).split(',')[1] : raw;
+              const safeOrig = (file.name || (tipo === 'video' ? 'video.mp4' : 'foto.jpg')).replace(/\s+/g, '_');
+              const upName = 'galeria_' + (a.nombre || 'animal').replace(/\s+/g, '_') + '_' + Date.now().toString(36) + '_' + safeOrig;
+              const mimeType = file.type || (tipo === 'video' ? 'video/mp4' : 'image/jpeg');
+              const up = await API.uploadDocumento(base64, upName, mimeType, 'galeria-' + tipo);
+              if (!up || !up.data || !up.data.fileId) throw new Error('Sin respuesta del servidor al subir');
+              const row = {
+                id: 'doc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+                animal_id: a.id,
+                animal: a.nombre || '',
+                nombre: file.name || upName,
+                tipo: 'galeria-' + tipo,
+                file_id: up.data.fileId,
+                url: up.data.webViewLink || up.data.webContentLink || '',
+                fecha: new Date().toISOString().slice(0, 10)
+              };
               try {
-                const base64 = ev.target.result;
-                const nombre = file.name || (tipo === "video" ? "video" : "foto") + "_" + Date.now();
-                const mimeType = file.type || (tipo === "video" ? "video/mp4" : "image/jpeg");
-                const r = await API.uploadDocumento(base64, nombre, mimeType, "galeria-" + tipo);
-                if (r && r.data) {
-                  if (!this.documentos) this.documentos = [];
-                  this.documentos.push({
-                    id: r.data.fileId || "doc_" + Date.now(),
-                    animal_id: animalId,
-                    tipo: "galeria-" + tipo,
-                    nombre: nombre,
-                    url: r.data.webContentLink || r.data.webViewLink,
-                    file_id: r.data.fileId,
-                    fecha: new Date().toISOString()
-                  });
-                  resolve(true);
-                } else {
-                  reject(new Error("Sin respuesta del servidor"));
-                }
-              } catch (err) {
-                reject(err);
+                await API.createDocumento(row);
+              } catch (errCreate) {
+                // Si ya se subió a Drive pero falló guardar el registro, avisar claramente
+                throw new Error('Archivo subido pero no se pudo guardar en la ficha: ' + this._errMsg(errCreate));
               }
-            };
-            reader.readAsDataURL(file);
-          });
-        }));
-        subidos += resultados.filter(r => r.status === "fulfilled").length;
-        const fallidos = resultados.filter(r => r.status === "rejected").length;
-        if (fallidos > 0) {
-          this.showSnackbar(fallidos + " archivo(s) fallaron", "warning");
-        }
-        if (progressEl) {
-          const pct = Math.round((subidos / validos.length) * 100);
-          const txt = progressEl.querySelector(".progress-text");
-          const bar = progressEl.querySelector(".progress-bar");
-          if (txt) txt.textContent = "Subiendo " + subidos + " de " + validos.length + "...";
-          if (bar) bar.style.width = pct + "%";
-        }
+              if (!this.documentos) this.documentos = [];
+              this.documentos.push(row);
+              resolve(true);
+            } catch (err) { reject(err); }
+          };
+          reader.readAsDataURL(file);
+        })));
+        resultados.forEach(r => { if (r.status === 'fulfilled') subidos++; else { fallidos++; console.warn('Galería upload error:', r.reason); } });
+        setProgress(subidos + fallidos, validos.length, true);
         this.saveLocal();
         this._galeriaRepintar(animalId);
       }
-      if (progressEl) {
-        setTimeout(() => { progressEl.style.display = "none"; }, 1000);
-      }
-      this.showSnackbar(subidos + " archivo(s) anadidos a la galeria", "success");
+
+      setProgress(validos.length, validos.length, false);
+      if (fallidos > 0) this.showSnackbar(fallidos + ' archivo(s) no se pudieron añadir', 'warning');
+      if (subidos > 0) this.showSnackbar(subidos + ' archivo(s) añadidos a la galería', 'success');
+      if (subidos === 0 && fallidos === 0) this.showSnackbar('No se añadió ningún archivo', 'warning');
+      // Refrescar documentos desde backend para confirmar persistencia
+      try {
+        await this._ensureListas(['documentos'], true);
+        this._galeriaRepintar(animalId);
+      } catch {}
     };
     input.click();
   },
+
   async _galeriaBorrar(animalId) {
     const fotos = this._galeriaFotos(animalId);
     const idx = this._galeriaIndex(animalId);
@@ -1237,32 +1245,6 @@ const Dashboard = {
       this.showSnackbar('Archivo borrado', 'success');
     } catch (err) {
       this._snackErr(err, 'Error al borrar archivo');
-    }
-  },
-
-  async _galeriaUsarComoPrincipal(animalId) {
-    const fotos = this._galeriaFotos(animalId);
-    const idx = this._galeriaIndex(animalId);
-    const current = fotos[idx];
-    if (!current) return;
-    const a = this._byId(this.animales, animalId);
-    if (!a) return;
-    const ok = await this._confirm('¿Usar esta foto como foto principal del animal?', 'Foto principal', 'Usar');
-    if (!ok) return;
-    try {
-      // Actualizar la ficha del animal con la nueva foto
-      a.foto = current.url;
-      a.foto_url = current.url;
-      a.foto_drive_id = current.file_id;
-      await API.updateAnimal(animalId, { foto: current.url, foto_url: current.url, foto_drive_id: current.file_id });
-      this.saveLocal();
-      // Re-renderizar la ficha
-      if (this._detailVigente('animales', 'animal:' + animalId)) {
-        this.viewAnimal(animalId, { ready: true });
-      }
-      this.showSnackbar('Foto principal actualizada', 'success');
-    } catch (err) {
-      this._snackErr(err, 'Error al actualizar foto principal');
     }
   },
 
@@ -4352,7 +4334,7 @@ const Dashboard = {
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
         <div class="detail-collapse-body">
-          ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/19)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, false)}
+          ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/10)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, false)}
           ${this._apadrinamientosFicha(a.id)}
           ${this._gastosFicha(a.id)}
           ${this._documentosFicha(a.id)}
