@@ -71,8 +71,8 @@ const Dashboard = {
     const btn = typeof document !== 'undefined' ? document.getElementById('refresh-btn') : null;
     if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
     try {
-      await this._loadSurveys(true);
       await Promise.all([
+        this._loadSurveys(true),
         this.loadEstados(true),
         this.loadNotas(true),
         this._ensureListas([
@@ -81,7 +81,7 @@ const Dashboard = {
           'donaciones', 'seguimientos', 'documentos', 'inventario', 'grupos', 'actividad'
         ], true)
       ]);
-      await Promise.all((this.surveys || []).map(s => this._loadResponses(s.id, true)));
+      await Promise.all(this._surveyIds().map(sid => this._loadResponses(sid, true)));
       const page = (typeof App !== 'undefined' && App.currentPage) || 'dashboard';
       if (typeof App !== 'undefined') {
         App.currentPage = null;
@@ -409,7 +409,9 @@ const Dashboard = {
       if (this._cached.estados && !force) return this.states;
       return this._loading.estados;
     }
-    const hasCache = !!this._cached.estados && this.states && Object.keys(this.states).length > 0;
+    // La cache local vale aunque este vacia: una lista sin registros tambien
+    // es un dato valido y no debe obligar a esperar ~2 s en cada visita.
+    const hasCache = this._cached.estados === true && !!this.states;
     const load = (async () => {
       const res = await API.getEstados();
       this.states = res.data || {};
@@ -434,7 +436,7 @@ const Dashboard = {
       if (this._cached.notas && !force) return this.notes;
       return this._loading.notas;
     }
-    const hasCache = !!this._cached.notas && this.notes && Object.keys(this.notes).length > 0;
+    const hasCache = this._cached.notas === true && !!this.notes;
     const load = (async () => {
       const res = await API.getNotas();
       this.notes = res.data || {};
@@ -456,10 +458,10 @@ const Dashboard = {
   async _loadSurveys(force) {
     if (this._loaded.surveys && !force) return this.surveys;
     if (this._loading.surveys) {
-      if (this._cached.surveys && (this.surveys || []).length && !force) return this.surveys;
+      if (this._cached.surveys && Array.isArray(this.surveys) && !force) return this.surveys;
       return this._loading.surveys;
     }
-    const hasCache = !!this._cached.surveys && Array.isArray(this.surveys) && this.surveys.length > 0;
+    const hasCache = this._cached.surveys === true && Array.isArray(this.surveys);
     const load = (async () => {
       const res = await API.getSurveys();
       this.surveys = res.data || [];
@@ -482,10 +484,10 @@ const Dashboard = {
     const key = 'responses_' + surveyId;
     if (this._loaded[key] && !force) return this.responses[surveyId] || [];
     if (this._loading[key]) {
-      if (this._cached.responses && (this.responses[surveyId] || []).length && !force) return this.responses[surveyId] || [];
+      if (this._cached.responses && Array.isArray(this.responses[surveyId]) && !force) return this.responses[surveyId] || [];
       return this._loading[key];
     }
-    const hasCache = !!this._cached.responses && Array.isArray(this.responses[surveyId]) && this.responses[surveyId].length > 0;
+    const hasCache = this._cached.responses === true && Array.isArray(this.responses[surveyId]);
     const load = (async () => {
       const res = await API.getResponses(surveyId);
       this.responses[surveyId] = (res.data || []).map(r => ({ ...r, _surveyId: surveyId }));
@@ -531,13 +533,22 @@ const Dashboard = {
     return ids;
   },
 
+  // Ids de encuesta que existen siempre, aunque la hoja Surveys tarde en
+  // responder. Asi las respuestas se piden en paralelo con _loadSurveys y no
+  // en una segunda ronda secuencial (cada ronda a Apps Script cuesta ~1-2 s).
+  _surveyIds() {
+    const conocidas = ['pre-adopcion-perros', 'pre-adopcion-gatos', 'pre-acogida'];
+    const ids = (this.surveys || []).map(s => s && s.id).filter(Boolean);
+    return [...new Set([...ids, ...conocidas])];
+  },
+
   _loadList(key, apiFn, force) {
     if (this._loaded[key] && !force) return this[key];
     if (this._loading[key]) {
-      if (this._cached[key] && (this[key] || []).length && !force) return this[key];
+      if (this._cached[key] && Array.isArray(this[key]) && !force) return this[key];
       return this._loading[key];
     }
-    const hasCache = !!this._cached[key] && Array.isArray(this[key]) && this[key].length > 0;
+    const hasCache = this._cached[key] === true && Array.isArray(this[key]);
     const load = (async () => {
       const res = await apiFn();
       const remote = res.data || [];
@@ -1020,14 +1031,14 @@ const Dashboard = {
 
   async _refreshHomeTier1(force) {
     // Datos criticos para pintar el home: encuestas, estados, animales,
-    // familias y respuestas. Se cargan primero para que la home aparezca
-    // rapido aunque el resto tarde.
-    await this._loadSurveys(force);
+    // familias y respuestas. Todo sale en paralelo: las respuestas usan los
+    // ids conocidos, asi el primer pintado no espera una segunda ronda.
     await Promise.all([
+      this._loadSurveys(force),
       this.loadEstados(force),
       this._loadList('animales', () => API.getAnimales(), force),
       this._loadList('familias', () => API.getFamilias(), force),
-      ...this.surveys.map(s => this._loadResponses(s.id, force)),
+      ...this._surveyIds().map(sid => this._loadResponses(sid, force)),
     ]);
   },
   async _refreshHomeTier2(force) {
@@ -1557,8 +1568,8 @@ const Dashboard = {
   // roedores...) NO tienen formulario propio: adopcion y acogida se tramitan
   // con estas mismas encuestas (el selector de asignacion no filtra por especie).
   async renderEncuestasHub(el) {
-    await this._loadSurveys();
     await Promise.all([
+      this._loadSurveys(),
       this._loadResponses('pre-adopcion-perros'),
       this._loadResponses('pre-adopcion-gatos'),
       this._loadResponses('pre-acogida'),
@@ -1590,8 +1601,7 @@ const Dashboard = {
   },
 
   async renderEncuesta(el, surveyId) {
-    await this._loadSurveys();
-    await Promise.all([this._loadResponses(surveyId), this.loadEstados()]);
+    await Promise.all([this._loadSurveys(), this._loadResponses(surveyId), this.loadEstados()]);
     const responses = this._sortEncuestas((this.responses[surveyId]||[]).filter(r=>!this.checkBlacklist(r.nombre,r.email)));
     this._shown[surveyId] = 20;
     el.innerHTML = `
@@ -2160,7 +2170,7 @@ const Dashboard = {
     if (c.animal_id) { box.innerHTML = '<div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Animal asignado</span></div></div>'; return; }
     const selKey = surveyId + '-' + responseId;
     const disp = this._ordenaUrgentes(this.animales.filter(a => a.estado === 'disponible'));
-    const fams = this.familias.filter(f => (f.capacidad || 'Libre') !== 'Ocupada');
+    const fams = this.familias.filter(f => this._capacidadEfectiva(f) !== 'Ocupada');
     const needsFam = c.tipo === 'acogida';
     box.innerHTML = `
       <div class="detail-field"><div class="detail-question">Animal disponible</div>
@@ -2206,6 +2216,12 @@ const Dashboard = {
     if (c.tipo === 'acogida') {
       const fam = this.familias.find(f => f.id === familiaId);
       if (!fam) { this.showSnackbar('Familia no encontrada', 'warning'); return false; }
+      // Sin hueco no se crea el caso: antes se asignaba el animal a una
+      // familia llena y la capacidad quedaba descuadrada.
+      if (this._capacidadEfectiva(fam) === 'Ocupada') {
+        this.showSnackbar(fam.nombre + ' ya está al máximo de animales (' + (fam.animales_actuales || 0) + '/' + (fam.max_capacity || 1) + '). Elige otra familia o amplía su capacidad.', 'warning');
+        return false;
+      }
       const caso = {
         id: 'acg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
         animal_id: a.id,
@@ -2224,13 +2240,10 @@ const Dashboard = {
       a.estado = 'en_acogida';
       a.acogida_familia = familiaId;
       await this._updateLocalYApi('animales', a);
-      // Solo incrementar si la familia aun tiene hueco (también corrige
-      // familias con datos antiguos marcadas 'Ocupada' con sitio libre).
-      if (this._capacidadFamilia(fam.animales_actuales, fam.max_capacity) === 'Libre') {
-        fam.animales_actuales = (fam.animales_actuales || 0) + 1;
-        fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
-        await this._updateLocalYApi('familias', fam);
-      }
+      // La familia ya tiene hueco (se comprobo arriba): se suma el animal.
+      fam.animales_actuales = (fam.animales_actuales || 0) + 1;
+      fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
+      await this._updateLocalYApi('familias', fam);
       return true;
     }
     const adopcion = {
@@ -2947,6 +2960,29 @@ const Dashboard = {
     setTimeout(() => clearInterval(iv), 6000);
   },
 
+  // Abre una ficha de caso desde otra pantalla (ficha de animal, familia...).
+  // Sin esto, `viewAdopcion`/`viewAcogida` pintaban el detalle de una pagina
+  // que no estaba visible y el boton "Ver caso" parecia no hacer nada.
+  openAdopcionFicha(id) {
+    this._abrirFichaEnPagina('adopciones', '.response-list', () => this.viewAdopcion(id));
+  },
+
+  openAcogidaFicha(id) {
+    this._abrirFichaEnPagina('acogidas-activas', '.response-list', () => this.viewAcogida(id));
+  },
+
+  _abrirFichaEnPagina(page, selector, paint) {
+    const pintar = () => {
+      const el = document.getElementById('page-' + page);
+      if (el && el.querySelector(selector)) { clearInterval(iv); paint(); }
+    };
+    const iv = setInterval(pintar, 150);
+    if (location.hash === '#' + page) { pintar(); return; }
+    location.hash = page;
+    pintar();
+    setTimeout(() => clearInterval(iv), 6000);
+  },
+
   _apadrinaFicha(socioId) {
     const list = (this.apadrinamientos || []).filter(x => String(x.padrino_id) === String(socioId));
     const items = list.length
@@ -3495,7 +3531,7 @@ const Dashboard = {
     const nombre = (g && g.nombre) || ms[0].grupo || gid;
     const cabecera = this._grupoCollage(gid);
     const filas = ms.map(x => `
-      <div class="grupo-miembro" onclick="Dashboard.closeInfoModal();Dashboard.viewAnimal('${x.id}')">
+      <div class="grupo-miembro" onclick="Dashboard.closeInfoModal();Dashboard.openAnimalFicha('${x.id}')">
         <span class="grupo-miembro-foto">${this._fotoSrc(x) ? `<img loading="lazy" src="${this._esc(this._fotoSrc(x, 'w80'))}" alt="">` : (x.especie === 'Perro' ? Icons.dog : (x.especie === 'Gato' ? Icons.cat : Icons.paw))}</span>
         <span class="grupo-miembro-nombre"><b>${this._esc(x.nombre)}</b><small>${this._esc(x.raza || '')}${x.edad ? ' · ' + this._esc(x.edad) : ''} · ${this._esc(x.sexo || '')}</small></span>
         <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span>
@@ -3937,9 +3973,9 @@ const Dashboard = {
     const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && p.desenlace !== 'devuelto' && p.fase !== 'Seguimiento');
     const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && c.fase !== 'finalizada');
     const estadoBanner = casoAdopcion
-      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAdopcion('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
+      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAdopcionFicha('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
       : (casoAcogida
-        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAcogida('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
+        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
         : (foster ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>Familia <b>${this._esc(foster.nombre)}</b> · ${this._esc(foster.ubicacion || '')}</span></div>` : ''));
     this._showDetail('animales', a.nombre, `
       <div class="responder-hero">
@@ -4010,7 +4046,7 @@ const Dashboard = {
           const fam = this.familias.find(f => f.id === c.familia_id);
           if (fam) {
             fam.animales_actuales = Math.max(0, (fam.animales_actuales || 0) - 1);
-            if (fam.capacidad === 'Ocupada' && fam.animales_actuales === 0) fam.capacidad = 'Libre';
+            fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
             this._updateLocalYApi('familias', fam);
           }
         }
@@ -4034,8 +4070,9 @@ const Dashboard = {
       this._loadList('animales', () => API.getAnimales())
     ]);
     const filter = this._currentFosterFilter;
-    const filtered = filter==='all' ? this.familias : this.familias.filter(f=>f.capacidad===filter);
-    const counts = {all:this.familias.length, Libre:this.familias.filter(f=>f.capacidad==='Libre').length, Ocupada:this.familias.filter(f=>f.capacidad==='Ocupada').length};
+    const capacidadDe = f => this._capacidadEfectiva(f);
+    const filtered = filter==='all' ? this.familias : this.familias.filter(f=>capacidadDe(f)===filter);
+    const counts = {all:this.familias.length, Libre:this.familias.filter(f=>capacidadDe(f)==='Libre').length, Ocupada:this.familias.filter(f=>capacidadDe(f)==='Ocupada').length};
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} familias</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaForm()">${Icons.plus} Nueva</button></div>
@@ -4051,7 +4088,7 @@ const Dashboard = {
           <div class="response-card-header">
             <div class="response-avatar" style="background:var(--info-light);color:var(--info)">${this._esc(String(f.nombre).charAt(0))}</div>
             <div class="response-info">
-              <div class="response-name">${this._esc(f.nombre)} <span class="estado-badge ${f.capacidad==='Libre'?'en_proceso':'pendiente'}">${this._esc(f.capacidad)}</span></div>
+              <div class="response-name">${this._esc(f.nombre)} <span class="estado-badge ${capacidadDe(f)==='Libre'?'en_proceso':'pendiente'}">${this._esc(capacidadDe(f))}</span></div>
               <div class="response-email">${this._esc(f.email)} &middot; ${this._esc(f.especialidad)} &middot; ${this._esc(f.ubicacion)}</div>
             </div>
             <div class="response-date">${f.animales_actuales}/${f.max_capacity}</div>
@@ -4070,6 +4107,14 @@ const Dashboard = {
     const m = parseInt(max, 10);
     const tope = m > 0 ? m : 1;
     return ((actuales || 0) >= tope) ? 'Ocupada' : 'Libre';
+  },
+
+  // Capacidad efectiva de una familia. Se calcula con los numeros actuales y
+  // no se confia en la columna `capacidad` de la hoja, que puede venir
+  // desfasada (por ejemplo 'Ocupada' con hueco libre o al reves).
+  _capacidadEfectiva(f) {
+    const actuales = parseInt(f && f.animales_actuales, 10) || 0;
+    return this._capacidadFamilia(actuales, f && f.max_capacity);
   },
 
   showFamiliaForm(data) {
@@ -4130,6 +4175,9 @@ const Dashboard = {
     const f = this._byId(this.familias, id);
     if(!f) { this.showSnackbar('Familia no encontrada (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const animalesEnAcogida = this.animales.filter(a => a.acogida_familia === id);
+    const capacidad = this._capacidadEfectiva(f);
+    const casos = (this.acogidas || []).filter(c => String(c.familia_id) === String(id));
+    const activos = casos.filter(c => c && c.fase !== 'finalizada');
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaFormById('${f.id}')">${Icons.pencil} Editar</button>
@@ -4141,11 +4189,12 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Teléfono</div><div class="detail-answer">${this._esc(f.telefono)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc(f.ubicacion)}</div></div>
         <div class="detail-field"><div class="detail-question">Especialidad</div><div class="detail-answer">${this._esc(f.especialidad)}</div></div>
-        <div class="detail-field"><div class="detail-question">Capacidad</div><div class="detail-answer">${f.animales_actuales}/${f.max_capacity} animales</div></div>
-        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${f.capacidad==='Libre'?'en_proceso':'pendiente'}">${f.capacidad}</span></div></div>
+        <div class="detail-field"><div class="detail-question">Capacidad</div><div class="detail-answer">${this._esc(String(f.animales_actuales || 0))}/${this._esc(String(f.max_capacity || 1))} animales</div></div>
+        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${capacidad==='Libre'?'en_proceso':'pendiente'}">${capacidad}</span></div></div>
         <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${this._esc(this._fmtFecha(f.fecha_registro))}</div></div>
       </div>
       ${f.notas?`<div class="detail-section"><div class="detail-section-title">Notas</div><div class="detail-field"><div class="detail-answer">${this._esc(f.notas)}</div></div></div>`:''}
+      ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(c.id)}')">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
       ${animalesEnAcogida.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Animales en Acogida</div>${animalesEnAcogida.map(a=>`<div class="detail-field"><div class="detail-question">${this._esc(a.nombre)}</div><div class="detail-answer">${this._esc(a.especie)} &middot; ${this._esc(a.raza)} &middot; ${this._esc(a.edad||'')}</div></div>`).join('')}</div>`:''}
       `);
   },
@@ -4155,7 +4204,7 @@ const Dashboard = {
     await this._ensureListas(['acogidas']);
     try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
     catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    const casos = this.acogidas.filter(x => x.familia_id === id && x.estado === 'activa' && x.fase !== 'finalizada');
+    const casos = this.acogidas.filter(x => x && x.familia_id === id && x.fase !== 'finalizada');
     if (casos.length) {
       for (const c of casos) {
         if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
@@ -4219,9 +4268,7 @@ const Dashboard = {
   async renderAcogidasActivas(el) {
     await Promise.all([
       this._loadList('animales', () => API.getAnimales()),
-      this._loadList('familias', () => API.getFamilias())
-    ]);
-    await Promise.all([
+      this._loadList('familias', () => API.getFamilias()),
       this._loadListBestEffort('acogidas', () => API.getAcogidas()),
       this._loadListBestEffort('contratos', () => API.getContratos())
     ]);
@@ -4284,7 +4331,7 @@ const Dashboard = {
         ${c.fase === 'entrega' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.checkCircle} Marcar en casa</button>` : ''}
         ${c.fase === 'en_casa' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.check} Finalizar acogida</button>` : ''}
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
-        ${a ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAnimal('${this._esc(a.id)}')">${Icons.paw} Ver ficha del animal</button>` : ''}
+        ${a ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAnimalFicha('${this._esc(a.id)}')">${Icons.paw} Ver ficha del animal</button>` : ''}
       </div>
       <div class="detail-section fase-stepper-card">
         <div class="fase-stepper-head">
@@ -4295,7 +4342,7 @@ const Dashboard = {
       </div>
       <div class="detail-section detail-section--fields">
         <div class="detail-section-title">${Icons.home} Animal y familia</div>
-        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${a ? `<a href="javascript:void(0)" onclick="Dashboard.viewAnimal('${this._esc(a.id)}')">${this._esc(a.nombre)}</a>` : this._esc(c.animal) || '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${a ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(a.id)}')">${this._esc(a.nombre)}</a>` : this._esc(c.animal) || '—'}</div></div>
         <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(c.familia) || '—'}</div></div>
         <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc((fam && fam.ubicacion) || '') || '—'}</div></div>
         <div class="detail-field"><div class="detail-question">Contacto</div><div class="detail-answer">${this._esc((fam && (fam.telefono || fam.email)) || '') || '—'}</div></div>
@@ -4352,8 +4399,12 @@ const Dashboard = {
       } else {
         this.showSnackbar('Fase actualizada', 'success');
       }
+      // Persistir el cambio de fase (antes se perdia al recargar).
+      await this._updateLocalYApi('acogidas', c);
       this.saveLocal();
-      this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+      const abierta = this._detailVigente('acogidas-activas', 'acogida:' + id);
+      await this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+      if (abierta) this.viewAcogida(id, { ready: true });
     } finally {
       fin();
       this._busyEnd(busyKey);
@@ -4499,7 +4550,14 @@ const Dashboard = {
       const identidad = await this._aplicarIdentidadAnimalContrato({
         animalId: c.animal_id || '',
         acogidaId: id,
+        // Sin `prefix` se leian los campos `ct-animal` (los de adopcion):
+        // raza, edad, sexo y microchip no se guardaban en la acogida.
+        prefix: 'ac-animal',
         nombre: (this._el('ac-animal-nombre') || {}).value || (datos.animal && datos.animal.nombre) || c.animal,
+        raza: (this._el('ac-animal-raza') || {}).value || (datos.animal && datos.animal.raza) || '',
+        edad: (this._el('ac-animal-edad') || {}).value || (datos.animal && datos.animal.edad) || '',
+        sexo: (this._el('ac-animal-sexo') || {}).value || (datos.animal && datos.animal.sexo) || '',
+        microchip: (this._el('ac-animal-microchip') || {}).value || (datos.animal && datos.animal.microchip) || '',
         actualizarFicha: !!(this._el('ac-animal-actualizar') || {}).checked,
         fotoActual: (datos.animal && datos.animal.foto) || (live.animal && live.animal.foto) || '',
         fotoFile: ((this._el('ac-animal-foto') || {}).files || [])[0] || null
@@ -4633,8 +4691,10 @@ const Dashboard = {
 
   // ==================== ADOPCIONES CRUD ====================
   async renderAdopciones(el) {
-    await this._loadList('adopciones', () => API.getAdopciones());
-    await this._ensureListas(['contratos', 'animales']);
+    await Promise.all([
+      this._loadList('adopciones', () => API.getAdopciones()),
+      this._ensureListas(['contratos', 'animales'])
+    ]);
     const fases = this._fasesAdopcion();
     el.innerHTML = `
       <div class="page-list-container">
@@ -5707,7 +5767,12 @@ const Dashboard = {
       p.fase = newFase;
       p.estado = `Fase: ${newFase}`;
       this._regLog('adopcion', 'Fase avanzada a ' + newFase + ' (' + (p.animal || '') + ')', 'adopcion', id);
-      this.viewAdopcion(id);
+      // La lista de fondo tambien se actualiza (pipeline y tarjeta) y, si la
+      // ficha estaba abierta, se reabre con la fase nueva.
+      const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
+      const lista = document.getElementById('page-adopciones');
+      if (lista) await this.renderAdopciones(lista);
+      if (abierta) this.viewAdopcion(id, { ready: true });
       this.showSnackbar('Fase actualizada: ' + newFase, 'success');
     } finally {
       fin();
@@ -5744,7 +5809,10 @@ const Dashboard = {
       p.fase = prev;
       p.estado = `Fase: ${prev}`;
       this._regLog('adopcion', 'Fase retrocedida a ' + prev + ' (' + (p.animal || '') + ')', 'adopcion', id);
-      this.viewAdopcion(id);
+      const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
+      const lista = document.getElementById('page-adopciones');
+      if (lista) await this.renderAdopciones(lista);
+      if (abierta) this.viewAdopcion(id, { ready: true });
       this.showSnackbar('Fase actualizada: ' + prev, 'success');
     } finally {
       fin();
@@ -7151,13 +7219,14 @@ const Dashboard = {
 
   // ==================== REPORTES ====================
   async renderReportes(el) {
-    await this._loadSurveys();
+    // Encuestas, estados, listas y respuestas salen a la vez: las respuestas
+    // se piden con los ids conocidos y el resto en cuanto responde Surveys.
     await Promise.all([
+      this._loadSurveys().then(() => Promise.all(this._surveyIds().map(sid => this._loadResponses(sid)))),
       this.loadEstados(),
       this._loadList('animales', () => API.getAnimales()),
       this._loadList('adopciones', () => API.getAdopciones()),
       this._loadList('socios', () => API.getSocios()),
-      ...this.surveys.map(s => this._loadResponses(s.id)),
       this._ensureListas(['gastos', 'donaciones', 'apadrinamientos', 'acogidas']),
       this._loadListBestEffort('actividad', () => API.getActividad()),
     ]);
