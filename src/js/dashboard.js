@@ -36,6 +36,24 @@ const Dashboard = {
     if (!this._onlineHook) {
       this._onlineHook = true;
       window.addEventListener('online', () => { this.flushPendingOps(); });
+      // Intentar flush antes de cerrar la pestaña (best-effort, no bloquea)
+      window.addEventListener('beforeunload', () => { this.flushPendingOps(); });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') this.flushPendingOps();
+      });
+      // Invalidar caché cuando otra pestaña modifica datos (evento storage)
+      window.addEventListener('storage', (e) => {
+        if (e.key && (e.key.startsWith('gn_cache_') || e.key.startsWith('gn_'))) {
+          const k = e.key.replace('gn_cache_', '').replace('gn_', '');
+          if (this._loaded) this._loaded[k] = false;
+          // Revalidar en segundo plano si la página actual muestra ese listado
+          if (typeof this.refreshData === 'function') {
+            // Solo revalidar, no forzar re-render inmediato
+            this._cacheDirty = this._cacheDirty || new Set();
+            this._cacheDirty.add(k);
+          }
+        }
+      });
     }
   },
 
@@ -130,7 +148,7 @@ const Dashboard = {
       console.error('Error cargando ' + page + ':', err);
       if (token !== this._pageToken) return;
       this._snackErr(err, 'No se pudo cargar esta pantalla');
-      el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.loadPage('${page}')">Reintentar</button></div>`;
+      el.innerHTML = `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.loadPage('${page}')">Reintentar</button></div>`;
       return;
     } finally {
       if (token === this._pageToken) el.removeAttribute('aria-busy');
@@ -178,7 +196,7 @@ const Dashboard = {
   },
 
   injectIcons() {
-    const set = (id, svg) => { const el = document.getElementById(id); if (el) el.innerHTML = svg; };
+    const set = (id, svg) => { const el = document.getElementById(id); if (el) el.innerHTML = (svg || '').replace('<svg', '<svg aria-hidden="true"'); };
     set('sidebar-toggle', Icons.menu);
     set('sidebar-collapse-btn', Icons.sidebarCollapse);
     set('mas-menu-icon', Icons.menu);
@@ -206,8 +224,8 @@ const Dashboard = {
       const m = { dashboard: Icons.dashboard, encuestas: Icons.clipboard, animales: Icons.heart, blacklist: Icons.ban };
       el.innerHTML = m[p] || Icons.clipboard;
     });
-    document.querySelectorAll('.input-icon').forEach((el, i) => { el.innerHTML = i === 0 ? Icons.mail : Icons.lock; });
-    document.querySelectorAll('.search-icon').forEach(el => { el.innerHTML = Icons.search; });
+    document.querySelectorAll('.input-icon').forEach((el, i) => { el.innerHTML = (i === 0 ? Icons.mail : Icons.lock).replace('<svg ', '<svg aria-hidden="true" '); });
+    document.querySelectorAll('.search-icon').forEach(el => { el.innerHTML = Icons.search.replace('<svg ', '<svg aria-hidden="true" '); });
     // Accesibilidad teclado: todo lo clicable no-nativo, enfocable y activable.
     document.querySelectorAll('[onclick]:not(button):not(a):not(input):not(select):not(textarea)').forEach(el => {
       if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
@@ -764,7 +782,7 @@ const Dashboard = {
   _modalScrollLock(open) {
     this._modalLocks = Math.max(0, (this._modalLocks || 0) + (open ? 1 : -1));
     if (typeof document !== 'undefined' && document.body) {
-      document.body.style.overflow = this._modalLocks > 0 ? 'hidden' : '';
+      document.body.classList.toggle('modal-open', this._modalLocks > 0);
     }
   },
 
@@ -890,7 +908,7 @@ const Dashboard = {
       if (detailContainer) {
         detailContainer.classList.add('active');
         detailContainer._prevHTML = null;
-        detailContainer.innerHTML = `<div class="detail-actions"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button></div>${html}`;
+        detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button></div>${html}`;
         detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       return;
@@ -901,7 +919,7 @@ const Dashboard = {
       if (!detailContainer._prevHTML) detailContainer._prevHTML = detailContainer.innerHTML;
       const titleEl = detailContainer.querySelector('.detail-actions span');
       const title = titleEl ? titleEl.innerHTML : '';
-      detailContainer.innerHTML = `<div class="detail-actions"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button><span class="detail-toolbar-title">${title}</span></div>${html}`;
+      detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button><span class="detail-toolbar-title">${title}</span></div>${html}`;
       const formCard = detailContainer.querySelector('.form-card');
       if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       else detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -916,7 +934,7 @@ const Dashboard = {
     if (!this._openSections) this._openSections = new Set(['info']);
     const open = !!defOpen || this._openSections.has(id);
     return `<div class="detail-section collapsible${open ? ' open' : ''}" data-sec="${id}">
-      <button class="detail-section-head" onclick="Dashboard._toggleSection(this,'${id}')">
+      <button type="button" class="detail-section-head" onclick="Dashboard._toggleSection(this,'${id}')">
         <span class="detail-section-title" style="margin:0">${titleHtml}</span>
         <span class="section-chevron">${Icons.chevronDown}</span>
       </button>
@@ -968,7 +986,7 @@ const Dashboard = {
       detailEl.dataset.detailKey = detailKey || '';
       detailEl.innerHTML = `
       <div class="detail-actions">
-        <button class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
         <span class="detail-toolbar-title">${this._esc(title)}</span>
       </div>
       ${contentHTML}`;
@@ -1175,7 +1193,7 @@ const Dashboard = {
               <h3 class="dash-panel-title">Acción requerida</h3>
               <p class="dash-panel-sub">Lo que toca hoy</p>
             </div>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Recordatorio</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Recordatorio</button>
           </header>
           <div class="dash-actions">${this._accionListHtml()}</div>
         </section>
@@ -1359,7 +1377,7 @@ const Dashboard = {
           <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button>
         </div>`;
       }
-      return `<div class="dash-action" role="button" tabindex="0" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')">
+      return `<div class="dash-action" role="button" tabindex="0" aria-label="Abrir cuestionario de ${this._esc(it.nombre || 'solicitud')}" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')">
         <span class="dash-action-icon">${Icons.clipboard}</span>
         <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.nombre)}</span><span class="dash-action-sub">${this._esc(it.survey)}</span></span>
         <span class="dash-action-meta"><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span><span class="dash-action-wait">${this._diasEspera(it.fecha)}</span></span>
@@ -1472,7 +1490,7 @@ const Dashboard = {
     return items.map(it => {
       if (it.kind === 'vencimiento') {
         const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
-        return `<tr><td>${this._esc(it.titulo)}<div style="font-size:var(--text-xs);color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button></td></tr>`;
+        return `<tr><td>${this._esc(it.titulo)}<div style="font-size:var(--text-xs);color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.toggleRecordatorio('${this._esc(it.ref.id)}')">Hecho</button></td></tr>`;
       }
       return `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')"><td>${this._esc(it.nombre)}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
     }).join('');
@@ -1611,8 +1629,8 @@ const Dashboard = {
     this._shown[surveyId] = 20;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
-        <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button class="btn btn-primary btn-sm" onclick="Dashboard.exportSurvey('${surveyId}')">${Icons.download} Exportar</button></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}'))"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSurvey('${surveyId}')">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -1652,12 +1670,12 @@ const Dashboard = {
     const shown = this._shown[surveyId] || 20;
     let html = this._renderResponseCards(responses.slice(0, shown), surveyId, emptyMsg);
     const rest = responses.length - shown;
-    if (rest > 0) html += `<div class="load-more-wrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.loadMore('${surveyId}')">+ Cargar más (${rest} restantes)</button></div>`;
+    if (rest > 0) html += `<div class="load-more-wrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.loadMore('${surveyId}')">+ Cargar más (${rest} restantes)</button></div>`;
     return html;
   },
 
   _renderResponseCards(responses, surveyId, emptyMsg) {
-    if(!responses.length) return '<div class="empty-state"><div class="empty-state-icon">'+Icons.clipboard+'</div><h3>'+(emptyMsg||'No hay solicitudes')+'</h3></div>';
+    if(!responses.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.clipboard+'</div><h3>'+(emptyMsg||'No hay solicitudes')+'</h3></div>';
     return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
@@ -1688,16 +1706,16 @@ const Dashboard = {
     const cands=this._candidaturasDe(surveyId, responseId);
     const candCls={en_lista:'',elegido:'aprobada',descartado:'descartada'};
     const actionButtons = e==='descartada'
-      ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.check} Restaurar</button>`
+      ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.check} Restaurar</button>`
       : e==='aprobada'
-        ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} Reabrir</button>
-           <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
+        ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} Reabrir</button>
+           <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
         : e==='en_proceso'
-          ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.aprobarEncuesta('${surveyId}','${r.id}')">${Icons.checkCircle} Aprobar</button>
-             <button class="btn btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','pendiente','${surveyId}')">${Icons.arrowRight} Pendiente</button>
-             <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
-          : `<button class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} En proceso</button>
-             <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`;
+          ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.aprobarEncuesta('${surveyId}','${r.id}')">${Icons.checkCircle} Aprobar</button>
+             <button type="button" class="btn btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','pendiente','${surveyId}')">${Icons.arrowRight} Pendiente</button>
+             <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
+          : `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} En proceso</button>
+             <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`;
     const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${c.fecha ? this._fmtFecha(c.fecha) : '—'}</div></div>`).join('')}</div>` : '';
     const asig = cands.length ? !!cands[0].animal_id : false;
     const assignBox = e==='aprobada' && !asig ? `<div class="detail-section"><div class="detail-section-title">${Icons.arrowRight} Asignar animal${cands[0]&&cands[0].tipo==='acogida'?' y familia':''}</div><div id="assign-box-${responseId}" style="min-height:70px"><div class="page-loader"><div class="spinner"></div><p>Cargando animales...</p></div></div></div>` : '';
@@ -1713,7 +1731,7 @@ const Dashboard = {
         </div>
       </div>
       <div class="detail-actions-wrap">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
         ${actionButtons}
       </div>
       ${blBanner}
@@ -1756,7 +1774,7 @@ const Dashboard = {
       gestion: this._tutorialGestion(),
       estados: this._tutorialEstados()
       };
-      body.innerHTML = `<button class="btn btn-outline-green btn-sm tutorial-back" onclick="Dashboard.showTutorial()">${Icons.arrowLeft} Todas las guías</button><h3 class="tutorial-guide-title">${titles[tab] || ''}</h3><div class="tutorial-panel">${panels[tab] || ''}</div>`;
+      body.innerHTML = `<button type="button" class="btn btn-outline-green btn-sm tutorial-back" onclick="Dashboard.showTutorial()">${Icons.arrowLeft} Todas las guías</button><h3 class="tutorial-guide-title">${titles[tab] || ''}</h3><div class="tutorial-panel">${panels[tab] || ''}</div>`;
     }
     if (el.style.display !== 'flex') this._modalScrollLock(true);
     el.style.display = 'flex';
@@ -1776,7 +1794,7 @@ const Dashboard = {
       ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, 'var(--info-light)', 'var(--info-strong)'],
       ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, 'var(--primary-lighter)', 'var(--success)']
     ];
-    return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
+    return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button type="button" class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
     <div class="guide-note">${Icons.info} <span>Los estados se pueden mover hacia delante y hacia atras en cualquier momento desde la ficha de cada solicitud.</span></div>
     <h4 class="tutorial-section-title">Accesos directos</h4>
     ${this._tutorialIndex()}`;
@@ -1830,8 +1848,8 @@ const Dashboard = {
       <div class="guide-note">${Icons.info} <span>La barra de estado del detalle te deja mover la solicitud hacia delante y hacia atras en cualquier momento: <b>Pendiente</b>, <b>En proceso</b>, <b>Aprobar</b> y <b>Descartar</b>.</span></div>
       <div class="guide-note">${Icons.info} <span>Sin red no pasa nada: los cambios se encolan (insignia "N pendientes" arriba) y se envian solos al volver la conexion. El boton <b>Guardar</b> se bloquea con "Guardando..." para no duplicar.</span></div>
       <div class="guide-cols">
-        <div class="guide-card"><div class="guide-card-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora con su capacidad (<b>max. de animales configurable</b>; 1 si no se indica). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada. El <b>contrato de acogida</b> es opcional.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
-        <div class="guide-card"><div class="guide-card-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y abrir el caso en <b>Adopciones</b>. El caso avanza por <b>7 fases</b> (Encuesta recibida → Revision → Visita domiciliaria → Contrato → Entrega → Prueba → Seguimiento): el contrato exige <b>foto y nombre del animal</b>, firma y terminos aceptados, y cada fase bloquea el avance hasta cumplir su requisito.</p><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</div><h4>Ruta de acogida</h4><p>La encuesta de <b>pre-acogida</b> aprobada crea la familia acogedora con su capacidad (<b>max. de animales configurable</b>; 1 si no se indica). Se asigna animal y familia, y el caso se sigue en <b>Acogidas activas</b>: Entrega → En casa → Finalizada. El <b>contrato de acogida</b> es opcional.</p><button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('acogida')">Ver guia de acogida</button></div>
+        <div class="guide-card"><div class="guide-card-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</div><h4>Ruta de adopcion</h4><p>La encuesta <b>pre-adopcion</b> (perros/gatos) aprobada permite asignar un animal disponible y abrir el caso en <b>Adopciones</b>. El caso avanza por <b>7 fases</b> (Encuesta recibida → Revision → Visita domiciliaria → Contrato → Entrega → Prueba → Seguimiento): el contrato exige <b>foto y nombre del animal</b>, firma y terminos aceptados, y cada fase bloquea el avance hasta cumplir su requisito.</p><button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial('adopcion')">Ver guia de adopcion</button></div>
       </div>`;
   },
 
@@ -1989,21 +2007,21 @@ const Dashboard = {
   _tutorialIndex() {
     return `
       <div class="guide-index">
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase y generar el contrato de acogida opcional.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('reportes')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('actividad')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
-        <button class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase y generar el contrato de acogida opcional.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('reportes')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('actividad')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
+        <button type="button" class="guide-index-item" onclick="Dashboard.showTutorial('apadrinamiento')"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
 
@@ -2028,8 +2046,8 @@ const Dashboard = {
         <div><span class="estado-badge en_proceso">${this._esc(u.roleLabel)}</span></div>
       </div>
       <div class="profile-actions">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.closeProfile();Dashboard.showTutorial()">${Icons.helpCircle} Guia de procesos</button>
-        <button class="btn btn-danger btn-sm" onclick="Auth.logout()">${Icons.xCircle} Cerrar sesion</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.closeProfile();Dashboard.showTutorial()">${Icons.helpCircle} Guia de procesos</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="Auth.logout()">${Icons.xCircle} Cerrar sesion</button>
       </div>`;
     if (el.style.display !== 'flex') this._modalScrollLock(true);
     el.style.display = 'flex';
@@ -2111,18 +2129,18 @@ const Dashboard = {
       ]);
     } catch (err) {
       if (!sigueAbierto()) return;
-      this.showInfoModal(titleBase, `<div class="empty-state">
+      this.showInfoModal(titleBase, `<div class="empty-state empty-state-illustrated">
         <div class="empty-state-icon">${Icons.alertTriangle}</div>
         <h3>No se pudo cargar</h3>
         <p>${this._esc(this._errMsg(err))}</p>
-        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.viewCuestionarioModal('${surveyId}','${responseId}')">Reintentar</button>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.viewCuestionarioModal('${surveyId}','${responseId}')">Reintentar</button>
       </div>`);
       return;
     }
     if (!sigueAbierto()) return;
     const r = (this.responses[surveyId] || []).find(x => String(x.id) === String(responseId));
     if (!r) {
-      this.showInfoModal(titleBase, `<div class="empty-state">
+      this.showInfoModal(titleBase, `<div class="empty-state empty-state-illustrated">
         <div class="empty-state-icon">${Icons.search}</div>
         <h3>Cuestionario no encontrado</h3>
         <p>Puede que se haya eliminado o que aun no se haya sincronizado.</p>
@@ -2138,8 +2156,8 @@ const Dashboard = {
       ${this._seccionesHtml(sections)}
       ${this._notasFichaHtml(surveyId, r.id, { readonly: true, ctx: 'modal' })}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
-        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.openCuestionarioEnPagina('${surveyId}','${r.id}')">${Icons.arrowRight} Abrir en Encuestas</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openCuestionarioEnPagina('${surveyId}','${r.id}')">${Icons.arrowRight} Abrir en Encuestas</button>
       </div>`);
   },
 
@@ -2182,7 +2200,7 @@ const Dashboard = {
         <select id="asg-animal-${selKey}" class="form-input">${disp.length ? disp.map(a=>`<option value="${a.id}">${this._esPrioritario(a)?'URGENTE · ':''}${this._esc(a.nombre)} (${this._esc(a.especie)} · ${this._esc(a.raza)})</option>`).join('') : `<option value="">(Sin animales disponibles)</option>`}</select>
       </div>
       ${needsFam ? `<div class="detail-field"><div class="detail-question">Familia de acogida</div><select id="asg-familia-${selKey}" class="form-input">${fams.length ? fams.map(f=>`<option value="${f.id}">${this._esc(f.nombre)}${f.ubicacion?' · '+this._esc(f.ubicacion):''}</option>`).join('') : `<option value="">(Sin familias libres)</option>`}</select></div>` : ''}
-      <div style="padding:12px 0 0;border-top:1px solid var(--gray-100);margin-top:8px"><button class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} onclick="Dashboard.asignarCandidatura('${surveyId}','${responseId}')">${Icons.checkCircle} Asignar animal</button></div>`;
+      <div style="padding:12px 0 0;border-top:1px solid var(--gray-100);margin-top:8px"><button type="button" class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} onclick="Dashboard.asignarCandidatura('${surveyId}','${responseId}')">${Icons.checkCircle} Asignar animal</button></div>`;
   },
 
   async asignarCandidatura(surveyId, responseId) {
@@ -2769,7 +2787,7 @@ const Dashboard = {
   _renderRedesHistorial() {
     const items = (this.publicaciones || []).slice().reverse();
     if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
-    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> <button class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver</a> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
   },
 
   async borrarPublicacion(id) {
@@ -2785,7 +2803,7 @@ const Dashboard = {
       ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin publicaciones todavia</div></div>`;
     const badgePubs = pubs.length ? ` · ${pubs.length}` : '';
-    return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div>`);
+    return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div>`);
   },
 
   _apadrinamientosFicha(animalId) {
@@ -2799,15 +2817,15 @@ const Dashboard = {
           ? `<a href="javascript:void(0)" onclick="Dashboard.openSocioFicha('${this._esc(p.padrino_id)}')">${this._esc(p.padrino_nombre || 'Socio')}</a>`
           : this._esc(p.padrino_nombre || 'Padrino');
         const acc = [];
-        if (p.estado === 'activo') acc.push(`<button class="btn btn-outline-green btn-sm" onclick="Dashboard.finalizarApadrinamiento('${this._esc(p.id)}')">Finalizar</button>`);
-        if (!p.padrino_id) acc.push(`<button class="btn btn-outline-green btn-sm" onclick="Dashboard.convertirPadrino('${this._esc(p.id)}')">A socio</button>`);
-        acc.push(`<button class="btn btn-danger btn-sm" onclick="Dashboard.deleteApadrinamiento('${this._esc(p.id)}')">${Icons.trash}</button>`);
+        if (p.estado === 'activo') acc.push(`<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.finalizarApadrinamiento('${this._esc(p.id)}')">Finalizar</button>`);
+        if (!p.padrino_id) acc.push(`<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.convertirPadrino('${this._esc(p.id)}')">A socio</button>`);
+        acc.push(`<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteApadrinamiento('${this._esc(p.id)}')">${Icons.trash}</button>`);
         return `<div class="detail-field"><div class="detail-question">${quien} · ${p.aporte_mensual ? this._esc(p.aporte_mensual) + ' €/mes' : 'sin aporte'} · desde ${p.fecha_inicio ? this._fmtFecha(p.fecha_inicio) : '—'}</div><div class="detail-answer"><span class="estado-badge ${p.estado === 'activo' ? 'aprobada' : ''}">${p.estado === 'activo' ? 'Activo' : 'Finalizado'}</span><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${acc.join('')}</div></div></div>`;
       }).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin apadrinamientos todavia</div></div>`;
     const totalHtml = activos.length ? `<div class="detail-field"><div class="detail-question">Total</div><div class="detail-answer">${total} €/mes entre ${activos.length}</div></div>` : '';
     const nuevo = (a && this._esApadrinable(a))
-      ? `<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showApadrinamientoForm('${animalId}')">${Icons.plus} Nuevo apadrinamiento</button></div>`
+      ? `<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showApadrinamientoForm('${animalId}')">${Icons.plus} Nuevo apadrinamiento</button></div>`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">No apadrinable (requiere check + disponible/en acogida)</div></div>`;
     const badgeApad = activos.length ? ` · ${activos.length}` : '';
     return this._collapsibleSection('apad', `${Icons.paw} Apadrinamientos${badgeApad}`, `${rows}${totalHtml}${nuevo}`);
@@ -3014,10 +3032,10 @@ const Dashboard = {
     const list = this._gastosDe(animalId);
     const total = this._totalGastos(list);
     const rows = list.length
-      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener">${Icons.fileText} Ver factura</a>` : ''} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener">${Icons.fileText} Ver factura</a>` : ''} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteGasto('${this._esc(g.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
     const badgeGastos = list.length ? ` · ${total.toFixed(2)} €` : '';
-    return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div>`);
+    return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showGastoForm('${animalId}')">${Icons.plus} Nuevo gasto</button></div>`);
   },
 
   showGastoForm(animalId) {
@@ -3108,10 +3126,10 @@ const Dashboard = {
   _documentosFicha(animalId) {
     const list = this._documentosDe(animalId);
     const rows = list.length
-      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" onclick="Dashboard.deleteDocumento('${this._esc(d.id)}')">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
     const badgeDocs = list.length ? ` · ${list.length}` : '';
-    return this._collapsibleSection('docs', `${Icons.fileText} Documentos${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir documento</button></div>`);
+    return this._collapsibleSection('docs', `${Icons.fileText} Documentos${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showDocumentoForm('${animalId}')">${Icons.plus} Añadir documento</button></div>`);
   },
 
   showDocumentoForm(animalId) {
@@ -3236,18 +3254,18 @@ const Dashboard = {
           <div class="animal-group-head">
             ${this._grupoCollage(b.gid)}
             <div class="animal-group-info"><b>${this._esc(b.nombre)}</b><small>${this._esc(this._grupoResumen(b.gid))}</small></div>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${b.gid}')">${Icons.eye} Ver grupo</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${b.gid}')">${Icons.eye} Ver grupo</button>
           </div>
           <div class="animal-group-body"><div class="animal-grid">${b.items.map(a => tarjeta(a, true)).join('')}</div></div>
         </section>`).join('');
     const sueltosHtml = sueltos.length ? `<div class="animal-grid">${sueltos.map(a => tarjeta(a, false)).join('')}</div>` : '';
     const vacio = filtered.length ? '' : (this.animales.length
-      ? `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>${prioridad==='solo' ? 'Ningún animal de este filtro es urgente.' : 'Prueba otro estado o cambia la especie.'}</p></div>`
-      : `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
+      ? `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin animales para este filtro</h3><p>${prioridad==='solo' ? 'Ningún animal de este filtro es urgente.' : 'Prueba otro estado o cambia la especie.'}</p></div>`
+      : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportAnimalesCsv()">${Icons.download} CSV</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" oninput="Dashboard.filterAnimales(this)"></div><div class="filter-row">
+        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.exportAnimalesCsv()">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showCamadaForm()">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalForm()">${Icons.plus} Nuevo</button></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" oninput="Dashboard._debounceFilter(this, () => Dashboard.filterAnimales(this))"></div><div class="filter-row">
           <select onchange="Dashboard._currentAnimalFilter=this.value;Dashboard.renderAnimales(document.getElementById('page-animales'))">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
@@ -3264,7 +3282,7 @@ const Dashboard = {
             <option value="all" ${prioridad==='all'?'selected':''}>Prioridad: Todas</option>
             <option value="solo" ${prioridad==='solo'?'selected':''}>Solo urgentes (${nUrgentes})</option>
           </select>
-          ${prioridad==='solo'?`<button class="btn btn-outline-green btn-sm" onclick="Dashboard._currentPrioridadFilter='all';Dashboard.renderAnimales(document.getElementById('page-animales'))">Ver todas</button>`:''}
+          ${prioridad==='solo'?`<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._currentPrioridadFilter='all';Dashboard.renderAnimales(document.getElementById('page-animales'))">Ver todas</button>`:''}
         </div></div>
         <div id="animales-form-container"></div>
         ${bloquesHtml}
@@ -3273,6 +3291,13 @@ const Dashboard = {
       </div>
       <div class="page-detail-container"></div>`;
     this._animaListado(el.querySelector('.page-list-container'));
+  },
+
+  // Helper de debounce para filtros de texto (evita re-render en cada tecla)
+  _debounceFilter(input, fn, delay = 300) {
+    if (!input) return;
+    clearTimeout(input._debounceTimer);
+    input._debounceTimer = setTimeout(() => { if (typeof fn === 'function') fn(); }, delay);
   },
 
   filterAnimales(input) {
@@ -3297,7 +3322,7 @@ const Dashboard = {
     if (!q) { if (empty) empty.remove(); return; }
     if (!visibles) {
       if (!empty) { empty = document.createElement('div'); empty.className = 'animal-search-empty'; cont.appendChild(empty); }
-      empty.innerHTML = `<div class="empty-state"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin resultados</h3><p>Ningun animal coincide con la busqueda.</p></div>`;
+      empty.innerHTML = `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Sin resultados</h3><p>Ningun animal coincide con la busqueda.</p></div>`;
     } else if (empty) empty.remove();
   },
 
@@ -3547,8 +3572,8 @@ const Dashboard = {
         <div class="grupo-hero-txt"><h4>${this._esc(nombre)}</h4><p>${this._esc(this._grupoResumen(gid))}</p></div>
       </div>
       <div style="display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showGrupoForm('${gid}')">${Icons.pencil} Editar grupo</button>
-        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showAnimalFormInGroup('${gid}')">${Icons.plus} Anadir animal</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showGrupoForm('${gid}')">${Icons.pencil} Editar grupo</button>
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showAnimalFormInGroup('${gid}')">${Icons.plus} Anadir animal</button>
       </div>
       ${g && g.descripcion ? `<div class="detail-section"><div class="detail-section-title">${Icons.info} Descripcion</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5">${this._esc(g.descripcion)}</p></div>` : ''}
       ${g && g.notas ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5;white-space:pre-wrap">${this._esc(g.notas)}</p></div>` : ''}
@@ -3978,9 +4003,9 @@ const Dashboard = {
     const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && p.desenlace !== 'devuelto' && p.fase !== 'Seguimiento');
     const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && c.fase !== 'finalizada');
     const estadoBanner = casoAdopcion
-      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAdopcionFicha('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
+      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAdopcionFicha('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
       : (casoAcogida
-        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
+        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
         : (foster ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>Familia <b>${this._esc(foster.nombre)}</b> · ${this._esc(foster.ubicacion || '')}</span></div>` : ''));
     this._showDetail('animales', a.nombre, `
       <div class="responder-hero">
@@ -3993,8 +4018,8 @@ const Dashboard = {
       </div>
       ${estadoBanner}
       <div class="detail-actions-wrap">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
       <div class="detail-section detail-section--fields">
         <div class="detail-section-title">${Icons.paw} Datos del animal</div>
@@ -4009,7 +4034,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esPrioritario(a)?'<span class="urgente-badge">Urgente</span>':'Normal'}</div></div>
         <div class="detail-field detail-field--wide"><div class="detail-question">Descripción</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
-        ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
+        ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
       </div>
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
       <details class="detail-collapse">
@@ -4019,7 +4044,7 @@ const Dashboard = {
           ${this._apadrinamientosFicha(a.id)}
           ${this._gastosFicha(a.id)}
           ${this._documentosFicha(a.id)}
-          ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div><div class="detail-grid-chips">${siblings.map(x=>`<button class="chip-link" onclick="Dashboard.viewAnimal('${this._esc(x.id)}')">${this._esc(x.nombre)} <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span></button>`).join('')}</div></div>`:''}
+          ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div><div class="detail-grid-chips">${siblings.map(x=>`<button type="button" class="chip-link" onclick="Dashboard.viewAnimal('${this._esc(x.id)}')">${this._esc(x.nombre)} <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span></button>`).join('')}</div></div>`:''}
           ${foster?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Familia acogedora</div>
             <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(foster.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc(foster.ubicacion)||'—'}</div></div>
@@ -4080,7 +4105,7 @@ const Dashboard = {
     const counts = {all:this.familias.length, Libre:this.familias.filter(f=>capacidadDe(f)==='Libre').length, Ocupada:this.familias.filter(f=>capacidadDe(f)==='Ocupada').length};
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} familias</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaForm()">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaForm()">${Icons.plus} Nueva</button></div>
       <div class="filters-bar"><div class="filter-row">
         <select onchange="Dashboard._currentFosterFilter=this.value;Dashboard.renderAcogidas(document.getElementById('page-acogidas'))">
           <option value="all" ${filter==='all'?'selected':''}>Todas (${counts.all})</option>
@@ -4098,7 +4123,7 @@ const Dashboard = {
             </div>
             <div class="response-date">${f.animales_actuales}/${f.max_capacity}</div>
           </div>
-        </div>`).join('') : (this.familias.length ? `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Sin familias para este filtro</h3><p>Prueba a mostrar todas o libres.</p></div>` : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Aun no hay familias</h3><p>Registra una nueva familia acogedora.</p></div>`)}</div>
+        </div>`).join('') : (this.familias.length ? `<div class="empty-state empty-state-illustrated" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Sin familias para este filtro</h3><p>Prueba a mostrar todas o libres.</p></div>` : `<div class="empty-state empty-state-illustrated" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.home}</div><h3>Aun no hay familias</h3><p>Registra una nueva familia acogedora.</p></div>`)}</div>
       </div>
       <div class="page-detail-container"></div>`;
     this._animaListado(el.querySelector('.response-list'));
@@ -4185,8 +4210,8 @@ const Dashboard = {
     const activos = casos.filter(c => c && c.fase !== 'finalizada');
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaFormById('${f.id}')">${Icons.pencil} Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteFamilia('${f.id}')">${Icons.trash} Eliminar</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showFamiliaFormById('${f.id}')">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteFamilia('${f.id}')">${Icons.trash} Eliminar</button>
       </div>
       <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion de la Familia</div>
         <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(f.nombre)}</div></div>
@@ -4199,7 +4224,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${this._esc(this._fmtFecha(f.fecha_registro))}</div></div>
       </div>
       ${f.notas?`<div class="detail-section"><div class="detail-section-title">Notas</div><div class="detail-field"><div class="detail-answer">${this._esc(f.notas)}</div></div></div>`:''}
-      ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(c.id)}')">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
+      ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(c.id)}')">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
       ${animalesEnAcogida.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Animales en Acogida</div>${animalesEnAcogida.map(a=>`<div class="detail-field"><div class="detail-question">${this._esc(a.nombre)}</div><div class="detail-answer">${this._esc(a.especie)} &middot; ${this._esc(a.raza)} &middot; ${this._esc(a.edad||'')}</div></div>`).join('')}</div>`:''}
       `);
   },
@@ -4260,11 +4285,11 @@ const Dashboard = {
       </div>
       <div class="acogida-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
       <div class="acogida-card-actions">
-        ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.checkCircle} En casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.check} Finalizar acogida</button>` : ''}
-        <button class="btn btn-sm btn-outline-green" onclick="Dashboard.viewAcogida('${this._esc(c.id)}')">${Icons.eye} Ver caso</button>
-        <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
-        <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash}</button>
+        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.checkCircle} En casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.viewAcogida('${this._esc(c.id)}')">${Icons.eye} Ver caso</button>
+        <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
+        <button type="button" class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash}</button>
         ${c.notas ? `<span class="acogida-card-nota">${this._esc(c.notas)}</span>` : ''}
       </div>
     </div>`;
@@ -4283,7 +4308,7 @@ const Dashboard = {
     const faseCls = { entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' };
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${casos.length} casos</span><button class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial()">${Icons.helpCircle} Guia</button></div>
+        <div class="list-header"><span class="response-count">${casos.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showTutorial()">${Icons.helpCircle} Guia</button></div>
         <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
           <div class="pipeline" role="list" aria-label="Casos por fase">${fases.map(ff => {
             const n = casos.filter(c => c.fase === ff).length;
@@ -4293,7 +4318,7 @@ const Dashboard = {
             </div>`;
           }).join('')}</div>
         </div></div>
-        <div class="response-list">${casos.length ? casos.map(c => this._acogidaCardHtml(c)).join('') : `<div class="empty-state"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
+        <div class="response-list">${casos.length ? casos.map(c => this._acogidaCardHtml(c)).join('') : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
         </div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -4333,10 +4358,10 @@ const Dashboard = {
       </div>
       ${finalizada ? `<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Acogida finalizada. El animal volvió a <b>Disponible</b> y la familia quedó libre.</span></div>` : ''}
       <div class="detail-actions-wrap">
-        ${c.fase === 'entrega' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.checkCircle} Marcar en casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.check} Finalizar acogida</button>` : ''}
-        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
-        ${a ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.openAnimalFicha('${this._esc(a.id)}')">${Icons.paw} Ver ficha del animal</button>` : ''}
+        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.checkCircle} Marcar en casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
+        ${a ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAnimalFicha('${this._esc(a.id)}')">${Icons.paw} Ver ficha del animal</button>` : ''}
       </div>
       <div class="detail-section fase-stepper-card">
         <div class="fase-stepper-head">
@@ -4364,7 +4389,7 @@ const Dashboard = {
             ${c.notas ? `<div class="detail-field detail-field--wide"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(c.notas)}</div></div>` : ''}
           </div>
           <div class="detail-actions-inline detail-actions-inline--danger">
-            <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash} Eliminar caso</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash} Eliminar caso</button>
           </div>
         </div>
       </details>`, detailKey);
@@ -4705,7 +4730,7 @@ const Dashboard = {
     const fases = this._fasesAdopcion();
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${this.adopciones.length} procesos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionForm()">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count">${this.adopciones.length} procesos</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAdopcionForm()">${Icons.plus} Nueva</button></div>
       <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
         <div class="pipeline" role="list" aria-label="Procesos por fase">${fases.map(f=>{
           const count = this.adopciones.filter(p=>p.fase===f).length;
@@ -4716,7 +4741,7 @@ const Dashboard = {
         }).join('')}</div>
       </div></div>
       <div id="adopciones-form-container"></div>
-      <div class="response-list">${this.adopciones.length ? this.adopciones.map(p => this._adopcionCardHtml(p)).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
+      <div class="response-list">${this.adopciones.length ? this.adopciones.map(p => this._adopcionCardHtml(p)).join('') : `<div class="empty-state empty-state-illustrated" style="grid-column:1/-1"><div class="empty-state-icon">${Icons.heart}</div><h3>Aun no hay procesos de adopcion</h3><p>Las solicitudes aprobadas apareceran aqui al asignarles un animal.</p></div>`}</div>
       </div>
       <div class="page-detail-container"></div>`;
     this._animaListado(el.querySelector('.response-list'));
@@ -4892,8 +4917,8 @@ const Dashboard = {
     const bloqueo = this._requisitoAvance(p, contrato, this.seguimientos);
     const puedeAvanzar = currentIdx < fases.length - 1;
     const avanceBtn = !puedeAvanzar ? '' : (bloqueo
-      ? `<button class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
-      : `<button class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}',this)">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
+      ? `<button type="button" class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
+      : `<button type="button" class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}',this)">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
     // Cada bloque aparece cuando ya tiene sentido en el flujo.
     const verContrato = !!contrato || currentIdx >= this._faseIdx('Visita domiciliaria');
     const verEntrega = !!p.fecha_entrega || currentIdx >= this._faseIdx('Entrega');
@@ -4914,9 +4939,9 @@ const Dashboard = {
       </div>
       ${devueltoBanner}
       <div class="detail-actions-wrap">
-        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         ${avanceBtn}
-        ${currentIdx > 0 ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}',this)">${Icons.arrowLeft} Retroceder</button>` : ''}
+        ${currentIdx > 0 ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}',this)">${Icons.arrowLeft} Retroceder</button>` : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
       ${this._faseStepperCardHtml(p, fases, currentIdx)}
@@ -4937,10 +4962,10 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado) || '—'}</div></div>
             ${p.notas ? `<div class="detail-field"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>` : ''}
           </div>
-          ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
+          ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
           <div class="detail-actions-inline detail-actions-inline--danger">
-            ${devuelto ? '' : `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>`}
-            <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar caso</button>
+            ${devuelto ? '' : `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>`}
+            <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar caso</button>
           </div>
         </div>
       </details>`, detailKey);
@@ -4976,16 +5001,16 @@ const Dashboard = {
         ${this._contratoTutor(contrato) ? `<div class="detail-field"><div class="detail-question">Tutor / persona de apoyo</div><div class="detail-answer">${this._esc(contrato.f2_nombre)}${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
         ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
         <div class="detail-actions-inline">
-          <button class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar contrato</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar cláusulas</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar por email</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoDoc('${p.id}')">${Icons.eye} Ver documento</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver cláusulas</button>
-          <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoIdentidad('${p.id}')">${Icons.pencil} Foto / nombre</button>
-          <button class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.descargarContrato('${p.id}')">${Icons.download} Descargar contrato</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.descargarTerminosAdopcion('${p.id}')">${Icons.download} Descargar cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar por email</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoDoc('${p.id}')">${Icons.eye} Ver documento</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showTerminosAdopcion('${p.id}')">${Icons.fileText} Ver cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoIdentidad('${p.id}')">${Icons.pencil} Foto / nombre</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.anularContrato('${p.id}')">${Icons.xCircle} Anular firma</button>
         </div>`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma.${adelantado ? ' Se firma en la fase Contrato, pero puedes adelantarlo.' : ' Es obligatorio firmarlo para pasar a Entrega.'}</div></div>
-        <div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showContratoForm('${p.id}')">${Icons.pencil} Firmar contrato</button></div>`}
+        <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showContratoForm('${p.id}')">${Icons.pencil} Firmar contrato</button></div>`}
     </div>`;
   },
 
@@ -5008,11 +5033,11 @@ const Dashboard = {
         ${faltan.length ? `<div class="fase-bloqueo fase-bloqueo--inline">${Icons.alertTriangle}<span>No se puede avanzar a Prueba hasta completar: ${this._esc(faltan.map(x => x.label).join(', '))}.</span></div>` : ''}
         ${p.entrega_observaciones ? `<div class="detail-field"><div class="detail-question">Observaciones</div><div class="detail-answer">${this._esc(p.entrega_observaciones)}</div></div>` : ''}
         ${foto}
-        <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showEntregaForm('${p.id}')">${Icons.pencil} Editar entrega</button>${contrato ? '' : '<span class="chip-pending">Contrato pendiente</span>'}</div>`
+        <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showEntregaForm('${p.id}')">${Icons.pencil} Editar entrega</button>${contrato ? '' : '<span class="chip-pending">Contrato pendiente</span>'}</div>`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Entrega pendiente. Registra la fecha y el checklist cuando el animal se entregue.</div></div>
         <div style="padding:0 16px 16px">${contrato
-          ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.showEntregaForm('${p.id}')">${Icons.checkCircle} Registrar entrega</button>`
-          : `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoForm('${p.id}')">${Icons.lock} Firma el contrato para registrar la entrega</button>`}</div>`}
+          ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showEntregaForm('${p.id}')">${Icons.checkCircle} Registrar entrega</button>`
+          : `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoForm('${p.id}')">${Icons.lock} Firma el contrato para registrar la entrega</button>`}</div>`}
     </div>`;
   },
 
@@ -5023,14 +5048,14 @@ const Dashboard = {
       const marcas = this._checklistMarks(r.checklist);
       const chips = this._pruebaChecklist().map(it => `<span class="${marcas[it.id] ? 'chip-ok' : 'chip-pending'}">${marcas[it.id] ? Icons.check : Icons.x} ${this._esc(it.label)}</span>`).join('');
       return `<div class="prueba-row">
-        <div class="detail-field"><div class="detail-question">${this._fmtFecha(r.fecha)} · <span class="estado-badge en_proceso">${this._esc(r.resultado || 'Sin resultado')}</span></div><div class="detail-answer"><div class="check-chips">${chips}</div>${r.nota ? `<div style="margin-top:8px">${this._esc(r.nota)}</div>` : ''}<div style="margin-top:6px"><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteSeguimiento('${this._esc(r.id)}')">${Icons.trash} Eliminar prueba</button></div></div></div>
+        <div class="detail-field"><div class="detail-question">${this._fmtFecha(r.fecha)} · <span class="estado-badge en_proceso">${this._esc(r.resultado || 'Sin resultado')}</span></div><div class="detail-answer"><div class="check-chips">${chips}</div>${r.nota ? `<div style="margin-top:8px">${this._esc(r.nota)}</div>` : ''}<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteSeguimiento('${this._esc(r.id)}')">${Icons.trash} Eliminar prueba</button></div></div></div>
       </div>`;
     }).join('') : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin prueba registrada todavia.</div></div>`;
     return `<div class="detail-section"><div class="detail-section-title">${Icons.activity} Prueba de adaptacion <span class="section-chip">15-30 dias</span></div>
       <div class="detail-section-note">Periodo corto para comprobar que el animal se adapta. No es lo mismo que el seguimiento a largo plazo (1, 3, 6 y 12 meses), que esta en la seccion Seguimiento de todas las fases.</div>
       ${p.fecha_entrega ? `<div class="detail-field"><div class="detail-question">Periodo orientativo</div><div class="detail-answer">${this._fmtFecha(p.fecha_entrega)} → ${ventana ? this._fmtFecha(ventana) : '30 dias'}</div></div>` : '<div class="detail-section-note">Registra primero la entrega para calcular el periodo orientativo de adaptacion.</div>'}
       ${rows}
-      <div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showPruebaForm('${p.id}')">${Icons.plus} Registrar prueba</button></div>
+      <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showPruebaForm('${p.id}')">${Icons.plus} Registrar prueba</button></div>
     </div>`;
   },
 
@@ -5748,7 +5773,7 @@ const Dashboard = {
     if (!g) return '';
     const icon = g.tono === 'success' ? Icons.checkCircle : (g.tono === 'warning' ? Icons.alertTriangle : Icons.info);
     const cta = g.cta
-      ? `<button class="btn btn-sm ${g.tono === 'warning' ? 'btn-primary' : 'btn-outline-green'}" onclick="${this._faseCtaOnclick(g.cta, p.id)}">${this._esc(g.ctaLabel)}</button>`
+      ? `<button type="button" class="btn btn-sm ${g.tono === 'warning' ? 'btn-primary' : 'btn-outline-green'}" onclick="${this._faseCtaOnclick(g.cta, p.id)}">${this._esc(g.ctaLabel)}</button>`
       : '';
     return `<div class="fase-guia ${g.tono}"><div class="fase-guia-icon">${icon}</div><div class="fase-guia-body"><div class="fase-guia-title">${this._esc(g.title)}</div><div class="fase-guia-text">${this._esc(g.text)}</div></div>${cta}</div>`;
   },
@@ -5885,14 +5910,14 @@ const Dashboard = {
       ? list.slice().reverse().map(s => {
         const tipo = s.tipo || 'Seguimiento';
         const hito = s.hito ? `<span class="section-chip">${this._esc(labels[s.hito] || s.hito)}</span>` : '';
-        return `<div class="detail-field"><div class="detail-question">${s.fecha ? this._fmtFecha(s.fecha) : '—'} · <span class="estado-badge pendiente">${this._esc(tipo)}</span>${hito}</div><div class="detail-answer">${this._esc(s.nota || '—')}<div style="margin-top:6px"><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteSeguimiento('${this._esc(s.id)}')">${Icons.trash} Eliminar</button></div></div></div>`;
+        return `<div class="detail-field"><div class="detail-question">${s.fecha ? this._fmtFecha(s.fecha) : '—'} · <span class="estado-badge pendiente">${this._esc(tipo)}</span>${hito}</div><div class="detail-answer">${this._esc(s.nota || '—')}<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteSeguimiento('${this._esc(s.id)}')">${Icons.trash} Eliminar</button></div></div></div>`;
       }).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin seguimientos todavia</div></div>`;
     return `<div class="detail-section"><div class="detail-section-title">${Icons.calendar} Seguimiento post-adopcion · ${list.length}</div>
       <div class="detail-section-note">Disponible en todas las fases. Los hitos de 1, 3, 6 y 12 meses se calculan desde la fecha de entrega. La prueba de adaptacion es un periodo corto y tiene su propia seccion.</div>
       ${p && p.fecha_entrega ? timeline : `<div class="detail-section-note">Registra la fecha de entrega para calcular los hitos de 1, 3, 6 y 12 meses.</div>`}
       ${rows}
-      <div style="padding:0 16px 16px"><button class="btn btn-primary btn-sm" onclick="Dashboard.showSeguimientoForm('${adopcionId}')">${Icons.plus} Nuevo seguimiento</button></div></div>`;
+      <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showSeguimientoForm('${adopcionId}')">${Icons.plus} Nuevo seguimiento</button></div></div>`;
   },
 
   showSeguimientoForm(adopcionId) {
@@ -6587,8 +6612,8 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${visibles.length} registros</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" oninput="Dashboard.filterSocios(this)"></div><div class="filter-row">
+        <div class="list-header"><span class="response-count">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showSocioForm()">${Icons.plus} Nuevo</button></div>
+      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" oninput="Dashboard._debounceFilter(this, () => Dashboard.filterSocios(this))"></div><div class="filter-row">
         <select onchange="Dashboard._currentSocioTipoFilter=this.value;Dashboard.renderSocios(document.getElementById('page-socios'))">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
@@ -6768,10 +6793,10 @@ const Dashboard = {
     const cuotaEstado = esSocio ? this._cuotaEstado(s) : null;
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.showSocioFormById('${s.id}')">${Icons.pencil} Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteSocio('${s.id}')">${Icons.trash} Eliminar</button>
-        <button class="btn btn-sm ${s.activo?'btn-outline-green':'btn-primary'}" onclick="Dashboard.toggleSocio('${s.id}')">${s.activo?'Desactivar':'Activar'}</button>
-        <button class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" onclick="Dashboard.showCarnet('${s.id}')">${Icons.download} Ver Carnet</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showSocioFormById('${s.id}')">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteSocio('${s.id}')">${Icons.trash} Eliminar</button>
+        <button type="button" class="btn btn-sm ${s.activo?'btn-outline-green':'btn-primary'}" onclick="Dashboard.toggleSocio('${s.id}')">${s.activo?'Desactivar':'Activar'}</button>
+        <button type="button" class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" onclick="Dashboard.showCarnet('${s.id}')">${Icons.download} Ver Carnet</button>
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
         ${fotoHero}
@@ -6800,7 +6825,7 @@ const Dashboard = {
       <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
         <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
         <div class="detail-field"><div class="detail-question">Ultima actividad</div><div class="detail-answer">${s.ultima_actividad ? this._fmtFecha(s.ultima_actividad) : 'Sin registro'}</div></div>
-        ${esVol ? `<div class="detail-field"><div class="detail-question">Registrar horas</div><div class="detail-answer"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="number" min="0" step="0.5" inputmode="decimal" id="hs-horas" class="form-input" style="max-width:120px;margin:0" placeholder="Ej: 2.5" aria-label="Horas a sumar"><button class="btn btn-primary btn-sm" onclick="Dashboard.registrarHoras('${s.id}')">Sumar horas</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.reiniciarHorasMes('${s.id}')">Reiniciar mes</button></div></div></div>` : ''}
+        ${esVol ? `<div class="detail-field"><div class="detail-question">Registrar horas</div><div class="detail-answer"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="number" min="0" step="0.5" inputmode="decimal" id="hs-horas" class="form-input" style="max-width:120px;margin:0" placeholder="Ej: 2.5" aria-label="Horas a sumar"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.registrarHoras('${s.id}')">Sumar horas</button><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.reiniciarHorasMes('${s.id}')">Reiniciar mes</button></div></div></div>` : ''}
       </div>
       ${this._apadrinaFicha(s.id)}`, detailKey);
   },
@@ -6869,7 +6894,7 @@ const Dashboard = {
   async renderBlacklist(el) {
     await this._loadList('blacklist', () => API.getBlacklist());
     el.innerHTML = `
-      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." oninput="Dashboard.filterBlacklist(this)"></div><button class="btn btn-primary btn-sm" onclick="Dashboard.showAddBlacklist()">${Icons.plus} Anadir</button></div>
+      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterBlacklist(this))"></div><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAddBlacklist()">${Icons.plus} Anadir</button></div>
       <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>`;
     this._animaListado(document.getElementById('blacklist-list-container'));
   },
@@ -6894,8 +6919,8 @@ const Dashboard = {
   _renderBlacklistCards(search='') {
     let idxs=(this.blacklist || []).map((bl,i)=>({bl,i}));
     if(search) idxs=idxs.filter(({bl})=>((bl.nombre||'')+' '+(bl.apellidos||'')+' '+(bl.email||'')+' '+(bl.motivo||'')).toLowerCase().includes(search.toLowerCase()));
-    if(!idxs.length) return '<div class="empty-state"><div class="empty-state-icon">'+Icons.checkCircle+'</div><p>No hay personas en la lista negra</p></div>';
-    return idxs.map(({bl,i})=>{ const k=this._esc(this._blClave(bl,i)); return `<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.showEditBlacklistItem('${k}')">${Icons.pencil}</button><button class="btn btn-danger btn-sm" onclick="Dashboard.removeBlacklistItem('${k}')">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(this._fmtFecha(bl.fecha)):''}</div></div>`; }).join('');
+    if(!idxs.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.checkCircle+'</div><p>No hay personas en la lista negra</p></div>';
+    return idxs.map(({bl,i})=>{ const k=this._esc(this._blClave(bl,i)); return `<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showEditBlacklistItem('${k}')">${Icons.pencil}</button><button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.removeBlacklistItem('${k}')">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(this._fmtFecha(bl.fecha)):''}</div></div>`; }).join('');
   },
 
   showAddBlacklist() {
@@ -6982,8 +7007,8 @@ const Dashboard = {
         <div class="stats-grid" style="margin-bottom:16px">
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showDonacionForm()">${Icons.plus} Nueva</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button class="btn btn-danger btn-sm" onclick="Dashboard.deleteDonacion('${this._esc(d.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showDonacionForm()">${Icons.plus} Nueva</button></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteDonacion('${this._esc(d.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -7051,8 +7076,8 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
-        <div class="list-header"><span class="response-count">${items.length} articulos</span><button class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
+        <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -7165,14 +7190,14 @@ const Dashboard = {
     const cuerpo = this._renderActividadTabla(rows);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard.filterActividad(this.closest('.page'))"></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterActividad(this.closest('.page')))"></div>
           <div class="filter-row">
             <select onchange="Dashboard.filterActividad(this.closest('.page'))" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
               ${tipos.map(t => `<option value="${this._esc(t)}">${this._esc(this._tipoLogLabel(t))}</option>`).join('')}
             </select>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('actividad')">${Icons.activity} Actualizar</button>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('actividad')">${Icons.activity} Actualizar</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
           </div>
         </div>
         <div class="list-header"><span class="response-count">${rows.length} registros</span></div>
@@ -7183,7 +7208,7 @@ const Dashboard = {
 
   _renderActividadTabla(rows) {
     if (!rows.length) {
-      return `<div class="empty-state"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro. Si acabas de desplegar el backend, vuelve a entrar para cargar el historial.</p></div>`;
+      return `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro. Si acabas de desplegar el backend, vuelve a entrar para cargar el historial.</p></div>`;
     }
     return `<table class="data-table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>${rows.map(r => `
       <tr>
@@ -7207,7 +7232,7 @@ const Dashboard = {
     let rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha));
     if (t) rows = rows.filter(r => r.tipo === t);
     if (q) rows = rows.filter(r => ((r.usuario || '') + ' ' + (r.detalle || '') + ' ' + (r.descripcion || '') + ' ' + (r.tipo || '')).toLowerCase().includes(q));
-    c.innerHTML = rows.length ? this._renderActividadTabla(rows) : `<div class="empty-state"><div class="empty-state-icon">${Icons.search}</div><h3>Sin resultados</h3><p>Prueba con otra palabra o quita el filtro de tipo.</p></div>`;
+    c.innerHTML = rows.length ? this._renderActividadTabla(rows) : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.search}</div><h3>Sin resultados</h3><p>Prueba con otra palabra o quita el filtro de tipo.</p></div>`;
     const n = container?.querySelector('.response-count');
     if (n) n.textContent = rows.length + ' registros';
   },
@@ -7273,7 +7298,7 @@ const Dashboard = {
       <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Memoria anual</h3></div><div class="card-body">
         <div class="filters-bar" style="margin-bottom:12px"><div class="filter-row">
           <select id="mem-anio" onchange="Dashboard._pintarMemoria()">${this._memoriaAnios().map(y => `<option value="${y}" ${y === new Date().getFullYear() ? 'selected' : ''}>Ejercicio ${y}</option>`).join('')}</select>
-          <button class="btn btn-primary btn-sm" onclick="Dashboard.exportMemoria()">${Icons.download} Descargar memoria (PDF)</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportMemoria()">${Icons.download} Descargar memoria (PDF)</button>
         </div></div>
         <div id="memoria-resumen"></div>
       </div></div>
@@ -7286,18 +7311,18 @@ const Dashboard = {
         <div class="alert-item warning" style="cursor:pointer" onclick="Dashboard.descartar2025()">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard.filterActividad(this.closest('.page'))"></div>
+        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterActividad(this.closest('.page')))"></div>
           <div class="filter-row">
             <select onchange="Dashboard.filterActividad(this.closest('.page'))" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
               ${Array.from(new Set((this.actividad||[]).map(r=>r.tipo).filter(Boolean))).sort().map(t => `<option value="${this._esc(t)}">${this._esc(this._tipoLogLabel(t))}</option>`).join('')}
             </select>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('reportes')">${Icons.activity} Actualizar</button>
-            <button class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.loadPage('reportes')">${Icons.activity} Actualizar</button>
+            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.exportActividadCsv()">${Icons.download} CSV</button>
           </div>
         </div>
         <div class="list-header"><span class="response-count">${(this.actividad||[]).length} registros</span></div>
-        <div class="card-body-flush" id="actividad-tabla">${(this.actividad||[]).length ? this._renderActividadTabla([...(this.actividad||[])].sort((a,b)=>{const tv=f=>{const d=Date.parse(String(f||'').replace(' ','T'));return isNaN(d)?0:d;};return tv(b.fecha)-tv(a.fecha);})) : `<div class="empty-state"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro.</p></div>`}</div>
+        <div class="card-body-flush" id="actividad-tabla">${(this.actividad||[]).length ? this._renderActividadTabla([...(this.actividad||[])].sort((a,b)=>{const tv=f=>{const d=Date.parse(String(f||'').replace(' ','T'));return isNaN(d)?0:d;};return tv(b.fecha)-tv(a.fecha);})) : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro.</p></div>`}</div>
       </div></div>`;
     this._pintarMemoria();
   },

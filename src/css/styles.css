@@ -1742,10 +1742,15 @@ body {
 }
 
 .form-row {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 16px;
   margin-bottom: 16px;
+}
+@media (min-width: 768px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .form-actions {
@@ -7318,3 +7323,270 @@ body.pwa-modal-open {
 }
 
 .notas-panel .detail-section-title { margin-bottom: 12px; }
+
+/* Scroll-lock cuando hay modales/drawer abiertos (ref-count en _modalScrollLock) */
+body.modal-open { overflow: hidden; }
+
+/* ============================================================ */
+/* MEJORAS UI/UX — Fase 1 (cero riesgo)                         */
+/* ============================================================ */
+
+/* Focus visible global para accesibilidad por teclado */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* content-visibility para rendimiento en listas largas */
+.response-card,
+.animal-card,
+.bl-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 120px;
+}
+
+/* Tooltip en rail de sidebar (tablet) */
+.sidebar.collapsed .sidebar-link[data-tooltip]:hover::after,
+.sidebar.collapsed .sidebar-link[data-tooltip]:focus::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 70px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--gray-800);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-xs, 0.75rem);
+  white-space: nowrap;
+  z-index: var(--z-dropdown, 100);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* Subir punto de corte de tarjetas de animal a 400px en móvil */
+@media (max-width: 399px) {
+  .animal-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Auto-colapsar sidebar en pantallas medianas (1024-1280px) */
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .sidebar:not(.open) {
+    width: 60px;
+  }
+  .sidebar:not(.open) .sidebar-link-text,
+  .sidebar:not(.open) .sidebar-brand,
+  .sidebar:not(.open) .sidebar-section-title span,
+  .sidebar:not(.open) .logout-text {
+    display: none;
+  }
+  .sidebar:not(.open) .sidebar-link {
+    justify-content: center;
+  }
+}
+
+/* Modal de contrato centrado en desktop (no pantalla completa) */
+@media (min-width: 1024px) {
+  .modal-overlay--full {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-box--full {
+    max-width: 960px;
+    max-height: 90vh;
+    border-radius: var(--radius-xl, 16px);
+  }
+}
+
+/* Botón "Ir arriba" flotante */
+.scroll-to-top {
+  position: fixed;
+  bottom: 80px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: var(--z-sticky, 200);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.scroll-to-top.visible {
+  display: flex;
+}
+.scroll-to-top:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Empty state ilustrado */
+.empty-state-illustrated {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--gray-500);
+}
+.empty-state-illustrated svg {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+.empty-state-illustrated h3 {
+  margin: 0 0 8px;
+  font-size: var(--text-lg, 1.125rem);
+  color: var(--gray-700);
+}
+.empty-state-illustrated p {
+  margin: 0 0 16px;
+  font-size: var(--text-sm, 0.875rem);
+}
+.empty-state-illustrated .btn {
+  margin-top: 8px;
+}
+
+/* Skeleton shimmer para listas */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--gray-100) 25%, var(--gray-200) 50%, var(--gray-100) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md, 8px);
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Tarjeta con hover elevación mejorada (desktop) */
+@media (min-width: 1024px) and (pointer: fine) {
+  .response-card:hover,
+  .animal-card:hover,
+  .bl-card:hover,
+  .socio-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+}
+
+/* Gradiente de scroll en tablas */
+.data-table-wrapper {
+  position: relative;
+}
+.data-table-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--surface, #fff));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.data-table-wrapper.has-scroll::after {
+  opacity: 1;
+}
+
+/* Hover con elevación en tarjetas (desktop) */
+@media (min-width: 1024px) and (pointer: fine) {
+  .response-card:hover,
+  .animal-card:hover,
+  .bl-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+}
+
+/* ============================================================ */
+/* MEJORAS UI/UX — Impresión / PDF (Opción D)                   */
+/* ============================================================ */
+
+@media print {
+  /* Ocultar UI */
+  .sidebar, .topbar, .bottom-nav, .mas-menu-popup, .mas-menu-overlay,
+  .btn, .form-actions, .no-print, .modal-close,
+  .loading-overlay, .toast-error, .pending-sync-badge {
+    display: none !important;
+  }
+
+  /* Ajustar layout */
+  .main-wrapper { margin: 0 !important; padding: 0 !important; }
+  .main-content { padding: 0 !important; }
+  .modal-overlay { position: static !important; display: block !important; }
+  .modal-box { box-shadow: none !important; border: none !important; max-width: 100% !important; }
+  .modal-box--full { max-width: 100% !important; }
+
+  /* Salto de página */
+  .page-break { break-before: page; }
+  .detail-section { break-inside: avoid; }
+  .card, .animal-card, .response-card { break-inside: avoid; }
+
+  /* Mostrar URLs de imágenes como texto (para que no se pierdan) */
+  img::after {
+    content: ' [' attr(src) ']';
+    font-size: 8px;
+    color: #666;
+  }
+
+  /* Ajustar tipografía para impresión */
+  body { font-size: 11pt; line-height: 1.4; }
+  h1 { font-size: 18pt; }
+  h2 { font-size: 14pt; }
+  h3 { font-size: 12pt; }
+
+  /* Ocultar fondos de glassmorphism */
+  body::before { display: none !important; }
+  .glass-1, .glass-2, .glass-3 { background: #fff !important; backdrop-filter: none !important; }
+}
+
+/* ============================================================ */
+/* MEJORAS UI/UX — Accesibilidad                                */
+/* ============================================================ */
+
+/* Skip link para lectores de pantalla */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 16px;
+  z-index: var(--z-toast, 1002);
+  transition: top 0.2s;
+}
+.skip-link:focus { top: 0; }
+
+/* Alto contraste para usuarios con baja visión */
+@media (prefers-contrast: high) {
+  :root {
+    --primary: #006400;
+    --danger: #8B0000;
+    --gray-500: #404040;
+    --gray-600: #303030;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

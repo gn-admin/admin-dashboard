@@ -27,7 +27,7 @@ const App = {
         document.getElementById('loading')?.classList.remove('active');
         this.showLogin();
       }
-    }, 12000);
+    }, 25000);
   },
 
   registerServiceWorker() {
@@ -89,6 +89,11 @@ const App = {
       if (target) {
         target.classList.add('active');
         this.currentPage = page;
+      } else {
+        // Ruta no existente: no quedarse en pantalla blanca, redirigir a dashboard
+        console.warn(`Ruta no encontrada: #${page}. Redirigiendo a #dashboard`);
+        location.hash = 'dashboard';
+        return;
       }
       document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
       const bottomParent = this._bottomParent(page);
@@ -278,6 +283,21 @@ const App = {
     });
     document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
     document.getElementById('sidebar-collapse-btn')?.addEventListener('click', () => this.toggleSidebarCollapse());
+
+    // Botón "Ir arriba" (móvil)
+    const scrollBtn = document.getElementById('scroll-to-top');
+    if (scrollBtn) {
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 2 * window.innerHeight) {
+          scrollBtn.classList.add('visible');
+        } else {
+          scrollBtn.classList.remove('visible');
+        }
+      }, { passive: true });
+      scrollBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    }
 
     document.querySelectorAll('.sidebar-link[data-page]').forEach(link => {
       link.addEventListener('click', (e) => {

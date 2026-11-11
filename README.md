@@ -17,48 +17,18 @@ npm run dev
 
 Abrir `http://localhost:8080` en el navegador.
 
-`npm run dev` regenera automáticamente `src/js/config.js` (y `apps-script/Config.gs`) a partir de `.env`. También se puede hacer manualmente con `npm run build`.
-
 ## Variables de entorno (privacy)
 
 Los valores reales (URL del backend, claves de Firebase, IDs de hojas/formularios) **no se suben a git**. Se definen en `.env` (local) y, para el despliegue en GitHub Pages, como **Repository variables/secretos** de GitHub:
 
 1. GitHub → **Settings → Secrets and variables → Actions**.
-2. Añadir cada clave de [`.env.example`](.env.example) como *Variable* o *Secret*:
-
-| Variable              | Descripción                                    |
-|-----------------------|------------------------------------------------|
-| `API_URL`             | URL del backend (Google Apps Script `/exec`)    |
-| `FIREBASE_API_KEY`    | Clave pública de Firebase                        |
-| `FIREBASE_AUTH_DOMAIN`| Dominio de autenticación                        |
-| `FIREBASE_PROJECT_ID` | ID del proyecto Firebase                        |
-| `FIREBASE_STORAGE_BUCKET` | Bucket de Storage                            |
-| `FIREBASE_MESSAGING_SENDER_ID` | ID del emisor MSG                    |
-| `FIREBASE_APP_ID`     | ID de la aplicación web                          |
-| `CONTACTO_TELEFONO`   | Teléfono en plantillas de Redes (opcional)       |
-| `CONTACTO_EMAIL`      | Email en plantillas de Redes (opcional)          |
-| `ASOCIACION_NOMBRE`   | Nombre de la asociación en los contratos (opcional) |
-| `ASOCIACION_CIF`      | CIF de la asociación en los contratos (opcional) |
-| `ASOCIACION_DOMICILIO`| Domicilio social en los contratos (opcional)     |
-| `ASOCIACION_REGISTRO` | Número de registro en los contratos (opcional)   |
-| `ASOCIACION_WEB`      | Web de la asociación en los contratos (opcional) |
-
-(Solo las variables *Frontend* se necesitan en GitHub; las de *Backend Apps Script* son únicamente para regenerar `apps-script/Config.gs` localmente.)
-
-El workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) inyecta esas variables al generar `src/js/config.js` antes de publicar.
+2. Añadir cada clave de [`.env.example`](.env.example) como *Variable* o *Secret*.
 
 ## Estructura del proyecto
 
 ```
 gn-encuestas/
-├── docs/                  # Documentación
 ├── .github/workflows/     # Despliegue automático a GitHub Pages
-├── apps-script/           # Backend (Google Apps Script, NO en git: solo local para desplegar)
-│   ├── Code.gs            # Punto de entrada + CRUD + cascadas
-│   ├── Config.gs          # Configuración (GENERADO desde .env)
-│   ├── Auth.gs            # Verificación JWT
-│   ├── DataFilter.gs      # Filtrado por rol (reservado, sin uso actual)
-│   └── PdfService.gs      # PDF en servidor (reservado; el front exporta en cliente)
 ├── scripts/
 │   └── gen-config.js      # Genera config a partir de .env / variables de CI
 ├── src/                   # Frontend PWA
@@ -66,9 +36,9 @@ gn-encuestas/
 │   ├── manifest.webmanifest
 │   ├── sw.js              # Service Worker
 │   ├── css/styles.css     # Mobile-first CSS
-│   ├── assets/icons/      # logo + icon-180/192/512.png (PWA)
+│   ├── assets/icons/      # logo + iconos PWA
 │   └── js/
-│       ├── config.js      # Configuración (GENERADO desde .env)
+│       ├── config.js      # Configuración (GENERADO desde .env, ignorado)
 │       ├── icons.js
 │       ├── auth.js
 │       ├── api.js
@@ -77,21 +47,15 @@ gn-encuestas/
 │       ├── pdf-export.js
 │       └── app.js
 ├── tests/                 # Unitarios (`npm test`, node --test, sin dependencias)
+├── .env.example
 ├── package.json
 └── .gitignore
 ```
 
 ## Despliegue
 
-Ver `docs/GUIA-DESPLIEGUE.md` para instrucciones completas.
-
-Resumen:
-1. Configurar Google Apps Script: ejecutar `npm run build` y desplegar `apps-script/` (Code.gs, Config.gs, Auth.gs, DataFilter.gs, PdfService.gs) en el proyecto Apps Script existente.
+1. Configurar Google Apps Script y desplegar el backend (`apps-script/`).
 2. Configurar Firebase Authentication.
-3. Subir el repo a GitHub y activar **Pages → Source: GitHub Actions** (usa la rama `main`; ajusta el nombre de rama en `.github/workflows/deploy.yml` si usas otra).
+3. Subir el repo a GitHub y activar **Pages → Source: GitHub Actions** (rama `main`).
 4. Añadir las variables frontend en Settings → Secrets and variables → Actions.
-5. Recordar actualizar `ALLOWED_ORIGINS` en `.env` con la URL real `https://<usuario>.github.io` y re-desplegar el backend si procede.
-
-## Roles
-
-Ver `docs/ROLES.md` para definición de roles (Arquitecto, Diseñador, Desarrollador, Tester).
+5. Recordar actualizar `ALLOWED_ORIGINS` con la URL real y re-desplegar el backend si procede.

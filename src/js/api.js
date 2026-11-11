@@ -149,6 +149,10 @@ const API = {
 
   // Foto animal a Drive
   async uploadFotoAnimal(base64, nombre, mimeType) {
+    // Validacion de tamano en frontend (max 5MB aprox. -> ~6.800.000 chars base64)
+    if (base64 && base64.length > 6800000) {
+      throw new Error('La foto supera el tamano maximo permitido (5MB)');
+    }
     return this._post('upload-foto-animal', { foto_base64: base64, nombre, mime_type: mimeType });
   },
 
@@ -156,6 +160,10 @@ const API = {
   async getDocumentos() { return this._get('documentos'); },
   async createDocumento(data) { return this._post('documentos', data); },
   async uploadDocumento(base64, nombre, mimeType, tipo) {
+    // Validacion de tamano en frontend (max 5MB aprox. -> ~6.800.000 chars base64)
+    if (base64 && base64.length > 6800000) {
+      throw new Error('El archivo supera el tamano maximo permitido (5MB)');
+    }
     return this._post('upload-documento', { archivo_base64: base64, nombre, mime_type: mimeType, tipo: tipo || 'documento' });
   },
   async updateDocumento(id, data) { const r = await this._post('update-documento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },

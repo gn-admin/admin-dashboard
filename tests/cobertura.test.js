@@ -883,17 +883,17 @@ describe('aprobarEncuesta: sin exito cuando setEstado falla', () => {
 describe('fluidez: scroll-lock de modales y entrada de listados', () => {
   it('_modalScrollLock cuenta modales apilados y restaura el overflow', () => {
     const realDoc = global.document;
-    const style = {};
-    global.document = { body: { style } };
+    const classList = { _classes: new Set(), toggle(c, force) { if (force) this._classes.add(c); else this._classes.delete(c); }, contains(c) { return this._classes.has(c); } };
+    global.document = { body: { classList } };
     Dashboard._modalLocks = 0;
     try {
       Dashboard._modalScrollLock(true);
-      assert.equal(style.overflow, 'hidden');
+      assert.ok(classList.contains('modal-open'));
       Dashboard._modalScrollLock(true);
       Dashboard._modalScrollLock(false);
-      assert.equal(style.overflow, 'hidden', 'sigue oculto mientras quede un modal abierto');
+      assert.ok(classList.contains('modal-open'), 'sigue oculto mientras quede un modal abierto');
       Dashboard._modalScrollLock(false);
-      assert.equal(style.overflow, '', 'restaurado al cerrar el ultimo modal');
+      assert.ok(!classList.contains('modal-open'), 'restaurado al cerrar el ultimo modal');
       Dashboard._modalScrollLock(false);
       assert.equal(Dashboard._modalLocks, 0, 'el contador nunca baja de 0');
     } finally {

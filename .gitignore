@@ -33,3 +33,6 @@ apps-script/
 # Temporary
 *.tmp
 *.temp
+
+# Documentación interna / operativa (nunca se sube al repo público)
+.internal-docs/

@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0A431E">
   <meta name="robots" content="noindex, nofollow">
+  <!-- Seguridad: no enviar Referer a sitios externos (evita filtrar ?token= en la URL) -->
+  <meta name="referrer" content="no-referrer">
+  <!-- Seguridad: CSP en modo reporte (solo informa, no bloquea nada). -->
+  <meta http-equiv="Content-Security-Policy-Report-Only" content="
+    default-src 'self';
+    script-src 'self' https://www.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
+    style-src 'self' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: https:;
+    connect-src 'self' https://script.google.com https://identitytoolkit.googleapis.com;
+    frame-ancestors 'none';
+    base-uri 'self';
+  ">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,16 +31,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preload" href="assets/icons/logo-nebak.jpg" as="image">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+
+  <!-- Skip link para lectores de pantalla -->
+  <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
 
   <div id="login-view" class="view active">
     <div class="login-container">
       <div class="login-brand">
         <div class="login-brand-inner">
           <div class="login-brand-logo">
-            <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" class="login-logo-img">
+            <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" class="login-logo-img" loading="eager" fetchpriority="high">
           </div>
           <h1 class="login-brand-title">Grupo Nebak</h1>
           <p class="login-brand-sub">Panel de administración para la gestión integral de la protectora: animales, familias de acogida, adopciones, socios y reportes.</p>
@@ -87,7 +104,7 @@
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <img src="assets/icons/logo-nebak.jpg" alt="Nebak" class="sidebar-logo-img">
+        <img src="assets/icons/logo-nebak.jpg" alt="Nebak" class="sidebar-logo-img" loading="eager" fetchpriority="high">
         <div class="sidebar-brand">
           <span class="sidebar-brand-name">Grupo Nebak</span>
           <span class="sidebar-brand-sub">Panel de administracion</span>
@@ -185,17 +202,17 @@
     <div class="main-wrapper">
       <header class="topbar">
         <div class="topbar-left">
-          <button id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" onclick="Dashboard.showProfile()"></button>
-          <button id="sidebar-toggle" class="btn-icon sidebar-toggle-btn"></button>
+          <button id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" aria-label="Mi perfil" onclick="Dashboard.showProfile()"></button>
+          <button id="sidebar-toggle" class="btn-icon sidebar-toggle-btn" aria-label="Abrir o cerrar menu lateral"></button>
           <h1 id="page-title" class="topbar-title">Dashboard</h1>
         </div>
         <div class="topbar-right">
           <button id="pwa-install-btn" class="btn-icon pwa-install-btn" title="Instalar app" aria-label="Instalar app" style="display:none"></button>
           <button id="refresh-btn" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos" onclick="Dashboard.refreshData()"></button>
-          <button id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" onclick="Dashboard.showTutorial()"></button>
+          <button id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" aria-label="Guia de procesos" onclick="Dashboard.showTutorial()"></button>
           <span class="pending-sync-badge" style="display:none"></span>
           <span class="topbar-user-name" id="topbar-user-name"></span>
-          <button id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion">
+          <button id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion" aria-label="Cerrar sesion">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </button>
         </div>
@@ -241,35 +258,35 @@
     </nav>
 
     <div class="mas-menu-overlay" id="mas-menu-overlay"></div>
-    <div class="mas-menu-popup" id="mas-menu-popup" style="display:none">
+    <div class="mas-menu-popup" id="mas-menu-popup" style="display:none" role="menu" aria-label="Menú de gestión y herramientas">
       <div class="mas-menu-sep">Gestion</div>
-      <a class="mas-menu-item" data-page="acogidas" href="#acogidas">
+      <a class="mas-menu-item" role="menuitem" data-page="acogidas" href="#acogidas">
         <span class="mas-menu-icon" id="mas-icon-acogidas"></span>Familias de acogida
       </a>
-      <a class="mas-menu-item" data-page="acogidas-activas" href="#acogidas-activas">
+      <a class="mas-menu-item" role="menuitem" data-page="acogidas-activas" href="#acogidas-activas">
         <span class="mas-menu-icon" id="mas-icon-acogidas-activas"></span>Acogidas activas
       </a>
-      <a class="mas-menu-item" data-page="adopciones" href="#adopciones">
+      <a class="mas-menu-item" role="menuitem" data-page="adopciones" href="#adopciones">
         <span class="mas-menu-icon" id="mas-icon-adopciones"></span>Adopciones
       </a>
-      <a class="mas-menu-item" data-page="socios" href="#socios">
+      <a class="mas-menu-item" role="menuitem" data-page="socios" href="#socios">
         <span class="mas-menu-icon" id="mas-icon-socios"></span>Socios
       </a>
       <div class="mas-menu-sep">Herramientas</div>
-      <a class="mas-menu-item" data-page="blacklist" href="#blacklist">
+      <a class="mas-menu-item" role="menuitem" data-page="blacklist" href="#blacklist">
         <span class="mas-menu-icon" id="mas-icon-blacklist"></span>Lista Negra
       </a>
-      <a class="mas-menu-item" data-page="reportes" href="#reportes">
+      <a class="mas-menu-item" role="menuitem" data-page="reportes" href="#reportes">
         <span class="mas-menu-icon" id="mas-icon-reportes"></span>Reportes y actividad
       </a>
 
-      <a class="mas-menu-item" data-page="redes" href="#redes">
+      <a class="mas-menu-item" role="menuitem" data-page="redes" href="#redes">
         <span class="mas-menu-icon" id="mas-icon-redes"></span>Redes Sociales
       </a>
-      <a class="mas-menu-item" data-page="donaciones" href="#donaciones">
+      <a class="mas-menu-item" role="menuitem" data-page="donaciones" href="#donaciones">
         <span class="mas-menu-icon" id="mas-icon-donaciones"></span>Donaciones
       </a>
-      <a class="mas-menu-item" data-page="almacen" href="#almacen">
+      <a class="mas-menu-item" role="menuitem" data-page="almacen" href="#almacen">
         <span class="mas-menu-icon" id="mas-icon-almacen"></span>Almacén
       </a>
     </div>
@@ -361,6 +378,10 @@
   </div>
 
   <div id="loading" class="loading-overlay" role="status" aria-live="polite" aria-label="Cargando"><div class="spinner"></div></div>
+  <!-- Botón "Ir arriba" (móvil) -->
+  <button type="button" class="scroll-to-top" id="scroll-to-top" aria-label="Ir arriba" title="Ir arriba">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
   <div id="error-message" class="toast-error" role="status" aria-live="polite"></div>
 
   <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
