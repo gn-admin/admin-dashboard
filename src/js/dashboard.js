@@ -900,6 +900,35 @@ const Dashboard = {
     }
   },
 
+  // Pila LIFO de modales abiertos: Escape cierra siempre el más reciente.
+  _modalStackInit() { if (!Array.isArray(this._modalStack)) this._modalStack = []; },
+  _modalPush(id) {
+    this._modalStackInit();
+    this._modalStack = this._modalStack.filter(x => x !== id);
+    this._modalStack.push(id);
+  },
+  _modalRemove(id) {
+    this._modalStackInit();
+    this._modalStack = this._modalStack.filter(x => x !== id);
+  },
+  _modalCloseTop() {
+    this._modalStackInit();
+    const top = this._modalStack[this._modalStack.length - 1];
+    if (!top) return false;
+    const map = {
+      'confirm-modal': () => this.cancelConfirm(false),
+      'contrato-modal': () => this.closeContratoForm(),
+      'form-modal': () => this.closeFormModal(),
+      'info-modal': () => this.closeInfoModal(),
+      'profile-modal': () => this.closeProfile(),
+      'tutorial-modal': () => this.closeTutorial(),
+    };
+    const fn = map[top];
+    if (fn) { fn(); return true; }
+    this._modalRemove(top);
+    return false;
+  },
+
   _confirm(msg, title, okLabel) {
     return new Promise(resolve => {
       const modal = document.getElementById('confirm-modal');
@@ -914,17 +943,19 @@ const Dashboard = {
       if (ok) { ok.textContent = okLabel || 'Confirmar'; ok.onclick = () => this._closeConfirm(true); }
       if (cancel) cancel.onclick = () => this._closeConfirm(false);
       modal.onclick = (e) => { if (e.target === modal) this._closeConfirm(false); };
+      if (modal.style.display !== 'flex') this._modalScrollLock(true);
       modal.style.display = 'flex';
-      this._modalScrollLock(true);
+      this._modalPush('confirm-modal');
       this._focusModal(modal);
     });
   },
 
   _closeConfirm(val) {
     const modal = document.getElementById('confirm-modal');
-    if (!modal) return;
+    if (!modal || modal.style.display === 'none') return;
     modal.style.display = 'none';
     this._modalScrollLock(false);
+    this._modalRemove('confirm-modal');
     const r = modal._resolve; modal._resolve = null;
     const ok = document.getElementById('confirm-ok');
     const cancel = document.getElementById('confirm-cancel');
@@ -2179,6 +2210,7 @@ const Dashboard = {
     }
     if (el.style.display !== 'flex') this._modalScrollLock(true);
     el.style.display = 'flex';
+    this._modalPush('tutorial-modal');
     el.onclick = (e) => { if (e.target === el) this.closeTutorial(); };
     body.scrollTop = 0;
     this.injectIcons();
@@ -2431,6 +2463,7 @@ const Dashboard = {
     el.style.display = 'none';
     el.onclick = null;
     this._modalScrollLock(false);
+    this._modalRemove('tutorial-modal');
   },
 
   showProfile() {
@@ -2472,6 +2505,7 @@ const Dashboard = {
     body.innerHTML = html;
     if (modal.style.display !== 'flex') this._modalScrollLock(true);
     modal.style.display = 'flex';
+    this._modalPush('info-modal');
     modal.onclick = (e) => { if (e.target === modal) this.closeInfoModal(); };
     this.injectIcons();
     this._focusModal(modal);
@@ -2483,6 +2517,7 @@ const Dashboard = {
     modal.style.display = 'none';
     modal.onclick = null;
     this._modalScrollLock(false);
+    this._modalRemove('info-modal');
   },
 
   showFormModal(title, html) {
@@ -2495,6 +2530,7 @@ const Dashboard = {
     body.classList.add('modal-body--form');
     if (modal.style.display !== 'flex') this._modalScrollLock(true);
     modal.style.display = 'flex';
+    this._modalPush('form-modal');
     this.injectIcons();
     this._focusModal(modal);
   },
@@ -2506,6 +2542,7 @@ const Dashboard = {
     const body = document.getElementById('form-body');
     if (body) body.classList.remove('modal-body--form');
     this._modalScrollLock(false);
+    this._modalRemove('form-modal');
   },
 
   async viewCuestionarioModal(surveyId, responseId) {
@@ -6749,7 +6786,9 @@ const Dashboard = {
           </form>
         </div>
       </div>`;
+    if (modal.style.display !== 'flex') this._modalScrollLock(true);
     modal.style.display = 'flex';
+    this._modalPush('contrato-modal');
     const shell = modal.querySelector('.contrato-shell');
     if (shell) shell.classList.remove('doc-open');
     const toggle = document.getElementById('contrato-doc-toggle');
@@ -6862,6 +6901,7 @@ const Dashboard = {
     const toggle = document.getElementById('contrato-doc-toggle');
     if (toggle) toggle.innerHTML = Icons.eye + ' Ver documento';
     this._modalScrollLock(false);
+    this._modalRemove('contrato-modal');
   },
 
   async guardarContrato(e, adopcionId) {
