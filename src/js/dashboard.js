@@ -148,7 +148,7 @@ const Dashboard = {
       socios: () => this.renderSocios(el),
       blacklist: () => this.renderBlacklist(el),
       reportes: () => this.renderReportes(el),
-      actividad: () => this.renderReportes(el),
+      actividad: () => this.renderActividad(el),
       redes: () => this.renderRedes(el),
       donaciones: () => this.renderDonaciones(el),
       almacen: () => this.renderAlmacen(el),
@@ -5316,6 +5316,8 @@ const Dashboard = {
     const sol = this._parseSolicitud(p.solicitud_id);
     const bloqueo = this._requisitoAvance(p, contrato, this.seguimientos);
     const puedeAvanzar = currentIdx < fases.length - 1;
+    const devuelto = p.desenlace === 'devuelto';
+    const anulado = p.desenlace === 'anulado';
     const avanceBtn = (!puedeAvanzar || devuelto || anulado) ? '' : (bloqueo
       ? `<button type="button" class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
       : `<button type="button" class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.showAvanzarFaseForm('${p.id}')">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
@@ -5323,8 +5325,6 @@ const Dashboard = {
     const verContrato = !!contrato || currentIdx >= this._faseIdx('Visita domiciliaria');
     const verEntrega = !!p.fecha_entrega || currentIdx >= this._faseIdx('Entrega');
     const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= this._faseIdx('Prueba');
-    const devuelto = p.desenlace === 'devuelto';
-    const anulado = p.desenlace === 'anulado';
     const puedeDevolucion = !devuelto && !anulado && (currentIdx >= this._faseIdx('Entrega') || !!p.fecha_entrega);
     const devueltoBanner = devuelto
       ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso devuelto</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El animal está disponible para una nueva adopción.</span></div>`
