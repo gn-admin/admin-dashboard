@@ -7352,6 +7352,40 @@ body.pwa-modal-open {
   aspect-ratio: 4/3;
   max-width: 600px;
   margin: 0 auto 12px;
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.galeria-carrusel:active {
+  cursor: grabbing;
+}
+
+.galeria-carrusel:focus-visible {
+  outline: 2px solid var(--primary, #1FC95B);
+  outline-offset: 2px;
+}
+
+/* Hint de swipe en móvil */
+@media (max-width: 767px) {
+  .galeria-carrusel::after {
+    content: '← Desliza →';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--text-2xs, 0.625rem);
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+  }
+  .galeria-carrusel:hover::after,
+  .galeria-carrusel:focus::after {
+    opacity: 0;
+  }
 }
 
 .galeria-counter {

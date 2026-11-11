@@ -33,6 +33,8 @@ const Dashboard = {
     this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'adopciones', 'blacklist', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos', 'documentos', 'grupos']);
     this._renderPendingBadge();
     this.flushPendingOps();
+    // Inicializar swipe + teclado para carrusel de galería
+    this._galeriaSwipeInit();
     if (!this._onlineHook) {
       this._onlineHook = true;
       window.addEventListener('online', () => { this.flushPendingOps(); });
@@ -1012,7 +1014,7 @@ const Dashboard = {
     }).join('');
 
     return `
-      <div class="galeria-carrusel" data-animal="${this._esc(animalId)}">
+      <div class="galeria-carrusel" data-animal="${this._esc(animalId)}" tabindex="0" role="region" aria-label="Galería de fotos" style="outline:none">
         <div class="galeria-counter">${idx + 1} de ${total}</div>
         <div class="galeria-track" style="transform: translateX(-${idx * 100}%)">
           ${slides}
@@ -1054,6 +1056,64 @@ const Dashboard = {
   _galeriaIr(animalId, idx) {
     this._galeriaSetIndex(animalId, idx);
     this._galeriaRepintar(animalId);
+  },
+
+  // Swipe + teclado para el carrusel de galería (Fase 3)
+  _galeriaSwipeInit() {
+    if (this._galeriaSwipeHook) return;
+    this._galeriaSwipeHook = true;
+
+    let startX = 0, startY = 0, swiping = false, carousel = null;
+
+    document.addEventListener('touchstart', (e) => {
+      const c = e.target.closest('.galeria-carrusel');
+      if (!c) return;
+      carousel = c;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      swiping = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!swiping || !carousel) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      // Solo swipe horizontal (evitar conflicto con scroll vertical)
+      if (Math.abs(dy) > Math.abs(dx)) { swiping = false; return; }
+      const track = carousel.querySelector('.galeria-track');
+      if (track) {
+        const idx = parseInt(carousel.dataset.animal ? this._galeriaIndex(carousel.dataset.animal) : 0, 10) || 0;
+        track.style.transform = 'translateX(' + (-idx * 100 + (dx / carousel.offsetWidth * 100)) + '%)';
+        track.style.transition = 'none';
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      if (!swiping || !carousel) return;
+      swiping = false;
+      const dx = e.changedTouches[0].clientX - startX;
+      const animalId = carousel.dataset.animal;
+      const track = carousel.querySelector('.galeria-track');
+      if (track) {
+        track.style.transition = '';
+        track.style.transform = '';
+      }
+      if (Math.abs(dx) > 50 && animalId) {
+        if (dx > 0) this._galeriaPrev(animalId);
+        else this._galeriaNext(animalId);
+      }
+      carousel = null;
+    }, { passive: true });
+
+    // Teclado: flechas izquierda/derecha
+    document.addEventListener('keydown', (e) => {
+      const c = document.activeElement?.closest?.('.galeria-carrusel') || document.querySelector('.galeria-carrusel:focus-within');
+      if (!c) return;
+      const animalId = c.dataset.animal;
+      if (!animalId) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); this._galeriaPrev(animalId); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); this._galeriaNext(animalId); }
+    });
   },
 
   _galeriaRepintar(animalId) {
