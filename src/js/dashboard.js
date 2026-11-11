@@ -5067,7 +5067,7 @@ const Dashboard = {
       <div class="response-card-header">
         <div class="response-avatar proceso-avatar">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
         <div class="response-info">
-          <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${faseCls}">${this._esc(p.fase)}</span>${ct ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}${p.desenlace === 'devuelto' ? ' <span class="estado-badge descartada">Devuelto</span>' : ''}${p.desenlace === 'anulado' ? ' <span class="estado-badge descartada">Anulado</span>' : ''}</div>
+          <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${faseCls}">${this._esc(p.fase)}</span>${ct && this._faseIdx(p.fase) >= this._faseIdx('Contrato') ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}${p.desenlace === 'devuelto' ? ' <span class="estado-badge descartada">Devuelto</span>' : ''}${p.desenlace === 'anulado' ? ' <span class="estado-badge descartada">Anulado</span>' : ''}</div>
           <div class="response-email">${this._esc(p.adoptante)}</div>
           <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
         </div>
@@ -5240,7 +5240,7 @@ const Dashboard = {
       <div class="proceso-hero">
         <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
         <div class="proceso-hero-info">
-          <div class="proceso-hero-title">${this._esc(p.animal)} <span class="estado-badge ${devuelto ? 'descartada' : 'en_proceso'}">${this._esc(p.fase)}</span>${contrato ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="proceso-hero-title">${this._esc(p.animal)} <span class="estado-badge ${devuelto ? 'descartada' : 'en_proceso'}">${this._esc(p.fase)}</span>${contrato && this._faseIdx(p.fase) >= this._faseIdx('Contrato') ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
           <div class="proceso-hero-sub">${this._esc(p.adoptante)} &middot; ${this._esc(this._fmtFecha(p.fecha))}</div>
           <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
         </div>
