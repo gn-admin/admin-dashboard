@@ -605,7 +605,13 @@ const Dashboard = {
     const anterior = this.states[key];
     this.states[key] = estado;
     this._syncCard(surveyId, id);
-    this.showLoading();
+    // El cambio se pinta al instante (optimista). La tarjeta queda marcada
+    // mientras el backend confirma: asi se ve que esta guardando sin tapar
+    // toda la pantalla con el overlay de carga.
+    const card = (typeof document !== 'undefined')
+      ? document.querySelector('.response-card[data-card="' + key + '"]')
+      : null;
+    if (card) card.classList.add('is-pending');
     try {
       await API.setEstado(id, surveyId || '', estado);
       return true;
@@ -616,8 +622,39 @@ const Dashboard = {
       this._snackErr(err, 'No se pudo guardar el estado');
       return false;
     } finally {
-      this.hideLoading();
+      if (card) card.classList.remove('is-pending');
     }
+  },
+
+  // Pone un boton en estado de carga y devuelve la funcion que lo restaura.
+  _btnBusy(btn, label) {
+    if (!btn || btn.dataset.busy === '1') return () => {};
+    const prev = btn.innerHTML;
+    btn.dataset.busy = '1';
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span><span>' + this._esc(label || 'Guardando...') + '</span>';
+    return () => {
+      if (!btn.isConnected) return;
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.innerHTML = prev;
+      delete btn.dataset.busy;
+    };
+  },
+
+  // Cambia el estado de una solicitud desde un boton: feedback inmediato en el
+  // propio boton y repintado de la ficha solo si sigue abierta.
+  async cambiarEstado(btn, id, estado, surveyId) {
+    const fin = this._btnBusy(btn, 'Guardando...');
+    const enFicha = !!(btn && btn.closest('.page-detail-container'));
+    const ok = await this.setEstado(id, estado, surveyId);
+    fin();
+    if (ok) {
+      if (enFicha) this.viewDetail(surveyId, id);
+      this.showSnackbar('Estado actualizado: ' + this._estadoLabel(estado), 'success');
+    }
+    return ok;
   },
 
   // ==================== CANDIDATURAS / FLUJO COMPLETO ====================
@@ -902,7 +939,7 @@ const Dashboard = {
     container._freshT = setTimeout(() => container.classList.remove('list-fresh'), 250);
   },
 
-  _showDetail(pageId, title, contentHTML) {
+  _showDetail(pageId, title, contentHTML, detailKey) {
     const page = document.getElementById('page-' + pageId);
     if (!page) return;
     const listEl = page.querySelector('.page-list-container');
@@ -912,6 +949,7 @@ const Dashboard = {
       listEl.classList.add('hidden');
       detailEl.classList.add('active');
       detailEl._prevHTML = null;
+      detailEl.dataset.detailKey = detailKey || '';
       detailEl.innerHTML = `
       <div class="detail-actions">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
@@ -919,10 +957,17 @@ const Dashboard = {
       </div>
       ${contentHTML}`;
       this.injectIcons();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'auto' });
     });
   },
 
+  // True si la ficha indicada sigue abierta (evita repintar otra pantalla
+  // cuando llega una carga en segundo plano).
+  _detailVigente(pageId, detailKey) {
+    const page = document.getElementById('page-' + pageId);
+    const d = page && page.querySelector('.page-detail-container');
+    return !!(d && d.classList.contains('active') && (!detailKey || d.dataset.detailKey === detailKey));
+  },
   _hideDetail(pageId) {
     const page = document.getElementById('page-' + pageId);
     if (!page) return;
@@ -931,10 +976,10 @@ const Dashboard = {
     if (listEl && listEl.classList.contains('hidden')) {
       this._withViewTransition(() => {
         listEl.classList.remove('hidden');
-        if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; }
+        if (detailEl) { detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; detailEl.dataset.detailKey = ''; }
       });
     } else if (detailEl) {
-      detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null;
+      detailEl.classList.remove('active'); detailEl.innerHTML = ''; detailEl._prevHTML = null; detailEl.dataset.detailKey = '';
     }
   },
 
@@ -1601,8 +1646,15 @@ const Dashboard = {
     return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
-  async viewDetail(surveyId, responseId) {
-    await this._ensureListas(['candidaturas', 'animales', 'blacklist']);
+  async viewDetail(surveyId, responseId, opts) {
+    const detailKey = 'solicitud:' + surveyId + '::' + responseId;
+    const faltan = ['candidaturas', 'animales', 'blacklist'].filter(k => !this._loaded[k]);
+    if (faltan.length && !(opts && opts.ready)) {
+      // La ficha se pinta al instante; si faltan listas, se completan detras.
+      this._ensureListas(faltan).then(() => {
+        if (this._detailVigente(this._encuestaPage(surveyId), detailKey)) this.viewDetail(surveyId, responseId, { ready: true });
+      }).catch(() => {});
+    }
     const r=(this.responses[surveyId]||[]).find(x=>x.id===responseId);
     if(!r) return;
     const blMatch = this.blacklist.find(b => {
@@ -1616,27 +1668,36 @@ const Dashboard = {
     const blBanner = blMatch ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.ban} <span>Esta persona esta en la <b>lista negra</b>${blMatch.motivo?': '+this._esc(blMatch.motivo):''}.</span></div>` : '';
     const sections=this._buildSections(r,surveyId);
     const e=this.getEstado(r.id, surveyId);
-    const note=this.notes[surveyId+'::'+r.id]||'';
     const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};
     const pageId=pageMap[surveyId]||surveyId;
     const cands=this._candidaturasDe(surveyId, responseId);
     const candCls={en_lista:'',elegido:'aprobada',descartado:'descartada'};
     const actionButtons = e==='descartada'
-      ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.check} Restaurar</button>`
+      ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.check} Restaurar</button>`
       : e==='aprobada'
-        ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} Reabrir</button>
-           <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`
+        ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} Reabrir</button>
+           <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
         : e==='en_proceso'
           ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.aprobarEncuesta('${surveyId}','${r.id}')">${Icons.checkCircle} Aprobar</button>
-             <button class="btn btn-sm" onclick="Dashboard.setEstado('${r.id}','pendiente','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} Pendiente</button>
-             <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`
-          : `<button class="btn btn-primary btn-sm" onclick="Dashboard.setEstado('${r.id}','en_proceso','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.arrowRight} En proceso</button>
-             <button class="btn btn-danger btn-sm" onclick="Dashboard.setEstado('${r.id}','descartada','${surveyId}').then(()=>Dashboard.viewDetail('${surveyId}','${r.id}'))">${Icons.xCircle} Descartar</button>`;
+             <button class="btn btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','pendiente','${surveyId}')">${Icons.arrowRight} Pendiente</button>
+             <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} En proceso</button>
+             <button class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`;
     const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${c.fecha ? this._fmtFecha(c.fecha) : '—'}</div></div>`).join('')}</div>` : '';
     const asig = cands.length ? !!cands[0].animal_id : false;
     const assignBox = e==='aprobada' && !asig ? `<div class="detail-section"><div class="detail-section-title">${Icons.arrowRight} Asignar animal${cands[0]&&cands[0].tipo==='acogida'?' y familia':''}</div><div id="assign-box-${responseId}" style="min-height:70px"><div class="page-loader"><div class="spinner"></div><p>Cargando animales...</p></div></div></div>` : '';
+    const surveyName = ((this.surveys || []).find(s => s.id === surveyId) || {}).name || surveyId;
+    const iniciales = this._esc(((r.nombre || '')[0] || '') + ((r.apellidos || '')[0] || '')) || '?';
     this._showDetail(pageId, (r.nombre||'')+' '+(r.apellidos||''), `
-      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <div class="responder-hero">
+        <div class="response-avatar" aria-hidden="true">${iniciales}</div>
+        <div class="responder-hero-info">
+          <div class="responder-hero-title">${this._esc(((r.nombre || '') + ' ' + (r.apellidos || '')).trim())}</div>
+          <div class="responder-hero-sub">${this._esc(r.email || '')}${r.telefono ? ' &middot; ' + this._esc(r.telefono) : ''}${r.fecha_creacion ? ' &middot; ' + this._fmtFecha(r.fecha_creacion) : ''}</div>
+          <div class="animal-card-pills" style="margin:8px 0 0"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span><span class="chip-neutral">${this._esc(surveyName)}</span></div>
+        </div>
+      </div>
+      <div class="detail-actions-wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
         ${actionButtons}
       </div>
@@ -1645,7 +1706,7 @@ const Dashboard = {
       ${assignBox}
       ${this._seccionesHtml(sections)}
       ${candHtml}
-      <div class="notes-section"><div class="detail-section-title"><span>${Icons.pencil} Notas</span><button class="btn btn-primary btn-sm" onclick="Dashboard.saveNote('${r.id}','${surveyId}')">Guardar</button></div><textarea id="note-${r.id}" placeholder="Escribe una nota...">${note}</textarea></div>`);
+      ${this._notasFichaHtml(surveyId, r.id)}`, detailKey);
     if (e==='aprobada' && !asig) this._renderAssignForm(surveyId, responseId);
   },
 
@@ -2055,13 +2116,12 @@ const Dashboard = {
     }
     const sections = this._buildSections(r, surveyId);
     const e = this.getEstado(r.id, surveyId);
-    const note = this.notes[surveyId + '::' + r.id] || '';
     const surveyName = ((this.surveys || []).find(s => s.id === surveyId) || {}).name || surveyId;
     this.showInfoModal('Cuestionario · ' + surveyName, `
       <div class="detail-field"><div class="detail-question">Solicitante</div><div class="detail-answer">${this._esc(((r.nombre || '') + ' ' + (r.apellidos || '')).trim())} · ${this._esc(r.email || '')}</div></div>
       <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span></div></div>
       ${this._seccionesHtml(sections)}
-      ${note ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><div class="detail-answer">${this._esc(note)}</div></div>` : ''}
+      ${this._notasFichaHtml(surveyId, r.id, { readonly: true, ctx: 'modal' })}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard.openCuestionarioEnPagina('${surveyId}','${r.id}')">${Icons.arrowRight} Abrir en Encuestas</button>
@@ -2282,16 +2342,164 @@ const Dashboard = {
     if (col === 'contratos') this.contratos.push(row);
   },
 
+  // ==================== NOTAS CON AUTOR (LINEA TEMPORAL) ====================
+  // La hoja notas guarda un unico texto por clave (survey_id + response_id).
+  // Para no romper ni el backend ni los datos existentes, ese texto puede ser:
+  //   - una nota antigua en texto plano (se trata como una entrada sin autor), o
+  //   - un JSON con [{ id, texto, autor, fecha }] que se pinta como linea
+  //     temporal y conserva quien la escribio y cuando.
+  _usuarioActual() {
+    const u = this._identity(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    return (u && u.name) || 'Usuario';
+  },
+
+  _notasParse(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) return [];
+    if (s.charAt(0) === '[') {
+      try {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) {
+          return arr
+            .filter(n => n && String(n.texto != null ? n.texto : n.nota || '').trim())
+            .map((n, i) => ({
+              id: String(n.id || 'n' + i),
+              texto: String(n.texto != null ? n.texto : n.nota || '').trim(),
+              autor: String(n.autor || '').trim(),
+              fecha: String(n.fecha || '').trim()
+            }));
+        }
+      } catch (e) { /* texto plano que empieza por corchete */ }
+    }
+    return [{ id: 'legacy', texto: s, autor: '', fecha: '' }];
+  },
+
+  _notasDe(key) { return this._notasParse((this.notes || {})[key]); },
+
+  _notasTexto(key) { return this._notasDe(key).map(n => n.texto).join('\n\n'); },
+
+  _notasGuardarLocal(key, lista) {
+    if (!this.notes) this.notes = {};
+    this.notes[key] = lista.length ? JSON.stringify(lista) : '';
+    this._cacheSet('notas', this.notes);
+  },
+
+  // Persiste la linea temporal completa en la hoja de notas (una fila por
+  // response_id/survey_id, sin columnas nuevas).
+  async _notasPersistir(key, lista) {
+    const sep = key.indexOf('::');
+    const kind = sep === -1 ? '' : key.slice(0, sep);
+    const id = sep === -1 ? key : key.slice(sep + 2);
+    this._notasGuardarLocal(key, lista);
+    try {
+      await API.setNota(id, kind, (this.notes || {})[key] || '');
+      return true;
+    } catch (err) {
+      this._snackErr(err, 'No se pudo guardar la nota');
+      return false;
+    }
+  },
+
+  async agregarNota(kind, id, texto) {
+    const limpio = String(texto == null ? '' : texto).trim();
+    if (!limpio) return false;
+    const key = kind + '::' + id;
+    const lista = this._notasDe(key);
+    lista.push({
+      id: 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      texto: limpio,
+      autor: this._usuarioActual(),
+      fecha: new Date().toISOString()
+    });
+    return this._notasPersistir(key, lista);
+  },
+
+  async borrarNota(kind, id, notaId) {
+    const key = kind + '::' + id;
+    const lista = this._notasDe(key).filter(n => String(n.id) !== String(notaId));
+    return this._notasPersistir(key, lista);
+  },
+
+  _notasCtxId(kind, id, ctx) {
+    return 'notas-' + String(ctx || 'main') + '-' + (kind + '-' + id).replace(/[^a-zA-Z0-9_-]/g, '_');
+  },
+
+  // Linea temporal + caja para anadir. En modo `readonly` (modal de solo
+  // lectura) solo muestra las notas.
+  _notasFichaHtml(kind, id, opts) {
+    const o = opts || {};
+    const key = kind + '::' + id;
+    const lista = this._notasDe(key);
+    const ctx = o.ctx || 'main';
+    const cid = this._notasCtxId(kind, id, ctx);
+    const items = lista.length ? lista.slice().reverse().map(n => {
+      const autor = n.autor || 'Nota anterior';
+      const inicial = (autor.charAt(0) || '?').toUpperCase();
+      return `<article class="nota-item">
+        <div class="nota-avatar" aria-hidden="true">${this._esc(inicial)}</div>
+        <div class="nota-cuerpo">
+          <div class="nota-head">
+            <span class="nota-autor">${this._esc(autor)}</span>
+            ${n.fecha ? `<span class="nota-fecha">${this._esc(this._fmtFecha(n.fecha))}</span>` : ''}
+            ${o.readonly || n.id === 'legacy' ? '' : `<button type="button" class="nota-del" title="Eliminar nota" aria-label="Eliminar nota de ${this._esc(autor)}" onclick="Dashboard.notaEliminarUI('${this._esc(kind)}','${this._esc(id)}','${this._esc(n.id)}','${this._esc(ctx)}')">${Icons.trash}</button>`}
+          </div>
+          <div class="nota-texto">${this._esc(n.texto)}</div>
+        </div>
+      </article>`;
+    }).join('') : `<div class="notas-vacio">${Icons.pencil}<span>Aún no hay notas. Anota aquí llamadas, visitas o acuerdos: queda registrado quién y cuándo.</span></div>`;
+    const compose = o.readonly ? '' : `<div class="notas-compose">
+        <textarea id="nota-input-${this._esc(cid)}" rows="3" placeholder="Añadir una nota (llamada, visita, acuerdo...)"></textarea>
+        <div class="notas-compose-actions">
+          <span class="notas-compose-hint">${Icons.info} Se guarda con tu nombre y la fecha.</span>
+          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.notaAddUI('${this._esc(kind)}','${this._esc(id)}','${this._esc(ctx)}',this)">${Icons.plus} Añadir nota</button>
+        </div>
+      </div>`;
+    return `<div class="detail-section notas-panel" id="${this._esc(cid)}">
+      <div class="detail-section-title">${Icons.pencil} ${this._esc(o.title || 'Notas')}${lista.length ? ` <span class="notas-count">${lista.length}</span>` : ''}</div>
+      <div class="notas-timeline">${items}</div>
+      ${compose}
+    </div>`;
+  },
+
+  _notasRepintar(kind, id, ctx, readonly) {
+    const el = document.getElementById(this._notasCtxId(kind, id, ctx));
+    if (!el) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = this._notasFichaHtml(kind, id, { ctx: ctx, readonly: readonly });
+    const fresh = tmp.firstElementChild;
+    if (fresh) el.replaceWith(fresh);
+  },
+
+  async notaAddUI(kind, id, ctx, btn) {
+    const input = document.getElementById('nota-input-' + this._notasCtxId(kind, id, ctx));
+    if (!input) return;
+    const texto = input.value;
+    if (!String(texto || '').trim()) { input.focus(); return; }
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Guardando...'; }
+    const ok = await this.agregarNota(kind, id, texto);
+    if (btn && btn.isConnected) { btn.disabled = false; btn.innerHTML = Icons.plus + ' Añadir nota'; }
+    if (!ok) return;
+    input.value = '';
+    this._notasRepintar(kind, id, ctx);
+    this.showSnackbar('Nota guardada', 'success');
+  },
+
+  async notaEliminarUI(kind, id, notaId, ctx) {
+    if (!(await this._confirm('¿Eliminar esta nota? No se puede deshacer.', 'Eliminar nota'))) return;
+    const ok = await this.borrarNota(kind, id, notaId);
+    if (!ok) return;
+    this._notasRepintar(kind, id, ctx);
+    this.showSnackbar('Nota eliminada', 'success');
+  },
+
   async saveNote(id, surveyId) {
     const ta = document.getElementById('note-' + id);
-    if (!ta) return;
-    const nota = ta.value;
-    this.notes[surveyId + '::' + id] = nota;
-    try {
-      await API.setNota(id, surveyId, nota);
+    const nota = ta ? ta.value : (this._notasDe(surveyId + '::' + id).slice(-1)[0] || {}).texto;
+    if (!String(nota || '').trim()) return;
+    const ok = await this.agregarNota(surveyId, id, nota);
+    if (ok) {
+      if (ta) ta.value = '';
       this.showSnackbar('Nota guardada', 'success');
-    } catch (err) {
-      this._snackErr(err, this._errMsg(err));
     }
   },
 
@@ -2303,7 +2511,7 @@ const Dashboard = {
   exportSingle(surveyId, id) {
     const row = (this.responses[surveyId] || []).find(r => r.id === id);
     const survey = this.surveys.find(s => s.id === surveyId);
-    if (row) PdfExport.exportSingleResponse(row, survey, this.notes[surveyId + '::' + id] || '');
+    if (row) PdfExport.exportSingleResponse(row, survey, this._notasTexto(surveyId + '::' + id));
   },
 
   // Formato visual unico: AAAA/MM/DD y, si hay hora, hh:mm AM/PM.
@@ -3711,52 +3919,73 @@ const Dashboard = {
     this.showInfoModal(a.nombre || 'Foto', `<img class="modal-foto" src="${this._esc(grande)}" alt="${alt}"${fb}>`);
   },
 
-  async viewAnimal(id) {
-    await this._ensureListas(['apadrinamientos', 'gastos', 'documentos']);
+  async viewAnimal(id, opts) {
     const a = this._byId(this.animales, id);
     if(!a) { this.showSnackbar('Animal no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
+    const detailKey = 'animal:' + id;
+    const faltan = ['apadrinamientos', 'gastos', 'documentos', 'adopciones', 'acogidas', 'familias'].filter(k => !this._loaded[k]);
+    if (faltan.length && !(opts && opts.ready)) {
+      // La ficha se pinta con lo que hay; el historial llega detras.
+      this._ensureListas(faltan).then(() => {
+        if (this._detailVigente('animales', detailKey)) this.viewAnimal(id, { ready: true });
+      }).catch(() => {});
+    }
     const foster = a.acogida_familia ? this.familias.find(f => f.id === a.acogida_familia) : null;
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
     const fotoHero = this._fotoHero(a);
+    // Caso activo (adopcion o acogida) para dar contexto desde la ficha.
+    const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && p.desenlace !== 'devuelto' && p.fase !== 'Seguimiento');
+    const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && c.fase !== 'finalizada');
+    const estadoBanner = casoAdopcion
+      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAdopcion('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
+      : (casoAcogida
+        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAcogida('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
+        : (foster ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>Familia <b>${this._esc(foster.nombre)}</b> · ${this._esc(foster.ubicacion || '')}</span></div>` : ''));
     this._showDetail('animales', a.nombre, `
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <div class="responder-hero">
+        ${fotoHero}
+        <div class="responder-hero-info">
+          <div class="responder-hero-title">${this._esc(a.nombre)}</div>
+          <div class="animal-card-pills" style="margin:6px 0 0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span>${this._esPrioritario(a)?'<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>':''}${a.grupo ? `<span class="chip-neutral">${this._esc(a.grupo)}</span>` : ''}</div>
+          <div class="responder-hero-sub">${this._esc(a.especie||'')}${a.raza?' &middot; '+this._esc(a.raza):''}${a.edad?' &middot; '+this._esc(a.edad):''}${a.sexo?' &middot; '+this._esc(a.sexo):''}</div>
+        </div>
+      </div>
+      ${estadoBanner}
+      <div class="detail-actions-wrap">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-        ${fotoHero}
-        <div style="flex:1;min-width:180px">
-          <div class="animal-card-pills" style="margin:0"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span>${this._esPrioritario(a)?'<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>':''}</div>
-          <div style="font-size:.82rem;color:var(--gray-500);margin-top:4px">${this._esc(a.especie||'')} &middot; ${this._esc(a.raza||'')} &middot; ${this._esc(a.edad||'')}</div>
-        </div>
-      </div>
-      <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion General</div>
-        <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)}</div></div>
-        <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)}</div></div>
+      <div class="detail-section detail-section--fields">
+        <div class="detail-section-title">${Icons.paw} Datos del animal</div>
+        <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Raza</div><div class="detail-answer">${this._esc(a.raza)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Edad</div><div class="detail-answer">${this._esc(a.edad)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Peso</div><div class="detail-answer">${this._esc(a.peso)||'—'}</div></div>
-        <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)}</div></div>
-        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div></div>
-        <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esPrioritario(a)?'<span class="urgente-badge" title="Necesita acogida o adopcion urgente">Urgente</span>':'Normal'}</div></div>
-        <div class="detail-field"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)||'—'}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''}${a.grupo_id?` <button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button><button class="btn btn-outline-green btn-sm" style="margin-left:6px;vertical-align:middle" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button>`:''}</div></div>
-        <div class="detail-field"><div class="detail-question">Descripcion</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
-      </div>
-      ${this._publicacionesFicha(a.id)}
-      ${this._apadrinamientosFicha(a.id)}
-      ${this._gastosFicha(a.id)}
-      ${this._documentosFicha(a.id)}
-      ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div>${siblings.map(x=>`<div class="detail-field"><div class="detail-question">${this._esc(x.nombre)}</div><div class="detail-answer">${this._esc(x.especie)} &middot; ${this._esc(x.raza)} &middot; ${this._esc(x.edad||'')} &middot; <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span></div></div>`).join('')}</div>`:''}
-      ${foster?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Familia Acogedora</div>
-        <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(foster.nombre)}</div></div>
-        <div class="detail-field"><div class="detail-question">Ubicacion</div><div class="detail-answer">${this._esc(foster.ubicacion)}</div></div>
-        <div class="detail-field"><div class="detail-question">Especialidad</div><div class="detail-answer">${this._esc(foster.especialidad)}</div></div>
-      </div>`:''}
-      <div class="detail-section"><div class="detail-section-title">${Icons.stethoscope} Historial Medico</div>
-        <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${this._esc(a.microchip||'—')}</div></div>
-        <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas||'—')}</div></div>
+        <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${this._fmtFecha(a.fecha_ingreso)}</div></div>
+        <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${this._esc(a.microchip)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Esterilizado/a</div><div class="detail-answer">${a.esterilizada?'Si':'No'}</div></div>
-        <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${this._esc(this._fmtFecha(a.fecha_ingreso))}</div></div>
-      </div>`);
+        <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esPrioritario(a)?'<span class="urgente-badge">Urgente</span>':'Normal'}</div></div>
+        <div class="detail-field detail-field--wide"><div class="detail-question">Descripción</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
+        ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button> <button class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
+      </div>
+      ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
+      <details class="detail-collapse">
+        <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
+        <div class="detail-collapse-body">
+          ${this._publicacionesFicha(a.id)}
+          ${this._apadrinamientosFicha(a.id)}
+          ${this._gastosFicha(a.id)}
+          ${this._documentosFicha(a.id)}
+          ${siblings.length?`<div class="detail-section"><div class="detail-section-title">${Icons.users} Grupo (${siblings.length+1})</div><div class="detail-grid-chips">${siblings.map(x=>`<button class="chip-link" onclick="Dashboard.viewAnimal('${this._esc(x.id)}')">${this._esc(x.nombre)} <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span></button>`).join('')}</div></div>`:''}
+          ${foster?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Familia acogedora</div>
+            <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(foster.nombre)}</div></div>
+            <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc(foster.ubicacion)||'—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Especialidad</div><div class="detail-answer">${this._esc(foster.especialidad)||'—'}</div></div>
+          </div>`:''}
+        </div>
+      </details>`, detailKey);
   },
 
   // El backend devuelve {success:false} si la fila no existe (p. ej. id no
@@ -3909,8 +4138,8 @@ const Dashboard = {
       <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion de la Familia</div>
         <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(f.nombre)}</div></div>
         <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(f.email)}</div></div>
-        <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(f.telefono)||'—'}</div></div>
-        <div class="detail-field"><div class="detail-question">Ubicacion</div><div class="detail-answer">${this._esc(f.ubicacion)}</div></div>
+        <div class="detail-field"><div class="detail-question">Teléfono</div><div class="detail-answer">${this._esc(f.telefono)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc(f.ubicacion)}</div></div>
         <div class="detail-field"><div class="detail-question">Especialidad</div><div class="detail-answer">${this._esc(f.especialidad)}</div></div>
         <div class="detail-field"><div class="detail-question">Capacidad</div><div class="detail-answer">${f.animales_actuales}/${f.max_capacity} animales</div></div>
         <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge ${f.capacidad==='Libre'?'en_proceso':'pendiente'}">${f.capacidad}</span></div></div>
@@ -3977,8 +4206,9 @@ const Dashboard = {
       </div>
       <div class="acogida-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
       <div class="acogida-card-actions">
-        ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.checkCircle} En casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}')">${Icons.check} Finalizar acogida</button>` : ''}
+        ${c.fase === 'entrega' ? `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.checkCircle} En casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        <button class="btn btn-sm btn-outline-green" onclick="Dashboard.viewAcogida('${this._esc(c.id)}')">${Icons.eye} Ver caso</button>
         <button class="btn btn-sm btn-outline-green" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
         <button class="btn btn-danger btn-sm" title="Eliminar caso" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash}</button>
         ${c.notas ? `<span class="acogida-card-nota">${this._esc(c.notas)}</span>` : ''}
@@ -4018,9 +4248,80 @@ const Dashboard = {
     this._animaListado(el.querySelector('.response-list'));
   },
 
-  async avanzarFaseAcogida(id) {
+  // Ficha del caso de acogida: mismo lenguaje que la de adopcion (hero,
+  // progreso, siguiente paso y notas con autor) para no tener que adivinar el
+  // estado desde una tarjeta.
+  async viewAcogida(id, opts) {
+    const c = this._byId(this.acogidas || [], id);
+    if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+    const detailKey = 'acogida:' + id;
+    const faltan = ['animales', 'familias', 'contratos'].filter(k => !this._loaded[k]);
+    if (faltan.length && !(opts && opts.ready)) {
+      this._ensureListas(faltan).then(() => {
+        if (this._detailVigente('acogidas-activas', detailKey)) this.viewAcogida(id, { ready: true });
+      }).catch(() => {});
+    }
+    const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
+    const fam = c.familia_id ? this._byId(this.familias || [], c.familia_id) : null;
+    const foto = a ? this._fotoSrc(a, 'w400') : '';
+    const guardado = this._contratoAcogidaDe(id);
+    const fases = ['entrega', 'en_casa', 'finalizada'];
+    const idx = Math.max(0, fases.indexOf(c.fase));
+    const pct = Math.round((idx / (fases.length - 1)) * 100);
+    const finalizada = c.fase === 'finalizada';
+    this._showDetail('acogidas-activas', c.animal || 'Caso de acogida', `
+      <div class="proceso-hero">
+        <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(c.animal)}">` : Icons.home}</div>
+        <div class="proceso-hero-info">
+          <div class="proceso-hero-title">${this._esc(c.animal || 'Animal')} <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span>${guardado ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="proceso-hero-sub">${this._esc(c.familia || 'Familia')} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}${c.fin ? ' &middot; hasta ' + this._esc(this._fmtFecha(c.fin)) : ''}</div>
+          <div class="proceso-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+        </div>
+        <div class="proceso-hero-pct">${pct}%<small>${idx + 1}/${fases.length}</small></div>
+      </div>
+      ${finalizada ? `<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Acogida finalizada. El animal volvió a <b>Disponible</b> y la familia quedó libre.</span></div>` : ''}
+      <div class="detail-actions-wrap">
+        ${c.fase === 'entrega' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.checkCircle} Marcar en casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoAcogida('${this._esc(c.id)}')">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
+        ${a ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewAnimal('${this._esc(a.id)}')">${Icons.paw} Ver ficha del animal</button>` : ''}
+      </div>
+      <div class="detail-section fase-stepper-card">
+        <div class="fase-stepper-head">
+          <div class="fase-stepper-title"><b>Acogida</b><span>${this._esc(this._faseAcogidaLabel(c.fase))}</span></div>
+          <div class="fase-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+        </div>
+        ${this._faseStepperHtml(fases.map(f => this._faseAcogidaLabel(f)), this._faseAcogidaLabel(c.fase))}
+      </div>
+      <div class="detail-section detail-section--fields">
+        <div class="detail-section-title">${Icons.home} Animal y familia</div>
+        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${a ? `<a href="javascript:void(0)" onclick="Dashboard.viewAnimal('${this._esc(a.id)}')">${this._esc(a.nombre)}</a>` : this._esc(c.animal) || '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(c.familia) || '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Ubicación</div><div class="detail-answer">${this._esc((fam && fam.ubicacion) || '') || '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Contacto</div><div class="detail-answer">${this._esc((fam && (fam.telefono || fam.email)) || '') || '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Inicio</div><div class="detail-answer">${this._fmtFecha(c.inicio)}</div></div>
+        <div class="detail-field"><div class="detail-question">Fin</div><div class="detail-answer">${c.fin ? this._fmtFecha(c.fin) : '—'}</div></div>
+      </div>
+      ${this._notasFichaHtml('acogida', c.id, { title: 'Notas del caso' })}
+      <details class="detail-collapse">
+        <summary>${Icons.info} Datos del caso</summary>
+        <div class="detail-collapse-body">
+          <div class="detail-section detail-section--fields">
+            <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(c.estado) || '—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Fase</div><div class="detail-answer">${this._esc(this._faseAcogidaLabel(c.fase))}</div></div>
+            ${c.notas ? `<div class="detail-field detail-field--wide"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(c.notas)}</div></div>` : ''}
+          </div>
+          <div class="detail-actions-inline detail-actions-inline--danger">
+            <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAcogida('${this._esc(c.id)}')">${Icons.trash} Eliminar caso</button>
+          </div>
+        </div>
+      </details>`, detailKey);
+  },
+
+  async avanzarFaseAcogida(id, btn) {
     const busyKey = 'fase-acogida:' + id;
     if (!this._busyStart(busyKey)) return;
+    const fin = this._btnBusy(btn, 'Actualizando...');
     try {
       const c = this._byId(this.acogidas, id);
       if (!c) return;
@@ -4054,6 +4355,7 @@ const Dashboard = {
       this.saveLocal();
       this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
     } finally {
+      fin();
       this._busyEnd(busyKey);
     }
   },
@@ -4497,12 +4799,24 @@ const Dashboard = {
     return true;
   },
 
-  async viewAdopcion(id) {
-    await this._ensureListas(['contratos', 'seguimientos', 'animales']);
+  // Ficha del caso de adopcion. Muestra solo lo que toca en la fase actual:
+  // contrato a partir de la visita domiciliaria, entrega desde Entrega y
+  // prueba desde Prueba. El resto queda plegado en "Datos del caso" para que
+  // la pantalla no acumule bloques que aun no aplican.
+  async viewAdopcion(id, opts) {
     const p = this._byId(this.adopciones, id);
-    if(!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
+    if (!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
+    const detailKey = 'adopcion:' + id;
+    const faltan = ['contratos', 'seguimientos', 'animales'].filter(k => !this._loaded[k]);
+    if (faltan.length && !(opts && opts.ready)) {
+      // Se pinta ya con lo que hay en memoria y se repinta cuando llega el
+      // resto: abrir una ficha no espera a la red.
+      this._ensureListas(faltan).then(() => {
+        if (this._detailVigente('adopciones', detailKey)) this.viewAdopcion(id, { ready: true });
+      }).catch(() => {});
+    }
     const fases = this._fasesAdopcion();
-    const currentIdx = fases.indexOf(p.fase);
+    const currentIdx = Math.max(0, fases.indexOf(p.fase));
     const contrato = this._contratoDeAdopcion(p.id);
     const av = p.animal_id ? this._byId(this.animales, p.animal_id) : null;
     const foto = av ? this._fotoSrc(av, 'w200') : '';
@@ -4512,50 +4826,70 @@ const Dashboard = {
     const puedeAvanzar = currentIdx < fases.length - 1;
     const avanceBtn = !puedeAvanzar ? '' : (bloqueo
       ? `<button class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
-      : `<button class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}')">${Icons.arrowRight} Avanzar fase</button>`);
+      : `<button class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" onclick="Dashboard.avanzarFase('${p.id}',this)">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
+    // Cada bloque aparece cuando ya tiene sentido en el flujo.
+    const verContrato = !!contrato || currentIdx >= this._faseIdx('Visita domiciliaria');
+    const verEntrega = !!p.fecha_entrega || currentIdx >= this._faseIdx('Entrega');
+    const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= this._faseIdx('Prueba');
+    const devuelto = p.desenlace === 'devuelto';
+    const devueltoBanner = devuelto
+      ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso devuelto</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El animal está disponible para una nueva adopción.</span></div>`
+      : '';
     this._showDetail('adopciones', p.animal, `
       <div class="proceso-hero">
         <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
         <div class="proceso-hero-info">
-          <div class="proceso-hero-title">${this._esc(p.animal)} <span class="estado-badge ${p.desenlace === 'devuelto' ? 'descartada' : 'en_proceso'}">${this._esc(p.fase)}</span>${contrato ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="proceso-hero-title">${this._esc(p.animal)} <span class="estado-badge ${devuelto ? 'descartada' : 'en_proceso'}">${this._esc(p.fase)}</span>${contrato ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
           <div class="proceso-hero-sub">${this._esc(p.adoptante)} &middot; ${this._esc(this._fmtFecha(p.fecha))}</div>
           <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
         </div>
         <div class="proceso-hero-pct">${prog.pct}%<small>${prog.idx + 1}/${prog.total}</small></div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      ${devueltoBanner}
+      <div class="detail-actions-wrap">
         <button class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         ${avanceBtn}
-        ${contrato ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.showContratoEmailForm('${p.id}')">${Icons.mail} Enviar contrato</button>` : ''}
-        ${currentIdx > 0?`<button class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}')">${Icons.arrowLeft} Retroceder</button>`:''}
-        ${p.desenlace === 'devuelto' ? '' : `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolucion</button>`}
-        <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar</button>
+        ${currentIdx > 0 ? `<button class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}',this)">${Icons.arrowLeft} Retroceder</button>` : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
-      ${this._contratoFicha(p, contrato)}
-      ${this._entregaFicha(p, contrato)}
-      ${this._pruebaFicha(p)}
-      <div class="detail-section"><div class="detail-section-title">${Icons.barChart} Pipeline de adopcion</div>
-        <div class="fase-stepper-head">
-          <div class="fase-stepper-title"><b>Fase ${currentIdx + 1} de ${fases.length}</b><span>${this._esc(p.fase)}</span></div>
-          <div class="fase-progress" role="progressbar" aria-valuenow="${Math.round((currentIdx / Math.max(1, fases.length - 1)) * 100)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${Math.round((currentIdx / Math.max(1, fases.length - 1)) * 100)}%"></span></div>
-        </div>
-        ${this._faseStepperHtml(fases, p.fase)}
-        <div class="detail-section-note">${this._esc(this._faseInfo(p.fase).desc)}</div>
-      </div>
+      ${this._faseStepperCardHtml(p, fases, currentIdx)}
+      ${verContrato ? this._contratoFicha(p, contrato) : ''}
+      ${verEntrega ? this._entregaFicha(p, contrato) : ''}
+      ${verPrueba ? this._pruebaFicha(p) : ''}
       ${this._seguimientosFicha(p)}
-      ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
-      <div class="detail-section"><div class="detail-section-title">Detalles</div>
-        <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${p.animal_id ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal)}</a>` : this._esc(p.animal)}</div></div>
-        <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
-        <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(p.email)||'—'}</div></div>
-        <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(p.telefono)||'—'}</div></div>
-        <div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer"><span class="estado-badge en_proceso">${p.fase}</span></div></div>
-        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado)}</div></div>
-        ${p.desenlace === 'devuelto' ? `<div class="detail-field"><div class="detail-question">Desenlace</div><div class="detail-answer"><span class="estado-badge descartada">Devuelto</span></div></div><div class="detail-field"><div class="detail-question">Motivo de la devolucion</div><div class="detail-answer">${this._esc(p.motivo_devolucion || '—')}</div></div><div class="detail-field"><div class="detail-question">Fecha devolucion</div><div class="detail-answer">${this._fmtFecha(p.fecha_devolucion) || '—'}</div></div>` : ''}
-        <div class="detail-field"><div class="detail-question">Fecha inicio</div><div class="detail-answer">${this._fmtFecha(p.fecha)}</div></div>
-        ${p.notas?`<div class="detail-field"><div class="detail-question">Notas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>`:''}
-      </div>`);
+      ${this._notasFichaHtml('adopcion', p.id, { title: 'Notas del caso' })}
+      <details class="detail-collapse">
+        <summary>${Icons.info} Datos del caso y solicitud de origen</summary>
+        <div class="detail-collapse-body">
+          <div class="detail-section detail-section--fields">
+            <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${p.animal_id ? `<a href="javascript:void(0)" onclick="Dashboard.openAnimalFicha('${this._esc(p.animal_id)}')">${this._esc(p.animal)}</a>` : this._esc(p.animal)}</div></div>
+            <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante)}</div></div>
+            <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(p.email) || '—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Teléfono</div><div class="detail-answer">${this._esc(p.telefono) || '—'}</div></div>
+            <div class="detail-field"><div class="detail-question">Fecha inicio</div><div class="detail-answer">${this._fmtFecha(p.fecha)}</div></div>
+            <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado) || '—'}</div></div>
+            ${p.notas ? `<div class="detail-field"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>` : ''}
+          </div>
+          ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
+          <div class="detail-actions-inline detail-actions-inline--danger">
+            ${devuelto ? '' : `<button class="btn btn-sm btn-outline-green" onclick="Dashboard.showDevolucionForm('${p.id}')">${Icons.arrowLeft} Registrar devolución</button>`}
+            <button class="btn btn-danger btn-sm" onclick="Dashboard.deleteAdopcion('${p.id}')">${Icons.trash} Eliminar caso</button>
+          </div>
+        </div>
+      </details>`, detailKey);
+  },
+
+  // Tarjeta compacta de progreso: fase actual, barra y pasos.
+  _faseStepperCardHtml(p, fases, currentIdx) {
+    const pct = Math.round((currentIdx / Math.max(1, fases.length - 1)) * 100);
+    return `<div class="detail-section fase-stepper-card">
+      <div class="fase-stepper-head">
+        <div class="fase-stepper-title"><b>Fase ${currentIdx + 1} de ${fases.length}</b><span>${this._esc(p.fase)}</span></div>
+        <div class="fase-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+      </div>
+      ${this._faseStepperHtml(fases, p.fase)}
+      <div class="detail-section-note">${this._esc(this._faseInfo(p.fase).desc)}</div>
+    </div>`;
   },
 
   _checklistMarks(raw) {
@@ -5215,11 +5549,11 @@ const Dashboard = {
     const map = {
       'Encuesta recibida': { desc: 'Solicitud recibida desde el formulario. Revisa los datos de contacto y el animal solicitado.', tono: 'info' },
       'Revision': { desc: 'Revisa el cuestionario, contacta con el adoptante y valora la idoneidad antes de la visita.', tono: 'info' },
-      'Visita domiciliaria': { desc: 'Comprueba el entorno donde vivira el animal. Anota fecha y observaciones en las notas del caso.', tono: 'info' },
-      'Contrato': { desc: 'Firma del contrato de adopcion. Es obligatorio firmarlo antes de pasar a Entrega.', tono: 'warning' },
-      'Entrega': { desc: 'Entrega fisica del animal. Registra la fecha, completa el checklist (los opcionales no bloquean) y adjunta una foto si quieres.', tono: 'warning' },
-      'Prueba': { desc: 'Periodo de adaptacion (15-30 dias). Comprueba alimentacion, descanso, convivencia y salud. Registra la prueba antes de pasar a Seguimiento.', tono: 'info' },
-      'Seguimiento': { desc: 'Seguimiento post-adopcion a largo plazo (1, 3, 6 y 12 meses). Registra llamadas, visitas o emails en cada hito.', tono: 'success' }
+      'Visita domiciliaria': { desc: 'Comprueba el entorno donde vivirá el animal. Anota fecha y observaciones en las notas del caso.', tono: 'info' },
+      'Contrato': { desc: 'Firma del contrato de adopción. Es obligatorio firmarlo antes de pasar a Entrega.', tono: 'warning' },
+      'Entrega': { desc: 'Entrega física del animal. Registra la fecha, completa el checklist (los opcionales no bloquean) y adjunta una foto si quieres.', tono: 'warning' },
+      'Prueba': { desc: 'Periodo de adaptación (15-30 días). Comprueba alimentación, descanso, convivencia y salud. Registra la prueba antes de pasar a Seguimiento.', tono: 'info' },
+      'Seguimiento': { desc: 'Seguimiento post-adopción a largo plazo (1, 3, 6 y 12 meses). Registra llamadas, visitas o emails en cada hito.', tono: 'success' }
     };
     return Object.assign({ fase, label: fase }, map[fase] || { desc: '', tono: 'info' });
   },
@@ -5234,7 +5568,7 @@ const Dashboard = {
       const faltan = this._entregaFaltantes(p);
       if (faltan.length) return 'Completa el checklist de entrega antes de pasar a Prueba (faltan: ' + faltan.map(x => x.label).join(', ') + ').';
     }
-    if (fase === 'Prueba' && !this._pruebaRegistrada(p && p.id, seguimientos)) return 'Registra la prueba de adaptacion (15-30 dias) antes de pasar a Seguimiento.';
+    if (fase === 'Prueba' && !this._pruebaRegistrada(p && p.id, seguimientos)) return 'Registra la prueba de adaptación (15-30 días) antes de pasar a Seguimiento.';
     return null;
   },
 
@@ -5314,7 +5648,7 @@ const Dashboard = {
     if (fase === 'Contrato') {
       return contrato
         ? { tono: 'success', title: 'Contrato firmado', text: 'Documento listo. Puedes enviarlo por email o avanzar a Entrega.', cta: 'email', ctaLabel: 'Enviar por email' }
-        : { tono: 'warning', title: 'Firma pendiente', text: 'El contrato es obligatorio para continuar. Firmalo en la seccion Contrato.', cta: 'contrato', ctaLabel: 'Firmar contrato' };
+        : { tono: 'warning', title: 'Firma pendiente', text: 'El contrato es obligatorio para continuar. Fírmalo en la sección Contrato.', cta: 'contrato', ctaLabel: 'Firmar contrato' };
     }
     if (fase === 'Entrega') {
       const faltan = this._entregaFaltantes(p);
@@ -5325,13 +5659,13 @@ const Dashboard = {
     }
     if (fase === 'Prueba') {
       return this._pruebaRegistrada(p && p.id)
-        ? { tono: 'success', title: 'Prueba registrada', text: 'La adaptacion esta documentada. Puedes avanzar a Seguimiento.', cta: 'prueba', ctaLabel: 'Registrar otra prueba' }
-        : { tono: 'warning', title: 'Prueba pendiente', text: 'Registra la prueba de adaptacion (15-30 dias) para poder pasar a Seguimiento.', cta: 'prueba', ctaLabel: 'Registrar prueba' };
+        ? { tono: 'success', title: 'Prueba registrada', text: 'La adaptación está documentada. Puedes avanzar a Seguimiento.', cta: 'prueba', ctaLabel: 'Registrar otra prueba' }
+        : { tono: 'warning', title: 'Prueba pendiente', text: 'Registra la prueba de adaptación (15-30 días) para poder pasar a Seguimiento.', cta: 'prueba', ctaLabel: 'Registrar prueba' };
     }
     if (fase === 'Seguimiento') {
       const hitos = this._seguimientoHitos(p);
       const pend = hitos.filter(h => !h.hecho);
-      return { tono: pend.length ? 'info' : 'success', title: 'Seguimiento post-adopcion', text: pend.length ? 'Proximo hito: ' + pend[0].etiqueta + (pend[0].fecha ? ' (' + this._fmtFecha(pend[0].fecha) + ')' : '') + '. Registra llamadas, visitas o emails.' : 'Hitos de 1, 3, 6 y 12 meses completados.', cta: 'seguimiento', ctaLabel: 'Nuevo seguimiento' };
+      return { tono: pend.length ? 'info' : 'success', title: 'Seguimiento post-adopción', text: pend.length ? 'Próximo hito: ' + pend[0].etiqueta + (pend[0].fecha ? ' (' + this._fmtFecha(pend[0].fecha) + ')' : '') + '. Registra llamadas, visitas o emails.' : 'Hitos de 1, 3, 6 y 12 meses completados.', cta: 'seguimiento', ctaLabel: 'Nuevo seguimiento' };
     }
     const info = this._faseInfo(fase);
     return { tono: info.tono, title: info.label, text: info.desc, cta: null, ctaLabel: '' };
@@ -5352,9 +5686,10 @@ const Dashboard = {
     return `<div class="fase-guia ${g.tono}"><div class="fase-guia-icon">${icon}</div><div class="fase-guia-body"><div class="fase-guia-title">${this._esc(g.title)}</div><div class="fase-guia-text">${this._esc(g.text)}</div></div>${cta}</div>`;
   },
 
-  async avanzarFase(id) {
+  async avanzarFase(id, btn) {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
+    const fin = this._btnBusy(btn, 'Avanzando...');
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -5375,13 +5710,15 @@ const Dashboard = {
       this.viewAdopcion(id);
       this.showSnackbar('Fase actualizada: ' + newFase, 'success');
     } finally {
+      fin();
       this._busyEnd(busyKey);
     }
   },
 
-  async retrocederFase(id) {
+  async retrocederFase(id, btn) {
     const busyKey = 'fase:' + id;
     if (!this._busyStart(busyKey)) return;
+    const fin = this._btnBusy(btn, 'Retrocediendo...');
     try {
       const p = this._byId(this.adopciones, id);
       if (!p) return;
@@ -5410,6 +5747,7 @@ const Dashboard = {
       this.viewAdopcion(id);
       this.showSnackbar('Fase actualizada: ' + prev, 'success');
     } finally {
+      fin();
       this._busyEnd(busyKey);
     }
   },
@@ -5419,11 +5757,11 @@ const Dashboard = {
   showDevolucionForm(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
-    this.showFormModal('Registrar devolucion · ' + p.animal, `
+    this.showFormModal('Registrar devolución · ' + p.animal, `
       <form onsubmit="Dashboard.guardarDevolucion(event,'${id}')">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: queda con desenlace <b>Devuelto</b>. El animal vuelve a <b>Disponible</b> y la solicitud a <b>En proceso</b>, para que pueda volver a adoptarse.</span></div>
         <div class="form-group"><label>Motivo de la devolucion *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej: El adoptante se ha mudado y no puede continuar con la adaptacion"></textarea></div>
-        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Registrar devolucion</button></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard.closeFormModal()">Cancelar</button><button type="submit" class="btn btn-primary">Registrar devolución</button></div>
       </form>`);
   },
 
@@ -6330,10 +6668,17 @@ const Dashboard = {
     return (t.charAt(0) || '?').toUpperCase();
   },
 
-  async viewSocio(id) {
-    await this._ensureListas(['apadrinamientos', 'animales']);
+  async viewSocio(id, opts) {
     const s = this._byId(this.socios, id);
     if(!s) { this.showSnackbar('Socio no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
+    const detailKey = 'socio:' + id;
+    const faltan = ['apadrinamientos', 'animales'].filter(k => !this._loaded[k]);
+    if (faltan.length && !(opts && opts.ready)) {
+      // La ficha se pinta con lo que hay; los apadrinamientos llegan detras.
+      this._ensureListas(faltan).then(() => {
+        if (this._detailVigente('socios', detailKey)) this.viewSocio(id, { ready: true });
+      }).catch(() => {});
+    }
     const esVol = s.tipo === 'Voluntario' || s.tipo === 'Ambos';
     const esSocio = s.tipo === 'Socio' || s.tipo === 'Ambos';
     // Hero compacto: la foto acompana solo al nombre y badges; los campos
@@ -6365,7 +6710,7 @@ const Dashboard = {
       <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion del Socio</div>
             <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(s.nombre)}</div></div>
             <div class="detail-field"><div class="detail-question">Email</div><div class="detail-answer">${this._esc(s.email)}</div></div>
-            <div class="detail-field"><div class="detail-question">Telefono</div><div class="detail-answer">${this._esc(s.telefono||'—')}</div></div>
+            <div class="detail-field"><div class="detail-question">Teléfono</div><div class="detail-answer">${this._esc(s.telefono||'—')}</div></div>
             <div class="detail-field"><div class="detail-question">Tipo</div><div class="detail-answer"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></div></div>
             ${esSocio?`<div class="detail-field"><div class="detail-question">Cuota</div><div class="detail-answer">${this._esc(s.cuota||'—')} €/año</div></div><div class="detail-field"><div class="detail-question">Ultimo pago</div><div class="detail-answer">${s.ultimo_pago?this._fmtFecha(s.ultimo_pago):'—'}</div></div><div class="detail-field"><div class="detail-question">Estado cuota</div><div class="detail-answer"><span class="estado-badge ${this._cuotaEstado(s).cls}">${this._cuotaEstado(s).label}</span></div></div>`:''}
             <div class="detail-field"><div class="detail-question">Area</div><div class="detail-answer">${this._esc(s.area)||'—'}</div></div>
@@ -6378,7 +6723,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Ultima actividad</div><div class="detail-answer">${s.ultima_actividad ? this._fmtFecha(s.ultima_actividad) : 'Sin registro'}</div></div>
         ${esVol ? `<div class="detail-field"><div class="detail-question">Registrar horas</div><div class="detail-answer"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="number" min="0" step="0.5" inputmode="decimal" id="hs-horas" class="form-input" style="max-width:120px;margin:0" placeholder="Ej: 2.5" aria-label="Horas a sumar"><button class="btn btn-primary btn-sm" onclick="Dashboard.registrarHoras('${s.id}')">Sumar horas</button><button class="btn btn-outline-green btn-sm" onclick="Dashboard.reiniciarHorasMes('${s.id}')">Reiniciar mes</button></div></div></div>` : ''}
       </div>
-      ${this._apadrinaFicha(s.id)}`);
+      ${this._apadrinaFicha(s.id)}`, detailKey);
   },
 
   showCarnet(id) {

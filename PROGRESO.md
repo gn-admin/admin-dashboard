@@ -17,7 +17,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 ## Comandos
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
-- `npm test` — `node --test tests/*.test.js` (**344 tests en verde**, lógica pura sin
+- `npm test` — `node --test tests/*.test.js` (**357 tests en verde**, lógica pura sin
   DOM; 6 ficheros: `dashboard` / `cobertura` / `api` / `diseno` / `pdf-export` / `auth`).
   En PowerShell sin TTY el reporter es TAP: buscar `^# pass` / `^# fail`, no `✖`.
   **También corren en CI**: el workflow ejecuta `npm test` tras `gen-config`.
@@ -30,7 +30,7 @@ gastos, recordatorios, seguimiento post-adopción, redes (simulado) y reportes.
 - `apps-script/` (gitignored, solo local para desplegar): `Code.gs`, `Config.gs`
   (generado), `Auth.gs` (JWT Firebase vía `accounts:lookup`), `DataFilter.gs`
   (reservado, sin uso), `PdfService.gs` (reservado, sin uso; el front exporta en cliente).
-- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v138`.
+- `tests/` (node:test, sin dependencias). SW actual: `gn-encuestas-v141`.
 
 ## Mapa funcional final
 - **Encuestas** (3, y solo 3): listados con filtros/buscador, ficha con estados (`pendiente`,
@@ -434,3 +434,14 @@ Mejoras candidatas, por orden de encaje:
 - Anade Registro de actividad, horas de voluntariado y analitica de Reportes, y accesos directos a Reportes y Actividad.
 - El ejemplo de contrato embebido en la guia se retira: incrustar el documento completo bloqueaba el hilo principal en movil. En su lugar, la guia indica donde ver el contrato real (<b>Adopciones > caso > Contrato</b>).
 - Tests: **344** en verde. SW `v138`.
+
+## v139–v141 — UX de fichas, notas con autor y acciones con feedback (2026-11-11)
+- **Notas con autor**: la hoja `notas` sigue guardando un texto por `survey_id::response_id`, pero ahora es un JSON `[{id, texto, autor, fecha}]`; `_notasParse` lee también las notas antiguas en plano (entrada `legacy` sin autor) y `_notasTexto` las une para el PDF. `agregarNota`/`borrarNota` + `_notasFichaHtml` (línea temporal con avatar, autor y fecha) se usan en la ficha de solicitud, el modal de cuestionario (solo lectura), y los casos de adopción, acogida y animal con `survey_id` sintético `adopcion`/`acogida`/`animal`.
+- **Ficha de adopción por fases**: contrato desde *Visita domiciliaria*, entrega desde *Entrega* y prueba desde *Prueba*; el resto se pliega en *Datos del caso y solicitud de origen*. Cabecera con foto, fase, progreso y siguiente paso.
+- **Ficha de acogida** (`viewAcogida`, botón *Ver caso* en la tarjeta) con el mismo lenguaje: hero, progreso, acciones de fase, contrato y notas.
+- **Ficha de animal** reorganizada: hero compacto, banner del caso activo (adopción/acogida), notas y `<details>` para actividad, padrinos, gastos y documentos.
+- **Render-first**: `viewDetail`/`viewAdopcion`/`viewAcogida`/`viewAnimal`/`viewSocio` pintan al instante y solo repintan si la ficha sigue abierta (`_detailVigente` + `dataset.detailKey`).
+- **Feedback de acciones**: `setEstado` deja de tapar la pantalla con el overlay; marca la tarjeta (`.is-pending`) y los botones usan `_btnBusy` (spinner inline). Estados y fases se cambian con `cambiarEstado(this, …)` y `avanzarFase`/`retrocederFase`/`avanzarFaseAcogida` reciben el botón y lo liberan en `finally`.
+- Cabecera compacta de la solicitud (avatar, email, teléfono, fecha, estado y encuesta) y `viewSocio` con carga en segundo plano.
+- Tests: **357** en verde. SW `v141`.
+

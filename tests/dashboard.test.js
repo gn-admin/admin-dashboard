@@ -1129,8 +1129,8 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
     assert.equal(Dashboard._faseIdx('No existe'), -1);
   });
 
-  it('_faseInfo distingue Prueba (adaptacion) de Seguimiento (largo plazo)', () => {
-    assert.match(Dashboard._faseInfo('Prueba').desc, /adaptacion/i);
+  it('_faseInfo distingue Prueba (adaptación) de Seguimiento (largo plazo)', () => {
+    assert.match(Dashboard._faseInfo('Prueba').desc, /adaptaci[oó]n/i);
     assert.match(Dashboard._faseInfo('Seguimiento').desc, /largo plazo/i);
     assert.equal(Dashboard._faseInfo('Contrato').tono, 'warning');
     assert.equal(Dashboard._faseInfo('Seguimiento').tono, 'success');
@@ -1472,5 +1472,141 @@ describe('stepper de fases de adopcion', () => {
     const html = Dashboard._faseStepperHtml(['<b>A</b>', 'B'], '<b>A</b>');
     assert.match(html, /&lt;b&gt;A&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>A<\/b>/);
+  });
+});
+
+describe('notas con autor (linea temporal)', () => {
+  let snacks;
+  beforeEach(() => {
+    Dashboard.notes = {};
+    Dashboard.userProfile = { name: 'Ana Voluntaria' };
+    snacks = [];
+    Dashboard.showSnackbar = (m, t) => snacks.push({ m, t });
+    Dashboard._snackErr = (err, m) => snacks.push({ m, t: 'snackErr' });
+    Dashboard._canPersistUserData = () => false; // sin localStorage en Node
+  });
+  afterEach(() => {
+    delete Dashboard.showSnackbar;
+    delete Dashboard._snackErr;
+    delete Dashboard._canPersistUserData;
+    delete global.API;
+    Dashboard.notes = {};
+    Dashboard.userProfile = null;
+  });
+
+  it('_notasParse: vacio devuelve lista vacia', () => {
+    assert.deepEqual(Dashboard._notasParse(''), []);
+    assert.deepEqual(Dashboard._notasParse(null), []);
+    assert.deepEqual(Dashboard._notasParse(undefined), []);
+  });
+
+  it('_notasParse: texto plano antiguo -> una nota sin autor', () => {
+    const r = Dashboard._notasParse('Llamada pendiente el lunes');
+    assert.equal(r.length, 1);
+    assert.equal(r[0].id, 'legacy');
+    assert.equal(r[0].texto, 'Llamada pendiente el lunes');
+    assert.equal(r[0].autor, '');
+    assert.equal(r[0].fecha, '');
+  });
+
+  it('_notasParse: JSON de la linea temporal', () => {
+    const raw = JSON.stringify([
+      { id: 'n1', texto: 'Visita hecha', autor: 'Ana', fecha: '2026-02-01T10:00:00.000Z' },
+      { id: 'n2', texto: '  Segunda  ', autor: 'Luis', fecha: '2026-02-02T10:00:00.000Z' }
+    ]);
+    const r = Dashboard._notasParse(raw);
+    assert.equal(r.length, 2);
+    assert.equal(r[0].autor, 'Ana');
+    assert.equal(r[1].texto, 'Segunda');
+  });
+
+  it('_notasParse: JSON roto que empieza por corchete se lee como texto', () => {
+    const r = Dashboard._notasParse('[esto no es json');
+    assert.equal(r.length, 1);
+    assert.equal(r[0].id, 'legacy');
+    assert.equal(r[0].texto, '[esto no es json');
+  });
+
+  it('_notasParse: descarta entradas sin texto', () => {
+    const raw = JSON.stringify([{ id: 'a', texto: '   ' }, { id: 'b', texto: 'vale' }, null]);
+    const r = Dashboard._notasParse(raw);
+    assert.equal(r.length, 1);
+    assert.equal(r[0].texto, 'vale');
+  });
+
+  it('_notasTexto une las notas con linea en blanco (para el PDF)', () => {
+    Dashboard.notes['adopcion::a1'] = JSON.stringify([
+      { id: 'n1', texto: 'Primera', autor: 'Ana', fecha: '' },
+      { id: 'n2', texto: 'Segunda', autor: 'Luis', fecha: '' }
+    ]);
+    assert.equal(Dashboard._notasTexto('adopcion::a1'), 'Primera\n\nSegunda');
+    assert.equal(Dashboard._notasTexto('adopcion::nada'), '');
+  });
+
+  it('agregarNota guarda autor y fecha y llama a la API con survey_id sintetico', async () => {
+    let llamada = null;
+    global.API = { setNota: async (id, sid, nota) => { llamada = { id, sid, nota }; return { status: 'success' }; } };
+    const ok = await Dashboard.agregarNota('adopcion', 'a1', '  Llamada hecha  ');
+    assert.equal(ok, true);
+    assert.equal(llamada.id, 'a1');
+    assert.equal(llamada.sid, 'adopcion');
+    const lista = JSON.parse(llamada.nota);
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].texto, 'Llamada hecha');
+    assert.equal(lista[0].autor, 'Ana Voluntaria');
+    assert.match(lista[0].fecha, /^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('agregarNota ignora el texto vacio y no llama a la API', async () => {
+    let llamadas = 0;
+    global.API = { setNota: async () => { llamadas++; return {}; } };
+    assert.equal(await Dashboard.agregarNota('animal', 'an1', '   '), false);
+    assert.equal(llamadas, 0);
+  });
+
+  it('agregarNota devuelve false si el backend falla', async () => {
+    global.API = { setNota: async () => { throw Object.assign(new Error('boom'), { status: 'error' }); } };
+    assert.equal(await Dashboard.agregarNota('acogida', 'c1', 'nota'), false);
+    assert.equal(snacks.length, 1);
+    assert.equal(snacks[0].t, 'snackErr');
+  });
+
+  it('borrarNota quita solo la nota indicada', async () => {
+    Dashboard.notes['adopcion::a1'] = JSON.stringify([
+      { id: 'n1', texto: 'Uno', autor: 'Ana', fecha: '' },
+      { id: 'n2', texto: 'Dos', autor: 'Luis', fecha: '' }
+    ]);
+    let guardado = null;
+    global.API = { setNota: async (id, sid, nota) => { guardado = JSON.parse(nota); return {}; } };
+    assert.equal(await Dashboard.borrarNota('adopcion', 'a1', 'n1'), true);
+    assert.equal(guardado.length, 1);
+    assert.equal(guardado[0].id, 'n2');
+  });
+
+  it('_notasFichaHtml pinta autor, fecha y escapea el texto', () => {
+    Dashboard.notes['animal::an1'] = JSON.stringify([
+      { id: 'n1', texto: '<img src=x onerror=alert(1)>', autor: 'Ana', fecha: '2026-03-04T09:30:00.000Z' }
+    ]);
+    const html = Dashboard._notasFichaHtml('animal', 'an1');
+    assert.match(html, /Ana/);
+    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    assert.doesNotMatch(html, /<img src=x/);
+    assert.match(html, /nota-input-/);
+  });
+
+  it('_notasFichaHtml en solo lectura no muestra caja ni borrar', () => {
+    Dashboard.notes['adopcion::a1'] = JSON.stringify([
+      { id: 'n1', texto: 'Hola', autor: 'Ana', fecha: '' }
+    ]);
+    const html = Dashboard._notasFichaHtml('adopcion', 'a1', { readonly: true });
+    assert.doesNotMatch(html, /nota-input-/);
+    assert.doesNotMatch(html, /notaEliminarUI/);
+  });
+
+  it('_notasFichaHtml no ofrece borrar en la nota antigua', () => {
+    Dashboard.notes['adopcion::a1'] = 'Nota antigua en texto plano';
+    const html = Dashboard._notasFichaHtml('adopcion', 'a1');
+    assert.match(html, /Nota anterior/);
+    assert.doesNotMatch(html, /notaEliminarUI/);
   });
 });
