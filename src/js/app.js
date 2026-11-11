@@ -49,6 +49,8 @@ const App = {
             }
           });
         });
+        // Verificar actualizaciones cada 60 segundos
+        setInterval(() => { reg.update().catch(() => {}); }, 60000);
       }).catch(() => {});
     }
   },
