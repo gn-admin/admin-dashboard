@@ -7804,27 +7804,26 @@ body.modal-open { overflow: hidden; }
 
 /* Skip link para lectores de pantalla (oculto hasta recibir foco) */
 .skip-link {
-  position: fixed;
-  top: 0;
-  left: 0;
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
   background: var(--primary);
   color: #fff;
   padding: 8px 16px;
   z-index: var(--z-toast, 1002);
-  transition: transform 0.2s ease, opacity 0.2s ease;
-  white-space: nowrap;
-  height: 0;
-  overflow: hidden;
 }
 .skip-link:focus {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: auto;
   height: auto;
   overflow: visible;
+  white-space: normal;
 }
 
 /* Alto contraste para usuarios con baja visión */
