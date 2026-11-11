@@ -101,6 +101,11 @@ const App = {
   },
 
   navigateTo(page) {
+    if (typeof Dashboard !== 'undefined' && typeof Dashboard.puedeAccederPagina === 'function' && !Dashboard.puedeAccederPagina(page)) {
+      const fallback = (typeof Dashboard.primeraPaginaPermitida === 'function') ? Dashboard.primeraPaginaPermitida() : 'dashboard';
+      if (page !== fallback) { location.hash = fallback; return; }
+      page = fallback;
+    }
     if (this.currentPage === page) return;
     const aplicar = () => {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));

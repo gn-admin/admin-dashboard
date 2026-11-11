@@ -19,6 +19,13 @@ const Dashboard = {
     API.getUserProfile().then(user => {
       this.userProfile = user;
       this.updateUserUI();
+      const actual = (location.hash || '').replace('#', '') || 'dashboard';
+      if (!this.puedeAccederPagina(actual)) {
+        location.hash = this.primeraPaginaPermitida();
+      } else if (typeof App !== 'undefined' && App.currentPage === actual) {
+        // Reaplicar por si el render se hizo antes de resolver el rol
+        this.loadPage(actual);
+      }
       const home = document.getElementById('page-dashboard');
       if (home && home.classList.contains('active') && this._hasHomeCache()) this._paintHome(home);
     }).catch(err => {
@@ -122,6 +129,11 @@ const Dashboard = {
   async loadPage(page) {
     const el = document.getElementById('page-' + page);
     if (!el) return;
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina(page)) {
+      this._sinPermisoPage(el);
+      this.injectIcons();
+      return;
+    }
     const token = ++this._pageToken;
     const pages = {
       dashboard: () => this.renderDashboardHome(el),
@@ -238,9 +250,97 @@ const Dashboard = {
 
   _roleLabel(role) {
     const raw = String(role || '').trim();
-    const key = raw.toLowerCase();
+    const key = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
     if (!key) return 'Administrador';
-    return { admin: 'Administrador', usuario: 'Usuario' }[key] || raw;
+    return {
+      admin: 'Administrador',
+      coordinador: 'Coordinador/a',
+      voluntario: 'Voluntario/a',
+      tesoreria: 'Tesorería',
+      consulta: 'Consulta',
+      usuario: 'Usuario'
+    }[key] || raw;
+  },
+
+  _rolActual() {
+    const r = String((this._currentUser() && this._currentUser().role) || 'admin').toLowerCase().trim();
+    return r || 'admin';
+  },
+
+  _paginasPorRol: {
+    admin: '*',
+    coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad'],
+    voluntario: ['dashboard','animales','reportes','actividad'],
+    tesoreria: ['dashboard','animales','donaciones','almacen','reportes','actividad'],
+    consulta: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad']
+  },
+
+  puedeAccederPagina(page) {
+    const p = String(page || 'dashboard');
+    if (p === 'redes') return false;
+    const rol = this._rolActual();
+    const allow = this._paginasPorRol[rol] || this._paginasPorRol.consulta || ['dashboard'];
+    if (allow === '*') return true;
+    return allow.indexOf(p) !== -1;
+  },
+
+  primeraPaginaPermitida() {
+    const orden = ['dashboard','encuestas','animales','adopciones','acogidas-activas','acogidas','reportes','actividad','donaciones','almacen','socios','blacklist'];
+    for (let i = 0; i < orden.length; i++) if (this.puedeAccederPagina(orden[i])) return orden[i];
+    return 'dashboard';
+  },
+
+  puedeEditar(modulo) {
+    const rol = this._rolActual();
+    if (rol === 'admin') return true;
+    if (rol === 'consulta') return false;
+    if (rol === 'coordinador') return ['encuestas','animales','acogidas','adopciones','socios','blacklist','reportes','actividad'].indexOf(modulo) !== -1;
+    if (rol === 'voluntario') return ['animales','reportes','actividad'].indexOf(modulo) !== -1;
+    if (rol === 'tesoreria') return ['donaciones','almacen','animales','reportes','actividad'].indexOf(modulo) !== -1;
+    return false;
+  },
+
+  aplicarPermisosUI() {
+    const puede = (p) => this.puedeAccederPagina(p);
+    document.querySelectorAll('.sidebar-link[data-page], .mas-menu-item[data-page], .bottom-nav-item[data-page]').forEach(el => {
+      const page = el.dataset.page;
+      if (!page) return;
+      const ok = puede(page) && page !== 'redes';
+      el.style.display = ok ? '' : 'none';
+      if (!ok) { el.setAttribute('aria-hidden', 'true'); el.setAttribute('tabindex', '-1'); }
+      else { el.removeAttribute('aria-hidden'); if (el.classList.contains('mas-menu-item') || el.classList.contains('sidebar-link')) el.removeAttribute('tabindex'); }
+    });
+    document.querySelectorAll('.sidebar-section[data-section]').forEach(sec => {
+      const links = [...sec.querySelectorAll('.sidebar-link[data-page]')].filter(l => l.style.display !== 'none');
+      sec.style.display = links.length ? '' : 'none';
+    });
+    document.querySelectorAll('.mas-menu-sep').forEach(sep => {
+      let next = sep.nextElementSibling;
+      let visible = false;
+      while (next && !next.classList.contains('mas-menu-sep')) {
+        if (next.classList.contains('mas-menu-item') && next.style.display !== 'none') { visible = true; break; }
+        next = next.nextElementSibling;
+      }
+      sep.style.display = visible ? '' : 'none';
+    });
+    const bottomEncuestas = document.querySelector('.bottom-nav-item[data-page="encuestas"]');
+    if (bottomEncuestas && !puede('encuestas') && !puede('encuestas-perros') && !puede('encuestas-gatos') && !puede('encuestas-acogida')) {
+      bottomEncuestas.style.display = 'none';
+    }
+    const masToggle = document.getElementById('mas-menu-toggle');
+    if (masToggle) {
+      const anyMas = [...document.querySelectorAll('.mas-menu-item[data-page]')].some(i => i.style.display !== 'none');
+      masToggle.style.display = anyMas ? '' : 'none';
+    }
+  },
+
+  _sinPermisoPage(el) {
+    if (!el) return;
+    el.innerHTML = `<div class="empty-state empty-state-illustrated">
+      <div class="empty-state-icon">${Icons.lock || Icons.alertTriangle || ''}</div>
+      <h3>Sin permisos</h3>
+      <p>Tu rol no tiene acceso a esta sección.</p>
+    </div>`;
   },
 
   // Identidad visible: perfil del backend o, mientras llega, la cuenta de
@@ -314,11 +414,12 @@ const Dashboard = {
     const r = document.getElementById('sidebar-user-role');
     const a = document.getElementById('sidebar-avatar');
     const tn = document.getElementById('topbar-user-name');
-    const u = this._identity(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    const u = this._currentUser();
     if (n) n.textContent = u.name;
     if (r) r.textContent = u.roleLabel;
     if (a) a.textContent = u.avatar;
     if (tn) tn.textContent = u.name;
+    if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI();
   },
 
   loadLocal() {
