@@ -7559,18 +7559,22 @@ body.modal-open { overflow: hidden; }
 /* MEJORAS UI/UX — Accesibilidad                                */
 /* ============================================================ */
 
-/* Skip link para lectores de pantalla */
+/* Skip link para lectores de pantalla (oculto hasta recibir foco) */
 .skip-link {
   position: absolute;
-  top: -40px;
+  top: 0;
   left: 0;
+  transform: translateY(-100%);
   background: var(--primary);
   color: #fff;
   padding: 8px 16px;
   z-index: var(--z-toast, 1002);
-  transition: top 0.2s;
+  transition: transform 0.2s ease;
+  white-space: nowrap;
 }
-.skip-link:focus { top: 0; }
+.skip-link:focus {
+  transform: translateY(0);
+}
 
 /* Alto contraste para usuarios con baja visión */
 @media (prefers-contrast: high) {
