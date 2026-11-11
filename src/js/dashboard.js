@@ -5067,8 +5067,8 @@ const Dashboard = {
       <div class="response-card-header">
         <div class="response-avatar proceso-avatar">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
         <div class="response-info">
-          <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${faseCls}">${this._esc(p.fase)}</span>${ct ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}${p.desenlace === 'devuelto' ? ' <span class="estado-badge descartada">Devuelto</span>' : ''}</div>
-          <div class="response-email">${this._esc(p.adoptante)} &middot; ${this._esc(p.estado)}</div>
+          <div class="response-name">${this._esc(p.animal)} <span class="estado-badge ${faseCls}">${this._esc(p.fase)}</span>${ct ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}${p.desenlace === 'devuelto' ? ' <span class="estado-badge descartada">Devuelto</span>' : ''}${p.desenlace === 'anulado' ? ' <span class="estado-badge descartada">Anulado</span>' : ''}</div>
+          <div class="response-email">${this._esc(p.adoptante)}</div>
           <div class="proceso-progress" aria-hidden="true"><span style="width:${prog.pct}%"></span></div>
         </div>
         <div class="response-date">${this._esc(this._fmtFecha(p.fecha))}<small>${prog.idx + 1}/${prog.total}</small></div>
@@ -5251,6 +5251,7 @@ const Dashboard = {
         <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showAdopcionFormById('${p.id}')">${Icons.pencil} Editar</button>
         ${avanceBtn}
         ${currentIdx > 0 ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.retrocederFase('${p.id}',this)">${Icons.arrowLeft} Retroceder</button>` : ''}
+        ${p.desenlace !== 'anulado' ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" onclick="Dashboard.anularCaso('${p.id}')">${Icons.ban} Anular caso</button>` : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
       ${this._faseStepperCardHtml(p, fases, currentIdx)}
@@ -6286,6 +6287,48 @@ const Dashboard = {
     this.saveLocal();
     if (s) this.viewAdopcion(s.adopcion_id);
     this.showSnackbar('Seguimiento eliminado', 'success');
+  },
+
+  async anularCaso(id) {
+    const p = this._byId(this.adopciones, id);
+    if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
+    if (p.desenlace === 'anulado') { this.showSnackbar('Este caso ya esta anulado', 'warning'); return; }
+    const motivo = prompt('Motivo de anulacion (obligatorio):');
+    if (!motivo || !motivo.trim()) { this.showSnackbar('Debes indicar un motivo', 'warning'); return; }
+    const ok = await this._confirm(
+      'Anular este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso. El caso se conservara en el historial con el motivo indicado.',
+      'Anular caso',
+      'Si, anular'
+    );
+    if (!ok) return;
+    this._busyStart('anular:' + id);
+    const fin = this._btnBusy(document.querySelector('[data-anular="' + id + '"]'), 'Anulando...');
+    this.showLoading();
+    try {
+      const data = {
+        desenlace: 'anulado',
+        motivo_devolucion: motivo.trim(),
+        fecha_devolucion: new Date().toISOString().slice(0, 10),
+        estado: 'Anulado'
+      };
+      try { await API.updateAdopcion(id, data); }
+      catch (err) { this._snackErr(err, 'No se pudo anular: ' + this._errMsg(err)); return; }
+      Object.assign(p, data);
+      // Rollback: liberar animal, solicitud, candidatura
+      await this._liberarAnimal(p.animal_id, id);
+      await this._rollbackSolicitud(p.solicitud_id);
+      this.saveLocal();
+      const abierta = this._detailVigente('adopciones', 'adopcion:' + id);
+      const lista = document.getElementById('page-adopciones');
+      if (lista) await this.renderAdopciones(lista);
+      if (abierta) this.viewAdopcion(id, { ready: true });
+      this.showSnackbar('Caso anulado. Animal disponible de nuevo.', 'success');
+      this._regLog('adopcion', 'Caso anulado: ' + motivo.trim() + ' (' + (p.animal || '') + ')', 'adopcion', id);
+    } finally {
+      fin();
+      this.hideLoading();
+      this._busyEnd('anular:' + id);
+    }
   },
 
   async deleteAdopcion(id) {
