@@ -953,6 +953,177 @@ const Dashboard = {
     if (body) body.style.display = open ? '' : 'none';
   },
 
+  // ==================== GALERIA DE FOTOS/VIDEOS (animal) ====================
+  // Usa la hoja "Documentos" con tipo 'galeria-foto' / 'galeria-video'.
+  // Limite de 19 archivos por animal. Fotos funcionan sin cambio en .gs;
+  // videos requieren que Code.gs acepte video/* (ya aplicado).
+
+  _galeriaFotos(animalId) {
+    return (this.documentos || []).filter(d =>
+      String(d.animal_id) === String(animalId) &&
+      (d.tipo === 'galeria-foto' || d.tipo === 'galeria-video')
+    ).sort((a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0));
+  },
+
+  _galeriaIndex(animalId) {
+    if (!this._galeriaState) this._galeriaState = {};
+    if (this._galeriaState[animalId] === undefined) this._galeriaState[animalId] = 0;
+    return this._galeriaState[animalId];
+  },
+
+  _galeriaSetIndex(animalId, idx) {
+    if (!this._galeriaState) this._galeriaState = {};
+    this._galeriaState[animalId] = idx;
+  },
+
+  _galeriaHtml(animalId) {
+    const fotos = this._galeriaFotos(animalId);
+    const idx = this._galeriaIndex(animalId);
+    const total = fotos.length;
+
+    if (!total) {
+      return `<div class="galeria-vacio">
+        <div class="empty-state-icon">${Icons.fileText}</div>
+        <h4>Sin fotos ni videos</h4>
+        <p>Añade hasta 19 fotos o videos a la galería de este animal.</p>
+        <div class="galeria-actions" style="margin-top:12px">
+          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
+        </div>
+      </div>`;
+    }
+
+    const dots = fotos.map((_, i) =>
+      `<button type="button" class="galeria-dot ${i === idx ? 'galeria-dot--active' : ''}" onclick="Dashboard._galeriaIr('${this._esc(animalId)}', ${i})" aria-label="Ir a ${i + 1}"></button>`
+    ).join('');
+
+    const slides = fotos.map(f => {
+      const isVideo = f.tipo === 'galeria-video';
+      const media = isVideo
+        ? `<video controls preload="metadata" poster="${this._esc(f.poster || '')}" style="max-width:100%;max-height:100%"><source src="${this._esc(f.url)}" type="video/mp4">Tu navegador no soporta video.</video>`
+        : `<img src="${this._esc(f.url)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain" loading="lazy">`;
+      return `<div class="galeria-slide">${media}</div>`;
+    }).join('');
+
+    return `
+      <div class="galeria-carrusel" data-animal="${this._esc(animalId)}">
+        <div class="galeria-counter">${idx + 1} de ${total}</div>
+        <div class="galeria-track" style="transform: translateX(-${idx * 100}%)">
+          ${slides}
+        </div>
+        ${total > 1 ? `
+          <button type="button" class="galeria-btn galeria-btn--prev" onclick="Dashboard._galeriaPrev('${this._esc(animalId)}')" aria-label="Anterior">◀</button>
+          <button type="button" class="galeria-btn galeria-btn--next" onclick="Dashboard._galeriaNext('${this._esc(animalId)}')" aria-label="Siguiente">▶</button>
+        ` : ''}
+        <div class="galeria-dots">${dots}</div>
+      </div>
+      <div class="galeria-actions">
+        ${total < 19 ? `
+          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
+          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
+        ` : '<span class="galeria-limite">Límite de 19 archivos alcanzado</span>'}
+        ${total > 0 ? `<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard._galeriaBorrar('${this._esc(animalId)}')">Borrar actual</button>` : ''}
+      </div>
+    `;
+  },
+
+  _galeriaPrev(animalId) {
+    const fotos = this._galeriaFotos(animalId);
+    if (!fotos.length) return;
+    let idx = this._galeriaIndex(animalId);
+    idx = (idx - 1 + fotos.length) % fotos.length;
+    this._galeriaSetIndex(animalId, idx);
+    this._galeriaRepintar(animalId);
+  },
+
+  _galeriaNext(animalId) {
+    const fotos = this._galeriaFotos(animalId);
+    if (!fotos.length) return;
+    let idx = this._galeriaIndex(animalId);
+    idx = (idx + 1) % fotos.length;
+    this._galeriaSetIndex(animalId, idx);
+    this._galeriaRepintar(animalId);
+  },
+
+  _galeriaIr(animalId, idx) {
+    this._galeriaSetIndex(animalId, idx);
+    this._galeriaRepintar(animalId);
+  },
+
+  _galeriaRepintar(animalId) {
+    const cont = document.querySelector(`[data-animal="${animalId}"]`)?.closest('.detail-section-body, .collapsible-body');
+    if (cont) cont.innerHTML = this._galeriaHtml(animalId);
+  },
+
+  async _galeriaSubir(animalId, tipo) {
+    const fotos = this._galeriaFotos(animalId);
+    if (fotos.length >= 19) {
+      this.showSnackbar('Límite de 19 archivos alcanzado', 'warning');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = tipo === 'video' ? 'video/mp4,video/webm' : 'image/*';
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        this.showSnackbar('El archivo supera los 5MB', 'warning');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target.result;
+        const nombre = file.name || (tipo === 'video' ? 'video' : 'foto') + '_' + Date.now();
+        const mimeType = file.type || (tipo === 'video' ? 'video/mp4' : 'image/jpeg');
+        try {
+          const r = await API.uploadDocumento(base64, nombre, mimeType, 'galeria-' + tipo);
+          if (r && r.data) {
+            if (!this.documentos) this.documentos = [];
+            this.documentos.push({
+              id: r.data.fileId || 'doc_' + Date.now(),
+              animal_id: animalId,
+              tipo: 'galeria-' + tipo,
+              nombre: nombre,
+              url: r.data.webContentLink || r.data.webViewLink,
+              file_id: r.data.fileId,
+              fecha: new Date().toISOString()
+            });
+            this.saveLocal();
+            this._galeriaSetIndex(animalId, this._galeriaFotos(animalId).length - 1);
+            this._galeriaRepintar(animalId);
+            this.showSnackbar('Archivo añadido a la galería', 'success');
+          }
+        } catch (err) {
+          this._snackErr(err, 'Error al subir archivo');
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  },
+
+  async _galeriaBorrar(animalId) {
+    const fotos = this._galeriaFotos(animalId);
+    const idx = this._galeriaIndex(animalId);
+    const current = fotos[idx];
+    if (!current) return;
+    const ok = await this._confirm('¿Borrar este archivo de la galería?', 'Borrar archivo', 'Borrar');
+    if (!ok) return;
+    try {
+      await API.deleteDocumento(current.id);
+      this.documentos = (this.documentos || []).filter(d => d.id !== current.id);
+      this.saveLocal();
+      const newTotal = this._galeriaFotos(animalId).length;
+      if (newTotal > 0 && idx >= newTotal) this._galeriaSetIndex(animalId, newTotal - 1);
+      if (newTotal === 0) this._galeriaSetIndex(animalId, 0);
+      this._galeriaRepintar(animalId);
+      this.showSnackbar('Archivo borrado', 'success');
+    } catch (err) {
+      this._snackErr(err, 'Error al borrar archivo');
+    }
+  },
+
   // ==================== INLINE DETAIL SYSTEM ====================
   // Ejecuta fn directamente. Se probo envolverlo en document.startViewTransition
   // para un cross-fade, pero con la API presente pero inestable la transicion
@@ -4037,6 +4208,7 @@ const Dashboard = {
         ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
       </div>
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
+      ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length})`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`)}
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
         <div class="detail-collapse-body">

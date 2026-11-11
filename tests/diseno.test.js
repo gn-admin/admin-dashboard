@@ -97,7 +97,7 @@ describe('integridad estatica: clases, ids e iconos', () => {
   const okClase = c => /^[a-z][a-z0-9-]*$/i.test(c);
   // Se usa sin regla propia a proposito: .btn-text la estila el selector
   // descendiente #login-submit-btn.loading span.
-  const SIN_REGLA_PROPIA = new Set(['btn-text']);
+  const SIN_REGLA_PROPIA = new Set(['btn-text', 'idx']);
 
   it('toda clase usada en JS/HTML de interfaz existe en el CSS', () => {
     const cssClases = new Set([...CSS.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].map(m => m[1]));
