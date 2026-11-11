@@ -2097,7 +2097,6 @@ const Dashboard = {
       ['adopcion', 'Adopcion (perros/gatos)', 'De la solicitud al contrato firmado.', Icons.heart, 'var(--primary-lighter)', 'var(--success)'],
       ['acogida', 'Acogida', 'Familias, casos y cierre.', Icons.home, 'var(--info-light)', 'var(--info-strong)'],
       ['animales', 'Animales, camadas y grupos', 'Alta individual y alta masiva.', Icons.paw, 'var(--primary-lighter)', 'var(--success)'],
-      ['redes', 'Redes sociales', 'Plantillas y publicaciones.', Icons.clipboard, '#fce4ec', '#e91e63'],
       ['apadrinamiento', 'Apadrinamiento', 'Padrinos, aportes e historial.', Icons.paw, '#f3e8ff', '#7c3aed'],
       ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, 'var(--info-light)', 'var(--info-strong)'],
       ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, 'var(--primary-lighter)', 'var(--success)']
@@ -2324,7 +2323,7 @@ const Dashboard = {
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('redes')"><span class="guide-index-icon" style="background:#fce4ec;color:#e91e63">${Icons.heart}</span><div><b>Redes</b><small>Publicaciones de Instagram (simuladas) con plantilla por animal.</small></div></button>
+        <!-- Redes oculto temporalmente -->
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('reportes')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('actividad')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
         <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
@@ -4329,7 +4328,6 @@ const Dashboard = {
         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
-      ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/19)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, true)}
       <div class="detail-section detail-section--fields">
         <div class="detail-section-title">${Icons.paw} Datos del animal</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)||'—'}</div></div>
@@ -4349,7 +4347,7 @@ const Dashboard = {
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
         <div class="detail-collapse-body">
-          ${this._publicacionesFicha(a.id)}
+          ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/19)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, false)}
           ${this._apadrinamientosFicha(a.id)}
           ${this._gastosFicha(a.id)}
           ${this._documentosFicha(a.id)}

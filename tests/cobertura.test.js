@@ -350,7 +350,7 @@ describe('guias y tutoriales: HTML sin huecos', () => {
   it('el indice enlaza a las pantallas principales', () => {
     const html = Dashboard._tutorialIndex();
     ['encuestas-perros', 'encuestas-gatos', 'encuestas-acogida', 'animales', 'acogidas', 'adopciones',
-      'socios', 'blacklist', 'redes', 'donaciones', 'almacen']
+      'socios', 'blacklist', 'donaciones', 'almacen']
       .forEach(p => assert.match(html, new RegExp("_jumpTo\\('" + p + "'\\)"), 'falta el salto a ' + p));
   });
 });
