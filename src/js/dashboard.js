@@ -933,7 +933,7 @@ const Dashboard = {
   // Secciones plegables en fichas (desglose progresivo): abiertas por
   // defecto solo las marcadas; el resto colapsan. Estado en memoria.
   _collapsibleSection(id, titleHtml, bodyHtml, defOpen) {
-    if (!this._openSections) this._openSections = new Set(['info']);
+    if (!this._openSections) this._openSections = new Set(['info', 'galeria']);
     const open = !!defOpen || this._openSections.has(id);
     return `<div class="detail-section collapsible${open ? ' open' : ''}" data-sec="${id}">
       <button type="button" class="detail-section-head" onclick="Dashboard._toggleSection(this,'${id}')">
@@ -4295,6 +4295,7 @@ const Dashboard = {
         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showAnimalFormById('${a.id}')">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteAnimal('${a.id}')">${Icons.trash} Eliminar</button>
       </div>
+      ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/19)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, true)}
       <div class="detail-section detail-section--fields">
         <div class="detail-section-title">${Icons.paw} Datos del animal</div>
         <div class="detail-field"><div class="detail-question">Especie</div><div class="detail-answer">${this._esc(a.especie)||'—'}</div></div>
@@ -4311,7 +4312,6 @@ const Dashboard = {
         ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewGrupo('${a.grupo_id}')">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
       </div>
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
-      ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length})`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`)}
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
         <div class="detail-collapse-body">

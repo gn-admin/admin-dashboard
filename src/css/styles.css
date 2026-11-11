@@ -7344,6 +7344,11 @@ body.pwa-modal-open {
 /* Galería de fotos/videos en ficha de animal                    */
 /* ============================================================ */
 
+/* Sección de galería destacada en ficha de animal */
+.galeria-container {
+  padding: 4px 0;
+}
+
 .galeria-carrusel {
   position: relative;
   overflow: hidden;
