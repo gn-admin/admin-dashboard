@@ -265,3 +265,6 @@ Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs 
 | 2026-11-12 | Fix/UX | Skeleton de navegaciÃ³n y ocultaciÃ³n de menÃºs mientras perfil/rol pendiente para evitar flash entre sesiones | f0499c7 (v180) | 357/357 tests, push main | Completado (validaciÃ³n visual multi-rol en prod pendiente) |
 | 2026-11-12 | 0 | Baseline tÃ©cnico/UX, inventario, pantallas crÃ­ticas, mÃ©tricas y backlog fases 1â€“6 documentados | (este commit) | Inventario desde repo local | Completado |
 
+| 2026-11-12 | 1 | Fundamentos de design system: tokens ampliados en `:root` (tipografía, escala de texto, espaciado, radios, semánticos, foco, z-index, motion/transition), `body` con variables base, utilidades iniciales (`.sr-only`, texto/layout/spacing) y `prefers-reduced-motion` global | e6ed331 (v181) | 357/357 tests, push `main` | Completado (base inicial; pendiente normalizar primitivas y reducir inline styles de forma progresiva) |
+| 2026-11-12 | 4 | Optimización de entrega: `qrcodejs` retirado de carga global en `index.html` y cargado bajo demanda en `CarnetGenerator` (`_ensureQRCode`) para reducir coste inicial; bump SW `gn-encuestas-v182` | 87fec7f (v182) | 357/357 tests, push `main` | Completado (parcial; pendiente lazy-load de vistas/PDF, optimización assets/fuentes y estrategia SW/precache) |
+
