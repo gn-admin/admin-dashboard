@@ -658,19 +658,20 @@ const Dashboard = {
   loadLocal() {
     if (!this._canPersistUserData()) return;
     const norm = (arr) => (arr || []).map(x => (x && x.id !== undefined && x.id !== null) ? { ...x, id: String(x.id) } : x);
-    try { this.blacklist = norm(JSON.parse(localStorage.getItem('gn_blacklist') || '[]')); } catch { this.blacklist = []; }
-    try { this.candidaturas = norm(JSON.parse(localStorage.getItem('gn_candidaturas') || '[]')); } catch { this.candidaturas = []; }
-    try { this.contratos = norm(JSON.parse(localStorage.getItem('gn_contratos') || '[]')); } catch { this.contratos = []; }
-    try { this.acogidas = norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')); } catch { this.acogidas = []; }
+    const allow = (k) => !this._cachePermitido || this._cachePermitido(k);
+    try { this.blacklist = allow('blacklist') ? norm(JSON.parse(localStorage.getItem('gn_blacklist') || '[]')) : []; } catch { this.blacklist = []; }
+    try { this.candidaturas = allow('candidaturas') ? norm(JSON.parse(localStorage.getItem('gn_candidaturas') || '[]')) : []; } catch { this.candidaturas = []; }
+    try { this.contratos = allow('contratos') ? norm(JSON.parse(localStorage.getItem('gn_contratos') || '[]')) : []; } catch { this.contratos = []; }
+    try { this.acogidas = allow('acogidas') ? norm(JSON.parse(localStorage.getItem('gn_acogidas') || '[]')) : []; } catch { this.acogidas = []; }
     try { this.publicaciones = norm(JSON.parse(localStorage.getItem('gn_publicaciones') || '[]')); } catch { this.publicaciones = []; }
-    try { this.apadrinamientos = norm(JSON.parse(localStorage.getItem('gn_apadrinamientos') || '[]')); } catch { this.apadrinamientos = []; }
-    try { this.gastos = norm(JSON.parse(localStorage.getItem('gn_gastos') || '[]')); } catch { this.gastos = []; }
-    try { this.recordatorios = norm(JSON.parse(localStorage.getItem('gn_recordatorios') || '[]')); } catch { this.recordatorios = []; }
-    try { this.donaciones = norm(JSON.parse(localStorage.getItem('gn_donaciones') || '[]')); } catch { this.donaciones = []; }
-    try { this.seguimientos = norm(JSON.parse(localStorage.getItem('gn_seguimientos') || '[]')); } catch { this.seguimientos = []; }
-    try { this.historialFasesAdopcion = norm(JSON.parse(localStorage.getItem('gn_historial_fases_adopcion') || '[]')); } catch { this.historialFasesAdopcion = []; }
-    try { this.documentos = JSON.parse(localStorage.getItem('gn_documentos') || '[]'); } catch { this.documentos = []; }
-    try { this.inventario = norm(JSON.parse(localStorage.getItem('gn_inventario') || '[]')); } catch { this.inventario = []; }
+    try { this.apadrinamientos = allow('apadrinamientos') ? norm(JSON.parse(localStorage.getItem('gn_apadrinamientos') || '[]')) : []; } catch { this.apadrinamientos = []; }
+    try { this.gastos = allow('gastos') ? norm(JSON.parse(localStorage.getItem('gn_gastos') || '[]')) : []; } catch { this.gastos = []; }
+    try { this.recordatorios = allow('recordatorios') ? norm(JSON.parse(localStorage.getItem('gn_recordatorios') || '[]')) : []; } catch { this.recordatorios = []; }
+    try { this.donaciones = allow('donaciones') ? norm(JSON.parse(localStorage.getItem('gn_donaciones') || '[]')) : []; } catch { this.donaciones = []; }
+    try { this.seguimientos = allow('seguimientos') ? norm(JSON.parse(localStorage.getItem('gn_seguimientos') || '[]')) : []; } catch { this.seguimientos = []; }
+    try { this.historialFasesAdopcion = allow('historialFasesAdopcion') ? norm(JSON.parse(localStorage.getItem('gn_historial_fases_adopcion') || '[]')) : []; } catch { this.historialFasesAdopcion = []; }
+    try { this.documentos = allow('documentos') ? JSON.parse(localStorage.getItem('gn_documentos') || '[]') : []; } catch { this.documentos = []; }
+    try { this.inventario = allow('inventario') ? norm(JSON.parse(localStorage.getItem('gn_inventario') || '[]')) : []; } catch { this.inventario = []; }
   },
 
   // Evita que una pestana que aun tiene la cuenta anterior escriba encima de
@@ -686,19 +687,20 @@ const Dashboard = {
 
   saveLocal() {
     if (!this._canPersistUserData()) return;
-    localStorage.setItem('gn_blacklist', JSON.stringify(this.blacklist));
-    localStorage.setItem('gn_candidaturas', JSON.stringify(this.candidaturas || []));
-    localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || []));
-    localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || []));
+    const allow = (k) => !this._cachePermitido || this._cachePermitido(k);
+    if (allow('blacklist')) localStorage.setItem('gn_blacklist', JSON.stringify(this.blacklist || [])); else try { localStorage.removeItem('gn_blacklist'); } catch {}
+    if (allow('candidaturas')) localStorage.setItem('gn_candidaturas', JSON.stringify(this.candidaturas || [])); else try { localStorage.removeItem('gn_candidaturas'); } catch {}
+    if (allow('contratos')) localStorage.setItem('gn_contratos', JSON.stringify(this.contratos || [])); else try { localStorage.removeItem('gn_contratos'); } catch {}
+    if (allow('acogidas')) localStorage.setItem('gn_acogidas', JSON.stringify(this.acogidas || [])); else try { localStorage.removeItem('gn_acogidas'); } catch {}
     localStorage.setItem('gn_publicaciones', JSON.stringify(this.publicaciones || []));
-    localStorage.setItem('gn_apadrinamientos', JSON.stringify(this.apadrinamientos || []));
-    localStorage.setItem('gn_gastos', JSON.stringify(this.gastos || []));
-    localStorage.setItem('gn_recordatorios', JSON.stringify(this.recordatorios || []));
-    localStorage.setItem('gn_donaciones', JSON.stringify(this.donaciones || []));
-    localStorage.setItem('gn_seguimientos', JSON.stringify(this.seguimientos || []));
-    localStorage.setItem('gn_historial_fases_adopcion', JSON.stringify(this.historialFasesAdopcion || []));
-    localStorage.setItem('gn_documentos', JSON.stringify(this.documentos || []));
-    localStorage.setItem('gn_inventario', JSON.stringify(this.inventario || []));
+    if (allow('apadrinamientos')) localStorage.setItem('gn_apadrinamientos', JSON.stringify(this.apadrinamientos || [])); else try { localStorage.removeItem('gn_apadrinamientos'); } catch {}
+    if (allow('gastos')) localStorage.setItem('gn_gastos', JSON.stringify(this.gastos || [])); else try { localStorage.removeItem('gn_gastos'); } catch {}
+    if (allow('recordatorios')) localStorage.setItem('gn_recordatorios', JSON.stringify(this.recordatorios || [])); else try { localStorage.removeItem('gn_recordatorios'); } catch {}
+    if (allow('donaciones')) localStorage.setItem('gn_donaciones', JSON.stringify(this.donaciones || [])); else try { localStorage.removeItem('gn_donaciones'); } catch {}
+    if (allow('seguimientos')) localStorage.setItem('gn_seguimientos', JSON.stringify(this.seguimientos || [])); else try { localStorage.removeItem('gn_seguimientos'); } catch {}
+    if (allow('historialFasesAdopcion')) localStorage.setItem('gn_historial_fases_adopcion', JSON.stringify(this.historialFasesAdopcion || [])); else try { localStorage.removeItem('gn_historial_fases_adopcion'); } catch {}
+    if (allow('documentos')) localStorage.setItem('gn_documentos', JSON.stringify(this.documentos || [])); else try { localStorage.removeItem('gn_documentos'); } catch {}
+    if (allow('inventario')) localStorage.setItem('gn_inventario', JSON.stringify(this.inventario || [])); else try { localStorage.removeItem('gn_inventario'); } catch {}
   },
 
   // Busqueda por id tolerante a tipos (la hoja puede devolver numeros y el
