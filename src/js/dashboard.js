@@ -5857,7 +5857,7 @@ const Dashboard = {
     if (!preview || !input || !input.files || !input.files[0]) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      preview.innerHTML = `<img src="${e.target.result}" alt="Foto del animal">`;
+      preview.innerHTML = `<img src="${String(e.target.result || '').replace(/"/g, '&quot;')}" alt="Foto del animal">`;
       if (chip) chip.textContent = 'Foto nueva';
     };
     reader.readAsDataURL(input.files[0]);
@@ -7565,7 +7565,7 @@ const Dashboard = {
     const preview = document.getElementById(previewId);
     if (!preview || !input.files[0]) return;
     const reader = new FileReader();
-    reader.onload = (e) => { preview.innerHTML = `<img src="${e.target.result}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);margin-top:8px">`; };
+    reader.onload = (e) => { preview.innerHTML = `<img src="${String(e.target.result || '').replace(/"/g, '&quot;')}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);margin-top:8px">`; };
     reader.readAsDataURL(input.files[0]);
   },
 
