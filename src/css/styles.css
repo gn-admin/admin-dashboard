@@ -5569,21 +5569,21 @@ select.form-input {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px;
-  border: 1px solid var(--gray-200);
-  border-radius: 16px;
-  background: var(--white);
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   box-shadow: var(--shadow-sm);
   font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
 }
 
 .dash-kpi:hover {
-  transform: translateY(-2px);
-  border-color: var(--primary-light);
+  transform: translateY(-3px);
+  border-color: rgba(31, 201, 91, 0.22);
   box-shadow: var(--shadow-md);
 }
 
