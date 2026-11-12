@@ -252,7 +252,7 @@ const Dashboard = {
   _roleLabel(role) {
     const raw = String(role || '').trim();
     const key = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
-    if (!key) return 'Administrador';
+    if (!key) return 'Consulta';
     return {
       admin: 'Administrador',
       coordinador: 'Coordinador/a',
@@ -264,8 +264,8 @@ const Dashboard = {
   },
 
   _rolActual() {
-    const r = String((this._currentUser() && this._currentUser().role) || 'admin').toLowerCase().trim();
-    return r || 'admin';
+    const r = String((this._currentUser() && this._currentUser().role) || 'consulta').toLowerCase().trim();
+    return r || 'consulta';
   },
 
   _paginasPorRol: {
@@ -353,9 +353,11 @@ const Dashboard = {
   // Firebase. Sirve para que un cambio de usuario no muestre el nombre viejo.
   _identity(profile, authUser) {
     const u = profile || authUser || {};
-    const name = String(u.name || u.email || 'Usuario').trim() || 'Usuario';
-    const email = String(u.email || '').trim();
-    const role = String(u.role || 'admin').trim() || 'admin';
+    const name = String(u.name || (authUser && authUser.email) || u.email || 'Usuario').trim() || 'Usuario';
+    const email = String(u.email || (authUser && authUser.email) || '').trim();
+    // El rol lo define el backend (user-profile/Roles.gs). Si no hay perfil resuelto,
+    // usar un rol mínimo por seguridad; nunca asumir admin por defecto.
+    const role = String((profile && profile.role) || u.role || 'consulta').trim().toLowerCase() || 'consulta';
     return { name, email, role, roleLabel: this._roleLabel(role), avatar: name.charAt(0).toUpperCase() || 'U' };
   },
 
