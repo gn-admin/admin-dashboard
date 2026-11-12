@@ -1082,6 +1082,17 @@ const Dashboard = {
     this.showGrupoForm(gid);
   },
 
+  closeCarnetModal(el) {
+    const modal = el && el.closest ? (el.closest('.modal-overlay') || el.closest('.modal-box')) : null;
+    if (modal) modal.remove();
+  },
+
+  downloadCarnetById(id) {
+    if (typeof CarnetGenerator !== 'undefined' && CarnetGenerator.downloadCarnetById) {
+      return CarnetGenerator.downloadCarnetById(id);
+    }
+  },
+
   _confirm(msg, title, okLabel) {
     return new Promise(resolve => {
       const modal = document.getElementById('confirm-modal');

@@ -63,8 +63,9 @@
     <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" class="offline-logo">
     <h1>Sin conexion</h1>
     <p>No hemos podido cargar Grupo Nebak. Comprueba tu conexion y vuelve a intentarlo. Las pantallas que ya habias abierto siguen disponibles sin red.</p>
-    <button type="button" class="offline-btn" onclick="location.reload()">Reintentar</button>
+    <button type="button" class="offline-btn" id="offline-retry">Reintentar</button>
     <p class="offline-note">Grupo Nebak</p>
   </main>
+  <script>document.getElementById('offline-retry').addEventListener('click',function(){location.reload();});</script>
 </body>
 </html>

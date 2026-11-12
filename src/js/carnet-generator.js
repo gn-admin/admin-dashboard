@@ -168,12 +168,12 @@ const CarnetGenerator = {
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center';
     modal.innerHTML = `
       <div style="background:#fff;border-radius:16px;padding:24px;max-width:700px;width:90%;text-align:center;position:relative">
-        <button onclick="this.closest('.modal-overlay').remove()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#666">&times;</button>
+        <button data-action="closeCarnetModal" data-pass="el" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#666">&times;</button>
         <h3 style="margin:0 0 16px;color:#191919">Carnet de ${nombreSeguro}</h3>
         <img src="${dataUrl}" style="max-width:100%;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15)" />
         <div style="margin-top:16px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="CarnetGenerator.downloadCarnetById('${String(socio.id || '').replace(/'/g, '').replace(/"/g, '&quot;')}')">${Icons.download} Descargar PNG</button>
-          <button class="btn btn-outline-green" onclick="this.closest('.modal-overlay').remove()">Cerrar</button>
+          <button class="btn btn-primary" data-action="downloadCarnetById" data-arg0="${String(socio.id || '').replace(/"/g, '&quot;')}">${typeof Icons !== 'undefined' && Icons.download ? Icons.download : ''} Descargar PNG</button>
+          <button class="btn btn-outline-green" data-action="closeCarnetModal" data-pass="el">Cerrar</button>
         </div>
       </div>
     `;

@@ -202,14 +202,14 @@
     <div class="main-wrapper">
       <header class="topbar">
         <div class="topbar-left">
-          <button type="button" id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" aria-label="Mi perfil" onclick="Dashboard.showProfile()"></button>
+          <button type="button" id="profile-btn" class="btn-icon profile-btn" title="Mi perfil" aria-label="Mi perfil" data-action="showProfile"></button>
           <button type="button" id="sidebar-toggle" class="btn-icon sidebar-toggle-btn" aria-label="Abrir o cerrar menu lateral"></button>
           <h1 id="page-title" class="topbar-title">Dashboard</h1>
         </div>
         <div class="topbar-right">
           <button type="button" id="pwa-install-btn" class="btn-icon pwa-install-btn" title="Instalar app" aria-label="Instalar app" style="display:none"></button>
-          <button type="button" id="refresh-btn" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos" onclick="Dashboard.refreshData()"></button>
-          <button type="button" id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" aria-label="Guia de procesos" onclick="Dashboard.showTutorial()"></button>
+          <button type="button" id="refresh-btn" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos" data-action="refreshData"></button>
+          <button type="button" id="tutorial-btn" class="btn-icon tutorial-btn" title="Guia de procesos" aria-label="Guia de procesos" data-action="showTutorial"></button>
           <span class="pending-sync-badge" style="display:none"></span>
           <span class="topbar-user-name" id="topbar-user-name"></span>
           <button type="button" id="mobile-logout-btn" class="btn-icon mobile-logout-btn" title="Cerrar sesion" aria-label="Cerrar sesion">
@@ -298,7 +298,7 @@
             <h3 id="tutorial-title" style="margin:0">Guia de procesos</h3>
             <span class="modal-subtitle">Como funciona el flujo de acogida y adopcion</span>
           </div>
-          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar guia de procesos" onclick="Dashboard.closeTutorial()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar guia de procesos" data-action="closeTutorial">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -310,7 +310,7 @@
       <div class="modal-box">
         <div class="modal-header">
           <h3 id="profile-title">Mi perfil</h3>
-          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar perfil" onclick="Dashboard.closeProfile()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar perfil" data-action="closeProfile">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -334,7 +334,7 @@
       <div class="modal-box modal-box--full">
         <div class="modal-header">
           <h3 id="contrato-title">Contrato de adopcion</h3>
-          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar contrato" onclick="Dashboard.closeContratoForm()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar contrato" data-action="closeContratoForm">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -345,7 +345,7 @@
       <div class="modal-box modal-box--wide">
         <div class="modal-header">
           <h3 id="info-title">Detalle</h3>
-          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar detalle" onclick="Dashboard.closeInfoModal()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar detalle" data-action="closeInfoModal">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -356,7 +356,7 @@
       <div class="modal-box modal-box--wide">
         <div class="modal-header">
           <h3 id="form-title">Formulario</h3>
-          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar formulario" onclick="Dashboard.closeFormModal()">
+          <button type="button" class="btn-icon modal-close" title="Cerrar" aria-label="Cerrar formulario" data-action="closeFormModal">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
