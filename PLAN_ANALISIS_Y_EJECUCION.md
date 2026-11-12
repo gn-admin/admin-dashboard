@@ -3,7 +3,7 @@
 **Proyecto:** GN-Encuestas / Admin Dashboard (Grupo Nebak)  
 **Fecha:** 2026-11-12  
 **Versión base analizada:** producción `v165` (commit `01617fe`)  
-**Estado:** en ejecución
+**Estado:** Fases 0–5 completadas en alcance frontend/código (pendientes externos: despliegue/config GAS, validación en dispositivos reales y operación de backups/auditoría)
 
 ---
 
@@ -131,42 +131,46 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 5 — Validación final y hardening
 **Objetivo:** cierre verificado.
-- [ ] Ejecutar suite de tests (`node --test tests/*.test.js`).
-- [ ] Pruebas por rol en desktop/tablet/móvil (manual en dispositivos reales recomendado): menú, rutas, acciones, formularios, modales, exportaciones.
-- [ ] Revisión de seguridad residual (CSP, almacenamiento, XSS, permisos).
-- [ ] Actualizar `src/sw.js` (`CACHE_NAME`) en cada despliegue con cambios frontend.
-- [ ] Commit/push y verificación en producción.
-- **Criterio de salida:** matriz de verificación completa, sin regresiones conocidas, mejoras desplegadas.
+- [x] Ejecutar suite de tests (`node --test tests/*.test.js`) — 357/357 OK en esta iteración.
+- [~] Pruebas por rol en desktop/tablet/móvil: verificación previa en producción (v165) y validación por código/despliegues posteriores realizadas; **pendiente validación manual en dispositivos reales** (iOS/Android/tablet, portrait/landscape) y smoke completo en entorno final por los 5 roles.
+- [x] Revisión de seguridad residual (alcance frontend/código): permisos UI+gating de cargas, CSP report-only alineada, caché con TTL y limpieza en logout/cambio, token en query mantenido por compatibilidad CORS/GAS con soporte preparado para `Authorization` (opt-in), y auditoría dirigida de sinks `innerHTML` sin hallazgos evidentes en la pasada realizada.
+- [x] Actualizar `src/sw.js` (`CACHE_NAME`) en despliegues con cambios frontend (hasta `v174`).
+- [x] Commit/push y verificación de despliegue en producción (frontend).
+- **Criterio de salida:** alcanzado en alcance frontend/código y despliegue web. Pendientes externos: validación en dispositivos reales, despliegue/configuración GAS para S2/preflight y operación de backups/auditoría en entorno Google.
 
 ---
 
 ## 5. Matriz de verificación (checklist)
 
 ### 5.1 Por rol (cada plataforma)
-- [ ] `admin`: acceso total, acciones de gestión visibles, donaciones/almacén accesibles
-- [ ] `coordinador`: operativo sin donaciones/almacén, mutaciones permitidas por módulo
-- [ ] `voluntario`: solo módulos permitidos, mutaciones/lectura según política
-- [ ] `tesoreria`: donaciones/almacén/animales/reportes según permisos
-- [ ] `consulta`: **solo lectura** estricta, sin crear/editar/eliminar/guardar
+- [~] `admin`: acceso total esperado por permisos/módulos (verificado en código y en validación previa de producción; smoke final multi-dispositivo pendiente)
+- [~] `coordinador`: operativo sin donaciones/almacén según matriz de permisos (código actualizado; validación manual final pendiente)
+- [~] `voluntario`: acceso limitado a módulos permitidos (código actualizado; validación manual final pendiente)
+- [~] `tesoreria`: donaciones/almacén/animales/reportes según permisos (código actualizado; validación manual final pendiente)
+- [~] `consulta`: solo lectura estricta reforzada en UI (ocultación/deshabilitado de mutaciones) y backend RBAC existente; validación manual final pendiente
 
 ### 5.2 Por plataforma
-- [ ] **Desktop:** sidebar, tablas, modales, formularios, foco teclado
-- [ ] **Tablet:** layout intermedio, touch, orientación, modales con teclado
-- [ ] **Móvil:** bottom-nav, menú “Más”, targets táctiles, formularios (teclado), tablas/tarjetas, modales full/scroll
+- [~] **Desktop:** mejoras de accesibilidad/foco/targets y comportamiento por rol implementadas (validación visual final recomendada)
+- [ ] **Tablet:** ajustes responsive aplicados; **validación en dispositivo real pendiente** (768–1023px, orientación, teclado)
+- [~] **Móvil:** bottom-nav/menú “Más”, targets táctiles, tablas→tarjetas y modales/formularios mejorados en código; **validación en dispositivo real pendiente**
 
 ### 5.3 Seguridad/estabilidad
-- [ ] Sin token en rutas expuestas innecesariamente; comportamiento de auth correcto
-- [ ] Sin acciones mutantes visibles para roles sin permiso
-- [ ] Sin errores de carga por peticiones no autorizadas en flujo normal
-- [ ] Caché limpiada en logout/cambio de usuario
-- [ ] CSP y cabeceras/meta revisadas
+- [~] Token sigue en query por restricción CORS/GAS (S2); frontend preparado para `Authorization` opt-in y backend acepta ambos formatos (pendiente despliegue/config CORS en GAS para migrar)
+- [x] Sin acciones mutantes visibles para roles sin permiso (refuerzo UI) y cargas/gating condicionados por permisos en frontend
+- [~] Reducción de peticiones/carreras no autorizadas y estados obsoletos (guards, perfil/rol, tokens de página); verificación exhaustiva en sesiones reales multirol pendiente
+- [x] Caché `gn_cache_*` con TTL y limpieza en logout/cambio de usuario
+- [x] CSP/meta revisadas y endurecidas en modo report-only; enforcement y validación final de reportes pendientes de entorno/operación
 
 ---
 
-## 6. Dependencias y bloqueos
-- **S2/B3 (token fuera de query + preflight CORS):** requiere cambios y despliegue coordinado en `apps-script/Code.gs`/config GAS.
-- **Auditoría/configuración backend** (códigos HTTP, paginación, versionado, auditoría efectiva, IDs): fuera del alcance exclusivo frontend.
-- **Pruebas en dispositivos reales:** requieren acceso a móviles/tablets físicos o infraestructura de device lab.
+## 6. Dependencias y bloqueos / acciones fuera del frontend
+- **S2/B3 (token fuera de query + preflight CORS):** aplicado en código/local workspace
+  - Frontend: `src/js/api.js` preparado para enviar `Authorization: Bearer` cuando `CONFIG.useAuthorizationHeader=true` (mantiene token en query por compatibilidad). Por defecto desactivado para no romper producción con preflight GAS.
+  - Backend (local, no versionado): `apps-script/Code.gs` ya acepta token en `Authorization` o query (`extractToken`) y se añadió `doOptions` best-effort. **Pendiente externo:** desplegar nueva versión del Web App GAS, validar preflight/CORS real y habilitar `useAuthorizationHeader` solo cuando sea compatible.
+- **Auditoría y backups (backend/operación):**
+  - Código local presente (`apps-script/Code.gs` registra auditoría sensible si `CONFIG.sheets.auditoria` está configurado; `apps-script/Backup.gs` incluye exportación ZIP, envío email y helpers de triggers).
+  - **Pendiente externo:** configurar IDs reales de hojas de auditoría/historial, `BACKUP_EMAIL`/`BACKUP_DRIVE_FOLDER_ID`, permisos de Drive/Spreadsheet y crear/activar triggers en entorno GAS (`crearTriggerBackupDiario/Semanal/CadaXDias`).
+- **Pruebas en dispositivos reales:** requieren acceso a móviles/tablets físicos o device lab (no automatizable en este entorno).
 
 ---
 
@@ -184,6 +188,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 2 | Fase 2 accesibilidad/touch: targets y affordance (sidebar/acciones/gráficos), `aria-label`/estado dinámico en controles icon-only clave, `:focus-visible` y etiquetas accesibles en filtros/búsquedas principales | `8684548` (v171) | 357 tests OK, desplegado (`gn-encuestas-v171`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | `6ab26a7` (v172) | 357 tests OK, desplegado (`gn-encuestas-v172`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | `907cf9a` (v173) | 357 tests OK, desplegado (`gn-encuestas-v173`) | Completado (frontend) |
+| 2026-11-12 | 5 | Fase 5 validación/hardening: tests 357/357, revisión residual seguridad/UI, preparación S2 (Authorization opt-in en frontend + soporte/doOptions en backend local), actualización de matriz/checklists y registro de pendientes externos | Pendiente commit (v174) | 357 tests OK, despliegue/verificación pendiente en este paso | En ejecución |
 
 ---
 

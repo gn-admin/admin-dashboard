@@ -39,25 +39,32 @@ const API = {
     return data;
   },
 
-  // El token viaja SOLO en la query (`?token=`): el backend desplegado asi lo
-  // lee y responde `ACAO: *`. NO enviar cabecera `Authorization` mientras el
-  // backend no se publique con soporte de preflight: un header no simple fuerza
-  // un OPTIONS que Apps Script no responde con `Access-Control-Allow-Headers`
-  // y el navegador bloquea TODAS las peticiones (rompia prod con "error al
-  // cargar"). Cuando Code.gs (Nueva version) este desplegado, migrar el token
-  // a la cabecera y retirar el query.
+  _authHeaders(token) {
+    // S2 (preparado): opt-in para Authorization header cuando el backend/GAS soporte preflight CORS.
+    // Por defecto desactivado para evitar romper producción (preflight con headers no simples).
+    if (typeof CONFIG !== 'undefined' && CONFIG && CONFIG.useAuthorizationHeader) {
+      return { 'Authorization': 'Bearer ' + token };
+    }
+    return {};
+  },
+
+  // Compatibilidad: token en query (`?token=`). Si CONFIG.useAuthorizationHeader=true,
+  // se añade también Authorization (requiere backend con preflight CORS correcto).
   async _get(endpoint, params = {}) {
     const token = await Auth.getIdToken();
     const qs = new URLSearchParams({ endpoint, ...params, token }).toString();
-    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`);
+    const auth = this._authHeaders(token);
+    const opts = Object.keys(auth).length ? { headers: auth } : undefined;
+    const res = await this._fetch(`${CONFIG.apiUrl}?${qs}`, opts);
     return this._resultado(res);
   },
 
   async _post(endpoint, body = {}) {
     const token = await Auth.getIdToken();
+    const auth = this._authHeaders(token);
     const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      headers: { 'Content-Type': 'text/plain;charset=utf-8', ...auth },
       body: JSON.stringify(body)
     });
     return this._resultado(res);
