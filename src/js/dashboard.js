@@ -157,6 +157,7 @@ const Dashboard = {
     if (typeof Auth !== 'undefined' && Auth.currentUser && this._profilePromise && !this._profileResolved) {
       try { await this._profilePromise; } catch {}
     }
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return;
     const token = this._pageToken;
     // Si la sesión cambió/navegó fuertemente, evitar trabajo innecesario
     if (token !== this._pageToken) return;
@@ -177,6 +178,10 @@ const Dashboard = {
   // vuelve a pintar la pagina actual sin recargar la PWA.
   async refreshData() {
     if (this._refreshing) return;
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) {
+      this.showSnackbar && this.showSnackbar('Tu cuenta no tiene acceso autorizado.', 'warning');
+      return;
+    }
     this._refreshing = true;
     const btn = typeof document !== 'undefined' ? document.getElementById('refresh-btn') : null;
     if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
@@ -367,19 +372,26 @@ const Dashboard = {
     coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad'],
     voluntario: ['dashboard','animales','reportes','actividad'],
     tesoreria: ['dashboard','animales','donaciones','almacen','reportes','actividad'],
-    consulta: ['dashboard','animales']
+    consulta: ['dashboard','animales'],
+    sin_acceso: []
+  },
+
+  _rolEsSinAcceso() {
+    return this._rolActual() === 'sin_acceso';
   },
 
   puedeAccederPagina(page) {
     const p = String(page || 'dashboard');
     if (p === 'redes') return false;
     const rol = this._rolActual();
+    if (rol === 'sin_acceso') return false;
     const allow = this._paginasPorRol[rol] || this._paginasPorRol.consulta || ['dashboard'];
     if (allow === '*') return true;
     return allow.indexOf(p) !== -1;
   },
 
   primeraPaginaPermitida() {
+    if (this._rolEsSinAcceso()) return 'dashboard';
     const orden = ['dashboard','encuestas','animales','adopciones','acogidas-activas','acogidas','reportes','actividad','donaciones','almacen','socios','blacklist'];
     for (let i = 0; i < orden.length; i++) if (this.puedeAccederPagina(orden[i])) return orden[i];
     return 'dashboard';
@@ -545,10 +557,11 @@ const Dashboard = {
 
   _sinPermisoPage(el) {
     if (!el) return;
+    const sinAcceso = this._rolEsSinAcceso && this._rolEsSinAcceso();
     el.innerHTML = `<div class="empty-state empty-state-illustrated">
       <div class="empty-state-icon">${Icons.lock || Icons.alertTriangle || ''}</div>
-      <h3>Sin permisos</h3>
-      <p>Tu rol no tiene acceso a esta sección.</p>
+      <h3>${sinAcceso ? 'Sin acceso autorizado' : 'Sin permisos'}</h3>
+      <p>${sinAcceso ? 'Tu cuenta no está autorizada para acceder a este panel. Si crees que es un error, contacta con un administrador.' : 'Tu rol no tiene acceso a esta sección.'}</p>
     </div>`;
   },
 
@@ -761,6 +774,7 @@ const Dashboard = {
   },
 
   async loadEstados(force) {
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return this.states || {};
     if (this._loaded.estados && !force) return this.states;
     if (this._loading.estados) {
       if (this._cached.estados && !force) return this.states;
@@ -788,6 +802,7 @@ const Dashboard = {
   },
 
   async loadNotas(force) {
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return this.notes || {};
     if (this._loaded.notas && !force) return this.notes;
     if (this._loading.notas) {
       if (this._cached.notas && !force) return this.notes;
@@ -1882,6 +1897,7 @@ const Dashboard = {
   },
 
   async _refreshHomeTier1(force) {
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return;
     // Datos criticos para pintar el home: encuestas, estados, animales,
     // familias y respuestas. Todo sale en paralelo: las respuestas usan los
     // ids conocidos, asi el primer pintado no espera una segunda ronda.
@@ -1902,6 +1918,7 @@ const Dashboard = {
     await Promise.all(jobs);
   },
   async _refreshHomeTier2(force) {
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return;
     // Datos secundarios (best-effort): no bloquean el primer pintado.
     const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
     const jobs = [
@@ -1919,6 +1936,7 @@ const Dashboard = {
     await Promise.all(jobs);
   },
   async _refreshHome(force) {
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return;
     // Fuerza red: si ya se pinto cache, esto corre en segundo plano y
     // repinta al terminar; si no hay cache, el esqueleto espera esta promesa.
     await this._refreshHomeTier1(force);
