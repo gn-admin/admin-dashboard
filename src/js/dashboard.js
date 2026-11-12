@@ -2162,24 +2162,36 @@ const Dashboard = {
   },
 
   async toggleRecordatorio(id) {
-    const r = this._byId(this.recordatorios, id);
-    if (!r) return;
-    r.hecho = !r.hecho;
-    this.saveLocal();
-    await this._updateLocalYApi('recordatorios', r);
-    this.renderDashboardHome(document.getElementById('page-dashboard'));
+    const busyKey = 'toggle-rec:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const r = this._byId(this.recordatorios, id);
+      if (!r) return;
+      r.hecho = !r.hecho;
+      this.saveLocal();
+      await this._updateLocalYApi('recordatorios', r);
+      this.renderDashboardHome(document.getElementById('page-dashboard'));
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async deleteRecordatorio(id) {
-    if (!(await this._confirm('Eliminar este recordatorio?', 'Eliminar'))) return;
+    const busyKey = 'del-rec:' + id;
+    if (!this._busyStart(busyKey)) return;
     try {
-      const res = await API.deleteRecordatorio(id);
-      this._assertDeleted(res, 'El recordatorio');
-    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    this.recordatorios = (this.recordatorios || []).filter(x => x.id !== id);
-    this.saveLocal();
-    this.renderDashboardHome(document.getElementById('page-dashboard'));
-    this.showSnackbar('Recordatorio eliminado', 'success');
+      if (!(await this._confirm('Eliminar este recordatorio?', 'Eliminar'))) return;
+      try {
+        const res = await API.deleteRecordatorio(id);
+        this._assertDeleted(res, 'El recordatorio');
+      } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
+      this.recordatorios = (this.recordatorios || []).filter(x => x.id !== id);
+      this.saveLocal();
+      this.renderDashboardHome(document.getElementById('page-dashboard'));
+      this.showSnackbar('Recordatorio eliminado', 'success');
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ENCUESTAS ====================
@@ -7028,7 +7040,7 @@ const Dashboard = {
     const r = new FileReader();
     r.onload = () => {
       const url = String(r.result || '');
-      box.innerHTML = `<img src="${url}" alt="Sello" style="max-height:90px;border:1px solid var(--gray-200);border-radius:8px">`;
+      box.innerHTML = `<img src="${url.replace(/"/g, '&quot;')}" alt="Sello" style="max-height:90px;border:1px solid var(--gray-200);border-radius:8px">`;
       try { localStorage.setItem('gn_sello_url', url); } catch (e) {}
     };
     r.readAsDataURL(f);
@@ -8405,23 +8417,29 @@ const Dashboard = {
   },
 
   async descartar2025() {
-    const lista = this._restantes2025();
-    if (!lista.length) { this.showSnackbar('No hay solicitudes de 2025 por descartar', 'success'); return; }
-    if (!(await this._confirm('Descartar ' + lista.length + ' solicitudes de 2025? Ya no contaran en dashboard ni reportes.', 'Descartar 2025'))) return;
-    this.showLoading();
-    let ok = 0;
+    const busyKey = 'descartar-2025';
+    if (!this._busyStart(busyKey)) return;
     try {
-      for (const it of lista) {
-        // setEstado ya revierte el estado optimista y pinta el error si falla.
-        if (await this.setEstado(it.id, 'descartada', it.surveyId)) ok++;
+      const lista = this._restantes2025();
+      if (!lista.length) { this.showSnackbar('No hay solicitudes de 2025 por descartar', 'success'); return; }
+      if (!(await this._confirm('Descartar ' + lista.length + ' solicitudes de 2025? Ya no contaran en dashboard ni reportes.', 'Descartar 2025'))) return;
+      this.showLoading();
+      let ok = 0;
+      try {
+        for (const it of lista) {
+          // setEstado ya revierte el estado optimista y pinta el error si falla.
+          if (await this.setEstado(it.id, 'descartada', it.surveyId)) ok++;
+        }
+      } finally {
+        this.hideLoading();
       }
+      this.renderReportes(document.getElementById('page-reportes'));
+      if (ok === lista.length) this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
+      else if (ok > 0) this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ' solicitudes de 2025', 'warning');
+      // Si ok===0 el ultimo setEstado ya mostro el error; no tapar con exito.
     } finally {
-      this.hideLoading();
+      this._busyEnd(busyKey);
     }
-    this.renderReportes(document.getElementById('page-reportes'));
-    if (ok === lista.length) this.showSnackbar('Descartadas ' + ok + ' solicitudes de 2025', 'success');
-    else if (ok > 0) this.showSnackbar('Descartadas ' + ok + ' de ' + lista.length + ' solicitudes de 2025', 'warning');
-    // Si ok===0 el ultimo setEstado ya mostro el error; no tapar con exito.
   },
 
   // Anti-doble-clic en Guardar: deshabilita el boton, pone "Guardando..."
