@@ -8401,6 +8401,7 @@ const Dashboard = {
   },
 
   _euros(v) {
+    if (typeof Utils !== 'undefined' && Utils.euros) return Utils.euros(v);
     return (parseFloat(String(v ?? '').replace(',', '.')) || 0).toFixed(2);
   },
 

@@ -100,5 +100,9 @@ const Utils = {
     if (tipo === 'gasto' || tipo === 'donacion') return 'en_proceso';
     if (tipo === 'adopcion' || tipo === 'candidatura' || tipo === 'contrato') return 'aprobada';
     return '';
+  },
+
+  euros(v) {
+    return (parseFloat(String(v ?? '').replace(',', '.')) || 0).toFixed(2);
   }
 };
