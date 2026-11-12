@@ -1,4 +1,6 @@
 const CarnetGenerator = {
+  _qrReady: null,
+
   generateCarnetId(area) {
     const prefix = (area || 'SOC').toUpperCase().replace(/\s+/g,'').slice(0,10);
     const year = new Date().getFullYear();
@@ -8,7 +10,22 @@ const CarnetGenerator = {
     return `GN-${prefix}-${year}-${random}`;
   },
 
+  async _ensureQRCode() {
+    if (typeof QRCode !== 'undefined') return true;
+    if (this._qrReady) return this._qrReady;
+    this._qrReady = new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      s.async = true;
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+    return this._qrReady;
+  },
+
   async generateCarnet(socio, options = {}) {
+    await this._ensureQRCode();
     const width = options.width || 640;
     const height = options.height || 400;
     const canvas = document.createElement('canvas');
