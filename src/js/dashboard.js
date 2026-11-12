@@ -2335,7 +2335,7 @@ const Dashboard = {
     this._shown[surveyId] = 20;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
         <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
@@ -4004,8 +4004,8 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
-          <select data-change="onAnimalEstadoFilterChange" data-cpass="el">
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
+          <select aria-label="Filtrar animales por estado" data-change="onAnimalEstadoFilterChange" data-cpass="el">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
             <option value="en_acogida" ${filter==='en_acogida'?'selected':''}>En acogida (${counts.en_acogida})</option>
@@ -4860,7 +4860,7 @@ const Dashboard = {
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaForm">${Icons.plus} Nueva</button></div>
       <div class="filters-bar"><div class="filter-row">
-        <select data-change="onFosterFilterChange" data-cpass="el">
+        <select aria-label="Filtrar familias de acogida" data-change="onFosterFilterChange" data-cpass="el">
           <option value="all" ${filter==='all'?'selected':''}>Todas (${counts.all})</option>
           <option value="Libre" ${filter==='Libre'?'selected':''}>Libres (${counts.Libre})</option>
           <option value="Ocupada" ${filter==='Ocupada'?'selected':''}>Ocupadas (${counts.Ocupada})</option>
@@ -7992,7 +7992,7 @@ const Dashboard = {
   async renderBlacklist(el) {
     await this._loadList('blacklist', () => API.getBlacklist());
     el.innerHTML = `
-      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
+      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" aria-label="Buscar en lista negra" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
       <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>`;
     this._animaListado(document.getElementById('blacklist-list-container'));
   },
@@ -8018,7 +8018,7 @@ const Dashboard = {
     let idxs=(this.blacklist || []).map((bl,i)=>({bl,i}));
     if(search) idxs=idxs.filter(({bl})=>((bl.nombre||'')+' '+(bl.apellidos||'')+' '+(bl.email||'')+' '+(bl.motivo||'')).toLowerCase().includes(search.toLowerCase()));
     if(!idxs.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.checkCircle+'</div><p>No hay personas en la lista negra</p></div>';
-    return idxs.map(({bl,i})=>{ const k=this._esc(this._blClave(bl,i)); return `<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button type="button" class="btn btn-outline-green btn-sm" data-action="showEditBlacklistItem" data-arg0="${k}">${Icons.pencil}</button><button type="button" class="btn btn-danger btn-sm" data-action="removeBlacklistItem" data-arg0="${k}">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(this._fmtFecha(bl.fecha)):''}</div></div>`; }).join('');
+    return idxs.map(({bl,i})=>{ const k=this._esc(this._blClave(bl,i)); const nombre = ((bl.nombre||'')+' '+(bl.apellidos||'')).trim(); return `<div class="bl-card"><div class="bl-card-header"><span class="bl-card-name">${this._esc(bl.nombre)} ${this._esc(bl.apellidos)}</span><div style="display:flex;gap:4px"><button type="button" class="btn btn-outline-green btn-sm" data-action="showEditBlacklistItem" data-arg0="${k}" aria-label="Editar ${this._esc(nombre || 'registro')}" title="Editar">${Icons.pencil}</button><button type="button" class="btn btn-danger btn-sm" data-action="removeBlacklistItem" data-arg0="${k}" aria-label="Eliminar ${this._esc(nombre || 'registro')}" title="Eliminar">${Icons.trash}</button></div></div>${bl.email?'<div class="bl-card-email">'+this._esc(bl.email)+'</div>':''}<div class="bl-card-motivo">${this._esc(bl.motivo)}</div><div class="bl-card-meta">${this._esc(bl.origen||'manual')} ${bl.fecha?'&middot; '+this._esc(this._fmtFecha(bl.fecha)):''}</div></div>`; }).join('');
   },
 
   showAddBlacklist() {
@@ -8309,7 +8309,7 @@ const Dashboard = {
     const cuerpo = this._renderActividadTabla(rows);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
@@ -8430,7 +8430,7 @@ const Dashboard = {
         <div class="alert-item warning" style="cursor:pointer" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>

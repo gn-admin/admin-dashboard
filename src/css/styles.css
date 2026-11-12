@@ -5167,6 +5167,38 @@ select.form-input {
   }
 }
 
+/* Mejora global de accesibilidad táctil/teclado */
+.btn-sm {
+  min-height: 36px;
+}
+.btn-icon {
+  min-width: 36px;
+  min-height: 36px;
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .btn-sm,
+  .table-actions .btn,
+  .bl-card .btn {
+    min-height: 44px;
+  }
+  .table-actions .btn.btn-sm,
+  .bl-card .btn.btn-sm {
+    min-width: 44px;
+  }
+}
+.chart-point,
+[data-action="_chartTip"] {
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  .chart-point,
+  [data-action="_chartTip"] {
+    stroke: transparent;
+    stroke-width: 18px;
+    paint-order: stroke fill;
+  }
+}
+
 /* ===== DASHBOARD HOME (estilo v22) ===== */
 .dash-hero {
   position: relative;
