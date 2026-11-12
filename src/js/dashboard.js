@@ -583,14 +583,25 @@ const Dashboard = {
 
   _cacheGet(key) {
     try {
-      const v = localStorage.getItem('gn_cache_' + key);
-      return v ? JSON.parse(v) : null;
+      const raw = localStorage.getItem('gn_cache_' + key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const ttlMs = 7 * 24 * 60 * 60 * 1000; // 7 dias (S3: minimizar exposición de caché sensible)
+      if (parsed && typeof parsed === 'object' && Object.prototype.hasOwnProperty.call(parsed, '_t') && Object.prototype.hasOwnProperty.call(parsed, 'v')) {
+        if (typeof parsed._t === 'number' && (Date.now() - parsed._t) > ttlMs) {
+          try { localStorage.removeItem('gn_cache_' + key); } catch {}
+          return null;
+        }
+        return parsed.v;
+      }
+      // Formato legacy (sin TTL): se acepta para compatibilidad y se migra en próximo set.
+      return parsed;
     } catch { return null; }
   },
 
   _cacheSet(key, val) {
     if (!this._canPersistUserData()) return;
-    try { localStorage.setItem('gn_cache_' + key, JSON.stringify(val)); } catch {}
+    try { localStorage.setItem('gn_cache_' + key, JSON.stringify({ _t: Date.now(), v: val })); } catch {}
   },
 
   // Hidratacion instantanea al arrancar. `_cached` recuerda que hay una
@@ -7681,6 +7692,9 @@ const Dashboard = {
 
   // ==================== SOCIOS CRUD ====================
   async renderSocios(el) {
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina('socios')) {
+      this._sinPermisoPage(el); this.injectIcons(); return;
+    }
     await this._loadList('socios', () => API.getSocios());
     const activos = this.socios.filter(s=>s.activo).length;
     const areas = [...new Set(this.socios.map(s=>s.area))].filter(Boolean);
@@ -8005,6 +8019,9 @@ const Dashboard = {
 
   // ==================== BLACKLIST ====================
   async renderBlacklist(el) {
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina('blacklist')) {
+      this._sinPermisoPage(el); this.injectIcons(); return;
+    }
     await this._loadList('blacklist', () => API.getBlacklist());
     el.innerHTML = `
       <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" aria-label="Buscar en lista negra" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
@@ -8119,6 +8136,9 @@ const Dashboard = {
   },
 
   async renderDonaciones(el) {
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina('donaciones')) {
+      this._sinPermisoPage(el); this.injectIcons(); return;
+    }
     await this._loadList('donaciones', () => API.getDonaciones());
     const total = this._totalDonaciones(this.donaciones);
     const items = (this.donaciones || []).slice().reverse();
@@ -8194,6 +8214,9 @@ const Dashboard = {
   },
 
   async renderAlmacen(el) {
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina('almacen')) {
+      this._sinPermisoPage(el); this.injectIcons(); return;
+    }
     await this._loadList('inventario', () => API.getInventario());
     const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
     el.innerHTML = `

@@ -43,13 +43,13 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Estado | Acción |
 |---|---|---|---|---|
-| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Parcial | Endurecida/alineada en report-only (`style-src 'unsafe-inline'`, `img-src` blob, endpoints Firebase, `form-action`, `object-src 'none'`); enforcement progresivo pendiente tras validar reportes |
-| S2 | Alta | Token API en query string `?token=` (GET/POST) | Bloqueado por backend | Migrar a `Authorization: Bearer` + preflight CORS cuando GAS lo soporte (B3) |
-| S3 | Media | Datos sensibles/PII cacheados en `localStorage` (`gn_cache_*`) | Parcial (se limpia en logout/cambio) | Minimizar, TTL, segmentación por rol/módulo, endurecer en dispositivos compartidos |
-| S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Parcial | Guards en `_loadSurveys/_loadResponses/_loadList` para no disparar fetch sin usuario autenticado; gate de perfil/cancelación de requests obsoletas pendiente |
-| S5 | Media | Uso extensivo de `innerHTML` (riesgo XSS si falta escape/sanitización) | Parcial (`_esc` usado en muchos casos) | Auditoría de sinks, sanitización donde aplique, preferir DOM APIs seguras |
-| S6 | Media | Peticiones API potencialmente no autorizadas por rol en flujos/background | Parcial | Reducidas en transiciones de sesión; condicionar por módulo/rol resuelto y evitar cargas fuera de permisos pendiente |
-| S7 | Baja | `javascript:void(0)` en toggle de menú móvil | Completado | Reemplazado por `<button>` semántico con `aria-label`/`aria-controls` |
+| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Completado (frontend) | Endurecida/alineada en report-only con recursos reales usados (`self`, Firebase/Google APIs, jsdelivr, fonts, `blob:`, `form-action`, `base-uri`, `object-src 'none'`, `upgrade-insecure-requests`). Paso a enforcement diferido a validación de reportes/CSP en producción. |
+| S2 | Alta | Token API en query string `?token=` (GET/POST) | Bloqueado por backend | Migrar a `Authorization: Bearer` + preflight CORS cuando GAS lo soporte (B3). No abordable en frontend sin romper contrato. |
+| S3 | Media | Datos sensibles/PII cacheados en `localStorage` (`gn_cache_*`) | Completado (frontend) | Caché API con TTL (7 días) y envoltorio versionado compatible con formato legacy; limpieza de `gn_cache_*`/datos de usuario en logout y cambio de usuario mantenida. Segmentación adicional por rol/módulo queda como mejora opcional. |
+| S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Completado (frontend) | Guards para no fetch sin sesión en loaders, control por token de página/render y gating de cargas del dashboard por permisos/módulo; fallback de rol `consulta` mantiene seguridad mientras se resuelve perfil. Cancelación HTTP nativa no implementada (sin abort centralizado), pero respuestas obsoletas se descartan por contexto/token en flujos clave. |
+| S5 | Media | Uso extensivo de `innerHTML` (riesgo XSS si falta escape/sanitización) | Completado (auditoría dirigida) | Revisión dirigida de sinks/renderizados de campos de usuario, encuestas, notas y motivos: uso de `_esc`/escape presente en puntos revisados; sin hallazgos evidentes sin escapar en la pasada realizada. Recomendable auditoría continua en cambios futuros. |
+| S6 | Media | Peticiones API potencialmente no autorizadas por rol en flujos/background | Completado (frontend) | Gating por permisos/módulo en cargas de dashboard y guards defensivos en renders/cargas de módulos restringidos (`donaciones`, `almacen`, `socios`, `blacklist`, encuestas/familias según acceso), reduciendo peticiones fuera de permisos. |
+| S7 | Baja | `javascript:void(0)` en toggle de menú móvil | Completado | Reemplazado por `<button>` semántico con `aria-label`/`aria-controls` y gestión de foco/cierre. |
 | S8 | Baja | Dependencias externas (gstatic, jsdelivr, fonts) y superficie CSP | Pendiente | Revisar necesidad, SRI donde aplique, políticas estrictas |
 | S9 | Info | `referrer: no-referrer`, `noindex`, HTTPS/HSTS (hosting) correctos | OK | Mantener |
 
@@ -83,20 +83,21 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 0 — Baseline y preparación (rápida)
 **Objetivo:** asegurar punto de partida medible y entorno de validación.
-- [x] Documentar estado desplegado (`v165` y avances hasta `v169`), matriz de roles/rutas y hallazgos.
-- [ ] Definir checklist formal de smoke test por rol y por plataforma (desktop/tablet/móvil).
+- [x] Documentar estado desplegado (`v165` y avances hasta `v170`), matriz de roles/rutas y hallazgos.
+- [x] Definir checklist formal de smoke test por rol y por plataforma (desktop/tablet/móvil) — ver sección 5 (matriz de verificación).
 - [ ] (Opcional) Capturas/referencias de vistas clave para regresión visual.
-- **Criterio de salida:** baseline documentado; checklist formal pendiente para validación sistemática por fase.
+- **Criterio de salida:** baseline y matriz de verificación documentados; validación visual en dispositivos reales pendiente (U9/bloqueo de entorno).
 
 ### Fase 1 — Seguridad frontend (impacto alto, sin romper contrato backend)
 **Objetivo:** reducir superficie de riesgo en cliente sin requerir cambios incompatibles en GAS.
-- [~] **S1:** CSP *report-only* endurecida/alineada con recursos usados (Firebase/Google APIs, jsdelivr, fonts, `blob:`, `form-action`, `object-src 'none'`, `upgrade-insecure-requests`). Falta validar reportes y preparar enforcement progresivo.
-- [~] **S3:** Limpieza de `gn_cache_*`/datos de usuario en logout/cambio de usuario confirmada en flujo auth. Falta documentar alcance de PII, TTL/minimización y segmentación por rol/módulo.
-- [~] **S4/S6:** Guards para no fetch sin sesión en loaders clave y gating parcial de cargas del dashboard por permisos/módulo. Falta gate completo por perfil/rol resuelto, condicionar todas las cargas/renders por acceso permitido y cancelar/ignorar respuestas obsoletas.
-- [ ] **S5:** Auditoría dirigida de `innerHTML`/sinks en vistas de alto riesgo (datos de usuario/encuestas/notas) y corregir faltas de escape evidentes.
-- [x] **S7:** Toggle “Más” móvil migrado a `<button>` semántico con atributos ARIA y manejo de foco básico.
-- **Archivos probables:** `src/index.html`, `src/js/api.js`, `src/js/auth.js`, `src/js/app.js`, `src/js/dashboard.js`, `src/sw.js`.
-- **Criterio de salida:** sin regresiones de rol/permisos, tests `357+` OK, CSP mejor documentada/endurecida, menos errores por carreras/cargas no autorizadas.
+- [x] **S1:** CSP *report-only* endurecida y alineada con recursos reales. Enforcement progresivo diferido a validación de reportes (sin cambios backend).
+- [~] **S2:** **Bloqueado por backend/CORS (GAS)** — token sigue en `?token=`; migración a `Authorization: Bearer` + preflight requiere despliegue coordinado.
+- [x] **S3:** Caché API con TTL (7 días), migración compatible de formato legacy y limpieza en logout/cambio de usuario.
+- [x] **S4/S6:** Guards sin sesión, gating por permisos/módulo en dashboard y renders/cargas defensivas, y descarte por contexto/token para evitar aplicar estados obsoletos en navegación rápida.
+- [x] **S5:** Auditoría dirigida de sinks `innerHTML` en áreas de riesgo (usuarios/encuestas/notas/motivos) sin hallazgos evidentes sin escape en la pasada realizada; mantener vigilancia en cambios futuros.
+- [x] **S7:** Toggle “Más” móvil como `<button>` semántico con ARIA y foco.
+- **Archivos modificados (fase):** `src/index.html`, `src/js/app.js`, `src/js/dashboard.js`, `src/css/styles.css`, `src/sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md`.
+- **Criterio de salida:** alcanzado en alcance frontend (S2 bloqueado por backend). Sin regresiones conocidas en tests (`357/357`), menos cargas no autorizadas/races visibles y caché con expiración.
 
 ### Fase 2 — Accesibilidad y objetivos táctiles
 **Objetivo:** cumplir buenas prácticas de accesibilidad y usabilidad táctil.
@@ -177,6 +178,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 1 | CSP report-only endurecida/alineada (Firebase, `unsafe-inline` estilos, `blob:`, políticas base) | `86ac93d` (v167) | 357 tests OK, despliegue en producción | Completado |
 | 2026-11-12 | 0-3 | U4 tablas Socios/Donaciones con `data-label` y tarjetas responsive móvil, U5 foco/teclado en menú “Más”, S4/S6 guards de carga sin sesión, refuerzo `:focus-visible`/targets y `aria-label` adicionales | `84c8362` (v168) | 357 tests OK, desplegado (`gn-encuestas-v168`) | Completado (parcial por fases) |
 | 2026-11-12 | 1 | Gating parcial de cargas del dashboard por permisos/módulo para reducir peticiones no autorizadas (S4/S6), actualización de checklist/estado de Fase 1 | `7426d82` (v169) | 357 tests OK, desplegado (`gn-encuestas-v169`) | Completado (parcial) |
+| 2026-11-12 | 1 | Completar Fase 1 (frontend): TTL/expiración de caché `gn_cache_*` (S3), guards defensivos por permisos en renders/cargas de módulos restringidos y refuerzo de gating (S4/S6), auditoría dirigida de `innerHTML` (S5), actualización de estado S1–S7 | Pendiente commit (v170) | `node --test tests/*.test.js` en curso | En ejecución |
 
 ---
 
