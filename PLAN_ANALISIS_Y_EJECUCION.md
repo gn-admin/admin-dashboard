@@ -132,7 +132,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 ### Fase 5 — Validación final y hardening
 **Objetivo:** cierre verificado.
 - [x] Ejecutar suite de tests (`node --test tests/*.test.js`) — 357/357 OK en esta iteración.
-- [~] Pruebas por rol en desktop/tablet/móvil: verificación previa en producción (v165) y validación por código/despliegues posteriores realizadas; **pendiente validación manual en dispositivos reales** (iOS/Android/tablet, portrait/landscape) y smoke completo en entorno final por los 5 roles.
+- [~] Pruebas por rol en desktop/tablet/móvil: verificación en producción (2026-11-12, navegador) con 5 cuentas de prueba (`asdf@1234`) confirmó autenticación y que `user-profile` devuelve roles correctos, pero detectó fallo frontend (perfil no aplicado en UI -> fallback consulta). Fix desplegable preparado (`v175`); **pendiente smoke post-deploy por los 5 roles** y validación manual en dispositivos reales (iOS/Android/tablet, portrait/landscape).
 - [x] Revisión de seguridad residual (alcance frontend/código): permisos UI+gating de cargas, CSP report-only alineada, caché con TTL y limpieza en logout/cambio, token en query mantenido por compatibilidad CORS/GAS con soporte preparado para `Authorization` (opt-in), y auditoría dirigida de sinks `innerHTML` sin hallazgos evidentes en la pasada realizada.
 - [x] Actualizar `src/sw.js` (`CACHE_NAME`) en despliegues con cambios frontend (hasta `v174`).
 - [x] Commit/push y verificación de despliegue en producción (frontend).
@@ -143,11 +143,11 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 ## 5. Matriz de verificación (checklist)
 
 ### 5.1 Por rol (cada plataforma)
-- [~] `admin`: acceso total esperado por permisos/módulos (verificado en código y en validación previa de producción; smoke final multi-dispositivo pendiente)
-- [~] `coordinador`: operativo sin donaciones/almacén según matriz de permisos (código actualizado; validación manual final pendiente)
-- [~] `voluntario`: acceso limitado a módulos permitidos (código actualizado; validación manual final pendiente)
-- [~] `tesoreria`: donaciones/almacén/animales/reportes según permisos (código actualizado; validación manual final pendiente)
-- [~] `consulta`: solo lectura estricta reforzada en UI (ocultación/deshabilitado de mutaciones) y backend RBAC existente; validación manual final pendiente
+- [~] `admin`: backend `user-profile` devuelve `admin` (verificado en producción 2026-11-12 con `gn.test.admin`). UI mostraba fallback `Consulta` por bug de carga de perfil en `init`; fix aplicado en `v175` (pendiente verificación post-deploy en producción).
+- [~] `coordinador`: backend devuelve `coordinador` (verificado en producción). Misma incidencia de UI/fallback corregida en `v175`; pendiente verificación post-deploy.
+- [~] `voluntario`: backend devuelve `voluntario` (verificado en producción). Misma incidencia corregida en `v175`; pendiente verificación post-deploy.
+- [~] `tesoreria`: backend devuelve `tesoreria` (verificado en producción). Misma incidencia corregida en `v175`; pendiente verificación post-deploy.
+- [~] `consulta`: backend devuelve `consulta` y fallback/solo lectura coherentes (verificado en producción). Pendiente smoke final multi-dispositivo.
 
 ### 5.2 Por plataforma
 - [~] **Desktop:** mejoras de accesibilidad/foco/targets y comportamiento por rol implementadas (validación visual final recomendada)
@@ -190,7 +190,8 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | `6ab26a7` (v172) | 357 tests OK, desplegado (`gn-encuestas-v172`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | `907cf9a` (v173) | 357 tests OK, desplegado (`gn-encuestas-v173`) | Completado (frontend) |
 | 2026-11-12 | 5 | Fase 5 validación/hardening: tests 357/357, revisión residual seguridad/UI, preparación S2 (Authorization opt-in en frontend + soporte/doOptions en backend local), actualización de matriz/checklists y registro de pendientes externos | `1764fe4` (v174) | 357 tests OK, desplegado (`gn-encuestas-v174`) | Completado (frontend/código; pendientes externos) |
-| 2026-11-12 | 5+ | Verificación adicional en navegador (producción): S2 con cabecera `Authorization` falla por preflight/CORS en GAS (`Failed to fetch`); CSP report-only en `<meta>` es ignorada por el navegador. Plan actualizado con hallazgos y bloqueos reales | Pendiente commit | Verificación browser en `gn-admin.github.io` (sesión admin) | Completado (análisis) |
+| 2026-11-12 | 5+ | Verificación adicional en navegador (producción): S2 con cabecera `Authorization` falla por preflight/CORS en GAS (`Failed to fetch`); CSP report-only en `<meta>` es ignorada por el navegador. Plan actualizado con hallazgos y bloqueos reales | `fa4ea3f` | Verificación browser en `gn-admin.github.io` (sesión admin) | Completado (análisis) |
+| 2026-11-12 | 5+ | Verificación multi-rol con navegador (producción, `gn.test.*@example.test` / `asdf@1234`): login correcto para los 5 roles; **backend `user-profile` devuelve el rol esperado** (admin/coordinador/voluntario/tesoreria/consulta), pero en el flujo UI `Dashboard.userProfile` quedaba `null` y se aplicaba fallback `Consulta` (sidebar/permisos incorrectos) por fallo/race al cargar perfil en `init`. Fix frontend: espera/reintento robusto de token/perfil (`src/js/auth.js`, `src/js/dashboard.js`) + bump SW `v175`. Roles backend configurados OK; verificación visual final por rol requiere despliegue de este fix. | Pendiente commit | Browser producción + tests 357/357 | Completado (fix frontend; verificación post-deploy pendiente) |
 
 ---
 

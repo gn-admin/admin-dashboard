@@ -18,27 +18,47 @@ const Dashboard = {
     // El perfil no bloquea el primer pintado: la UI arranca con cache local
     // y el nombre llega en segundo plano. Si falla, la app sigue usable.
     this._profileResolved = false;
-    this._profilePromise = API.getUserProfile().then(user => {
-      this.userProfile = user;
-      this._profileResolved = true;
-      this.updateUserUI();
-      const actual = (location.hash || '').replace('#', '') || 'dashboard';
-      if (!this.puedeAccederPagina(actual)) {
-        location.hash = this.primeraPaginaPermitida();
-      } else if (typeof App !== 'undefined' && App.currentPage === actual) {
-        // Reaplicar por si el render se hizo antes de resolver el rol
-        this.loadPage(actual);
+    const _fetchProfile = async () => {
+      try {
+        const user = await API.getUserProfile();
+        this.userProfile = user;
+        this._profileResolved = true;
+        this.updateUserUI();
+        const actual = (location.hash || '').replace('#', '') || 'dashboard';
+        if (!this.puedeAccederPagina(actual)) {
+          location.hash = this.primeraPaginaPermitida();
+        } else if (typeof App !== 'undefined' && App.currentPage === actual) {
+          // Reaplicar por si el render se hizo antes de resolver el rol
+          this.loadPage(actual);
+        }
+        const home = document.getElementById('page-dashboard');
+        if (home && home.classList.contains('active') && this._hasHomeCache()) this._paintHome(home);
+        return user;
+      } catch (err) {
+        console.error('Error init:', err);
+        // Si hay sesión activa, reintentar (posible race con Firebase auth)
+        if (typeof Auth !== 'undefined' && Auth.currentUser) {
+          try {
+            await new Promise(r => setTimeout(r, 1500));
+            const user = await API.getUserProfile();
+            this.userProfile = user;
+            this._profileResolved = true;
+            this.updateUserUI();
+            const actual = (location.hash || '').replace('#', '') || 'dashboard';
+            if (!this.puedeAccederPagina(actual)) location.hash = this.primeraPaginaPermitida();
+            else if (typeof App !== 'undefined' && App.currentPage === actual) this.loadPage(actual);
+            return user;
+          } catch (err2) {
+            console.error('Error init (reintento):', err2);
+          }
+        }
+        this.userProfile = this.userProfile || null;
+        this._profileResolved = true;
+        this._snackErr(err, 'No se pudieron cargar los datos iniciales');
+        return null;
       }
-      const home = document.getElementById('page-dashboard');
-      if (home && home.classList.contains('active') && this._hasHomeCache()) this._paintHome(home);
-      return user;
-    }).catch(err => {
-      console.error('Error init:', err);
-      this.userProfile = this.userProfile || null;
-      this._profileResolved = true;
-      this._snackErr(err, 'No se pudieron cargar los datos iniciales');
-      return null;
-    });
+    };
+    this._profilePromise = _fetchProfile();
     this.hideLoading();
     // Cargas diferidas: se condicionan por permisos cuando el perfil esté resuelto
     this._startBackgroundLoads();

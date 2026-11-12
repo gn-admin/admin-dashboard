@@ -96,9 +96,21 @@ const Auth = {
 
   async getIdToken() {
     await this._ensureSDK();
+    // Esperar a que Firebase auth esté listo y haya usuario
     if (!firebase.auth().currentUser) {
-      throw new Error('No hay usuario autenticado');
+      // Intentar esperar a onAuthStateChanged
+      if (!this._resolved) {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('No hay usuario autenticado')), 10000);
+          const unsub = firebase.auth().onAuthStateChanged((user) => {
+            if (user) { clearTimeout(timeout); try { unsub(); } catch {} resolve(); }
+          });
+        });
+      } else if (!firebase.auth().currentUser) {
+        throw new Error('No hay usuario autenticado');
+      }
     }
+    if (!firebase.auth().currentUser) throw new Error('No hay usuario autenticado');
     return await firebase.auth().currentUser.getIdToken();
   },
 
