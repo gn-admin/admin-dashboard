@@ -104,5 +104,15 @@ const Utils = {
 
   euros(v) {
     return (parseFloat(String(v ?? '').replace(',', '.')) || 0).toFixed(2);
+  },
+
+  snackTipo(err) {
+    const st = err && err.status;
+    if (st === 'warning' || st === 'success' || st === 'error' || st === 'neutral') return st;
+    if (err && err.code === 429) return 'warning';
+    const m = String((err && (err.message || err.error)) || '').toLowerCase();
+    if (m && /sin configurar|no configurado|demasiadas peticiones|espera unos segundos/.test(m)) return 'warning';
+    if (m && /http\s*\d{3}/.test(m)) return 'error';
+    return 'neutral';
   }
 };

@@ -9022,15 +9022,13 @@ const Dashboard = {
   // codigo HTTP explicito. Cualquier fallo sin clasificar (red caida, mensaje
   // desconocido) va en gris neutro: nunca un falso error rojo.
   _snackTipo(err) {
+    if (typeof Utils !== 'undefined' && Utils.snackTipo) return Utils.snackTipo(err);
     const st = err && err.status;
     if (st === 'warning' || st === 'success' || st === 'error' || st === 'neutral') return st;
     if (err && err.code === 429) return 'warning';
     const m = String((err && (err.message || err.error)) || '').toLowerCase();
     if (m && /sin configurar|no configurado|demasiadas peticiones|espera unos segundos/.test(m)) return 'warning';
-    // HTTP con codigo de error explicito -> error (rojo).
     if (m && /http\s*\d{3}/.test(m)) return 'error';
-    // Sin status reconocible ni codigo HTTP no se puede afirmar que sea un
-    // fallo del backend: gris neutro (nunca verde).
     return 'neutral';
   },
 
