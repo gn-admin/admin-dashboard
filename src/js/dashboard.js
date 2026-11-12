@@ -446,6 +446,9 @@ const Dashboard = {
 
     // Ocultar acciones de creaci?n/edici?n/borrado seg?n permisos por m?dulo
     try {
+      // Mientras el perfil/rol está pendiente, solo se aplica skeleton de navegación.
+      // No ocultar acciones de contenido: no se restauran al resolver y pueden desaparecer (p.ej. admin).
+      if (pending) return;
       const rol = this._rolActual ? this._rolActual() : 'consulta';
       const hash = String(location.hash || '#dashboard').replace('#','');
       const pageToMod = {
@@ -5923,7 +5926,8 @@ const Dashboard = {
     const verEntrega = !!p.fecha_entrega || currentIdx >= idxEntrega;
     const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= idxPrueba;
     const puedeDevolucion = !cerrado && (currentIdx >= idxEntrega || !!p.fecha_entrega);
-    const verSeguimiento = !!p.fecha_entrega || currentIdx >= idxEntrega || (this.seguimientos || []).some(x => String(x.adopcion_id) === String(p.id) && String(x.tipo || '').toLowerCase() !== 'prueba');
+    // Seguimiento post-adopción: visible después de la fase de Entrega (Prueba/Seguimiento) o si ya hay seguimientos registrados.
+    const verSeguimiento = currentIdx >= idxPrueba || (this.seguimientos || []).some(x => String(x.adopcion_id) === String(p.id) && String(x.tipo || '').toLowerCase() !== 'prueba');
     const devueltoBanner = devuelto
       ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso devuelto</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El animal está disponible para una nueva adopción.</span></div>`
       : (anulado ? `<div class="alert-item warning" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso anulado</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El caso se conserva en el historial.</span></div>` : '');
@@ -5946,7 +5950,9 @@ const Dashboard = {
 
     const seguimientoHtml = verSeguimiento
       ? this._seguimientosFicha(p, { cerrado })
-      : `<details class="detail-collapse"><summary>${Icons.calendar} Seguimiento post-adopción</summary><div class="detail-collapse-body"><div class="detail-section-note">El seguimiento a largo plazo (1, 3, 6 y 12 meses) se habilita a partir de la <b>Entrega</b>. La prueba de adaptación (15-30 días) se gestiona en su propia sección cuando corresponda.</div></div></details>`;
+      : (currentIdx >= idxEntrega
+        ? `<details class="detail-collapse"><summary>${Icons.calendar} Seguimiento post-adopción</summary><div class="detail-collapse-body"><div class="detail-section-note">El seguimiento a largo plazo (1, 3, 6 y 12 meses) se habilita tras completar la fase de <b>Entrega</b> (en fases de Prueba/Seguimiento).</div></div></details>`
+        : '');
 
     const accionesSecundarias = (!cerrado || puedeDevolucion)
       ? `<details class="detail-collapse"><summary>${Icons.settings || Icons.info} Más acciones del caso</summary><div class="detail-collapse-body"><div class="detail-actions-inline detail-actions-inline--danger" style="padding:8px 0 0">
