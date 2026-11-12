@@ -1232,20 +1232,21 @@ body {
 
 /* ===== CARDS ===== */
 .stat-card {
-  background: var(--white);
-  border-radius: var(--radius);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--gray-100);
+  border: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
 }
 
 .stat-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  border-color: rgba(31, 201, 91, 0.18);
 }
 
 .stat-card-icon {
