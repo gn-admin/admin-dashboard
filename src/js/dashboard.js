@@ -941,6 +941,7 @@ const Dashboard = {
       e.preventDefault();
       const d = el.dataset || {};
       try {
+        if (d.stopPropagation === '1') e.stopPropagation();
         if (d.closeInfo === '1') this.closeInfoModal();
         if (d.pass === 'el') {
           if (d.args) { this[action].apply(this, [el, ...JSON.parse(d.args)]); }
@@ -948,12 +949,34 @@ const Dashboard = {
         } else if (d.args) {
           this[action].apply(this, JSON.parse(d.args));
         } else if (d.arg0 !== undefined) {
-          const args=[]; for(let i=0;i<6;i++){const k='arg'+i; if(d[k]===undefined) break; args.push(d[k]);} this[action].apply(this,args);
+          const args=[]; for(let i=0;i<6;i++){const k='arg'+i; if(d[k]===undefined) break; let v=d[k]; if(v==='true') v=true; else if(v==='false') v=false; args.push(v);} this[action].apply(this,args);
         } else {
           this[action].call(this);
         }
       } catch (err) {
         console.error('Acción delegada fallida:', action, err);
+        this._snackErr(err, 'No se pudo completar la acción');
+      }
+    });
+    document.addEventListener('submit', (e) => {
+      const form = e.target.closest('form[data-submit]');
+      if (!form) return;
+      const action = form.dataset.submit;
+      if (!action || typeof this[action] !== 'function') return;
+      e.preventDefault();
+      const d = form.dataset || {};
+      try {
+        const args = [e];
+        for (let i = 0; i < 8; i++) {
+          const k = 'sarg' + i;
+          if (d[k] === undefined) break;
+          let v = d[k];
+          if (v === 'true') v = true; else if (v === 'false') v = false;
+          args.push(v);
+        }
+        this[action].apply(this, args);
+      } catch (err) {
+        console.error('Submit delegado fallido:', action, err);
         this._snackErr(err, 'No se pudo completar la acción');
       }
     });
@@ -976,6 +999,25 @@ const Dashboard = {
   clearBlacklistForm() {
     const c = document.getElementById('blacklist-form-container');
     if (c) c.innerHTML = '';
+  },
+
+  showTutorialFromProfile() {
+    this.closeProfile();
+    this.showTutorial();
+  },
+
+  doLogout() {
+    if (typeof Auth !== 'undefined' && Auth.logout) Auth.logout();
+  },
+
+  openAnimalFichaFromInfo(id) {
+    this.closeInfoModal();
+    this.openAnimalFicha(id);
+  },
+
+  showGrupoFormFromInfo(gid) {
+    this.closeInfoModal();
+    this.showGrupoForm(gid);
   },
 
   _confirm(msg, title, okLabel) {
@@ -2014,7 +2056,7 @@ const Dashboard = {
 
   showRecordatorioForm() {
     this.showFormModal('Nuevo recordatorio', `
-      <form onsubmit="Dashboard.saveRecordatorio(event)">
+      <form data-submit="saveRecordatorio">
       <div class="form-group"><label>Título *</label><input type="text" id="rc-titulo" required placeholder="Ej: Vacuna anual Luna"></div>
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="rc-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
       <div class="form-group"><label>Nota</label><input type="text" id="rc-nota" placeholder="Opcional"></div></div>
@@ -2528,8 +2570,8 @@ const Dashboard = {
         <div><span class="estado-badge en_proceso">${this._esc(u.roleLabel)}</span></div>
       </div>
       <div class="profile-actions">
-        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.closeProfile();Dashboard.showTutorial()">${Icons.helpCircle} Guia de procesos</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="Auth.logout()">${Icons.xCircle} Cerrar sesion</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="showTutorialFromProfile">${Icons.helpCircle} Guia de procesos</button>
+        <button type="button" class="btn btn-danger btn-sm" data-action="doLogout">${Icons.xCircle} Cerrar sesion</button>
       </div>`;
     if (el.style.display !== 'flex') this._modalScrollLock(true);
     el.style.display = 'flex';
@@ -2963,7 +3005,7 @@ const Dashboard = {
           <div class="nota-head">
             <span class="nota-autor">${this._esc(autor)}</span>
             ${n.fecha ? `<span class="nota-fecha">${this._esc(this._fmtFecha(n.fecha))}</span>` : ''}
-            ${o.readonly || n.id === 'legacy' ? '' : `<button type="button" class="nota-del" title="Eliminar nota" aria-label="Eliminar nota de ${this._esc(autor)}" onclick="Dashboard.notaEliminarUI('${this._esc(kind)}','${this._esc(id)}','${this._esc(n.id)}','${this._esc(ctx)}')">${Icons.trash}</button>`}
+            ${o.readonly || n.id === 'legacy' ? '' : `<button type="button" class="nota-del" title="Eliminar nota" aria-label="Eliminar nota de ${this._esc(autor)}" data-action="notaEliminarUI" data-arg0="${this._esc(kind)}" data-arg1="${this._esc(id)}" data-arg2="${this._esc(n.id)}" data-arg3="${this._esc(ctx)}">${Icons.trash}</button>`}
           </div>
           <div class="nota-texto">${this._esc(n.texto)}</div>
         </div>
@@ -3187,7 +3229,7 @@ const Dashboard = {
           <div class="form-group"><label>Tipo *</label><select id="rd-tipo" onchange="Dashboard._rellenarPlantilla()"><option value="adopcion">Adopcion (contrato)</option><option value="acogida">Acogida (acuerdo temporal)</option></select></div></div>
           <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div>
           <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:var(--text-xs);color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
-          <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="_copiarCaption">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
+          <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="_copiarCaption">Copiar texto</button><button type="button" class="btn btn-primary" data-action="publicarRedes">${Icons.check} Publicar (simulado)</button></div>
         </div>
         <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Vista previa</h3></div><div class="card-body"><div id="rd-preview"></div></div></div>
         <div class="card"><div class="card-header"><h3>Historial</h3></div><div class="card-body-flush"><div id="redes-historial">${this._renderRedesHistorial()}</div></div></div>
@@ -3323,7 +3365,7 @@ const Dashboard = {
     await this._ensureListas(['socios']);
     const opts = (this.socios || []).map(s => `<option value="${this._esc(s.id)}">${this._esc(s.nombre)} · ${this._esc(s.tipo || '')}</option>`).join('');
     this.showFormModal('Nuevo apadrinamiento · ' + a.nombre, `
-      <form onsubmit="Dashboard.saveApadrinamiento(event,'${a.id}')">
+      <form data-submit="saveApadrinamiento" data-sarg0="${a.id}">
       <div class="form-group"><label>Tipo de padrino *</label><select id="ap-tipo" onchange="Dashboard._togglePadrino()"><option value="Socio">Socio existente</option><option value="Externo">Externo (nuevo)</option></select></div>
       <div class="form-group" id="ap-socio-wrap"><label>Socio *</label><select id="ap-socio">${opts || '<option value="">Sin socios</option>'}</select></div>
       <div id="ap-externo-wrap" style="display:none">
@@ -3528,7 +3570,7 @@ const Dashboard = {
     const a = this._byId(this.animales, animalId);
     if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
     this.showFormModal('Nuevo gasto · ' + a.nombre, `
-      <form onsubmit="Dashboard.saveGasto(event,'${a.id}')">
+      <form data-submit="saveGasto" data-sarg0="${a.id}">
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="gs-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
       <div class="form-group"><label>Importe (€) *</label><input type="text" id="gs-importe" required placeholder="Ej: 45.50" inputmode="decimal"></div></div>
       <div class="form-group"><label>Concepto *</label><input type="text" id="gs-concepto" required placeholder="Ej: Vacuna rabia"></div>
@@ -3622,7 +3664,7 @@ const Dashboard = {
     const a = this._byId(this.animales, animalId);
     if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
     this.showFormModal('Nuevo documento · ' + a.nombre, `
-      <form onsubmit="Dashboard.saveDocumento(event,'${a.id}')">
+      <form data-submit="saveDocumento" data-sarg0="${a.id}">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
       <div class="form-group"><label>Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
       <div class="form-group"><label>Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
@@ -3732,7 +3774,7 @@ const Dashboard = {
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${this._esc(a.raza)} &middot; ${this._esc(a.edad)} &middot; ${this._esc(a.sexo)}</div>
               <div class="animal-card-pills">${this._esPrioritario(a)?`<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>`:''}<span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div>
-              ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" onclick="event.stopPropagation();Dashboard.viewGrupo('${a.grupo_id}')" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
+              ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" data-action="viewGrupo" data-arg0="${a.grupo_id}" data-stop-propagation="1" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
           </div>`;
     const bloquesHtml = bloques.map(b => `
@@ -4047,7 +4089,7 @@ const Dashboard = {
     const nombre = (g && g.nombre) || ms[0].grupo || gid;
     const cabecera = this._grupoCollage(gid);
     const filas = ms.map(x => `
-      <div class="grupo-miembro" onclick="Dashboard.closeInfoModal();Dashboard.openAnimalFicha('${x.id}')">
+      <div class="grupo-miembro" data-action="openAnimalFichaFromInfo" data-arg0="${x.id}" style="cursor:pointer">
         <span class="grupo-miembro-foto">${this._fotoSrc(x) ? `<img loading="lazy" src="${this._esc(this._fotoSrc(x, 'w80'))}" alt="">` : (x.especie === 'Perro' ? Icons.dog : (x.especie === 'Gato' ? Icons.cat : Icons.paw))}</span>
         <span class="grupo-miembro-nombre"><b>${this._esc(x.nombre)}</b><small>${this._esc(x.raza || '')}${x.edad ? ' · ' + this._esc(x.edad) : ''} · ${this._esc(x.sexo || '')}</small></span>
         <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span>
@@ -4058,7 +4100,7 @@ const Dashboard = {
         <div class="grupo-hero-txt"><h4>${this._esc(nombre)}</h4><p>${this._esc(this._grupoResumen(gid))}</p></div>
       </div>
       <div style="display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap">
-        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showGrupoForm('${gid}')">${Icons.pencil} Editar grupo</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="showGrupoFormFromInfo" data-arg0="${gid}">${Icons.pencil} Editar grupo</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="showAnimalFormInGroup" data-arg0="${gid}" data-close-info="1">${Icons.plus} Anadir animal</button>
       </div>
       ${g && g.descripcion ? `<div class="detail-section"><div class="detail-section-title">${Icons.info} Descripcion</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5">${this._esc(g.descripcion)}</p></div>` : ''}
@@ -4088,7 +4130,7 @@ const Dashboard = {
     const g = this._grupoInfo(gid) || {};
     const nombre = g.nombre || ms[0].grupo || '';
     const fotoActual = this._grupoFoto(gid) || '';
-    this.showFormModal('Editar grupo', `<form onsubmit="Dashboard.saveGrupo(event,'${gid}')">
+    this.showFormModal('Editar grupo', `<form data-submit="saveGrupo" data-sarg0="${gid}">
       <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label>Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'gr-foto-preview')"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
       <div class="form-group"><label>Descripcion</label><textarea id="gr-descripcion" rows="2" placeholder="De donde viene la camada, caracteristicas...">${this._esc(g.descripcion || '')}</textarea></div>
       <div class="form-group"><label>Notas</label><textarea id="gr-notas" rows="3" placeholder="Seguimiento, tratamientos, acuerdos...">${this._esc(g.notas || '')}</textarea></div>
@@ -4237,7 +4279,7 @@ const Dashboard = {
       + listaGrupos.map(g => `<option value="${this._esc(g.nombre)}" ${enLista && g.norm === normVal ? 'selected' : ''}>${this._esc(g.nombre)}${g.n ? ` (${g.n})` : ''}</option>`).join('')
       + (grupoVal && !enLista ? `<option value="${this._esc(grupoVal)}" selected>${this._esc(grupoVal)}</option>` : '')
       + `<option value="__nuevo__">Crear grupo nuevo...</option>`;
-    this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form onsubmit="Dashboard.saveAnimal(event,${isEdit?'true':'false'},'${data?.id||''}')">
+    this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form data-submit="saveAnimal" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
@@ -4284,7 +4326,7 @@ const Dashboard = {
   },
 
   showCamadaForm() {
-    this.showFormModal('Alta de camada', `<form onsubmit="Dashboard.saveCamada(event)">
+    this.showFormModal('Alta de camada', `<form data-submit="saveCamada">
       <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
       <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required>${this._especiesDomesticas().map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>
       <div class="form-row"><div class="form-group"><label>Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label>Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
@@ -4635,7 +4677,7 @@ const Dashboard = {
 
   showFamiliaForm(data) {
     const isEdit = !!data;
-    this._renderForm('acogidas', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Familia Acogedora</h3><form onsubmit="Dashboard.saveFamilia(event,${isEdit?'true':'false'},'${data?.id||''}')">
+    this._renderForm('acogidas', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Familia Acogedora</h3><form data-submit="saveFamilia" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="fa-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="fa-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Telefono</label><input type="text" id="fa-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label>Ubicacion *</label><input type="text" id="fa-ubicacion" value="${this._esc(data?.ubicacion||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Especialidad</label><input type="text" id="fa-especialidad" value="${this._esc(data?.especialidad||'')}" placeholder="Ej: Gatos, Perros pequenos"></div><div class="form-group"><label>Max animales</label><input type="number" id="fa-max" value="${this._esc(data?.max_capacity||2)}" min="1"></div></div>
@@ -5262,7 +5304,7 @@ const Dashboard = {
     const isEdit = !!data;
     const fases = this._fasesAdopcion();
     await this._ensureListas(['animales']);
-    this._renderForm('adopciones', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Adopcion</h3><form onsubmit="Dashboard.saveAdopcion(event,${isEdit?'true':'false'},'${data?.id||''}')">
+    this._renderForm('adopciones', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nueva'} Adopcion</h3><form data-submit="saveAdopcion" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-row"><div class="form-group"><label>Animal *</label><input type="text" id="ad-animal" value="${this._esc(data?.animal||'')}" required placeholder="Ej: Max (Labrador)"></div><div class="form-group"><label>Adoptante *</label><input type="text" id="ad-adoptante" value="${this._esc(data?.adoptante||'')}" required></div></div>
       <div class="form-group"><label>Vincular animal (reserva estado)</label><select id="ad-animal-id" onchange="Dashboard._vincularAnimalTexto()"><option value="">Sin vincular (solo texto)</option>${this._ordenaUrgentes(this.animales).map(a=>`<option value="${this._esc(a.id)}" ${String(data?.animal_id||'')===String(a.id)?'selected':''}>${this._esPrioritario(a)?'URGENTE · ':''}${this._esc(a.nombre)} · ${this._esc(a.especie||'')}</option>`).join('')}</select></div>
       <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="ad-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="ad-telefono" value="${this._esc(data?.telefono||'')}"></div></div>
@@ -5554,7 +5596,7 @@ const Dashboard = {
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
     if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden añadir notas de fase.', 'warning'); return; }
     this.showFormModal('Nota de fase · ' + (p.fase || ''), `
-      <form onsubmit="Dashboard.guardarNotaFase(event,'${adopcionId}')">
+      <form data-submit="guardarNotaFase" data-sarg0="${adopcionId}">
         <div class="form-group"><label>Fase actual</label><input type="text" value="${this._esc(p.fase || '')}" disabled></div>
         <div class="form-group"><label>Nota</label><textarea id="hf-nota" rows="4" placeholder="Escribe una nota para esta fase (opcional pero recomendada)"></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Se guardará con tu usuario y la fecha/hora actual.</div></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar nota</button></div>
@@ -6088,7 +6130,7 @@ const Dashboard = {
     }
     const marcas = this._checklistMarks(p.entrega_checklist);
     this.showFormModal('Registrar entrega · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.saveEntrega(event,'${id}')">
+      <form data-submit="saveEntrega" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Registra la entrega fisica del animal. El checklist ayuda a comprobar que todo esta listo.</span></div>
         <div class="form-row"><div class="form-group"><label>Fecha de entrega *</label><input type="date" id="en-fecha" value="${this._esc(p.fecha_entrega || new Date().toISOString().slice(0,10))}" required></div><div class="form-group"><label>Persona que recibe</label><input type="text" id="en-recibe" value="${this._esc(p.adoptante || '')}" placeholder="Nombre del adoptante"></div></div>
         <div class="form-group"><label>Checklist de entrega</label><div class="check-grid">${this._entregaChecklist().map(it => { const fijo = it.id === 'contrato'; return `<label class="check-item"><input type="checkbox" id="en-chk-${it.id}" ${(fijo || marcas[it.id]) ? 'checked' : ''} ${fijo ? 'disabled' : ''}><span>${this._esc(it.label)}${fijo ? ' (ya verificado)' : ''}${it.opcional ? ' (opcional)' : ''}</span></label>`; }).join('')}</div></div>
@@ -6157,7 +6199,7 @@ const Dashboard = {
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
     await this._ensureListas(['seguimientos']);
     this.showFormModal('Prueba de adaptacion · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.savePrueba(event,'${id}')">
+      <form data-submit="savePrueba" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>La <b>prueba</b> es el periodo corto de adaptacion (15-30 dias). El <b>seguimiento</b> se registra despues, a 1, 3, 6 y 12 meses.</span></div>
         <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="pb-fecha" value="${new Date().toISOString().slice(0,10)}" required></div><div class="form-group"><label>Resultado *</label><select id="pb-resultado" required><option value="Continua la adopcion">Continua la adopcion</option><option value="Seguimiento especial">Seguimiento especial</option><option value="Devolucion recomendada">Devolucion recomendada</option></select></div></div>
         <div class="form-group"><label>Checklist de adaptacion</label><div class="check-grid">${this._pruebaChecklist().map(it => `<label class="check-item"><input type="checkbox" id="pb-chk-${it.id}"><span>${this._esc(it.label)}</span></label>`).join('')}</div></div>
@@ -6401,9 +6443,9 @@ const Dashboard = {
     return { tono: info.tono, title: info.label, text: info.desc, cta: null, ctaLabel: '' };
   },
 
-  _faseCtaOnclick(cta, id) {
+  _faseCtaAction(cta) {
     const map = { contrato: 'showContratoForm', entrega: 'showEntregaForm', prueba: 'showPruebaForm', seguimiento: 'showSeguimientoForm', email: 'showContratoEmailForm' };
-    return `Dashboard.${map[cta] || 'viewAdopcion'}('${id}')`;
+    return map[cta] || 'viewAdopcion';
   },
 
   _faseGuiaHtml(p, contrato) {
@@ -6411,7 +6453,7 @@ const Dashboard = {
     if (!g) return '';
     const icon = g.tono === 'success' ? Icons.checkCircle : (g.tono === 'warning' ? Icons.alertTriangle : Icons.info);
     const cta = g.cta
-      ? `<button type="button" class="btn btn-sm ${g.tono === 'warning' ? 'btn-primary' : 'btn-outline-green'}" onclick="${this._faseCtaOnclick(g.cta, p.id)}">${this._esc(g.ctaLabel)}</button>`
+      ? `<button type="button" class="btn btn-sm ${g.tono === 'warning' ? 'btn-primary' : 'btn-outline-green'}" data-action="${this._faseCtaAction(g.cta)}" data-arg0="${this._esc(p.id)}">${this._esc(g.ctaLabel)}</button>`
       : '';
     return `<div class="fase-guia ${g.tono}"><div class="fase-guia-icon">${icon}</div><div class="fase-guia-body"><div class="fase-guia-title">${this._esc(g.title)}</div><div class="fase-guia-text">${this._esc(g.text)}</div></div>${cta}</div>`;
   },
@@ -6433,7 +6475,7 @@ const Dashboard = {
     if (bloqueo) { this.showSnackbar(bloqueo, 'warning'); return; }
     const next = fases[idx + 1];
     this.showFormModal('Avanzar fase · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.guardarAvanceFase(event,'${id}')">
+      <form data-submit="guardarAvanceFase" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Vas a cerrar <b>${this._esc(p.fase)}</b> y avanzar a <b>${this._esc(next)}</b>. Se guardará quién realiza el cambio y la fecha de cierre de la fase.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Siguiente fase</div><div class="detail-answer">${this._esc(next)}</div></div></div>
         <div class="form-group"><label>Nota de cierre de fase (opcional)</label><textarea id="af-nota" rows="4" placeholder="Observaciones, acuerdos, incidencias... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
@@ -6503,7 +6545,7 @@ const Dashboard = {
       ? 'Se conservan los datos ya registrados (' + conserva.join(' y ') + '), pero el caso volverá a una fase anterior.'
       : 'No se borran datos, pero el caso volverá a la fase anterior.';
     this.showFormModal('Retroceder fase · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.guardarRetrocesoFase(event,'${id}')">
+      <form data-submit="guardarRetrocesoFase" data-sarg0="${id}">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>Vas a retroceder de <b>${this._esc(p.fase)}</b> a <b>${this._esc(prev)}</b>. ${this._esc(extra)} Se guardará quién realiza el cambio y la fecha.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Fase destino</div><div class="detail-answer">${this._esc(prev)}</div></div></div>
         <div class="form-group"><label>Nota del retroceso (opcional)</label><textarea id="rf-nota" rows="4" placeholder="Motivo del retroceso, observaciones... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
@@ -6554,7 +6596,7 @@ const Dashboard = {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado', 'warning'); return; }
     this.showFormModal('Registrar devolución · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.guardarDevolucion(event,'${id}')">
+      <form data-submit="guardarDevolucion" data-sarg0="${id}">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: quedará con desenlace <b>Devuelto</b> y se conservará en el historial. El animal volverá a <b>Disponible</b> y la solicitud a <b>En proceso</b>.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase || '—')}</div></div><div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante || '—')}</div></div></div>
         <div class="form-group"><label>Motivo de la devolución *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej.: No se ha adaptado al hogar, cambio de circunstancias del adoptante..."></textarea></div>
@@ -6626,7 +6668,7 @@ const Dashboard = {
     const opciones = [['', 'Sin hito (extra)'], ['1m', '1 mes'], ['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses']]
       .map(([v, l]) => `<option value="${v}" ${siguiente && siguiente.hito === v ? 'selected' : ''}>${l}</option>`).join('');
     this.showFormModal('Nuevo seguimiento', `
-      <form onsubmit="Dashboard.saveSeguimiento(event,'${p.id}')">
+      <form data-submit="saveSeguimiento" data-sarg0="${p.id}">
       <div class="alert-item info" style="margin-bottom:14px">${Icons.calendar} <span>El <b>seguimiento</b> es el acompanamiento a largo plazo (1, 3, 6 y 12 meses). La <b>prueba</b> de adaptacion es el periodo corto de 15-30 dias y se registra en su propia seccion.</span></div>
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="sg-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
       <div class="form-group"><label>Tipo *</label><select id="sg-tipo" required><option value="Llamada">Llamada</option><option value="Visita">Visita</option><option value="Email">Email</option><option value="Otro">Otro</option></select></div></div>
@@ -6688,7 +6730,7 @@ const Dashboard = {
     if (p.desenlace === 'anulado') { this.showSnackbar('Este caso ya está anulado', 'warning'); return; }
     if (p.desenlace === 'devuelto') { this.showSnackbar('Este caso ya está devuelto', 'warning'); return; }
     this.showFormModal('Anular caso · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.guardarAnulacionCaso(event,'${id}')">
+      <form data-submit="guardarAnulacionCaso" data-sarg0="${id}">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>Vas a <b>anular</b> este caso. El caso se conservará en el historial con el motivo indicado. El animal volverá a <b>Disponible</b> y la solicitud/candidatura se liberarán según corresponda.</span></div>
         <div class="detail-section" style="margin-bottom:12px">
           <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${this._esc(p.animal || '—')}</div></div>
@@ -6799,15 +6841,15 @@ const Dashboard = {
         <div class="contrato-topbar">
           <div class="contrato-topbar-meta">${Icons.fileText} <span><b>${this._esc(p.animal || 'Animal')}</b> · ${this._esc(p.adoptante || 'Adoptante')}</span> <span class="estado-badge pendiente">Pendiente de firma</span></div>
           <div class="contrato-topbar-actions">
-            <button type="button" class="btn btn-sm btn-outline-green" id="contrato-doc-toggle" onclick="Dashboard._toggleContratoDoc()">${Icons.eye} Ver documento</button>
+            <button type="button" class="btn btn-sm btn-outline-green" id="contrato-doc-toggle" data-action="_toggleContratoDoc">${Icons.eye} Ver documento</button>
           </div>
         </div>
         <div class="contrato-layout">
           <aside class="contrato-doc-pane" id="contrato-doc-pane">
-            <button type="button" class="btn btn-sm btn-outline-green contrato-doc-back" onclick="Dashboard._toggleContratoDoc(false)">${Icons.arrowLeft} Volver a la firma</button>
+            <button type="button" class="btn btn-sm btn-outline-green contrato-doc-back" data-action="_toggleContratoDoc" data-arg0="false">${Icons.arrowLeft} Volver a la firma</button>
             ${this._contratoTerminosHtml(p)}
           </aside>
-          <form class="contrato-form-pane" onsubmit="Dashboard.guardarContrato(event,'${adopcionId}')">
+          <form class="contrato-form-pane" data-submit="guardarContrato" data-sarg0="${adopcionId}">
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
             ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
             <div class="form-row"><div class="form-group"><label>Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
@@ -6817,7 +6859,7 @@ const Dashboard = {
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label>DNI</label><input type="text" id="f1-dni" value="${this._esc(sol.dni || '')}" placeholder="12345678A"></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f1-direccion" value="${this._esc(sol.domicilio || '')}" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f1-email" value="${this._esc(p.email || sol.email || '')}" placeholder="Se usa para enviar el contrato"><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El contrato se enviara a este email y al de Grupo Nebak.</div></div><div class="form-group"><label>Telefono</label><input type="text" id="f1-telefono" value="${this._esc(p.telefono || sol.telefono || '')}"></div></div>
-              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del adoptante *</label><canvas id="f1-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f1-firma')">Limpiar firma</button></div>
+              <div class="form-group"><label class="detail-question" style="margin-bottom:6px">Firma del adoptante *</label><canvas id="f1-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_clearFirmaCanvas" data-arg0="f1-firma">Limpiar firma</button></div>
             </div>
 
             <label class="contrato-acepta contrato-acepta--tutor"><input type="checkbox" id="ct-tutor" onchange="Dashboard._toggleContratoTutor(this.checked)"><span>El adoptante tiene tutor legal o persona de apoyo. Se añadirá una página con sus datos y deberá firmar.</span></label>
@@ -6825,16 +6867,16 @@ const Dashboard = {
             <div class="detail-section" id="contrato-tutor-section" style="display:none"><div class="detail-section-title">Tutor / persona de apoyo</div>
               <div class="detail-section-note">Rellena esta seccion solo si el adoptante tiene tutor legal o una persona de apoyo. Sus datos y su firma apareceran en una pagina nueva del contrato y en el PDF.</div>
               <div class="form-row"><div class="form-group"><label>Nombre completo *</label><input type="text" id="f2-nombre" placeholder="Nombre del tutor o persona de apoyo"></div><div class="form-group"><label>DNI</label><input type="text" id="f2-dni" placeholder="12345678A"></div></div>
-              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Firma del tutor *</label><canvas id="f2-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._clearFirmaCanvas('f2-firma')">Limpiar firma</button></div></div>
+              <div class="form-row"><div class="form-group"><label>Relacion con el adoptante</label><input type="text" id="f2-relacion" placeholder="Ej: tutor legal, madre, pareja"></div><div class="form-group"><label>Firma del tutor *</label><canvas id="f2-firma" width="560" height="240" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_clearFirmaCanvas" data-arg0="f2-firma">Limpiar firma</button></div></div>
               <div class="form-group"><label>Domicilio</label><input type="text" id="f2-direccion" placeholder="Calle, numero, piso, ciudad"></div>
               <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="f2-email"></div><div class="form-group"><label>Telefono</label><input type="text" id="f2-telefono"></div></div>
             </div>
 
-            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto las <a href="#" class="contrato-link" onclick="event.preventDefault(); event.stopPropagation(); Dashboard.showTerminosAdopcion('${adopcionId}');">cláusulas de adopción</a> del contrato de adopción responsable.</span></label>
+            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto las <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">cláusulas de adopción</a> del contrato de adopción responsable.</span></label>
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
               <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
-              <div class="form-row"><div class="form-group"><label>Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" onchange="Dashboard._previewSelloContrato(this)"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" onclick="Dashboard._limpiarSelloContrato()">Quitar sello</button></div>
-              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" onchange="Dashboard._toggleEntidadFirma(this.checked)"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" onclick="Dashboard._clearFirmaCanvas('entidad-firma')">Limpiar firma</button></div></div>
+              <div class="form-row"><div class="form-group"><label>Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" onchange="Dashboard._previewSelloContrato(this)"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_limpiarSelloContrato">Quitar sello</button></div>
+              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" onchange="Dashboard._toggleEntidadFirma(this.checked)"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" data-action="_clearFirmaCanvas" data-arg0="entidad-firma">Limpiar firma</button></div></div>
             </div>
             <label class="contrato-acepta"><input type="checkbox" id="ct-enviar" checked><span>Enviar una copia por email al adoptante y a Grupo Nebak al firmar.</span></label>
             <div class="contrato-actions"><button type="button" class="btn btn-outline-green" data-action="closeContratoForm">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.checkCircle} Firmar y guardar</button></div>
@@ -7178,7 +7220,7 @@ const Dashboard = {
     if (!p || !c) { this.showSnackbar('No hay contrato firmado', 'warning'); return; }
     const animal = this._contratoAnimalDatos(p, c);
     this.showFormModal('Foto y nombre del contrato · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.guardarContratoIdentidad(event,'${adopcionId}')">
+      <form data-submit="guardarContratoIdentidad" data-sarg0="${adopcionId}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Corrige el nombre o la foto del animal en el contrato firmado. Tambien se actualizan en su ficha y en el caso.</span></div>
         ${this._contratoAnimalEditorHtml({ prefix: 'ci-animal', nombre: animal.nombre || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar cambios</button></div>
@@ -7280,7 +7322,7 @@ const Dashboard = {
     }
     const emails = this._contratoEmails(p);
     this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
-      <form onsubmit="Dashboard.enviarContratoEmail(event,'${adopcionId}')">
+      <form data-submit="enviarContratoEmail" data-sarg0="${adopcionId}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y el anexo de cláusulas de adopción a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
         <div class="form-group"><label>Destinatarios</label>
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
@@ -7425,7 +7467,7 @@ const Dashboard = {
     const areasDisp = ['Paseos de perros', 'Socializacion de gatos', 'Transporte de animales', 'Eventos y captacion', 'Fotografia', 'Administracion'];
     const areaActual = data?.area || '';
     const areaExtra = areaActual && areasDisp.indexOf(areaActual) === -1 ? `<option value="${this._esc(areaActual)}" selected>${this._esc(areaActual)}</option>` : '';
-    this._renderForm('socios', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Socio</h3><form onsubmit="Dashboard.saveSocio(event,${isEdit?'true':'false'},'${data?.id||''}')">
+    this._renderForm('socios', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Socio</h3><form data-submit="saveSocio" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-group"><label>Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" onchange="Dashboard._previewFoto(this,'so-foto-preview')"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label>Tipo *</label><select id="so-tipo" required onchange="Dashboard._toggleCuota()"><option value="">Seleccionar...</option><option value="Socio" ${data?.tipo==='Socio'?'selected':''}>Solo socio (cuota)</option><option value="Voluntario" ${data?.tipo==='Voluntario'?'selected':''}>Solo voluntario (colabora)</option><option value="Ambos" ${data?.tipo==='Ambos'?'selected':''}>Ambos</option></select></div><div class="form-group" id="so-cuota-wrap" style="${(data?.tipo==='Socio'||data?.tipo==='Ambos')?'':'display:none'}"><label>Cuota (€/año)</label><input type="text" id="so-cuota" value="${this._esc(data?.cuota||'')}" placeholder="Ej: 30"><label style="margin-top:8px">Ultimo pago</label><input type="date" id="so-ultimo-pago" value="${this._esc(data?.ultimo_pago||'')}"></div></div>
@@ -7708,7 +7750,7 @@ const Dashboard = {
 
   _blacklistFormHTML(data, id) {
     const isEdit = id !== undefined;
-    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form onsubmit="Dashboard.saveBlacklistItem(event,'${isEdit ? this._esc(String(id)) : ''}')"><div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label>Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label>Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="clearBlacklistForm">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
+    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form data-submit="saveBlacklistItem" data-sarg0="${isEdit ? this._esc(String(id)) : ''}"><div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label>Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label>Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="clearBlacklistForm">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
   },
 
   async saveBlacklistItem(e, id) {
@@ -7776,7 +7818,7 @@ const Dashboard = {
         <div class="stats-grid" style="margin-bottom:16px">
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showDonacionForm()">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
         <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -7784,7 +7826,7 @@ const Dashboard = {
 
   showDonacionForm() {
     this.showFormModal('Nueva donacion', `
-      <form onsubmit="Dashboard.saveDonacion(event)">
+      <form data-submit="saveDonacion">
       <div class="form-row"><div class="form-group"><label>Donante *</label><input type="text" id="dn-donante" required placeholder="Nombre o Anonimo"></div>
       <div class="form-group"><label>Importe (€) *</label><input type="text" id="dn-importe" required placeholder="Ej: 50" inputmode="decimal"></div></div>
       <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="dn-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
@@ -7845,8 +7887,8 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
-        <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
+        <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -7855,7 +7897,7 @@ const Dashboard = {
     const data = id ? this._byId(this.inventario, id) : null;
     const isEdit = !!data;
     this.showFormModal(isEdit ? 'Editar artículo' : 'Nuevo artículo', `
-      <form onsubmit="Dashboard.saveInventario(event,'${data ? this._esc(data.id) : ''}')">
+      <form data-submit="saveInventario" data-sarg0="${data ? this._esc(data.id) : ''}">
       <div class="form-row"><div class="form-group"><label>Artículo *</label><input type="text" id="iv-nombre" required value="${this._esc(data?.nombre || '')}" placeholder="Ej: Pienso cachorro"></div>
       <div class="form-group"><label>Unidad</label><input type="text" id="iv-unidad" value="${this._esc(data?.unidad || '')}" placeholder="Ej: sacos, latas"></div></div>
       <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="iv-cantidad" required step="any" value="${data?.cantidad ?? ''}" placeholder="Ej: 12"></div>
