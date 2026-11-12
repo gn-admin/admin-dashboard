@@ -1834,6 +1834,10 @@ const Dashboard = {
   },
 
   _homeDataReady() {
+    const puedeEncuestas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('encuestas') : true;
+    if (!puedeEncuestas) {
+      return !!this._cached.animales || !!(this._loaded && this._loaded.animales) || Array.isArray(this.animales);
+    }
     if (!Array.isArray(this.surveys) || !this.surveys.length) return false;
     const hasResponses = !!this._cached.responses
       || (this.surveys || []).every(s => this._loaded && this._loaded['responses_' + s.id]);
@@ -1854,18 +1858,19 @@ const Dashboard = {
     // Datos criticos para pintar el home: encuestas, estados, animales,
     // familias y respuestas. Todo sale en paralelo: las respuestas usan los
     // ids conocidos, asi el primer pintado no espera una segunda ronda.
-    const jobs = [
-      this.loadEstados(force),
-      this._loadList('animales', () => API.getAnimales(), force),
-    ];
     const puedeEncuestas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('encuestas') : true;
     const puedeAcogidas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('acogidas') : true;
+    const jobs = [];
     if (puedeEncuestas) {
+      jobs.push(this.loadEstados(force).catch(() => {}));
       jobs.push(this._loadSurveys(force));
-      jobs.push(...this._surveyIds().map(sid => this._loadResponses(sid, force)));
+      jobs.push(...this._surveyIds().map(sid => this._loadResponses(sid, force).catch(() => {})));
+    }
+    if (typeof this.puedeAccederPagina !== 'function' || this.puedeAccederPagina('animales')) {
+      jobs.push(this._loadList('animales', () => API.getAnimales(), force).catch(() => {}));
     }
     if (puedeAcogidas) {
-      jobs.push(this._loadList('familias', () => API.getFamilias(), force));
+      jobs.push(this._loadList('familias', () => API.getFamilias(), force).catch(() => {}));
     }
     await Promise.all(jobs);
   },
