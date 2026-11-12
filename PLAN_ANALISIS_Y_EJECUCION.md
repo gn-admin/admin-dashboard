@@ -204,3 +204,64 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 - Subir `CACHE_NAME` en `src/sw.js` ante cambios de JS/CSS/HTML relevantes.
 - **S1/S2 descartados por plataforma (GitHub Pages + GAS):** no implementar CSP por cabeceras HTTP ni migración a `Authorization` en esta arquitectura; mantener token en `?token=` (`useAuthorizationHeader` desactivado).
 - Backend como fuente de verdad para autorización; frontend como refuerzo UX (mostrar/ocultar datos y acciones según rol y módulo permitido).
+
+
+## 9. ModernizaciÃ³n UI/UX â€” Baseline (Fase 0) y ejecuciÃ³n
+
+> Objetivo: hacer el frontend mÃ¡s ligero y profesional (desktop/tablet/mÃ³vil) sin romper permisos por rol/fase ni restricciones de plataforma (GitHub Pages + token en ?token=).
+
+### 9.1 Baseline tÃ©cnico (2026-11-12, gn-encuestas-v180, commit f0499c7)
+
+| Archivo | TamaÃ±o | Notas |
+|---|---:|---|
+| src/js/dashboard.js | 556,5 KB (8.549 lÃ­neas) | Monolito: estado, permisos, render de vistas, modales, exportaciÃ³n y reglas. ~80 innerHTML, ~219 estilos inline. |
+| src/css/styles.css | 159,1 KB (6.906 lÃ­neas) | Tokens parciales, componentes y overrides; alta repeticiÃ³n y muchos breakpoints. |
+| src/index.html | 26,3 KB (381 lÃ­neas) | Shell SPA, login, sidebar/topbar/bottom-nav/menÃº MÃ¡s. |
+| src/js/pdf-export.js | 47,2 KB | Flujo pesado de exportaciÃ³n/PDF. |
+| src/js/app.js | 18,1 KB | Router/hash y flujo login/dashboard. |
+| src/js/icons.js | 13,7 KB | SVG inline por JS. |
+| src/js/api.js | 11,9 KB | Cliente API GAS (token en query). |
+| src/js/carnet-generator.js | 8,2 KB | Carnet/QR. |
+| src/js/auth.js | 8,1 KB | Firebase auth + perfil. |
+| src/js/pwa.js | 6,4 KB | PWA/SW registration. |
+| src/sw.js | 3,4 KB | Precache y estrategias de cachÃ©; CACHE_NAME manual. |
+| Assets iconos PWA | hasta ~200 KB (512) | Revisar compresiÃ³n manteniendo manifest. |
+
+Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs CDN; jsPDF/html2canvas en flujos PDF/export. Tooling: gen-config, serve, node --test (357 tests). Sin bundler/minificaciÃ³n/tree-shaking.
+
+### 9.2 Inventario de patrones UI
+- NavegaciÃ³n: sidebar + topbar + bottom-nav + menÃº MÃ¡s; skeleton de navegaciÃ³n mientras perfil/rol pendiente (v180) para evitar fuga de menÃºs entre sesiones.
+- Componentes: botones, cards/listas, modales, formularios, tablasâ†’tarjetas mÃ³vil (data-label), badges/chips, toasts, empty/loading/error, skeletons, filtros/search, stepper/pipeline, fichas por fases (adopciones).
+- Tokens actuales: colores, radios, sombras, layout, glass, textos xs/sm/2xs. Pendiente: escala tipogrÃ¡fica/espaciado, tokens semÃ¡nticos, z-index y motion.
+- A11y base: skip-link, focus-visible, aria en controles/modales clave; revisar foco en re-render/modales, aria-live y formularios dinÃ¡micos.
+
+### 9.3 Pantallas crÃ­ticas por rol (no-regresiÃ³n)
+| Rol | Pantallas crÃ­ticas | Criterio |
+|---|---|---|
+| admin | Dashboard, animales, adopciones (todas fases), encuestas, acogidas, socios, donaciones, almacÃ©n, reportes | Funcionalidad completa, permisos/fases correctos. |
+| coordinador | Dashboard, encuestas, animales, acogidas, adopciones, socios, blacklist, reportes | Sin tesorerÃ­a; segÃºn matriz. |
+| voluntario | Dashboard, animales, reportes/actividad | Sin fuga de menÃºs/datos/acciones no permitidos. |
+| tesoreria | Dashboard, donaciones, almacÃ©n, animales/reportes (segÃºn backend) | UI acorde; errores backend conocidos externos. |
+| consulta | Dashboard y mÃ³dulos de lectura permitidos | Solo lectura estricta, sin mutaciones/submit. |
+| Todos | Login/logout/cambio usuario, navegaciÃ³n, modales, forms, tablas/listas | Sin flash de menÃºs ajenos, responsive y feedback coherente. |
+
+### 9.4 MÃ©tricas y criterios
+- Ligereza: reducir payload inicial/recursos bloqueantes; diferir PDF/QR/vistas no usadas; comparar tamaÃ±o/requests/carga percibida.
+- Consistencia: tokens y primitivas compartidas (botÃ³n, form, card, tabla, modal, badge, estados).
+- Mantenibilidad: modularizar dashboard.js, reducir duplicaciÃ³n CSS e inline styles.
+- Calidad: 357/357 tests por iteraciÃ³n, bump CACHE_NAME en cambios frontend, verificaciÃ³n por rol y responsive; sin fugas de permisos/fases.
+- Restricciones: rutas relativas, sin secretos, token en ?token=, sin destructivas, GitHub Pages + GAS.
+
+### 9.5 Backlog inicial
+1. Fase 1: tokens (tipografÃ­a/espaciado/estados/motion) y primitivas/utilidades base.
+2. Fase 2: consolidaciÃ³n/limpieza CSS, breakpoints y reducciÃ³n de inline/duplicaciÃ³n.
+3. Fase 3: modularizaciÃ³n de dashboard.js por dominio/vista/componentes.
+4. Fase 4: lazy-load de mÃ³dulos pesados, optimizaciÃ³n assets/fuentes y estrategia SW.
+5. Fase 5â€“6: UX homogÃ©nea por flujos (ref. adopciones), a11y avanzada y cierre responsive.
+
+### 9.6 Registro de ejecuciÃ³n (modernizaciÃ³n)
+| Fecha | Fase | Cambio | Commit | VerificaciÃ³n | Estado |
+|---|---|---|---|---|---|
+| 2026-11-12 | Fix/UX | Skeleton de navegaciÃ³n y ocultaciÃ³n de menÃºs mientras perfil/rol pendiente para evitar flash entre sesiones | f0499c7 (v180) | 357/357 tests, push main | Completado (validaciÃ³n visual multi-rol en prod pendiente) |
+| 2026-11-12 | 0 | Baseline tÃ©cnico/UX, inventario, pantallas crÃ­ticas, mÃ©tricas y backlog fases 1â€“6 documentados | (este commit) | Inventario desde repo local | Completado |
+
