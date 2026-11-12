@@ -728,8 +728,45 @@ const Dashboard = {
     } catch { return null; }
   },
 
+  _cachePermitido(key) {
+    // Mientras el perfil no está resuelto, permitir caché para no romper el primer pintado;
+    // si el rol ya es sin_acceso (resuelto), bloquear siempre.
+    if (this._profileResolved === false && !(this._rolEsSinAcceso && this._rolEsSinAcceso())) return true;
+    if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return false;
+    const k = String(key || '');
+    const map = {
+      surveys: () => this.puedeAccederPagina('encuestas'),
+      responses: () => this.puedeAccederPagina('encuestas'),
+      estados: () => this.puedeAccederPagina('encuestas'),
+      notas: () => true,
+      animales: () => this.puedeAccederPagina('animales'),
+      familias: () => this.puedeAccederPagina('acogidas') || this.puedeAccederPagina('acogidas-activas'),
+      actividad: () => this.puedeAccederPagina('actividad') || this.puedeAccederPagina('reportes'),
+      candidaturas: () => this.puedeAccederPagina('adopciones'),
+      acogidas: () => this.puedeAccederPagina('acogidas') || this.puedeAccederPagina('acogidas-activas'),
+      contratos: () => this.puedeAccederPagina('adopciones') || this.puedeAccederPagina('acogidas'),
+      blacklist: () => this.puedeAccederPagina('blacklist'),
+      socios: () => this.puedeAccederPagina('socios'),
+      adopciones: () => this.puedeAccederPagina('adopciones'),
+      grupos: () => this.puedeAccederPagina('animales'),
+      apadrinamientos: () => this.puedeAccederPagina('animales'),
+      gastos: () => this.puedeAccederPagina('donaciones') || this.puedeAccederPagina('reportes') || this.puedeAccederPagina('animales'),
+      recordatorios: () => this.puedeAccederPagina('animales'),
+      donaciones: () => this.puedeAccederPagina('donaciones'),
+      seguimientos: () => this.puedeAccederPagina('adopciones') || this.puedeAccederPagina('acogidas') || this.puedeAccederPagina('acogidas-activas'),
+      historialFasesAdopcion: () => this.puedeAccederPagina('adopciones'),
+      documentos: () => this.puedeAccederPagina('animales') || this.puedeAccederPagina('adopciones'),
+      inventario: () => this.puedeAccederPagina('almacen')
+    };
+    if (Object.prototype.hasOwnProperty.call(map, k)) {
+      try { return !!map[k](); } catch { return false; }
+    }
+    return true;
+  },
+
   _cacheSet(key, val) {
     if (!this._canPersistUserData()) return;
+    if (!this._cachePermitido(key)) return;
     try { localStorage.setItem('gn_cache_' + key, JSON.stringify({ _t: Date.now(), v: val })); } catch {}
   },
 
@@ -738,37 +775,41 @@ const Dashboard = {
   // despues sin bloquear. `_loaded` se marca solo cuando responde la red.
   _hydrateCache() {
     if (!this._canPersistUserData()) return;
-    const h = (k, v, cacheKey) => {
+    const h = (k, cacheKey) => {
+      const ck = cacheKey || k;
+      if (!this._cachePermitido(ck)) return;
+      const v = this._cacheGet(ck);
       if (v !== null && v !== undefined) {
         this[k] = v;
-        this._cached[cacheKey || k] = true;
+        this._cached[ck] = true;
       }
     };
-    h('surveys', this._cacheGet('surveys'));
-    h('responses', this._cacheGet('responses'));
-    h('states', this._cacheGet('estados'), 'estados');
-    h('notes', this._cacheGet('notas'), 'notas');
-    h('animales', this._cacheGet('animales'));
-    h('familias', this._cacheGet('familias'));
-    h('actividad', this._cacheGet('actividad'));
-    h('candidaturas', this._cacheGet('candidaturas'));
-    h('acogidas', this._cacheGet('acogidas'));
-    h('contratos', this._cacheGet('contratos'));
-    h('blacklist', this._cacheGet('blacklist'));
-    h('socios', this._cacheGet('socios'));
-    h('adopciones', this._cacheGet('adopciones'));
-    h('grupos', this._cacheGet('grupos'));
-    h('apadrinamientos', this._cacheGet('apadrinamientos'));
-    h('gastos', this._cacheGet('gastos'));
-    h('recordatorios', this._cacheGet('recordatorios'));
-    h('donaciones', this._cacheGet('donaciones'));
-    h('seguimientos', this._cacheGet('seguimientos'));
-    h('historialFasesAdopcion', this._cacheGet('historialFasesAdopcion'));
-    h('documentos', this._cacheGet('documentos'));
-    h('inventario', this._cacheGet('inventario'));
-    // Listas que loadLocal ya rescato de localStorage: se pueden pintar al
-    // instante aunque aun no haya cache de API; la red las revalida detras.
+    h('surveys', 'surveys');
+    h('responses', 'responses');
+    h('states', 'estados');
+    h('notes', 'notas');
+    h('animales', 'animales');
+    h('familias', 'familias');
+    h('actividad', 'actividad');
+    h('candidaturas', 'candidaturas');
+    h('acogidas', 'acogidas');
+    h('contratos', 'contratos');
+    h('blacklist', 'blacklist');
+    h('socios', 'socios');
+    h('adopciones', 'adopciones');
+    h('grupos', 'grupos');
+    h('apadrinamientos', 'apadrinamientos');
+    h('gastos', 'gastos');
+    h('recordatorios', 'recordatorios');
+    h('donaciones', 'donaciones');
+    h('seguimientos', 'seguimientos');
+    h('historialFasesAdopcion', 'historialFasesAdopcion');
+    h('documentos', 'documentos');
+    h('inventario', 'inventario');
+    // Listas que loadLocal ya rescató de localStorage: se pueden pintar al
+    // instante aunque aún no haya cache de API; la red las revalida detrás.
     ['blacklist', 'candidaturas', 'contratos', 'acogidas'].forEach(k => {
+      if (!this._cachePermitido(k)) return;
       if (!this._cached[k] && Array.isArray(this[k]) && this[k].length) this._cached[k] = true;
     });
   },
