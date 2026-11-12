@@ -288,3 +288,6 @@ Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs 
 
 > Criterio de cierre aplicado: cada fase cuenta con entregables implementados/desplegados y documentados, con pruebas (`357/357`) y sin romper permisos, fases, routing ni restricciones de plataforma. Los puntos marcados como seguimiento son mejoras evolutivas de mayor alcance/riesgo o dependientes de entorno externo, y no bloquean el cierre operativo de esta iteraciÃ³n.
 
+| 2026-11-12 | VerificaciÃ³n | RevisiÃ³n de fases 0â€“6 ejecutadas: commits `f0499c7`â€“`7addc0c` presentes, `CACHE_NAME=gn-encuestas-v183` (luego v184), skeletons en HTML, tokens/utilidades/focus-ring/reduced-motion en CSS, `qrcodejs` lazy-load y `pdf-export` defer, `aria-atomic` en toast, contratos/permisos preservados; `node --test tests/*.test.js` â†’ 357/357 OK | - | Tests 357/357, inspecciÃ³n de `src/*`, `sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md` | Verificado |
+| 2026-11-12 | 3 | ModularizaciÃ³n incremental: creado `src/js/utils.js` (helpers compartidos), extracciÃ³n/delegaciÃ³n de `_esc` desde `Dashboard` a `Utils.esc` con fallback, inclusiÃ³n en `index.html` y precache SW; bump `gn-encuestas-v184` | 268cddd (v184) | 357/357 tests, push `main` | En progreso (base de extracciÃ³n creada; pendiente seguir extrayendo helpers puros y preparar particiÃ³n controlada del monolito) |
+
