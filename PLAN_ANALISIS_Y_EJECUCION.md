@@ -43,7 +43,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Estado | Acción |
 |---|---|---|---|---|
-| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Completado (frontend) | Endurecida/alineada en report-only con recursos reales usados (`self`, Firebase/Google APIs, jsdelivr, fonts, `blob:`, `form-action`, `base-uri`, `object-src 'none'`, `upgrade-insecure-requests`). Paso a enforcement diferido a validación de reportes/CSP en producción. |
+| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Parcial (no efectiva en `<meta>`) | Política endurecida en `src/index.html`, pero verificación en navegador mostró que **CSP Report-Only entregada vía `<meta>` es ignorada** por el navegador. Para que tenga efecto real se requiere entregarla por cabecera HTTP (o CSP enforcing por cabecera) en el hosting/CDN; enforcement/meta-only no es suficiente. |
 | S2 | Alta | Token API en query string `?token=` (GET/POST) | Bloqueado por backend | Migrar a `Authorization: Bearer` + preflight CORS cuando GAS lo soporte (B3). No abordable en frontend sin romper contrato. |
 | S3 | Media | Datos sensibles/PII cacheados en `localStorage` (`gn_cache_*`) | Completado (frontend) | Caché API con TTL (7 días) y envoltorio versionado compatible con formato legacy; limpieza de `gn_cache_*`/datos de usuario en logout y cambio de usuario mantenida. Segmentación adicional por rol/módulo queda como mejora opcional. |
 | S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Completado (frontend) | Guards para no fetch sin sesión en loaders, control por token de página/render y gating de cargas del dashboard por permisos/módulo; fallback de rol `consulta` mantiene seguridad mientras se resuelve perfil. Cancelación HTTP nativa no implementada (sin abort centralizado), pero respuestas obsoletas se descartan por contexto/token en flujos clave. |
@@ -90,7 +90,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 1 — Seguridad frontend (impacto alto, sin romper contrato backend)
 **Objetivo:** reducir superficie de riesgo en cliente sin requerir cambios incompatibles en GAS.
-- [x] **S1:** CSP *report-only* endurecida y alineada con recursos reales. Enforcement progresivo diferido a validación de reportes (sin cambios backend).
+- [~] **S1:** CSP endurecida/alineada en código, pero **CSP Report-Only en `<meta>` es ignorada por el navegador** (verificado en producción). Requiere cabeceras HTTP en hosting/CDN para reportes/enforcement efectivos.
 - [~] **S2:** **Bloqueado por backend/CORS (GAS)** — token sigue en `?token=`; migración a `Authorization: Bearer` + preflight requiere despliegue coordinado.
 - [x] **S3:** Caché API con TTL (7 días), migración compatible de formato legacy y limpieza en logout/cambio de usuario.
 - [x] **S4/S6:** Guards sin sesión, gating por permisos/módulo en dashboard y renders/cargas defensivas, y descarte por contexto/token para evitar aplicar estados obsoletos en navegación rápida.
@@ -164,9 +164,10 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 ---
 
 ## 6. Dependencias y bloqueos / acciones fuera del frontend
-- **S2/B3 (token fuera de query + preflight CORS):** aplicado en código/local workspace
+- **S2/B3 (token fuera de query + preflight CORS):** aplicado en código/local workspace, **bloqueado por plataforma GAS/CORS**
   - Frontend: `src/js/api.js` preparado para enviar `Authorization: Bearer` cuando `CONFIG.useAuthorizationHeader=true` (mantiene token en query por compatibilidad). Por defecto desactivado para no romper producción con preflight GAS.
-  - Backend (local, no versionado): `apps-script/Code.gs` ya acepta token en `Authorization` o query (`extractToken`) y se añadió `doOptions` best-effort. **Pendiente externo:** desplegar nueva versión del Web App GAS, validar preflight/CORS real y habilitar `useAuthorizationHeader` solo cuando sea compatible.
+  - Backend (local, no versionado): `apps-script/Code.gs` ya acepta token en `Authorization` o query (`extractToken`) y se añadió `doOptions` best-effort. Usuario indicó que subió `Code.gs`.
+  - **Verificación (2026-11-12, navegador/producción):** petición cross-origin con cabecera `Authorization` falla en navegador (`Failed to fetch`) por preflight/CORS incompatible con Apps Script Web Apps. **Conclusión:** no es viable completar S2 en esta arquitectura sin un proxy/backend que controle cabeceras CORS/preflight. Mantener token en query y no habilitar `useAuthorizationHeader` en producción.
 - **Auditoría y backups (backend/operación):**
   - Código local presente (`apps-script/Code.gs` registra auditoría sensible si `CONFIG.sheets.auditoria` está configurado; `apps-script/Backup.gs` incluye exportación ZIP, envío email y helpers de triggers).
   - **Pendiente externo:** configurar IDs reales de hojas de auditoría/historial, `BACKUP_EMAIL`/`BACKUP_DRIVE_FOLDER_ID`, permisos de Drive/Spreadsheet y crear/activar triggers en entorno GAS (`crearTriggerBackupDiario/Semanal/CadaXDias`).
@@ -189,6 +190,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | `6ab26a7` (v172) | 357 tests OK, desplegado (`gn-encuestas-v172`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | `907cf9a` (v173) | 357 tests OK, desplegado (`gn-encuestas-v173`) | Completado (frontend) |
 | 2026-11-12 | 5 | Fase 5 validación/hardening: tests 357/357, revisión residual seguridad/UI, preparación S2 (Authorization opt-in en frontend + soporte/doOptions en backend local), actualización de matriz/checklists y registro de pendientes externos | `1764fe4` (v174) | 357 tests OK, desplegado (`gn-encuestas-v174`) | Completado (frontend/código; pendientes externos) |
+| 2026-11-12 | 5+ | Verificación adicional en navegador (producción): S2 con cabecera `Authorization` falla por preflight/CORS en GAS (`Failed to fetch`); CSP report-only en `<meta>` es ignorada por el navegador. Plan actualizado con hallazgos y bloqueos reales | Pendiente commit | Verificación browser en `gn-admin.github.io` (sesión admin) | Completado (análisis) |
 
 ---
 
