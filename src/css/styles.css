@@ -5368,10 +5368,13 @@ select.form-input {
   }
 }
 
-/* Foco visible reforzado */
+/* Foco visible reforzado (Fase 2/6) */
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+:where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
 /* ===== DASHBOARD HOME (estilo v22) ===== */

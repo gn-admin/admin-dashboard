@@ -403,7 +403,7 @@
   <button type="button" class="scroll-to-top" id="scroll-to-top" aria-label="Ir arriba" title="Ir arriba">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
   </button>
-  <div id="error-message" class="toast-error" role="status" aria-live="polite"></div>
+  <div id="error-message" class="toast-error" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
@@ -412,7 +412,7 @@
   <script src="js/api.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/carnet-generator.js"></script>
-  <script src="js/pdf-export.js"></script>
+  <script defer src="js/pdf-export.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
