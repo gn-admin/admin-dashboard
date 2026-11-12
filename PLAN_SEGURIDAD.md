@@ -161,6 +161,6 @@ Cada hito indica el **% estimado alcanzado tras completarlo** (acumulado). Compl
 | Fecha | Hito(s) | Cambio realizado | % alcanzado | Responsable | Evidencia/Notas |
 |---|---|---|---:|---|---|
 | — | Base | Línea base documentada | ~60% | — | Estado inicial estimado |
-| 2026-11-12 | 1.2 (parcial, frontend) | Añadido rol `sin_acceso` (sin páginas), bloqueo de navegación/cargas en background/home/estados/notas/refresco cuando el rol es `sin_acceso`, y pantalla “Sin acceso autorizado”. Requiere 1.1 en backend (GAS) para denegar/no degradar usuarios no reconocidos y devolver `sin_acceso`. | ~61% | — | Commit `working tree` → `6b7679a` base previa; desplegado en `v201`. Tests 357/357. |
+| 2026-11-12 | 1.2 (parcial, frontend) | Añadido rol `sin_acceso` (sin páginas), bloqueo de navegación/cargas en background/home/estados/notas/refresco cuando el rol es `sin_acceso`, y pantalla “Sin acceso autorizado”. Requiere 1.1 en backend (GAS) para denegar/no degradar usuarios no reconocidos y devolver `sin_acceso`. | ~61% | — | Commit `f3e68e3`, desplegado en `v201`. Tests 357/357. |
 
 > Actualizar esta tabla al completar cada hito, indicando evidencia (commit, captura/config, resultado de prueba o verificación en GAS/Firebase).
