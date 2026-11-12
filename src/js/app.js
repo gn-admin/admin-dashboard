@@ -228,23 +228,33 @@ const App = {
     const overlay = document.getElementById('mas-menu-overlay');
     const toggle = document.getElementById('mas-menu-toggle');
     const isOpen = popup?.style.display === 'block';
-    if (isOpen) { this.closeMasMenu(); }
+    if (isOpen) { this.closeMasMenu({ restoreFocus: true }); }
     else {
-      popup.style.display = 'block';
+      if (popup) popup.style.display = 'block';
       overlay?.classList.add('active');
       toggle?.setAttribute('aria-expanded', 'true');
       this._lockBg(true);
+      const first = popup?.querySelector('.mas-menu-item:not([style*="display: none"]):not([aria-hidden="true"])');
+      if (first && typeof first.focus === 'function') {
+        try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); }
+      }
     }
   },
 
-  closeMasMenu() {
+  closeMasMenu(opts = {}) {
     const popup = document.getElementById('mas-menu-popup');
     const overlay = document.getElementById('mas-menu-overlay');
+    const toggle = document.getElementById('mas-menu-toggle');
     const wasOpen = popup?.style.display === 'block';
     if (popup) popup.style.display = 'none';
     overlay?.classList.remove('active');
-    document.getElementById('mas-menu-toggle')?.setAttribute('aria-expanded', 'false');
+    toggle?.setAttribute('aria-expanded', 'false');
     if (wasOpen) this._lockBg(false);
+    if (wasOpen && opts.restoreFocus !== false && toggle && document.activeElement && popup?.contains(document.activeElement)) {
+      try { toggle.focus({ preventScroll: true }); } catch (_) { toggle.focus(); }
+    } else if (wasOpen && opts.restoreFocus === true && toggle) {
+      try { toggle.focus({ preventScroll: true }); } catch (_) { toggle.focus(); }
+    }
   },
 
   setupEventListeners() {
@@ -297,7 +307,7 @@ const App = {
         return;
       }
       if (typeof Dashboard !== 'undefined' && typeof Dashboard._modalCloseTop === 'function' && Dashboard._modalCloseTop()) return;
-      this.closeMasMenu();
+      this.closeMasMenu({ restoreFocus: true });
       this.closeSidebar();
     });
     document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
@@ -342,7 +352,7 @@ const App = {
     document.querySelectorAll('.mas-menu-item[data-page]').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
-        this.closeMasMenu();
+        this.closeMasMenu({ restoreFocus: false });
         location.hash = item.dataset.page;
       });
     });

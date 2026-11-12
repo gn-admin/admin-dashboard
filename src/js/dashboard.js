@@ -687,6 +687,7 @@ const Dashboard = {
 
   async _loadSurveys(force) {
     if (this._loaded.surveys && !force) return this.surveys;
+    if (typeof Auth !== 'undefined' && !Auth.currentUser) return Array.isArray(this.surveys) ? this.surveys : [];
     if (this._loading.surveys) {
       if (this._cached.surveys && Array.isArray(this.surveys) && !force) return this.surveys;
       return this._loading.surveys;
@@ -713,6 +714,7 @@ const Dashboard = {
   async _loadResponses(surveyId, force) {
     const key = 'responses_' + surveyId;
     if (this._loaded[key] && !force) return this.responses[surveyId] || [];
+    if (typeof Auth !== 'undefined' && !Auth.currentUser) return Array.isArray(this.responses[surveyId]) ? this.responses[surveyId] : [];
     if (this._loading[key]) {
       if (this._cached.responses && Array.isArray(this.responses[surveyId]) && !force) return this.responses[surveyId] || [];
       return this._loading[key];
@@ -774,6 +776,7 @@ const Dashboard = {
 
   _loadList(key, apiFn, force) {
     if (this._loaded[key] && !force) return this[key];
+    if (typeof Auth !== 'undefined' && !Auth.currentUser) return Array.isArray(this[key]) ? this[key] : [];
     if (this._loading[key]) {
       if (this._cached[key] && Array.isArray(this[key]) && !force) return this[key];
       return this._loading[key];
@@ -7683,8 +7686,8 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
-        <select data-change="onSocioTipoFilterChange" data-cpass="el">
+      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
+        <select aria-label="Filtrar por tipo de socio" data-change="onSocioTipoFilterChange" data-cpass="el">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
           <option value="Voluntario" ${tipoF==='Voluntario'?'selected':''}>Voluntarios (${this.socios.filter(s=>s.tipo==='Voluntario'||s.tipo==='Ambos').length})</option>
@@ -7693,7 +7696,7 @@ const Dashboard = {
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
         <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Horas/mes</th><th>Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td>${this._esc(s.nombre)}</td><td>${this._esc(s.email)}</td><td><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td>${this._esc(s.area)||'—'}</td><td>${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td data-label="Nombre">${this._esc(s.nombre)}</td><td data-label="Email">${this._esc(s.email)}</td><td data-label="Tipo"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td data-label="Área">${this._esc(s.area)||'—'}</td><td data-label="Horas/mes">${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td data-label="Estado"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -8113,7 +8116,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },

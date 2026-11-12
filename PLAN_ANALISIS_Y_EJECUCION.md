@@ -43,13 +43,13 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Estado | Acción |
 |---|---|---|---|---|
-| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Pendiente | Endurecer y migrar a enforcement progresivo tras validación |
+| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Parcial | Endurecida/alineada en report-only (`style-src 'unsafe-inline'`, `img-src` blob, endpoints Firebase, `form-action`, `object-src 'none'`); enforcement progresivo pendiente tras validar reportes |
 | S2 | Alta | Token API en query string `?token=` (GET/POST) | Bloqueado por backend | Migrar a `Authorization: Bearer` + preflight CORS cuando GAS lo soporte (B3) |
 | S3 | Media | Datos sensibles/PII cacheados en `localStorage` (`gn_cache_*`) | Parcial (se limpia en logout/cambio) | Minimizar, TTL, segmentación por rol/módulo, endurecer en dispositivos compartidos |
-| S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Pendiente | Gate de render por perfil, cancelación de requests, evitar cargas no autorizadas |
+| S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Parcial | Guards en `_loadSurveys/_loadResponses/_loadList` para no disparar fetch sin usuario autenticado; gate de perfil/cancelación de requests obsoletas pendiente |
 | S5 | Media | Uso extensivo de `innerHTML` (riesgo XSS si falta escape/sanitización) | Parcial (`_esc` usado en muchos casos) | Auditoría de sinks, sanitización donde aplique, preferir DOM APIs seguras |
-| S6 | Media | Peticiones API potencialmente no autorizadas por rol en flujos/background | Pendiente | Condicionar cargas a `puedeAccederPagina/puedeEditar` y rol resuelto |
-| S7 | Baja | `javascript:void(0)` en toggle de menú móvil | Pendiente | Reemplazar por `<button>` semántico |
+| S6 | Media | Peticiones API potencialmente no autorizadas por rol en flujos/background | Parcial | Reducidas en transiciones de sesión; condicionar por módulo/rol resuelto y evitar cargas fuera de permisos pendiente |
+| S7 | Baja | `javascript:void(0)` en toggle de menú móvil | Completado | Reemplazado por `<button>` semántico con `aria-label`/`aria-controls` |
 | S8 | Baja | Dependencias externas (gstatic, jsdelivr, fonts) y superficie CSP | Pendiente | Revisar necesidad, SRI donde aplique, políticas estrictas |
 | S9 | Info | `referrer: no-referrer`, `noindex`, HTTPS/HSTS (hosting) correctos | OK | Mantener |
 
@@ -57,14 +57,14 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Plataforma | Estado | Acción |
 |---|---|---|---|---|---|
-| U1 | Alta | Objetivos táctiles < 44px (botones 31–36px, iconos 36px, puntos gráfico 11px) | Móvil/Tablet | Pendiente | Aumentar tamaño/área táctil (min 44x44) |
-| U2 | Alta | Botones icon-only sin etiqueta accesible suficiente (ej. editar/eliminar en blacklist) | Todas | Pendiente | Añadir `aria-label`/`title` descriptivos |
-| U3 | Media | Inputs de búsqueda/filtro sin `<label>` asociado (solo placeholder) | Todas | Pendiente | Añadir `aria-label` o label visible/asociado |
-| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Pendiente | Vista tarjeta o columnas prioritarias en <=767px |
-| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Pendiente | Botón real, gestión de foco, cierre por Escape/overlay consistente |
-| U6 | Media | Estados de carga/error transitorios y mensajes por carreras de sesión | Todas | Pendiente | Estados consistentes, gating por perfil, reintentos controlados |
+| U1 | Alta | Objetivos táctiles < 44px (botones 31–36px, iconos 36px, puntos gráfico 11px) | Móvil/Tablet | Parcial | CSS global/touch mejorado (`btn-sm`, iconos/acciones, área de toque en puntos de gráfico); revisar componentes residuales |
+| U2 | Alta | Botones icon-only sin etiqueta accesible suficiente (ej. editar/eliminar en blacklist) | Todas | Parcial | `aria-label`/`title` añadidos en acciones clave (blacklist, donaciones); auditoría completa pendiente |
+| U3 | Media | Inputs de búsqueda/filtro sin `<label>` asociado (solo placeholder) | Todas | Parcial | `aria-label` añadido en búsquedas/filtros principales (encuestas, animales, socios, acogidas, blacklist, actividad); completar resto de vistas |
+| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Parcial | `data-label` + vista en tarjetas CSS para tablas en `<=767px` (Socios/Donaciones); extender a otras tablas densas |
+| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Parcial | Botón real, `aria-expanded`, foco al primer ítem al abrir y retorno/cierre con Escape; pulir navegación por teclado dentro del menú |
+| U6 | Media | Estados de carga/error transitorios y mensajes por carreras de sesión | Todas | Parcial | Guards para evitar fetches sin sesión; gating por perfil y estados consistentes pendiente |
 | U7 | Baja | Sidebar colapsada: targets/densidad y affordance | Desktop/Tablet | Pendiente | Ajustar altura/touch, tooltips/foco |
-| U8 | Baja | Feedback visual/foco en algunos controles (verificar `:focus-visible`) | Todas | Pendiente | Garantizar foco visible consistente |
+| U8 | Baja | Feedback visual/foco en algunos controles (verificar `:focus-visible`) | Todas | Parcial | Regla global `:focus-visible` reforzada; verificar casos específicos |
 | U9 | Baja | Validación visual responsive no realizada en dispositivos reales | Tablet/Móvil | Pendiente | Pruebas manuales en iOS/Android, portrait/landscape |
 | U10 | Info | Modales con `role="dialog"`, `aria-modal`, `aria-labelledby` | Todas | OK | Mantener y verificar foco-trap/cierre |
 
@@ -172,7 +172,9 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | Fecha | Fase | Cambio | Commit | Verificación | Estado |
 |---|---|---|---|---|---|
 | 2026-11-12 | - | Ocultamiento acciones por rol/módulo, UI solo lectura consulta, permisos tras render/modal | `01617fe` (v165) | 357 tests OK, verificación 5 roles en producción | Completado |
-| 2026-11-12 | 0 | Creación de plan de análisis y ejecución | - | Documento generado | En curso |
+| 2026-11-12 | 1/2 | Accesibilidad/UI: menú “Más” como botón, `aria-label` en controles/acciones clave, targets táctiles iniciales | `9787e0f` (v166) | 357 tests OK, despliegue en producción | Completado |
+| 2026-11-12 | 1 | CSP report-only endurecida/alineada (Firebase, `unsafe-inline` estilos, `blob:`, políticas base) | `86ac93d` (v167) | 357 tests OK, despliegue en producción | Completado |
+| 2026-11-12 | 0-3 | U4 tablas Socios/Donaciones con `data-label` y tarjetas responsive móvil, U5 foco/teclado en menú “Más”, S4/S6 guards de carga sin sesión, refuerzo `:focus-visible`/targets y `aria-label` adicionales | Pendiente commit (v168) | `node --test tests/*.test.js` en curso | En ejecución |
 
 ---
 
