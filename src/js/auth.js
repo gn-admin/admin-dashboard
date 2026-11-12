@@ -72,9 +72,17 @@ const Auth = {
   // preferencias de interfaz (sidebar, tema, etc.).
   _clearUserData() {
     this._userKeys.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    const extras = [
+      'gn_blacklist', 'gn_candidaturas', 'gn_contratos', 'gn_acogidas', 'gn_familias',
+      'gn_gastos', 'gn_recordatorios', 'gn_donaciones', 'gn_seguimientos', 'gn_documentos',
+      'gn_inventario', 'gn_grupos', 'gn_apadrinamientos', 'gn_historial_fases_adopcion',
+      'gn_states', 'gn_surveys', 'gn_responses', 'gn_notes', 'gn_animales', 'gn_socios',
+      'gn_adopciones', 'gn_activity', 'gn_publicaciones', 'gn_pending_ops', 'gn_historial_fases_adopcion_cache'
+    ];
+    extras.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     try {
       Object.keys(localStorage)
-        .filter(k => k.indexOf('gn_cache_') === 0)
+        .filter(k => k.indexOf('gn_cache_') === 0 || k.indexOf('gn_responses_all') === 0)
         .forEach(k => { try { localStorage.removeItem(k); } catch {} });
     } catch {}
   },
