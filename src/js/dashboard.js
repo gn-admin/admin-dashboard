@@ -15,9 +15,11 @@ const Dashboard = {
     this.injectIcons();
     this._initActionDelegation();
     this.showLoading();
+    // Evitar filtrar menús del rol anterior: ocultar navegación hasta resolver perfil/rol.
+    this._profileResolved = false;
+    if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI();
     // El perfil no bloquea el primer pintado: la UI arranca con cache local
     // y el nombre llega en segundo plano. Si falla, la app sigue usable.
-    this._profileResolved = false;
     const _fetchProfile = async () => {
       try {
         const user = await API.getUserProfile();
@@ -393,20 +395,33 @@ const Dashboard = {
     return false;
   },
 
+  _setNavSkeleton(on) {
+    const root = document.getElementById('dashboard-view');
+    if (!root) return;
+    root.classList.toggle('nav-pending', !!on);
+    const side = document.getElementById('sidebar-nav-skeleton');
+    const bottom = document.getElementById('bottom-nav-skeleton');
+    if (side) side.style.display = on ? '' : 'none';
+    if (bottom) bottom.style.display = on ? '' : 'none';
+  },
+
   aplicarPermisosUI() {
-    const puede = (p) => this.puedeAccederPagina(p);
-    const puedeEditMod = (m) => this.puedeEditar(m);
+    const pending = typeof this._perfilPendienteNav === 'function' && this._perfilPendienteNav();
+    this._setNavSkeleton(pending);
+    const puede = (p) => !pending && this.puedeAccederPagina(p);
+    const puedeEditMod = (m) => !pending && this.puedeEditar(m);
+
     document.querySelectorAll('.sidebar-link[data-page], .mas-menu-item[data-page], .bottom-nav-item[data-page]').forEach(el => {
       const page = el.dataset.page;
       if (!page) return;
-      const ok = puede(page) && page !== 'redes';
+      const ok = !pending && puede(page) && page !== 'redes';
       el.style.display = ok ? '' : 'none';
       if (!ok) { el.setAttribute('aria-hidden', 'true'); el.setAttribute('tabindex', '-1'); }
       else { el.removeAttribute('aria-hidden'); if (el.classList.contains('mas-menu-item') || el.classList.contains('sidebar-link')) el.removeAttribute('tabindex'); }
     });
     document.querySelectorAll('.sidebar-section[data-section]').forEach(sec => {
       const links = [...sec.querySelectorAll('.sidebar-link[data-page]')].filter(l => l.style.display !== 'none');
-      sec.style.display = links.length ? '' : 'none';
+      sec.style.display = pending ? 'none' : (links.length ? '' : 'none');
     });
     document.querySelectorAll('.mas-menu-sep').forEach(sep => {
       let next = sep.nextElementSibling;
@@ -415,15 +430,17 @@ const Dashboard = {
         if (next.classList.contains('mas-menu-item') && next.style.display !== 'none') { visible = true; break; }
         next = next.nextElementSibling;
       }
-      sep.style.display = visible ? '' : 'none';
+      sep.style.display = pending ? 'none' : (visible ? '' : 'none');
     });
     const bottomEncuestas = document.querySelector('.bottom-nav-item[data-page="encuestas"]');
-    if (bottomEncuestas && !puede('encuestas') && !puede('encuestas-perros') && !puede('encuestas-gatos') && !puede('encuestas-acogida')) {
-      bottomEncuestas.style.display = 'none';
+    if (bottomEncuestas) {
+      if (pending || !(puede('encuestas') || puede('encuestas-perros') || puede('encuestas-gatos') || puede('encuestas-acogida'))) {
+        bottomEncuestas.style.display = 'none';
+      }
     }
     const masToggle = document.getElementById('mas-menu-toggle');
     if (masToggle) {
-      const anyMas = [...document.querySelectorAll('.mas-menu-item[data-page]')].some(i => i.style.display !== 'none');
+      const anyMas = !pending && [...document.querySelectorAll('.mas-menu-item[data-page]')].some(i => i.style.display !== 'none');
       masToggle.style.display = anyMas ? '' : 'none';
     }
 
@@ -580,6 +597,8 @@ const Dashboard = {
     this.inventario = [];
     this.historialFasesAdopcion = [];
     this.userProfile = null;
+    this._profileResolved = false;
+    this._profilePromise = null;
     this._loaded = {};
     this._loading = {};
     this._cached = {};
@@ -601,7 +620,9 @@ const Dashboard = {
         el.style.display = 'none';
         el.onclick = null;
       });
+      if (typeof this._setNavSkeleton === 'function') this._setNavSkeleton(true);
       this.updateUserUI();
+      if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI();
     }
   },
 

@@ -7982,3 +7982,47 @@ body.modal-open { overflow: hidden; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Nav skeleton: oculta menús reales mientras se resuelve perfil/rol (evita filtrar menús de otro usuario) */
+.nav-skeleton { }
+#dashboard-view.nav-pending .sidebar-nav > .sidebar-link,
+#dashboard-view.nav-pending .sidebar-nav > .sidebar-section,
+#dashboard-view.nav-pending .bottom-nav > .bottom-nav-item,
+#dashboard-view.nav-pending .bottom-nav > #mas-menu-toggle {
+  display: none !important;
+}
+#dashboard-view.nav-pending #sidebar-nav-skeleton { display: block !important; }
+#dashboard-view.nav-pending #bottom-nav-skeleton { display: flex !important; }
+
+.nav-skeleton-sidebar { padding: 8px 10px; }
+.nav-skeleton-sidebar .nav-skel-item,
+.nav-skeleton-sidebar .nav-skel-section {
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
+}
+.nav-skeleton-sidebar .nav-skel-item { height: 36px; margin: 6px 0; }
+.nav-skeleton-sidebar .nav-skel-section { height: 10px; width: 55%; margin: 16px 0 8px 4px; opacity: 0.7; }
+
+.nav-skeleton-bottom {
+  position: absolute; inset: 0;
+  align-items: center; justify-content: space-around;
+  padding: 0 12px;
+  background: inherit;
+  z-index: 2;
+}
+.nav-skeleton-bottom .nav-skel-tab {
+  width: 44px; height: 32px; border-radius: 8px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.06) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
+}
+.sidebar.collapsed .nav-skeleton-sidebar .nav-skel-section { display: none; }
+.sidebar.collapsed .nav-skeleton-sidebar .nav-skel-item { height: 36px; margin: 8px 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-skeleton-sidebar .nav-skel-item,
+  .nav-skeleton-sidebar .nav-skel-section,
+  .nav-skeleton-bottom .nav-skel-tab { animation: none; }
+}
