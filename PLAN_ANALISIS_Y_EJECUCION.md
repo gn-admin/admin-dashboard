@@ -101,3 +101,15 @@
 - **Backend GAS:** permisos de `tesorería` en endpoints (`animales/reportes/grupos/recordatorios/documentos`) según configuración desplegada.
 - **Validación real:** pruebas en dispositivos físicos (móvil/tablet, iOS/Android, orientaciones) y auditoría a11y con lector de pantalla.
 - **Plataforma:** S1/S2 no aplicables (GitHub Pages + GAS/CORS); no bloquean la modernización UI/UX.
+| 2026-11-12 | Docs | Limpieza y reenfoque del plan en modernizaciÃ³n UI/UX (eliminada planificaciÃ³n S/U histÃ³rica no UI/UX) | `e09f384` | 357/357, push | Completada |
+| 2026-11-12 | 1/2/5 | ModernizaciÃ³n visual de componentes base: botones, cards, response-cards, formularios, modales (radios, sombras, bordes, transiciones/tokens) | `ff78bfa` (`v189`) | 357/357, push | Parcial (mejora aplicada) |
+| 2026-11-12 | 1/5 | Tarjetas de estadÃ­sticas modernizadas (superficie, hover, tokens) | `5c3791f` (`v190`) | 357/357, push | Parcial |
+| 2026-11-12 | 5 | Bottom-nav modernizado (blur/sombra, estado activo) | `9616628` (`v191`) | 357/357, push | Parcial |
+| 2026-11-12 | 1/2/5 | Modal header y campos de bÃºsqueda/filtros modernizados (tokens, hover/focus, espaciado) | `1e77a39` (`v192`) | 357/357, push | Parcial |
+| 2026-11-12 | 3 | ExtracciÃ³n `_snackTipo` a `utils.js` con fallback | `c32ac5f` (`v193`) | 357/357, push | Parcial |
+| 2026-11-12 | 1/5 | Refinado KPI dashboard y bump cache CSS | `eb3808e`, `fe270a9` (`v194`) | 357/357, push | Parcial |
+| 2026-11-12 | 1/2/5 | Tablas, filtros/selects y estados vacÃ­os modernizados; modal body y animal-cards refinados | `798dff4` (`v195`), `6b4056e` (`v196`) | 357/357, push | Parcial |
+| 2026-11-12 | 0â€“6 | EjecuciÃ³n secuencial integral (UI/UX): base visual modernizada, rendimiento percibido mejorado (lazy/defer/fuentes), modularizaciÃ³n incremental (`utils.js`), accesibilidad y consistencia reforzadas, sin regresiones; validaciÃ³n en dispositivos reales pendiente | `e09f384`â€“`6b4056e` (`v188`â€“`v196`) | 357/357 en cada iteraciÃ³n, push `main` | Avance sustancial completado (seguimientos evolutivos: split profundo monolito, limpieza CSS/inline exhaustiva, homogenizaciÃ³n total por pantalla, QA real dispositivos) |
+
+> **Estado actualizado:** Fase 0 completada. Fases 1â€“6 con **avance sustancial implementado y desplegado** (UI mÃ¡s moderna/consistente, mejor foco/a11y base, carga optimizada en puntos clave, utilidades extraÃ­das), manteniendo 357/357 tests y contratos/permisos; quedan trabajos evolutivos de profundidad (particiÃ³n completa de `dashboard.js`, limpieza exhaustiva CSS/inline, homogenizaciÃ³n pantalla a pantalla y QA en dispositivos reales).
+
