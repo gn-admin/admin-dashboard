@@ -1408,13 +1408,17 @@ body {
 .search-box input {
   width: 100%;
   padding: 10px 14px 10px 40px;
-  border: 1.5px solid var(--gray-200);
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.9rem;
   font-family: inherit;
-  color: var(--gray-800);
-  background: var(--white);
-  transition: border-color 0.2s;
+  color: var(--text-color);
+  background: var(--surface);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.search-box input:hover {
+  border-color: var(--gray-300);
 }
 
 .search-box input:focus {
@@ -2374,8 +2378,9 @@ select.form-input {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--gray-100);
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--surface-soft);
 }
 
 .modal-header h3 {
