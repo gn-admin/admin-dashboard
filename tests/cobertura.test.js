@@ -620,7 +620,7 @@ describe('fichas de animal y socio', () => {
   it('_gastosFicha: total en el badge y precio formateado', () => {
     const html = Dashboard._gastosFicha('a1');
     assert.match(html, /Gastos veterinarios · 25\.50 €/);
-    assert.match(html, /deleteGasto\('g1'\)/);
+    assert.match(html, /data-action="deleteGasto" data-arg0="g1"/);
     assert.match(Dashboard._gastosFicha('otro'), /Sin gastos registrados/);
   });
 
@@ -683,7 +683,7 @@ describe('foto de la ficha: avatar clickable y modal', () => {
   it('_fotoHero con foto: boton que llama a verFotoAnimal, alt e id escapados', () => {
     const html = Dashboard._fotoHero({ id: "a'1", nombre: '<b>Luna</b>', especie: 'Perro', foto_drive_id: 'fid1' });
     assert.match(html, /<button type="button" class="foto-hero"/);
-    assert.match(html, /Dashboard\.verFotoAnimal\('a&#39;1'\)/);
+    assert.match(html, /data-action="verFotoAnimal" data-arg0="a&#39;1"/);
     assert.match(html, /alt="&lt;b&gt;Luna&lt;\/b&gt;"/);
     assert.match(html, /thumbnail\?id=fid1&amp;sz=w800/);
     assert.match(html, /title="Ver foto completa"/);
@@ -787,11 +787,11 @@ describe('lista negra: clave estable por fila', () => {
   it('las tarjetas filtradas siguen apuntando a la fila real', () => {
     // Busqueda que solo deja ver a "Luis" (indice real 2, filtrado 0).
     const html = Dashboard._renderBlacklistCards('luis');
-    assert.match(html, /showEditBlacklistItem\('bl_3'\)/);
-    assert.match(html, /removeBlacklistItem\('bl_3'\)/);
-    assert.doesNotMatch(html, /idx:0/);
+    assert.match(html, /data-action="showEditBlacklistItem" data-arg0="bl_3"/);
+    assert.match(html, /data-action="removeBlacklistItem" data-arg0="bl_3"/);
+    assert.doesNotMatch(html, /data-arg0="idx:0"/);
     const html2 = Dashboard._renderBlacklistCards('sin');
-    assert.match(html2, /removeBlacklistItem\('idx:1'\)/, 'la fila sin id mantiene su indice real, no el filtrado');
+    assert.match(html2, /data-action="removeBlacklistItem" data-arg0="idx:1"/, 'la fila sin id mantiene su indice real, no el filtrado');
   });
 
   it('_blPorClave resuelve id y idx: y rechaza claves rotas', () => {
