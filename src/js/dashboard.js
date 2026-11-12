@@ -160,6 +160,7 @@ const Dashboard = {
       const renderFn = pages[page] || (async () => {});
       await renderFn(el);
       if (token !== this._pageToken) return;
+      if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI();
     } catch (err) {
       console.error('Error cargando ' + page + ':', err);
       if (token !== this._pageToken) return;
@@ -247,6 +248,7 @@ const Dashboard = {
       if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
       if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
     });
+    try { if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI(); } catch (e) {}
   },
 
   _roleLabel(role) {
@@ -303,6 +305,7 @@ const Dashboard = {
 
   aplicarPermisosUI() {
     const puede = (p) => this.puedeAccederPagina(p);
+    const puedeEditMod = (m) => this.puedeEditar(m);
     document.querySelectorAll('.sidebar-link[data-page], .mas-menu-item[data-page], .bottom-nav-item[data-page]').forEach(el => {
       const page = el.dataset.page;
       if (!page) return;
@@ -333,6 +336,99 @@ const Dashboard = {
       const anyMas = [...document.querySelectorAll('.mas-menu-item[data-page]')].some(i => i.style.display !== 'none');
       masToggle.style.display = anyMas ? '' : 'none';
     }
+
+    // Ocultar acciones de creaci?n/edici?n/borrado seg?n permisos por m?dulo
+    try {
+      const rol = this._rolActual ? this._rolActual() : 'consulta';
+      const hash = String(location.hash || '#dashboard').replace('#','');
+      const pageToMod = {
+        dashboard: 'dashboard',
+        encuestas: 'encuestas', 'encuestas-perros': 'encuestas', 'encuestas-gatos': 'encuestas', 'encuestas-acogida': 'encuestas',
+        animales: 'animales', grupos: 'animales',
+        acogidas: 'acogidas', 'acogidas-activas': 'acogidas',
+        adopciones: 'adopciones',
+        socios: 'socios',
+        blacklist: 'blacklist',
+        donaciones: 'donaciones',
+        almacen: 'almacen',
+        reportes: 'reportes', actividad: 'actividad'
+      };
+      const currentMod = pageToMod[hash] || hash;
+      const actionToMod = {
+        showAnimalForm: 'animales', showCamadaForm: 'animales', showAnimalFormById: 'animales', showAnimalFormInGroup: 'animales',
+        saveAnimal: 'animales', saveCamada: 'animales', deleteAnimal: 'animales',
+        showGastoForm: 'animales', saveGasto: 'animales', deleteGasto: 'animales',
+        showDocumentoForm: 'animales', saveDocumento: 'animales', deleteDocumento: 'animales',
+        showApadrinamientoForm: 'animales', saveApadrinamiento: 'animales', deleteApadrinamiento: 'animales', finalizarApadrinamiento: 'animales', convertirPadrino: 'animales',
+        showGrupoForm: 'animales', showGrupoFormFromInfo: 'animales', saveGrupo: 'animales', separarDelGrupo: 'animales',
+        showFamiliaForm: 'acogidas', showFamiliaFormById: 'acogidas', saveFamilia: 'acogidas', deleteFamilia: 'acogidas',
+        showAcogidaForm: 'acogidas', saveAcogida: 'acogidas', deleteAcogida: 'acogidas',
+        showAdopcionForm: 'adopciones', showAdopcionFormById: 'adopciones', saveAdopcion: 'adopciones', deleteAdopcion: 'adopciones',
+        showSeguimientoForm: 'adopciones', saveSeguimiento: 'adopciones', deleteSeguimiento: 'adopciones',
+        showAvanzarFaseForm: 'adopciones', showRetrocederFaseForm: 'adopciones', showDevolucionForm: 'adopciones', anularCaso: 'adopciones',
+        guardarAvanceFase: 'adopciones', guardarRetrocesoFase: 'adopciones', guardarDevolucion: 'adopciones', guardarAnulacionCaso: 'adopciones',
+        showNotaFaseForm: 'adopciones', guardarNotaFase: 'adopciones', showEntregaForm: 'adopciones', saveEntrega: 'adopciones',
+        showPruebaForm: 'adopciones', savePrueba: 'adopciones',
+        showContratoForm: 'adopciones', saveContrato: 'adopciones', anularContrato: 'adopciones', showContratoEmailForm: 'adopciones', enviarContratoEmail: 'adopciones',
+        showSocioForm: 'socios', showSocioFormById: 'socios', saveSocio: 'socios', deleteSocio: 'socios',
+        showAddBlacklist: 'blacklist', showEditBlacklistItem: 'blacklist', saveBlacklist: 'blacklist', removeBlacklistItem: 'blacklist',
+        showDonacionForm: 'donaciones', saveDonacion: 'donaciones', deleteDonacion: 'donaciones',
+        showInventarioForm: 'almacen', saveInventario: 'almacen', deleteInventario: 'almacen',
+        showRecordatorioForm: 'reportes', saveRecordatorio: 'reportes', deleteRecordatorio: 'reportes',
+        descartar2025: 'reportes'
+      };
+      const hideEl = (el) => {
+        if (!el) return;
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+        el.setAttribute('tabindex', '-1');
+        if ('disabled' in el) el.disabled = true;
+      };
+      const isMutating = (a) => {
+        if (!a) return false;
+        if (actionToMod[a]) return true;
+        return /^(save|delete|remove|anular|finalizar|separar|convertir|guardar|eliminar|descartar|add|create)/i.test(a);
+      };
+
+      document.querySelectorAll('[data-action]').forEach(el => {
+        const a = el.getAttribute('data-action') || '';
+        if (!a) return;
+        const mod = actionToMod[a] || null;
+        if (mod) {
+          if (!puedeEditMod(mod)) hideEl(el);
+          return;
+        }
+        if (/^(save|delete|remove|anular|finalizar|separar|convertir|descartar)/i.test(a)) {
+          if (currentMod === 'dashboard') return;
+          if (!puedeEditMod(currentMod)) hideEl(el);
+        }
+      });
+
+      document.querySelectorAll('form[data-submit]').forEach(form => {
+        const submitAction = form.getAttribute('data-submit') || '';
+        const mod = actionToMod[submitAction] || (currentMod !== 'dashboard' ? currentMod : null);
+        if (mod && !puedeEditMod(mod)) {
+          form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(hideEl);
+          form.querySelectorAll('input,select,textarea').forEach(inp => {
+            if (inp.type === 'hidden') return;
+            inp.disabled = true;
+            inp.setAttribute('aria-readonly', 'true');
+          });
+        }
+      });
+
+      // Consulta: solo lectura estricta en UI
+      if (rol === 'consulta') {
+        document.querySelectorAll('[data-action]').forEach(el => {
+          const a = el.getAttribute('data-action') || '';
+          if (!a) return;
+          const allowed = /^(view|open|openCuestionario|export|showTutorial|showTutorialFromProfile|goHash|goAnimales|chartTip|loadPage|loadMore|close|hide|toggle|showProfile|doLogout|refreshData|filter|search|sort|nota)/i.test(a);
+          if (allowed) return;
+          if (isMutating(a) || /edit|form|delete|remove|save|anular|create|add|nuevo|nueva|guardar|eliminar/i.test(a)) hideEl(el);
+        });
+        document.querySelectorAll('button[type="submit"]').forEach(hideEl);
+      }
+    } catch (e) { /* ignore */ }
   },
 
   _sinPermisoPage(el) {
@@ -2686,6 +2782,7 @@ const Dashboard = {
     this._modalPush('info-modal');
     modal.onclick = (e) => { if (e.target === modal) this.closeInfoModal(); };
     this.injectIcons();
+    try { if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI(); } catch (e) {}
     this._focusModal(modal);
   },
 
@@ -2710,6 +2807,7 @@ const Dashboard = {
     modal.style.display = 'flex';
     this._modalPush('form-modal');
     this.injectIcons();
+    try { if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI(); } catch (e) {}
     this._focusModal(modal);
   },
 
