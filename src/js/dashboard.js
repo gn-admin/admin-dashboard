@@ -1753,25 +1753,37 @@ const Dashboard = {
     // Datos criticos para pintar el home: encuestas, estados, animales,
     // familias y respuestas. Todo sale en paralelo: las respuestas usan los
     // ids conocidos, asi el primer pintado no espera una segunda ronda.
-    await Promise.all([
-      this._loadSurveys(force),
+    const jobs = [
       this.loadEstados(force),
       this._loadList('animales', () => API.getAnimales(), force),
-      this._loadList('familias', () => API.getFamilias(), force),
-      ...this._surveyIds().map(sid => this._loadResponses(sid, force)),
-    ]);
+    ];
+    const puedeEncuestas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('encuestas') : true;
+    const puedeAcogidas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('acogidas') : true;
+    if (puedeEncuestas) {
+      jobs.push(this._loadSurveys(force));
+      jobs.push(...this._surveyIds().map(sid => this._loadResponses(sid, force)));
+    }
+    if (puedeAcogidas) {
+      jobs.push(this._loadList('familias', () => API.getFamilias(), force));
+    }
+    await Promise.all(jobs);
   },
   async _refreshHomeTier2(force) {
     // Datos secundarios (best-effort): no bloquean el primer pintado.
-    await Promise.all([
+    const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
+    const jobs = [
       this._loadListBestEffort('recordatorios', () => API.getRecordatorios(), force),
       this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos(), force),
-      this._loadListBestEffort('donaciones', () => API.getDonaciones(), force),
       this._loadListBestEffort('gastos', () => API.getGastos(), force),
-      this._loadListBestEffort('socios', () => API.getSocios(), force),
-      this._loadListBestEffort('contratos', () => API.getContratos(), force),
-      this._ensureListas(['candidaturas', 'acogidas'], force),
-    ]);
+    ];
+    if (puede('donaciones')) jobs.push(this._loadListBestEffort('donaciones', () => API.getDonaciones(), force));
+    if (puede('socios')) jobs.push(this._loadListBestEffort('socios', () => API.getSocios(), force));
+    if (puede('adopciones')) jobs.push(this._loadListBestEffort('contratos', () => API.getContratos(), force));
+    const listas = [];
+    if (puede('adopciones')) listas.push('candidaturas');
+    if (puede('acogidas') || puede('acogidas-activas')) listas.push('acogidas');
+    if (listas.length) jobs.push(this._ensureListas(listas, force));
+    await Promise.all(jobs);
   },
   async _refreshHome(force) {
     // Fuerza red: si ya se pinto cache, esto corre en segundo plano y

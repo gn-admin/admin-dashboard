@@ -83,18 +83,18 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 0 — Baseline y preparación (rápida)
 **Objetivo:** asegurar punto de partida medible y entorno de validación.
-- [x] Documentar estado desplegado (`v165`, commit), matriz de roles y rutas críticas.
-- [ ] Definir checklist de smoke test por rol y por plataforma (desktop/tablet/móvil).
+- [x] Documentar estado desplegado (`v165` y avances hasta `v169`), matriz de roles/rutas y hallazgos.
+- [ ] Definir checklist formal de smoke test por rol y por plataforma (desktop/tablet/móvil).
 - [ ] (Opcional) Capturas/referencias de vistas clave para regresión visual.
-- **Criterio de salida:** checklist y matriz listas para validar cada fase.
+- **Criterio de salida:** baseline documentado; checklist formal pendiente para validación sistemática por fase.
 
 ### Fase 1 — Seguridad frontend (impacto alto, sin romper contrato backend)
 **Objetivo:** reducir superficie de riesgo en cliente sin requerir cambios incompatibles en GAS.
-- [ ] **S1:** Revisar y endurecer CSP *report-only* (alinear con recursos reales: self, Firebase/gstatic, jsdelivr qrcode, Google Fonts, script.google.com, identitytoolkit). Preparar política de enforcement viable.
-- [ ] **S3:** Revisar caché en `localStorage`: documentar datos sensibles, asegurar limpieza en logout/cambio de usuario, y añadir/ajustar TTL o minimización donde sea seguro.
-- [ ] **S4/S6:** Endurecer flujo auth/perfil: no renderizar/cargar módulos no autorizados hasta resolver rol; evitar peticiones para páginas fuera de permisos; cancelar/ignorar respuestas obsoletas en cambios de sesión/ruta.
+- [~] **S1:** CSP *report-only* endurecida/alineada con recursos usados (Firebase/Google APIs, jsdelivr, fonts, `blob:`, `form-action`, `object-src 'none'`, `upgrade-insecure-requests`). Falta validar reportes y preparar enforcement progresivo.
+- [~] **S3:** Limpieza de `gn_cache_*`/datos de usuario en logout/cambio de usuario confirmada en flujo auth. Falta documentar alcance de PII, TTL/minimización y segmentación por rol/módulo.
+- [~] **S4/S6:** Guards para no fetch sin sesión en loaders clave y gating parcial de cargas del dashboard por permisos/módulo. Falta gate completo por perfil/rol resuelto, condicionar todas las cargas/renders por acceso permitido y cancelar/ignorar respuestas obsoletas.
 - [ ] **S5:** Auditoría dirigida de `innerHTML`/sinks en vistas de alto riesgo (datos de usuario/encuestas/notas) y corregir faltas de escape evidentes.
-- [ ] **S7:** Cambiar toggle “Más” móvil a `<button>` con atributos ARIA correctos.
+- [x] **S7:** Toggle “Más” móvil migrado a `<button>` semántico con atributos ARIA y manejo de foco básico.
 - **Archivos probables:** `src/index.html`, `src/js/api.js`, `src/js/auth.js`, `src/js/app.js`, `src/js/dashboard.js`, `src/sw.js`.
 - **Criterio de salida:** sin regresiones de rol/permisos, tests `357+` OK, CSP mejor documentada/endurecida, menos errores por carreras/cargas no autorizadas.
 
