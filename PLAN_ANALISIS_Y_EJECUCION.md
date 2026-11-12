@@ -183,7 +183,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 1 | Completar Fase 1 (frontend): TTL/expiración de caché `gn_cache_*` (S3), guards defensivos por permisos en renders/cargas de módulos restringidos y refuerzo de gating (S4/S6), auditoría dirigida de `innerHTML` (S5), actualización de estado S1–S7 | `caba214` (v170) | 357 tests OK, desplegado (`gn-encuestas-v170`) | Completado (frontend; S2 bloqueado por backend) |
 | 2026-11-12 | 2 | Fase 2 accesibilidad/touch: targets y affordance (sidebar/acciones/gráficos), `aria-label`/estado dinámico en controles icon-only clave, `:focus-visible` y etiquetas accesibles en filtros/búsquedas principales | `8684548` (v171) | 357 tests OK, desplegado (`gn-encuestas-v171`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | `6ab26a7` (v172) | 357 tests OK, desplegado (`gn-encuestas-v172`) | Completado (frontend; validación real pendiente) |
-| 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | Pendiente commit (v173) | `node --test tests/*.test.js` en curso | En ejecución |
+| 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | `907cf9a` (v173) | 357 tests OK, desplegado (`gn-encuestas-v173`) | Completado (frontend) |
 
 ---
 
