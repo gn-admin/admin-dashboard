@@ -144,21 +144,21 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 ## 5. Matriz de verificación (checklist)
 
 ### 5.1 Por rol (cada plataforma)
-- [~] `admin`: backend `user-profile` devuelve `admin` (verificado en producción 2026-11-12 con `gn.test.admin`). UI mostraba fallback `Consulta` por bug de carga de perfil en `init`; fix aplicado en `v175` (pendiente verificación post-deploy en producción).
-- [~] `coordinador`: backend devuelve `coordinador` (verificado en producción). Misma incidencia de UI/fallback corregida en `v175`; pendiente verificación post-deploy.
-- [~] `voluntario`: backend devuelve `voluntario` (verificado en producción). Misma incidencia corregida en `v175`; pendiente verificación post-deploy.
-- [~] `tesoreria`: backend devuelve `tesoreria` (verificado en producción). Misma incidencia corregida en `v175`; pendiente verificación post-deploy.
-- [~] `consulta`: backend devuelve `consulta` y fallback/solo lectura coherentes (verificado en producción). Pendiente smoke final multi-dispositivo.
+- [x] `admin` (desktop, verificado v177): perfil/rol correctos, sidebar completo (incl. Donaciones/Almacén). Dashboard completo: KPIs de solicitudes/acogida/adopciones/apadrinamientos, gráfico y embudo, acción requerida, tesorería del mes, solicitudes recientes, accesos rápidos y botón de recordatorio.
+- [x] `coordinador` (desktop, verificado v177): perfil/rol correctos, sin Donaciones/Almacén. Dashboard operativo con encuestas/adopciones/socios/animales, gráfico/embudo/solicitudes recientes y acción requerida; sin panel de tesorería; accesos rápidos filtrados.
+- [~] `voluntario` (desktop, verificado v177): perfil/rol y sidebar correctos (dashboard, animales, reportes). Dashboard simplificado (animales en acogida, acción requerida, accesos rápidos relevantes). **Pendiente:** revisar/confirmar filtrado de navegación móvil/menú “Más” y limitación completa de botones en todos los módulos.
+- [~] `tesoreria` (desktop, verificado v177): perfil/rol y sidebar correctos (dashboard, animales, reportes, donaciones, almacén). Dashboard con KPIs/paneles de tesorería y animales (sin encuestas/adopciones/solicitudes). Corregido error de carga por permisos de estados/encuestas. **Pendiente:** smoke completo de acciones permitidas/no permitidas en módulos.
+- [x] `consulta` (desktop, verificado v177): perfil/rol correctos, sin Donaciones/Almacén. Dashboard informativo de módulos accesibles sin botones mutantes de recordatorio ("Hecho"/crear). **Pendiente:** smoke completo de solo lectura en fichas/modales/rutas profundas.
 
 ### 5.2 Por plataforma
-- [~] **Desktop:** mejoras de accesibilidad/foco/targets y comportamiento por rol implementadas (validación visual final recomendada)
-- [ ] **Tablet:** ajustes responsive aplicados; **validación en dispositivo real pendiente** (768–1023px, orientación, teclado)
-- [~] **Móvil:** bottom-nav/menú “Más”, targets táctiles, tablas→tarjetas y modales/formularios mejorados en código; **validación en dispositivo real pendiente**
+- [~] **Desktop:** verificación navegador/Playwright realizada en producción (`v177`) para dashboard por rol y perfiles/menús principales. Pendiente smoke completo de acciones/botones dentro de cada módulo y rutas profundas.
+- [ ] **Tablet:** ajustes responsive aplicados; **validación en dispositivo real pendiente** (768–1023px, orientación, teclado). Sin emulación de viewport disponible en las herramientas usadas.
+- [~] **Móvil:** mejoras responsive y lógica de permisos en bottom-nav/“Más” presentes en código; verificación de atributos de visibilidad por rol realizada parcialmente en desktop. **No fue posible emular viewport móvil real** con las herramientas de navegador disponibles; **validación en dispositivo real/emulación dedicada pendiente** (layout, touch, teclado).
 
 ### 5.3 Seguridad/estabilidad
 - [x] **S2 ignorado/no aplicable:** token en query se mantiene por limitación GAS+CORS (no viable migrar a `Authorization` en esta arquitectura). Sin acciones pendientes.
-- [x] Sin acciones mutantes visibles para roles sin permiso (refuerzo UI) y cargas/gating condicionados por permisos en frontend
-- [~] Reducción de peticiones/carreras no autorizadas y estados obsoletos (guards, perfil/rol, tokens de página); verificación exhaustiva en sesiones reales multirol pendiente
+- [~] Sin acciones mutantes visibles para roles sin permiso: reforzado en UI (incl. dashboard/home y `aplicarPermisosUI`) y cargas/gating condicionados por permisos; **pendiente auditoría/verificación exhaustiva en todos los módulos, modales y acciones dinámicas** (usuario reporta que no está 100% completo)
+- [~] Reducción de peticiones/carreras no autorizadas y estados obsoletos (guards, perfil/rol, tokens de página): mejorado; **verificación exhaustiva en sesiones reales multirol pendiente**
 - [x] Caché `gn_cache_*` con TTL y limpieza en logout/cambio de usuario
 - [x] **S1 ignorado/no aplicable:** CSP efectiva por cabeceras HTTP no posible en GitHub Pages; se mantiene endurecimiento en `<meta>` como referencia, sin acciones pendientes.
 
@@ -192,7 +192,8 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 5 | Fase 5 validación/hardening: tests 357/357, revisión residual seguridad/UI, preparación S2 (Authorization opt-in en frontend + soporte/doOptions en backend local), actualización de matriz/checklists y registro de pendientes externos | `1764fe4` (v174) | 357 tests OK, desplegado (`gn-encuestas-v174`) | Completado (frontend/código; pendientes externos) |
 | 2026-11-12 | 5+ | Verificación adicional en navegador (producción): S2 con cabecera `Authorization` falla por preflight/CORS en GAS (`Failed to fetch`); CSP report-only en `<meta>` es ignorada por el navegador. Plan actualizado con hallazgos y bloqueos reales | `fa4ea3f` | Verificación browser en `gn-admin.github.io` (sesión admin) | Completado (análisis) |
 | 2026-11-12 | 5+ | Verificación multi-rol con navegador (producción, `gn.test.*@example.test` / `asdf@1234`): login correcto para los 5 roles; **backend `user-profile` devuelve el rol esperado** (admin/coordinador/voluntario/tesoreria/consulta), pero en el flujo UI `Dashboard.userProfile` quedaba `null` y se aplicaba fallback `Consulta` (sidebar/permisos incorrectos) por fallo/race al cargar perfil en `init`. Fix frontend: espera/reintento robusto de token/perfil (`src/js/auth.js`, `src/js/dashboard.js`) + bump SW `v175`. Roles backend configurados OK; verificación visual final por rol requiere despliegue de este fix. | `f6c0999` (v175) | Browser producción + tests 357/357 | Completado (fix frontend; verificación post-deploy pendiente) |
-| 2026-11-12 | 5+ | S1/S2 marcados como **ignorados/no aplicables** por limitación de plataforma (GitHub Pages + GAS/CORS). Mejora frontend: dashboard de inicio diferenciado por rol (admin completo, resto solo widgets/datos/accesos de módulos permitidos) y refuerzo de limitación de botones/acciones en home según permisos (`puedeAccederPagina`/`puedeEditar`), sin romper vista admin. | Pendiente commit | 357/357 tests | Completado (frontend; verificación post-deploy pendiente) |
+| 2026-11-12 | 5+ | S1/S2 marcados como **ignorados/no aplicables** por limitación de plataforma (GitHub Pages + GAS/CORS). Mejora frontend: dashboard de inicio diferenciado por rol (admin completo, resto solo widgets/datos/accesos de módulos permitidos) y refuerzo de limitación de botones/acciones en home según permisos (`puedeAccederPagina`/`puedeEditar`), sin romper vista admin. | `689bf70` (v176) | 357/357 tests | Completado (frontend) |
+| 2026-11-12 | 5+ | Fix: dashboard fallaba para roles sin acceso a encuestas (carga de `estados` no autorizada / caché de home basada en encuestas). Se condiciona carga a permisos y se ajusta readiness del home; tesorería vuelve a renderizar correctamente. Verificación navegador (Playwright, desktop) por roles: perfiles/sidebars correctos y dashboard diferenciado (admin completo; coordinador sin tesorería; voluntario simplificado; tesorería con KPIs/paneles de donaciones-animales-reportes; consulta informativa sin botones mutantes de recordatorio). | `9157a07` (v177) | Producción `gn-encuestas-v177`, tests 357/357 | Completado (desktop verificado; móvil layout real pendiente) |
 
 ---
 
