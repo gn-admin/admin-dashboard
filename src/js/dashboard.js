@@ -475,7 +475,7 @@ const Dashboard = {
         showAcogidaForm: 'acogidas', saveAcogida: 'acogidas', deleteAcogida: 'acogidas',
         showAdopcionForm: 'adopciones', showAdopcionFormById: 'adopciones', saveAdopcion: 'adopciones', deleteAdopcion: 'adopciones',
         showSeguimientoForm: 'adopciones', saveSeguimiento: 'adopciones', deleteSeguimiento: 'adopciones',
-        showAvanzarFaseForm: 'adopciones', showRetrocederFaseForm: 'adopciones', showDevolucionForm: 'adopciones', anularCaso: 'adopciones',
+        showAvanzarFaseForm: 'adopciones', showRetrocederFaseForm: 'adopciones', showDevolucionForm: 'adopciones', anularCaso: 'adopciones', showAnularCasoForm: 'adopciones',
         guardarAvanceFase: 'adopciones', guardarRetrocesoFase: 'adopciones', guardarDevolucion: 'adopciones', guardarAnulacionCaso: 'adopciones',
         showNotaFaseForm: 'adopciones', guardarNotaFase: 'adopciones', showEntregaForm: 'adopciones', saveEntrega: 'adopciones',
         showPruebaForm: 'adopciones', savePrueba: 'adopciones',
@@ -5954,10 +5954,14 @@ const Dashboard = {
         ? `<details class="detail-collapse"><summary>${Icons.calendar} Seguimiento post-adopción</summary><div class="detail-collapse-body"><div class="detail-section-note">El seguimiento a largo plazo (1, 3, 6 y 12 meses) se habilita tras completar la fase de <b>Entrega</b> (en fases de Prueba/Seguimiento).</div></div></details>`
         : '');
 
-    const accionesSecundarias = (!cerrado || puedeDevolucion)
-      ? `<details class="detail-collapse"><summary>${Icons.settings || Icons.info} Más acciones del caso</summary><div class="detail-collapse-body"><div class="detail-actions-inline detail-actions-inline--danger" style="padding:8px 0 0">
-          ${puedeDevolucion ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="showDevolucionForm" data-arg0="${p.id}">${Icons.arrowLeft} Registrar devolución</button>` : ''}
-          ${!cerrado ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" data-action="showAnularCasoForm" data-arg0="${p.id}">${Icons.ban} Anular caso</button>` : ''}
+    const accionesPeligro = !cerrado
+      ? `<div class="detail-actions-inline detail-actions-inline--danger" style="margin-top:8px">
+          <button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" data-action="showAnularCasoForm" data-arg0="${p.id}">${Icons.ban} Anular caso</button>
+        </div>`
+      : '';
+    const accionesSecundarias = puedeDevolucion
+      ? `<details class="detail-collapse"><summary>${Icons.settings || Icons.info} Más acciones del caso</summary><div class="detail-collapse-body"><div class="detail-actions-inline" style="padding:8px 0 0">
+          <button type="button" class="btn btn-sm btn-outline-green" data-action="showDevolucionForm" data-arg0="${p.id}">${Icons.arrowLeft} Registrar devolución</button>
         </div></div></details>`
       : '';
 
@@ -5987,6 +5991,7 @@ const Dashboard = {
       ${seguimientoHtml}
       ${origenNotasHtml}
       ${notasCasoHtml}
+      ${accionesPeligro}
       ${accionesSecundarias}
       <details class="detail-collapse">
         <summary>${Icons.info} Datos del caso y solicitud de origen</summary>
