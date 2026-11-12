@@ -162,5 +162,6 @@ Cada hito indica el **% estimado alcanzado tras completarlo** (acumulado). Compl
 |---|---|---|---:|---|---|
 | — | Base | Línea base documentada | ~60% | — | Estado inicial estimado |
 | 2026-11-12 | 1.2 (parcial, frontend) | Añadido rol `sin_acceso` (sin páginas), bloqueo de navegación/cargas en background/home/estados/notas/refresco cuando el rol es `sin_acceso`, y pantalla “Sin acceso autorizado”. Requiere 1.1 en backend (GAS) para denegar/no degradar usuarios no reconocidos y devolver `sin_acceso`. | ~61% | — | Commit `f3e68e3`, desplegado en `v201`. Tests 357/357. |
+| 2026-11-12 | 3.1 (parcial, frontend) | Ampliada la limpieza de datos locales en logout/cambio de usuario (`_clearUserData`) para eliminar claves `gn_*`/cachés de datos de cuenta, reduciendo persistencia residual en el navegador. Pendiente: minimizar qué datos se cachean durante el uso y estrategia de caché de datos sensibles. | ~62% | — | Commit `37ce8e1`, desplegado en `v202`. Tests 357/357. |
 
 > Actualizar esta tabla al completar cada hito, indicando evidencia (commit, captura/config, resultado de prueba o verificación en GAS/Firebase).
