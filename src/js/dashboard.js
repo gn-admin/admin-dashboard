@@ -3413,6 +3413,10 @@ const Dashboard = {
   },
 
   async notaAddUI(kind, id, ctx, btn) {
+    if (kind === 'adopcion') {
+      const p = this._byId(this.adopciones, id);
+      if (p && p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden añadir notas.', 'warning'); return; }
+    }
     const input = document.getElementById('nota-input-' + this._notasCtxId(kind, id, ctx));
     if (!input) return;
     const texto = input.value;
@@ -3427,6 +3431,10 @@ const Dashboard = {
   },
 
   async notaEliminarUI(kind, id, notaId, ctx) {
+    if (kind === 'adopcion') {
+      const p = this._byId(this.adopciones, id);
+      if (p && p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden eliminar notas.', 'warning'); return; }
+    }
     if (!(await this._confirm('¿Eliminar esta nota? No se puede deshacer.', 'Eliminar nota'))) return;
     const ok = await this.borrarNota(kind, id, notaId);
     if (!ok) return;
@@ -5865,11 +5873,16 @@ const Dashboard = {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado (id ' + id + '). Recarga la lista.', 'warning'); return; }
     const detailKey = 'adopcion:' + id;
-    const faltan = ['contratos', 'seguimientos', 'animales', 'historialFasesAdopcion'].filter(k => !this._loaded[k]);
+    const faltan = ['contratos', 'seguimientos', 'animales', 'historialFasesAdopcion', 'notas'].filter(k => !this._loaded[k]);
     if (faltan.length && !(opts && opts.ready)) {
       // Se pinta ya con lo que hay en memoria y se repinta cuando llega el
       // resto: abrir una ficha no espera a la red.
-      this._ensureListas(faltan).then(() => {
+      this._ensureListas(faltan.filter(k => k !== 'notas')).catch(() => {});
+      if (faltan.indexOf('notas') !== -1) this.loadNotas().catch(() => {});
+      Promise.all([
+        ...faltan.filter(k => k !== 'notas').map(k => this._ensureListas([k]).catch(() => {})),
+        faltan.indexOf('notas') !== -1 ? this.loadNotas().catch(() => {}) : Promise.resolve()
+      ]).then(() => {
         if (this._detailVigente('adopciones', detailKey)) this.viewAdopcion(id, { ready: true });
       }).catch(() => {});
     }
@@ -5884,17 +5897,50 @@ const Dashboard = {
     const puedeAvanzar = currentIdx < fases.length - 1;
     const devuelto = p.desenlace === 'devuelto';
     const anulado = p.desenlace === 'anulado';
-    const avanceBtn = (!puedeAvanzar || devuelto || anulado) ? '' : (bloqueo
+    const cerrado = !!(devuelto || anulado);
+    const idxEntrega = this._faseIdx('Entrega');
+    const idxPrueba = this._faseIdx('Prueba');
+    const faseTemprana = currentIdx <= this._faseIdx('Visita domiciliaria');
+    const avanceBtn = (!puedeAvanzar || cerrado) ? '' : (bloqueo
       ? `<button type="button" class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="${this._esc(bloqueo)}">${Icons.lock} Avanzar fase</button>`
       : `<button type="button" class="btn btn-primary btn-sm" title="Pasar a la siguiente fase" data-action="showAvanzarFaseForm" data-arg0="${p.id}">${Icons.arrowRight} Avanzar a ${this._esc(fases[currentIdx + 1])}</button>`);
     // Cada bloque aparece cuando ya tiene sentido en el flujo.
     const verContrato = !!contrato || currentIdx >= this._faseIdx('Visita domiciliaria');
-    const verEntrega = !!p.fecha_entrega || currentIdx >= this._faseIdx('Entrega');
-    const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= this._faseIdx('Prueba');
-    const puedeDevolucion = !devuelto && !anulado && (currentIdx >= this._faseIdx('Entrega') || !!p.fecha_entrega);
+    const verEntrega = !!p.fecha_entrega || currentIdx >= idxEntrega;
+    const verPrueba = this._pruebaRegistrada(p.id) || currentIdx >= idxPrueba;
+    const puedeDevolucion = !cerrado && (currentIdx >= idxEntrega || !!p.fecha_entrega);
+    const verSeguimiento = !!p.fecha_entrega || currentIdx >= idxEntrega || (this.seguimientos || []).some(x => String(x.adopcion_id) === String(p.id) && String(x.tipo || '').toLowerCase() !== 'prueba');
     const devueltoBanner = devuelto
       ? `<div class="alert-item danger" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso devuelto</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El animal está disponible para una nueva adopción.</span></div>`
       : (anulado ? `<div class="alert-item warning" style="margin-bottom:16px">${Icons.alertTriangle} <span><b>Caso anulado</b>${p.fecha_devolucion ? ' el ' + this._fmtFecha(p.fecha_devolucion) : ''}${p.motivo_devolucion ? ': ' + this._esc(p.motivo_devolucion) : ''}. El caso se conserva en el historial.</span></div>` : '');
+
+    const notasSol = sol ? this._notasDe(sol.surveyId + '::' + sol.responseId) : [];
+    const origenAccion = sol ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="viewCuestionarioModal" data-arg0="${sol.surveyId}" data-arg1="${sol.responseId}">${Icons.clipboard} ${faseTemprana ? 'Ver cuestionario de origen' : 'Cuestionario'}</button>` : '';
+    const origenNotasHtml = sol
+      ? (notasSol.length
+        ? this._notasFichaHtml(sol.surveyId, sol.responseId, { readonly: true, ctx: 'adopcion-origen', title: 'Notas del cuestionario de origen' })
+        : `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Notas del cuestionario de origen</div><div class="detail-section-note">No hay notas registradas en la solicitud de origen.</div>${origenAccion ? `<div style="padding:0 16px 16px">${origenAccion}</div>` : ''}</div>`)
+      : '';
+
+    const notasCasoKey = 'adopcion::' + p.id;
+    const tieneNotasCaso = this._notasDe(notasCasoKey).length > 0 || !!(p.notas && String(p.notas).trim());
+    const notasCasoReadonly = cerrado;
+    const notasCasoSection = this._notasFichaHtml('adopcion', p.id, { title: 'Bitácora general del caso', readonly: notasCasoReadonly });
+    const notasCasoHtml = (faseTemprana && !tieneNotasCaso && !cerrado)
+      ? `<details class="detail-collapse"><summary>${Icons.pencil} Bitácora general del caso</summary><div class="detail-collapse-body">${notasCasoSection}</div></details>`
+      : notasCasoSection;
+
+    const seguimientoHtml = verSeguimiento
+      ? this._seguimientosFicha(p, { cerrado })
+      : `<details class="detail-collapse"><summary>${Icons.calendar} Seguimiento post-adopción</summary><div class="detail-collapse-body"><div class="detail-section-note">El seguimiento a largo plazo (1, 3, 6 y 12 meses) se habilita a partir de la <b>Entrega</b>. La prueba de adaptación (15-30 días) se gestiona en su propia sección cuando corresponda.</div></div></details>`;
+
+    const accionesSecundarias = (!cerrado || puedeDevolucion)
+      ? `<details class="detail-collapse"><summary>${Icons.settings || Icons.info} Más acciones del caso</summary><div class="detail-collapse-body"><div class="detail-actions-inline detail-actions-inline--danger" style="padding:8px 0 0">
+          ${puedeDevolucion ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="showDevolucionForm" data-arg0="${p.id}">${Icons.arrowLeft} Registrar devolución</button>` : ''}
+          ${!cerrado ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" data-action="showAnularCasoForm" data-arg0="${p.id}">${Icons.ban} Anular caso</button>` : ''}
+        </div></div></details>`
+      : '';
+
     this._showDetail('adopciones', p.animal, `
       <div class="proceso-hero">
         <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
@@ -5907,19 +5953,21 @@ const Dashboard = {
       </div>
       ${devueltoBanner}
       <div class="detail-actions-wrap">
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="showAdopcionFormById" data-arg0="${p.id}">${Icons.pencil} Editar</button>
+        ${!cerrado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showAdopcionFormById" data-arg0="${p.id}">${Icons.pencil} Editar</button>` : ''}
         ${avanceBtn}
-        ${currentIdx > 0 && !devuelto && !anulado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showRetrocederFaseForm" data-arg0="${p.id}">${Icons.arrowLeft} Retroceder</button>` : ''}
-        ${!anulado && !devuelto ? `<button type="button" class="btn btn-danger btn-sm" data-anular="${p.id}" data-action="showAnularCasoForm" data-arg0="${p.id}">${Icons.ban} Anular caso</button>` : ''}
+        ${currentIdx > 0 && !cerrado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showRetrocederFaseForm" data-arg0="${p.id}">${Icons.arrowLeft} Retroceder</button>` : ''}
+        ${faseTemprana && origenAccion ? origenAccion : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
       ${this._faseStepperCardHtml(p, fases, currentIdx)}
       ${this._historialFasesAdopcionHtml(p)}
-      ${verContrato ? this._contratoFicha(p, contrato) : ''}
-      ${verEntrega ? this._entregaFicha(p, contrato) : ''}
-      ${verPrueba ? this._pruebaFicha(p) : ''}
-      ${this._seguimientosFicha(p)}
-      ${this._notasFichaHtml('adopcion', p.id, { title: 'Notas generales del caso' })}
+      ${verContrato ? this._contratoFicha(p, contrato, { faseTemprana, cerrado }) : ''}
+      ${verEntrega ? this._entregaFicha(p, contrato, { cerrado }) : ''}
+      ${verPrueba ? this._pruebaFicha(p, { cerrado }) : ''}
+      ${seguimientoHtml}
+      ${origenNotasHtml}
+      ${notasCasoHtml}
+      ${accionesSecundarias}
       <details class="detail-collapse">
         <summary>${Icons.info} Datos del caso y solicitud de origen</summary>
         <div class="detail-collapse-body">
@@ -5933,9 +5981,6 @@ const Dashboard = {
             ${p.notas ? `<div class="detail-field"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>` : ''}
           </div>
           ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" data-action="viewCuestionarioModal" data-arg0="${sol.surveyId}" data-arg1="${sol.responseId}">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
-          <div class="detail-actions-inline detail-actions-inline--danger">
-            ${puedeDevolucion ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="showDevolucionForm" data-arg0="${p.id}">${Icons.arrowLeft} Registrar devolución</button>` : ''}
-          </div>
         </div>
       </details>`, detailKey);
   },
@@ -6056,16 +6101,19 @@ const Dashboard = {
     try { const o = JSON.parse(raw); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; }
   },
 
-  _contratoFicha(p, contrato) {
+  _contratoFicha(p, contrato, opts) {
+    const o = opts || {};
     const firmado = !!contrato;
     const adelantado = this._faseIdx(p.fase) < this._faseIdx('Contrato');
+    const cerrado = !!o.cerrado;
     const emails = firmado ? this._contratoEmails(p) : [];
-    return `<div class="detail-section"><div class="detail-section-title">${Icons.fileText} Contrato de adopcion</div>
-      ${firmado ? `
-        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Contrato firmado</span> · ${this._fmtFecha(contrato.fecha)}</div></div>
-        <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(contrato.f1_nombre) || '—'}${contrato.f1_email ? ` · ${this._esc(contrato.f1_email)}` : ''}</div></div>
-        ${this._contratoTutor(contrato) ? `<div class="detail-field"><div class="detail-question">Tutor / persona de apoyo</div><div class="detail-answer">${this._esc(contrato.f2_nombre)}${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
-        ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
+    const accionesFirmado = cerrado ? `
+        <div class="detail-actions-inline">
+          <button type="button" class="btn btn-primary btn-sm" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} Descargar contrato</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoDoc" data-arg0="${p.id}">${Icons.eye} Ver documento</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver cláusulas</button>
+        </div>` : `
         <div class="detail-actions-inline">
           <button type="button" class="btn btn-primary btn-sm" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} Descargar contrato</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar cláusulas</button>
@@ -6074,13 +6122,22 @@ const Dashboard = {
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver cláusulas</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoIdentidad" data-arg0="${p.id}">${Icons.pencil} Foto / nombre</button>
           <button type="button" class="btn btn-danger btn-sm" data-action="anularContrato" data-arg0="${p.id}">${Icons.xCircle} Anular firma</button>
-        </div>`
-      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma.${adelantado ? ' Se firma en la fase Contrato, pero puedes adelantarlo.' : ' Es obligatorio firmarlo para pasar a Entrega.'}</div></div>
-        <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showContratoForm" data-arg0="${p.id}">${Icons.pencil} Firmar contrato</button></div>`}
+        </div>`;
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.fileText} Contrato de adopcion</div>
+      ${firmado ? `
+        <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer"><span class="estado-badge aprobada">Contrato firmado</span> · ${this._fmtFecha(contrato.fecha)}</div></div>
+        <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(contrato.f1_nombre) || '—'}${contrato.f1_email ? ` · ${this._esc(contrato.f1_email)}` : ''}</div></div>
+        ${this._contratoTutor(contrato) ? `<div class="detail-field"><div class="detail-question">Tutor / persona de apoyo</div><div class="detail-answer">${this._esc(contrato.f2_nombre)}${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
+        ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
+        ${accionesFirmado}`
+      : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma.${adelantado ? ' Se firma en la fase Contrato (puede adelantarse si ya está todo revisado), pero es obligatorio antes de Entrega.' : ' Es obligatorio firmarlo para pasar a Entrega.'}</div></div>
+        ${cerrado ? '' : `<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showContratoForm" data-arg0="${p.id}">${Icons.pencil} Firmar contrato</button></div>`}`}
     </div>`;
   },
 
-  _entregaFicha(p, contrato) {
+  _entregaFicha(p, contrato, opts) {
+    const o = opts || {};
+    const cerrado = !!o.cerrado;
     const fecha = p.fecha_entrega;
     const marcas = this._checklistMarks(p.entrega_checklist);
     const requeridos = this._entregaChecklist().filter(it => !it.opcional);
@@ -6099,29 +6156,38 @@ const Dashboard = {
         ${faltan.length ? `<div class="fase-bloqueo fase-bloqueo--inline">${Icons.alertTriangle}<span>No se puede avanzar a Prueba hasta completar: ${this._esc(faltan.map(x => x.label).join(', '))}.</span></div>` : ''}
         ${p.entrega_observaciones ? `<div class="detail-field"><div class="detail-question">Observaciones</div><div class="detail-answer">${this._esc(p.entrega_observaciones)}</div></div>` : ''}
         ${foto}
-        <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="showEntregaForm" data-arg0="${p.id}">${Icons.pencil} Editar entrega</button>${contrato ? '' : '<span class="chip-pending">Contrato pendiente</span>'}</div>`
+        ${cerrado ? '' : `<div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="showEntregaForm" data-arg0="${p.id}">${Icons.pencil} Editar entrega</button>${contrato ? '' : '<span class="chip-pending">Contrato pendiente</span>'}</div>`}`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Entrega pendiente. Registra la fecha y el checklist cuando el animal se entregue.</div></div>
-        <div style="padding:0 16px 16px">${contrato
+        ${cerrado ? '' : `<div style="padding:0 16px 16px">${contrato
           ? `<button type="button" class="btn btn-primary btn-sm" data-action="showEntregaForm" data-arg0="${p.id}">${Icons.checkCircle} Registrar entrega</button>`
-          : `<button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoForm" data-arg0="${p.id}">${Icons.lock} Firma el contrato para registrar la entrega</button>`}</div>`}
+          : `<button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoForm" data-arg0="${p.id}">${Icons.lock} Firma el contrato para registrar la entrega</button>`}</div>`}`}
     </div>`;
   },
 
-  _pruebaFicha(p) {
+  _pruebaFicha(p, opts) {
+    const o = opts || {};
+    const cerrado = !!o.cerrado;
     const list = (this.seguimientos || []).filter(x => String(x.adopcion_id) === String(p.id) && String(x.tipo || '').toLowerCase() === 'prueba');
     const ventana = p.fecha_entrega ? this._sumaMeses(p.fecha_entrega, 1) : '';
     const rows = list.length ? list.slice().reverse().map(r => {
       const marcas = this._checklistMarks(r.checklist);
       const chips = this._pruebaChecklist().map(it => `<span class="${marcas[it.id] ? 'chip-ok' : 'chip-pending'}">${marcas[it.id] ? Icons.check : Icons.x} ${this._esc(it.label)}</span>`).join('');
+      const delBtn = cerrado ? '' : `<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" data-action="deleteSeguimiento" data-arg0="${this._esc(r.id)}">${Icons.trash} Eliminar prueba</button></div>`;
       return `<div class="prueba-row">
-        <div class="detail-field"><div class="detail-question">${this._fmtFecha(r.fecha)} · <span class="estado-badge en_proceso">${this._esc(r.resultado || 'Sin resultado')}</span></div><div class="detail-answer"><div class="check-chips">${chips}</div>${r.nota ? `<div style="margin-top:8px">${this._esc(r.nota)}</div>` : ''}<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" data-action="deleteSeguimiento" data-arg0="${this._esc(r.id)}">${Icons.trash} Eliminar prueba</button></div></div></div>
+        <div class="detail-field"><div class="detail-question">${this._fmtFecha(r.fecha)} · <span class="estado-badge en_proceso">${this._esc(r.resultado || 'Sin resultado')}</span></div><div class="detail-answer"><div class="check-chips">${chips}</div>${r.nota ? `<div style="margin-top:8px">${this._esc(r.nota)}</div>` : ''}${delBtn}</div></div>
       </div>`;
     }).join('') : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin prueba registrada todavia.</div></div>`;
+    const canAdd = !cerrado && !!p.fecha_entrega;
+    const addBtn = cerrado
+      ? ''
+      : (canAdd
+        ? `<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showPruebaForm" data-arg0="${p.id}">${Icons.plus} Registrar prueba</button></div>`
+        : `<div style="padding:0 16px 16px"><button type="button" class="btn btn-outline-green btn-sm" disabled aria-disabled="true" title="Registra primero la entrega">${Icons.lock} Registrar prueba</button><div class="detail-section-note" style="padding:8px 0 0">La prueba de adaptación se registra tras la entrega del animal.</div></div>`);
     return `<div class="detail-section"><div class="detail-section-title">${Icons.activity} Prueba de adaptacion <span class="section-chip">15-30 dias</span></div>
-      <div class="detail-section-note">Periodo corto para comprobar que el animal se adapta. No es lo mismo que el seguimiento a largo plazo (1, 3, 6 y 12 meses), que esta en la seccion Seguimiento de todas las fases.</div>
+      <div class="detail-section-note">Periodo corto para comprobar que el animal se adapta. No es lo mismo que el seguimiento a largo plazo (1, 3, 6 y 12 meses), que se gestiona en la sección de seguimiento post-adopción.</div>
       ${p.fecha_entrega ? `<div class="detail-field"><div class="detail-question">Periodo orientativo</div><div class="detail-answer">${this._fmtFecha(p.fecha_entrega)} → ${ventana ? this._fmtFecha(ventana) : '30 dias'}</div></div>` : '<div class="detail-section-note">Registra primero la entrega para calcular el periodo orientativo de adaptacion.</div>'}
       ${rows}
-      <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showPruebaForm" data-arg0="${p.id}">${Icons.plus} Registrar prueba</button></div>
+      ${addBtn}
     </div>`;
   },
 
@@ -6554,6 +6620,7 @@ const Dashboard = {
   async showEntregaForm(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede editar la entrega.', 'warning'); return; }
     await this._ensureListas(['contratos']);
     if (!this._contratoDeAdopcion(id)) {
       this.showSnackbar('Firma el contrato de adopcion antes de registrar la entrega.', 'warning');
@@ -6578,6 +6645,7 @@ const Dashboard = {
     if (!finGuardar) return;
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede editar la entrega.', 'warning'); finGuardar(); return; }
     const fecha = (document.getElementById('en-fecha').value || '').trim();
     if (!fecha) { this.showSnackbar('Indica la fecha de entrega', 'warning'); finGuardar(); return; }
     const marcas = {};
@@ -6629,6 +6697,8 @@ const Dashboard = {
   async showPruebaForm(id) {
     const p = this._byId(this.adopciones, id);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede registrar la prueba.', 'warning'); return; }
+    if (!p.fecha_entrega) { this.showSnackbar('Registra primero la fecha de entrega para poder añadir la prueba de adaptación.', 'warning'); return; }
     await this._ensureListas(['seguimientos']);
     this.showFormModal('Prueba de adaptacion · ' + (p.animal || ''), `
       <form data-submit="savePrueba" data-sarg0="${id}">
@@ -6646,6 +6716,8 @@ const Dashboard = {
     if (!finGuardar) return;
     const p = this._byId(this.adopciones, adopcionId);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede registrar la prueba.', 'warning'); finGuardar(); return; }
+    if (!p.fecha_entrega) { this.showSnackbar('Registra primero la fecha de entrega para poder añadir la prueba de adaptación.', 'warning'); finGuardar(); return; }
     const marcas = {};
     this._pruebaChecklist().forEach(it => {
       const el = document.getElementById('pb-chk-' + it.id);
@@ -7064,9 +7136,11 @@ const Dashboard = {
     this.showSnackbar('Devolución registrada: el animal vuelve a Disponible', 'success');
   },
 
-  _seguimientosFicha(adopcionIdOrP) {
+  _seguimientosFicha(adopcionIdOrP, opts) {
+    const o = opts || {};
     const p = adopcionIdOrP && typeof adopcionIdOrP === 'object' ? adopcionIdOrP : this._byId(this.adopciones, adopcionIdOrP);
     const adopcionId = p ? p.id : adopcionIdOrP;
+    const cerrado = !!o.cerrado;
     const list = (this.seguimientos || []).filter(x =>
       String(x.adopcion_id) === String(adopcionId) && String(x.tipo || '').toLowerCase() !== 'prueba'
     );
@@ -7082,19 +7156,28 @@ const Dashboard = {
       ? list.slice().reverse().map(s => {
         const tipo = s.tipo || 'Seguimiento';
         const hito = s.hito ? `<span class="section-chip">${this._esc(labels[s.hito] || s.hito)}</span>` : '';
-        return `<div class="detail-field"><div class="detail-question">${s.fecha ? this._fmtFecha(s.fecha) : '—'} · <span class="estado-badge pendiente">${this._esc(tipo)}</span>${hito}</div><div class="detail-answer">${this._esc(s.nota || '—')}<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" data-action="deleteSeguimiento" data-arg0="${this._esc(s.id)}">${Icons.trash} Eliminar</button></div></div></div>`;
+        const delBtn = cerrado ? '' : `<div style="margin-top:6px"><button type="button" class="btn btn-danger btn-sm" data-action="deleteSeguimiento" data-arg0="${this._esc(s.id)}">${Icons.trash} Eliminar</button></div>`;
+        return `<div class="detail-field"><div class="detail-question">${s.fecha ? this._fmtFecha(s.fecha) : '—'} · <span class="estado-badge pendiente">${this._esc(tipo)}</span>${hito}</div><div class="detail-answer">${this._esc(s.nota || '—')}${delBtn}</div></div>`;
       }).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin seguimientos todavia</div></div>`;
+    const puedeNuevo = !cerrado && !!(p && p.fecha_entrega);
+    const nuevoBtn = cerrado
+      ? ''
+      : (puedeNuevo
+        ? `<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showSeguimientoForm" data-arg0="${adopcionId}">${Icons.plus} Nuevo seguimiento</button></div>`
+        : `<div style="padding:0 16px 16px"><div class="detail-section-note" style="padding:0">Podrás registrar seguimientos a largo plazo cuando conste la fecha de entrega.</div></div>`);
     return `<div class="detail-section"><div class="detail-section-title">${Icons.calendar} Seguimiento post-adopcion · ${list.length}</div>
-      <div class="detail-section-note">Disponible en todas las fases. Los hitos de 1, 3, 6 y 12 meses se calculan desde la fecha de entrega. La prueba de adaptacion es un periodo corto y tiene su propia seccion.</div>
+      <div class="detail-section-note">Seguimiento a largo plazo (1, 3, 6 y 12 meses) calculado desde la entrega. La prueba de adaptacion (15-30 días) se registra en su propia sección.</div>
       ${p && p.fecha_entrega ? timeline : `<div class="detail-section-note">Registra la fecha de entrega para calcular los hitos de 1, 3, 6 y 12 meses.</div>`}
       ${rows}
-      <div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showSeguimientoForm" data-arg0="${adopcionId}">${Icons.plus} Nuevo seguimiento</button></div></div>`;
+      ${nuevoBtn}</div>`;
   },
 
   showSeguimientoForm(adopcionId) {
     const p = this._byId(this.adopciones, adopcionId);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede registrar seguimiento.', 'warning'); return; }
+    if (!p.fecha_entrega) { this.showSnackbar('Registra primero la fecha de entrega para habilitar el seguimiento post-adopción.', 'warning'); return; }
     const hitos = this._seguimientoHitos(p);
     const siguiente = p.fecha_entrega ? (hitos.find(h => !h.hecho) || hitos[0]) : null;
     const opciones = [['', 'Sin hito (extra)'], ['1m', '1 mes'], ['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses']]
@@ -7116,6 +7199,8 @@ const Dashboard = {
     if (!finGuardar) return;
     const p = this._byId(this.adopciones, adopcionId);
     if (!p) { this.showSnackbar('Caso no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se puede registrar seguimiento.', 'warning'); finGuardar(); return; }
+    if (!p.fecha_entrega) { this.showSnackbar('Registra primero la fecha de entrega para habilitar el seguimiento post-adopción.', 'warning'); finGuardar(); return; }
     const nota = document.getElementById('sg-nota').value.trim();
     if (!nota) { this.showSnackbar('Escribe la nota del seguimiento', 'warning'); finGuardar(); return; }
     const row = {
@@ -7143,6 +7228,8 @@ const Dashboard = {
     if (!this._busyStart(busyKey)) return;
     try {
     const s = this._byId(this.seguimientos, id);
+    const p = s ? this._byId(this.adopciones, s.adopcion_id) : null;
+    if (p && p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden eliminar registros.', 'warning'); return; }
     if (!(await this._confirm('Eliminar este seguimiento?', 'Eliminar'))) return;
     try {
       const res = await API.deleteSeguimiento(id);
