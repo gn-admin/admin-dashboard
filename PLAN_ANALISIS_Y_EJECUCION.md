@@ -60,8 +60,8 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | U1 | Alta | Objetivos táctiles < 44px (botones 31–36px, iconos 36px, puntos gráfico 11px) | Móvil/Tablet | Completado (frontend) | Targets mejorados globalmente (`btn-sm`, `.btn-icon`, acciones/tablas, áreas táctiles en coarse/mobile, puntos de gráfico con hit-area ampliada, sidebar colapsada con `min-height` en enlaces). |
 | U2 | Alta | Botones icon-only sin etiqueta accesible suficiente (ej. editar/eliminar en blacklist) | Todas | Completado (frontend) | `aria-label`/`title` añadidos en acciones icon-only clave (blacklist, donaciones, controles globales/modales) y estado dinámico accesible del botón de colapso del sidebar. |
 | U3 | Media | Inputs de búsqueda/filtro sin `<label>` asociado (solo placeholder) | Todas | Completado (frontend, alcance principal) | `aria-label` añadido en búsquedas/filtros principales de listas y navegación de datos; formularios modales conservan labels visibles (asociación explícita `for/id` mejorable en iteraciones futuras). |
-| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Parcial | `data-label` + vista en tarjetas CSS para tablas en `<=767px` (Socios/Donaciones); extender a otras tablas densas (Fase 3). |
-| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Parcial | Botón real, `aria-expanded`, foco al primer ítem al abrir y retorno/cierre con Escape; pulir navegación por teclado interna y casos de foco avanzados (Fase 3). |
+| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Completado (frontend) | Tablas densas principales adaptadas a tarjetas en móvil (`<=767px`) con `data-label` (Socios, Donaciones, Almacén, Actividad, historial publicaciones). |
+| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Completado (frontend) | Semántica de botón, ARIA, foco al abrir/cerrar, cierre por Escape/overlay/navegación y navegación por teclado con flechas/Home/End/Tab. |
 | U6 | Media | Estados de carga/error transitorios y mensajes por carreras de sesión | Todas | Completado (frontend, alcance Fase 1) | Guards sin sesión, gating por permisos/contexto y descarte por token/página para estados obsoletos; mantener observación en flujos complejos. |
 | U7 | Baja | Sidebar colapsada: targets/densidad y affordance | Desktop/Tablet | Completado (frontend) | Botón de colapso con mayor tamaño/estado accesible y enlaces en sidebar colapsada con altura táctil adecuada/tooltips existentes. |
 | U8 | Baja | Feedback visual/foco en algunos controles (verificar `:focus-visible`) | Todas | Completado (frontend) | `:focus-visible` global reforzado y controles interactivos clave con estilos de foco coherentes. |
@@ -111,13 +111,13 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 3 — UX responsive (tablet y móvil)
 **Objetivo:** mejorar legibilidad y operativa en pantallas pequeñas.
-- [ ] **U4:** Tablas en móvil: patrón responsive (tarjetas, columnas prioritarias o scroll mejor señalizado) para Socios/Donaciones y otras tablas densas.
-- [ ] **U5:** Menú “Más”: comportamiento robusto (apertura/cierre, overlay, foco, `aria-expanded`, cierre al navegar).
-- [ ] Modales/formularios: asegurar scroll interno, acciones visibles con teclado virtual, y tamaños adecuados en 360–767px.
-- [ ] Gráficos/listas: mejorar interacción táctil (hit-area, alternativas de lectura).
-- [ ] Ajustes específicos tablet (768–1023px): grillas, densidad, orientación.
-- **Archivos probables:** `src/css/styles.css`, `src/js/dashboard.js`, `src/index.html`, `src/js/app.js`.
-- **Criterio de salida:** flujos principales utilizables sin zoom/scroll horizontal accidental y con navegación clara en móvil/tablet.
+- [x] **U4:** Patrón responsive de tablas como tarjetas en móvil (`<=767px`) aplicado a tablas en tarjetas (`.card .data-table`) con `data-label`; extendido a Socios, Donaciones, Almacén, Actividad y historial de publicaciones (redes).
+- [x] **U5:** Menú “Más” robustecido: botón semántico, `aria-expanded/controls`, foco al abrir, cierre por Escape/overlay/navegación, foco de retorno y navegación por teclado con flechas/Home/End/Tab dentro del menú.
+- [x] Modales/formularios: mejoras de tamaño, scroll interno y pie de acciones en móvil (incl. `safe-area`), manteniendo formularios usables con teclado virtual en `360–767px`.
+- [x] Gráficos/listas: hit-area táctil ampliada en puntos interactivos de gráficos (mejora aplicada en CSS/touch).
+- [~] Ajustes específicos tablet (768–1023px): base responsive existente y mejoras de targets/foco aplicadas; ajustes finos adicionales dependen de validación visual en dispositivo real (U9).
+- **Archivos modificados (fase):** `src/css/styles.css`, `src/js/dashboard.js`, `src/js/app.js`, `src/sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md`.
+- **Criterio de salida:** alcanzado en alcance frontend (mejoras implementadas para móvil/tablet); validación visual en dispositivos reales pendiente.
 
 ### Fase 4 — Robustez, rendimiento y permisos (refuerzo)
 **Objetivo:** estabilidad y consistencia percibida.
@@ -180,6 +180,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 1 | Gating parcial de cargas del dashboard por permisos/módulo para reducir peticiones no autorizadas (S4/S6), actualización de checklist/estado de Fase 1 | `7426d82` (v169) | 357 tests OK, desplegado (`gn-encuestas-v169`) | Completado (parcial) |
 | 2026-11-12 | 1 | Completar Fase 1 (frontend): TTL/expiración de caché `gn_cache_*` (S3), guards defensivos por permisos en renders/cargas de módulos restringidos y refuerzo de gating (S4/S6), auditoría dirigida de `innerHTML` (S5), actualización de estado S1–S7 | `caba214` (v170) | 357 tests OK, desplegado (`gn-encuestas-v170`) | Completado (frontend; S2 bloqueado por backend) |
 | 2026-11-12 | 2 | Fase 2 accesibilidad/touch: targets y affordance (sidebar/acciones/gráficos), `aria-label`/estado dinámico en controles icon-only clave, `:focus-visible` y etiquetas accesibles en filtros/búsquedas principales | `8684548` (v171) | 357 tests OK, desplegado (`gn-encuestas-v171`) | Completado (frontend; validación real pendiente) |
+| 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | Pendiente commit (v172) | `node --test tests/*.test.js` en curso | En ejecución |
 
 ---
 

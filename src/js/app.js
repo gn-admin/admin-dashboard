@@ -293,9 +293,41 @@ const App = {
     });
 
     document.addEventListener('keydown', (e) => {
+      const popup = document.getElementById('mas-menu-popup');
+      const masOpen = popup?.style.display === 'block';
+
+      if (masOpen && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+        const items = [...popup.querySelectorAll('.mas-menu-item')].filter(el =>
+          el.offsetParent !== null && getComputedStyle(el).display !== 'none' && el.getAttribute('aria-hidden') !== 'true'
+        );
+        if (items.length) {
+          e.preventDefault();
+          const idx = items.indexOf(document.activeElement);
+          let nextIdx = 0;
+          if (e.key === 'Home') nextIdx = 0;
+          else if (e.key === 'End') nextIdx = items.length - 1;
+          else if (e.key === 'ArrowDown') nextIdx = idx < 0 ? 0 : (idx + 1) % items.length;
+          else if (e.key === 'ArrowUp') nextIdx = idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length;
+          try { items[nextIdx].focus({ preventScroll: true }); } catch (_) { items[nextIdx].focus(); }
+        }
+        return;
+      }
+
       if (e.key === 'Tab') {
         const open = [...document.querySelectorAll('.modal-overlay')].filter(m => m.style.display === 'flex');
-        if (!open.length) return;
+        if (!open.length) {
+          if (masOpen) {
+            const items = [...popup.querySelectorAll('.mas-menu-item')].filter(el =>
+              el.offsetParent !== null && getComputedStyle(el).display !== 'none' && el.getAttribute('aria-hidden') !== 'true'
+            );
+            if (items.length) {
+              const first = items[0], last = items[items.length - 1];
+              if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+              else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+          }
+          return;
+        }
         const top = open[open.length - 1];
         const f = [...top.querySelectorAll('button, input, select, textarea, a[href], [tabindex]')].filter(x => !x.disabled && x.offsetParent !== null);
         if (!f.length) return;
@@ -304,6 +336,7 @@ const App = {
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         return;
       }
+
       if (e.key !== 'Escape' && e.key !== 'Enter' && e.key !== ' ') return;
       if (e.key === 'Enter' || e.key === ' ') {
         const t = e.target?.closest?.('[role="button"]');

@@ -4902,7 +4902,24 @@ select.form-input {
   }
 
   .modal-overlay {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    align-items: flex-end;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .modal-box:not(.modal-box--full) {
+    width: 100%;
+    max-height: min(92dvh, 100%);
+    border-radius: 16px 16px 12px 12px;
+  }
+  .modal-box.modal-box--wide:not(.modal-box--full) {
+    max-width: 100%;
+  }
+  .modal-body {
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-body--form .form-actions {
+    margin: 16px -16px 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -5202,16 +5219,16 @@ select.form-input {
 
 /* Tablas responsive como tarjetas en móvil (U4) */
 @media (max-width: 767px) {
-  .card-body-flush .data-table,
-  .card-body-flush .data-table thead,
-  .card-body-flush .data-table tbody,
-  .card-body-flush .data-table th,
-  .card-body-flush .data-table tr,
-  .card-body-flush .data-table td {
+  .card .data-table,
+  .card .data-table thead,
+  .card .data-table tbody,
+  .card .data-table th,
+  .card .data-table tr,
+  .card .data-table td {
     display: block;
     width: 100%;
   }
-  .card-body-flush .data-table thead {
+  .card .data-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -5221,17 +5238,17 @@ select.form-input {
     clip: rect(0 0 0 0);
     border: 0;
   }
-  .card-body-flush .data-table tbody tr {
+  .card .data-table tbody tr {
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm);
     margin: 10px 12px;
     padding: 8px 10px;
     background: var(--white);
   }
-  .card-body-flush .data-table tbody tr:hover td {
+  .card .data-table tbody tr:hover td {
     background: transparent;
   }
-  .card-body-flush .data-table td {
+  .card .data-table td {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -5240,29 +5257,29 @@ select.form-input {
     border-bottom: 1px dashed var(--gray-200);
     text-align: right;
   }
-  .card-body-flush .data-table td:last-child {
+  .card .data-table td:last-child {
     border-bottom: none;
   }
-  .card-body-flush .data-table td::before {
+  .card .data-table td::before {
     content: attr(data-label);
     font-weight: 600;
     color: var(--gray-600);
     text-align: left;
     flex: 0 0 42%;
   }
-  .card-body-flush .data-table td.table-empty,
-  .card-body-flush .data-table td[colspan] {
+  .card .data-table td.table-empty,
+  .card .data-table td[colspan] {
     display: block;
     text-align: center;
   }
-  .card-body-flush .data-table td.table-empty::before,
-  .card-body-flush .data-table td[colspan]::before {
+  .card .data-table td.table-empty::before,
+  .card .data-table td[colspan]::before {
     content: none;
   }
-  .card-body-flush .data-table td.table-actions {
+  .card .data-table td.table-actions {
     justify-content: flex-end;
   }
-  .card-body-flush .data-table td.table-actions::before {
+  .card .data-table td.table-actions::before {
     margin-right: auto;
   }
 }
