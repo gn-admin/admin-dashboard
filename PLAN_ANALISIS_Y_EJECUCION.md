@@ -296,3 +296,5 @@ Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs 
 
 | 2026-11-12 | 3 | ExtracciÃ³n de helpers de actividad/log a `utils.js` (`tipoLogLabel`, `tipoLogCls`) con delegaciÃ³n y fallbacks compatibles; bump `gn-encuestas-v187` | 92ee35c (v187) | 357/357 tests, push `main` | En progreso (mÃ³dulo `utils.js` ampliado; pendiente extracciÃ³n adicional y particiÃ³n controlada de vistas) |
 
+| 2026-11-12 | 3 | ExtracciÃ³n de `_euros` a `utils.js` con delegaciÃ³n/fallback; bump `gn-encuestas-v188` | 75ce35f (v188) | 357/357 tests, push `main` | En progreso (helpers puros adicionales modularizados) |
+
