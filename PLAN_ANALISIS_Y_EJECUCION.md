@@ -298,3 +298,5 @@ Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs 
 
 | 2026-11-12 | 3 | ExtracciÃ³n de `_euros` a `utils.js` con delegaciÃ³n/fallback; bump `gn-encuestas-v188` | 75ce35f (v188) | 357/357 tests, push `main` | En progreso (helpers puros adicionales modularizados) |
 
+| 2026-11-12 | 3â€“6 (verificaciÃ³n continua) | Ciclo continuo aplicarâ†’testearâ†’corregirâ†’testear mantenido: tras extracciÃ³n de fechas se detectaron 23 fallos por ausencia de `Utils` en tests, se restauraron fallbacks compatibles en `Dashboard` y se revalidÃ³ hasta **357/357**; tras extracciÃ³n de helpers de log se corrigiÃ³ fallback de `tipoLogLabel` y se revalidÃ³ a **357/357**. Fases con avances adicionales desplegados en `v184`â€“`v188` | 268cddd, 0aeab5b, 92ee35c, 75ce35f, 0cf6069 | 357/357 tests en cada iteraciÃ³n, push `main` | En progreso (ejecuciÃ³n iterativa activa; refactors profundos pendientes en fase 3 y mejoras evolutivas en 1â€“2/4â€“6) |
+
