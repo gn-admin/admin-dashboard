@@ -479,6 +479,8 @@ describe('_hasHomeCache: pinta instantaneo solo con datos', () => {
     const prev = Dashboard.surveys;
     const prevCached = Dashboard._cached;
     const prevLoaded = Dashboard._loaded;
+    const prevPuede = Dashboard.puedeAccederPagina;
+    Dashboard.puedeAccederPagina = () => true;
     Dashboard.surveys = [];
     Dashboard._cached = {};
     Dashboard._loaded = {};
@@ -490,6 +492,7 @@ describe('_hasHomeCache: pinta instantaneo solo con datos', () => {
     Dashboard.surveys = prev;
     Dashboard._cached = prevCached;
     Dashboard._loaded = prevLoaded;
+    Dashboard.puedeAccederPagina = prevPuede;
   });
 });
 

@@ -367,7 +367,7 @@ const Dashboard = {
     coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad'],
     voluntario: ['dashboard','animales','reportes','actividad'],
     tesoreria: ['dashboard','animales','donaciones','almacen','reportes','actividad'],
-    consulta: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad']
+    consulta: ['dashboard','animales']
   },
 
   puedeAccederPagina(page) {
