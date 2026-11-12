@@ -59,10 +59,13 @@ const App = {
     const stored = localStorage.getItem('gn_sidebar_collapsed');
     const isTablet = window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches;
     const collapsed = stored === 'true' || (stored === null && isTablet);
-    if (collapsed) {
-      document.getElementById('sidebar')?.classList.add('collapsed');
-      const btn = document.getElementById('sidebar-collapse-btn');
-      if (btn) btn.innerHTML = Icons.arrowRight;
+    const sidebar = document.getElementById('sidebar');
+    if (collapsed) sidebar?.classList.add('collapsed');
+    const btn = document.getElementById('sidebar-collapse-btn');
+    if (btn) {
+      btn.innerHTML = collapsed ? Icons.arrowRight : Icons.sidebarCollapse;
+      btn.setAttribute('aria-label', collapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral');
+      btn.setAttribute('title', collapsed ? 'Expandir menú' : 'Colapsar menú');
     }
   },
 
@@ -189,10 +192,14 @@ const App = {
   toggleSidebarCollapse() {
     const sidebar = document.getElementById('sidebar');
     sidebar?.classList.toggle('collapsed');
-    const isCollapsed = sidebar?.classList.contains('collapsed');
+    const isCollapsed = !!sidebar?.classList.contains('collapsed');
     localStorage.setItem('gn_sidebar_collapsed', isCollapsed ? 'true' : 'false');
     const btn = document.getElementById('sidebar-collapse-btn');
-    if (btn) btn.innerHTML = isCollapsed ? Icons.arrowRight : Icons.sidebarCollapse;
+    if (btn) {
+      btn.innerHTML = isCollapsed ? Icons.arrowRight : Icons.sidebarCollapse;
+      btn.setAttribute('aria-label', isCollapsed ? 'Expandir menú lateral' : 'Colapsar menú lateral');
+      btn.setAttribute('title', isCollapsed ? 'Expandir menú' : 'Colapsar menú');
+    }
   },
 
   initSidebarSections() {

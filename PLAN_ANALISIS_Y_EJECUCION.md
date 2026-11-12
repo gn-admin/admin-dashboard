@@ -57,16 +57,16 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Plataforma | Estado | Acción |
 |---|---|---|---|---|---|
-| U1 | Alta | Objetivos táctiles < 44px (botones 31–36px, iconos 36px, puntos gráfico 11px) | Móvil/Tablet | Parcial | CSS global/touch mejorado (`btn-sm`, iconos/acciones, área de toque en puntos de gráfico); revisar componentes residuales |
-| U2 | Alta | Botones icon-only sin etiqueta accesible suficiente (ej. editar/eliminar en blacklist) | Todas | Parcial | `aria-label`/`title` añadidos en acciones clave (blacklist, donaciones); auditoría completa pendiente |
-| U3 | Media | Inputs de búsqueda/filtro sin `<label>` asociado (solo placeholder) | Todas | Parcial | `aria-label` añadido en búsquedas/filtros principales (encuestas, animales, socios, acogidas, blacklist, actividad); completar resto de vistas |
-| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Parcial | `data-label` + vista en tarjetas CSS para tablas en `<=767px` (Socios/Donaciones); extender a otras tablas densas |
-| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Parcial | Botón real, `aria-expanded`, foco al primer ítem al abrir y retorno/cierre con Escape; pulir navegación por teclado dentro del menú |
-| U6 | Media | Estados de carga/error transitorios y mensajes por carreras de sesión | Todas | Parcial | Guards para evitar fetches sin sesión; gating por perfil y estados consistentes pendiente |
-| U7 | Baja | Sidebar colapsada: targets/densidad y affordance | Desktop/Tablet | Pendiente | Ajustar altura/touch, tooltips/foco |
-| U8 | Baja | Feedback visual/foco en algunos controles (verificar `:focus-visible`) | Todas | Parcial | Regla global `:focus-visible` reforzada; verificar casos específicos |
-| U9 | Baja | Validación visual responsive no realizada en dispositivos reales | Tablet/Móvil | Pendiente | Pruebas manuales en iOS/Android, portrait/landscape |
-| U10 | Info | Modales con `role="dialog"`, `aria-modal`, `aria-labelledby` | Todas | OK | Mantener y verificar foco-trap/cierre |
+| U1 | Alta | Objetivos táctiles < 44px (botones 31–36px, iconos 36px, puntos gráfico 11px) | Móvil/Tablet | Completado (frontend) | Targets mejorados globalmente (`btn-sm`, `.btn-icon`, acciones/tablas, áreas táctiles en coarse/mobile, puntos de gráfico con hit-area ampliada, sidebar colapsada con `min-height` en enlaces). |
+| U2 | Alta | Botones icon-only sin etiqueta accesible suficiente (ej. editar/eliminar en blacklist) | Todas | Completado (frontend) | `aria-label`/`title` añadidos en acciones icon-only clave (blacklist, donaciones, controles globales/modales) y estado dinámico accesible del botón de colapso del sidebar. |
+| U3 | Media | Inputs de búsqueda/filtro sin `<label>` asociado (solo placeholder) | Todas | Completado (frontend, alcance principal) | `aria-label` añadido en búsquedas/filtros principales de listas y navegación de datos; formularios modales conservan labels visibles (asociación explícita `for/id` mejorable en iteraciones futuras). |
+| U4 | Media | Tablas con scroll horizontal en móvil (Socios, Donaciones) | Móvil | Parcial | `data-label` + vista en tarjetas CSS para tablas en `<=767px` (Socios/Donaciones); extender a otras tablas densas (Fase 3). |
+| U5 | Media | Menú “Más” móvil: semántica y foco mejorables | Móvil | Parcial | Botón real, `aria-expanded`, foco al primer ítem al abrir y retorno/cierre con Escape; pulir navegación por teclado interna y casos de foco avanzados (Fase 3). |
+| U6 | Media | Estados de carga/error transitorios y mensajes por carreras de sesión | Todas | Completado (frontend, alcance Fase 1) | Guards sin sesión, gating por permisos/contexto y descarte por token/página para estados obsoletos; mantener observación en flujos complejos. |
+| U7 | Baja | Sidebar colapsada: targets/densidad y affordance | Desktop/Tablet | Completado (frontend) | Botón de colapso con mayor tamaño/estado accesible y enlaces en sidebar colapsada con altura táctil adecuada/tooltips existentes. |
+| U8 | Baja | Feedback visual/foco en algunos controles (verificar `:focus-visible`) | Todas | Completado (frontend) | `:focus-visible` global reforzado y controles interactivos clave con estilos de foco coherentes. |
+| U9 | Baja | Validación visual responsive no realizada en dispositivos reales | Tablet/Móvil | Pendiente | Pruebas manuales en iOS/Android, portrait/landscape. |
+| U10 | Info | Modales con `role="dialog"`, `aria-modal`, `aria-labelledby` | Todas | OK | Mantener y verificar foco-trap/cierre en pruebas de dispositivo/teclado. |
 
 ### 3.3 Roles y permisos (funcional)
 | Área | Estado | Nota |
@@ -101,13 +101,13 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 2 — Accesibilidad y objetivos táctiles
 **Objetivo:** cumplir buenas prácticas de accesibilidad y usabilidad táctil.
-- [ ] **U1:** Aumentar targets a >=44x44px (o 44px min-height/width con área táctil) para botones, icon-buttons, acciones de fila, controles de gráfico (hit-area).
-- [ ] **U2:** Añadir `aria-label`/`title` a botones icon-only (editar, eliminar, cerrar, acciones contextuales).
-- [ ] **U3:** Añadir `aria-label` o labels asociados a campos de búsqueda/filtros sin etiqueta.
-- [ ] **U7/U8:** Mejorar foco visible (`:focus-visible`), estados hover/active y contraste donde aplique.
-- [ ] Verificar orden de tabulación y cierre de modales (Escape, foco de retorno).
-- **Archivos probables:** `src/css/styles.css`, `src/js/dashboard.js`, `src/index.html`.
-- **Criterio de salida:** controles clave alcanzan target táctil recomendado; lectores/teclado pueden identificar acciones y campos.
+- [x] **U1:** Targets táctiles reforzados (global/touch/mobile): `btn-sm`, iconos/acciones, filas/tablas, hit-area en controles de gráfico y enlaces del sidebar colapsado.
+- [x] **U2:** `aria-label`/`title` en botones icon-only y controles clave (modales, acciones contextuales, colapso sidebar con estado dinámico).
+- [x] **U3:** `aria-label` en búsquedas/filtros principales; formularios con labels visibles mantenidos (asociación explícita `for/id` residual en modales como mejora incremental).
+- [x] **U7/U8:** Mejora de foco visible global (`:focus-visible`) y affordance/targets del sidebar colapsado; estados existentes conservados.
+- [x] Verificar orden de tabulación y cierre de modales (Escape, foco de retorno) a nivel de implementación actual (focus-trap básico en modales y cierre de “Más” con Escape); validación manual en dispositivos/teclados reales pendiente (U9).
+- **Archivos modificados (fase):** `src/index.html`, `src/js/app.js`, `src/js/dashboard.js`, `src/css/styles.css`, `src/sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md`.
+- **Criterio de salida:** alcanzado en alcance frontend (controles clave más accesibles y táctiles; validación visual/teclado en dispositivos reales pendiente).
 
 ### Fase 3 — UX responsive (tablet y móvil)
 **Objetivo:** mejorar legibilidad y operativa en pantallas pequeñas.
@@ -179,6 +179,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 0-3 | U4 tablas Socios/Donaciones con `data-label` y tarjetas responsive móvil, U5 foco/teclado en menú “Más”, S4/S6 guards de carga sin sesión, refuerzo `:focus-visible`/targets y `aria-label` adicionales | `84c8362` (v168) | 357 tests OK, desplegado (`gn-encuestas-v168`) | Completado (parcial por fases) |
 | 2026-11-12 | 1 | Gating parcial de cargas del dashboard por permisos/módulo para reducir peticiones no autorizadas (S4/S6), actualización de checklist/estado de Fase 1 | `7426d82` (v169) | 357 tests OK, desplegado (`gn-encuestas-v169`) | Completado (parcial) |
 | 2026-11-12 | 1 | Completar Fase 1 (frontend): TTL/expiración de caché `gn_cache_*` (S3), guards defensivos por permisos en renders/cargas de módulos restringidos y refuerzo de gating (S4/S6), auditoría dirigida de `innerHTML` (S5), actualización de estado S1–S7 | `caba214` (v170) | 357 tests OK, desplegado (`gn-encuestas-v170`) | Completado (frontend; S2 bloqueado por backend) |
+| 2026-11-12 | 2 | Fase 2 accesibilidad/touch: targets y affordance (sidebar/acciones/gráficos), `aria-label`/estado dinámico en controles icon-only clave, `:focus-visible` y etiquetas accesibles en filtros/búsquedas principales | Pendiente commit (v171) | `node --test tests/*.test.js` en curso | En ejecución |
 
 ---
 
