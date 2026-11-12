@@ -1113,6 +1113,7 @@ const Dashboard = {
   },
 
   _esc(str) {
+    if (typeof Utils !== 'undefined' && Utils.esc) return Utils.esc(str);
     if (str == null) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   },
