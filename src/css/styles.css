@@ -2403,7 +2403,7 @@ select.form-input {
 }
 
 .modal-body {
-  padding: 16px 20px;
+  padding: 20px 22px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--gray-300) transparent;
@@ -4188,17 +4188,18 @@ select.form-input {
 }
 
 .animal-card {
-  background: var(--white);
-  border-radius: var(--radius);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  border: 1px solid var(--gray-100);
-  transition: box-shadow 0.2s, transform 0.2s;
+  border: 1px solid var(--border-color);
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
 }
 
 .animal-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  border-color: rgba(31, 201, 91, 0.2);
 }
 
 .animal-card-img {
