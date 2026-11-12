@@ -92,6 +92,13 @@ const App = {
     document.getElementById('loading')?.classList.remove('active');
     document.getElementById('dashboard-view').classList.remove('active');
     document.getElementById('login-view').classList.add('active');
+    const loginBtn = document.getElementById('login-submit-btn');
+    if (loginBtn) {
+      loginBtn.style.display = '';
+      loginBtn.removeAttribute('aria-hidden');
+      loginBtn.removeAttribute('tabindex');
+      loginBtn.disabled = false;
+    }
   },
 
   // Pestana de la bottom-nav que corresponde a una pagina (incluye subpaginas).

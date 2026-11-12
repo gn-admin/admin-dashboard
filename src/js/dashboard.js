@@ -507,16 +507,18 @@ const Dashboard = {
         }
       });
 
-      // Consulta: solo lectura estricta en UI
+      // Consulta: solo lectura estricta en UI (nunca afectar a la pantalla de login)
       if (rol === 'consulta') {
+        const inLogin = (el) => !!(el && el.closest && el.closest('#login-view'));
         document.querySelectorAll('[data-action]').forEach(el => {
+          if (inLogin(el)) return;
           const a = el.getAttribute('data-action') || '';
           if (!a) return;
           const allowed = /^(view|open|openCuestionario|export|showTutorial|showTutorialFromProfile|goHash|goAnimales|chartTip|loadPage|loadMore|close|hide|toggle|showProfile|doLogout|refreshData|filter|search|sort|nota)/i.test(a);
           if (allowed) return;
           if (isMutating(a) || /edit|form|delete|remove|save|anular|create|add|nuevo|nueva|guardar|eliminar/i.test(a)) hideEl(el);
         });
-        document.querySelectorAll('button[type="submit"]').forEach(hideEl);
+        document.querySelectorAll('button[type="submit"]').forEach(el => { if (!inLogin(el)) hideEl(el); });
       }
     } catch (e) { /* ignore */ }
   },
