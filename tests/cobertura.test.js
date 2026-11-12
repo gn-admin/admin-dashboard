@@ -138,7 +138,7 @@ describe('_recentRows: ultimas respuestas del panel', () => {
   });
 
   it('enlaza a la pagina de su encuesta', () => {
-    assert.match(Dashboard._recentRows(), /location\.hash='encuestas-perros'/);
+    assert.match(Dashboard._recentRows(), /data-action="goHash" data-arg0="encuestas-perros"/);
   });
 });
 
@@ -213,7 +213,7 @@ describe('_accionRows: caja de acciones', () => {
     const html = Dashboard._accionRows();
     assert.match(html, /Ana G/);
     assert.match(html, /estado-badge /);
-    assert.match(html, /openCuestionarioEnPagina\('s1','r1'\)/);
+    assert.match(html, /data-action="openCuestionarioEnPagina" data-arg0="s1" data-arg1="r1"/);
   });
 });
 
@@ -351,7 +351,7 @@ describe('guias y tutoriales: HTML sin huecos', () => {
     const html = Dashboard._tutorialIndex();
     ['encuestas-perros', 'encuestas-gatos', 'encuestas-acogida', 'animales', 'acogidas', 'adopciones',
       'socios', 'blacklist', 'donaciones', 'almacen']
-      .forEach(p => assert.match(html, new RegExp("_jumpTo\\('" + p + "'\\)"), 'falta el salto a ' + p));
+      .forEach(p => assert.match(html, new RegExp('data-action="_jumpTo" data-arg0="' + p + '"'), 'falta el salto a ' + p));
   });
 });
 
@@ -613,7 +613,7 @@ describe('fichas de animal y socio', () => {
     const html = Dashboard._publicacionesFicha('a1');
     assert.match(html, /Publicaciones · 1/);
     assert.match(html, /https:\/\/ig\/p1/);
-    assert.match(html, /publicarAnimal\('a1'\)/);
+    assert.match(html, /data-action="publicarAnimal" data-arg0="a1"/);
     assert.match(Dashboard._publicacionesFicha('sin-pub'), /Sin publicaciones todavia/);
   });
 

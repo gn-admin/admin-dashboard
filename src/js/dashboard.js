@@ -164,7 +164,7 @@ const Dashboard = {
       console.error('Error cargando ' + page + ':', err);
       if (token !== this._pageToken) return;
       this._snackErr(err, 'No se pudo cargar esta pantalla');
-      el.innerHTML = `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.loadPage('${page}')">Reintentar</button></div>`;
+      el.innerHTML = `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="loadPage" data-arg0="${page}">Reintentar</button></div>`;
       return;
     } finally {
       if (token === this._pageToken) el.removeAttribute('aria-busy');
@@ -941,6 +941,7 @@ const Dashboard = {
       e.preventDefault();
       const d = el.dataset || {};
       try {
+        if (d.closeInfo === '1') this.closeInfoModal();
         if (d.pass === 'el') {
           if (d.args) { this[action].apply(this, [el, ...JSON.parse(d.args)]); }
           else { const args=[]; for(let i=0;i<6;i++){const k='arg'+i; if(d[k]===undefined) break; args.push(d[k]);} this[action].apply(this,[el,...args]); }
@@ -956,6 +957,25 @@ const Dashboard = {
         this._snackErr(err, 'No se pudo completar la acción');
       }
     });
+  },
+
+  resetPrioridadFilter() {
+    this._currentPrioridadFilter = 'all';
+    this.renderAnimales(document.getElementById('page-animales'));
+  },
+
+  goHash(hash) {
+    if (hash) location.hash = hash;
+  },
+
+  goAnimalesEnAcogida() {
+    this._currentAnimalFilter = 'en_acogida';
+    location.hash = 'animales';
+  },
+
+  clearBlacklistForm() {
+    const c = document.getElementById('blacklist-form-container');
+    if (c) c.innerHTML = '';
   },
 
   _confirm(msg, title, okLabel) {
@@ -1082,7 +1102,7 @@ const Dashboard = {
       if (detailContainer) {
         detailContainer.classList.add('active');
         detailContainer._prevHTML = null;
-        detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button></div>${html}`;
+        detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" data-action="cancelForm" data-arg0="${pageId}">${Icons.arrowLeft} Volver</button></div>${html}`;
         detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       return;
@@ -1093,7 +1113,7 @@ const Dashboard = {
       if (!detailContainer._prevHTML) detailContainer._prevHTML = detailContainer.innerHTML;
       const titleEl = detailContainer.querySelector('.detail-actions span');
       const title = titleEl ? titleEl.innerHTML : '';
-      detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.cancelForm('${pageId}')">${Icons.arrowLeft} Volver</button><span class="detail-toolbar-title">${title}</span></div>${html}`;
+      detailContainer.innerHTML = `<div class="detail-actions"><button type="button" class="btn btn-outline-green btn-sm" data-action="cancelForm" data-arg0="${pageId}">${Icons.arrowLeft} Volver</button><span class="detail-toolbar-title">${title}</span></div>${html}`;
       const formCard = detailContainer.querySelector('.form-card');
       if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       else detailContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1108,7 +1128,7 @@ const Dashboard = {
     if (!this._openSections) this._openSections = new Set(['info', 'galeria']);
     const open = !!defOpen || this._openSections.has(id);
     return `<div class="detail-section collapsible${open ? ' open' : ''}" data-sec="${id}">
-      <button type="button" class="detail-section-head" onclick="Dashboard._toggleSection(this,'${id}')">
+      <button type="button" class="detail-section-head" data-action="_toggleSection" data-pass="el" data-arg0="${id}">
         <span class="detail-section-title" style="margin:0">${titleHtml}</span>
         <span class="section-chevron">${Icons.chevronDown}</span>
       </button>
@@ -1165,14 +1185,14 @@ const Dashboard = {
           <div class="progress-bar-track"><div class="progress-bar" style="width:0%"></div></div>
         </div>
         <div class="galeria-actions" style="margin-top:12px">
-          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
-          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
+          <button type="button" class="btn btn-primary btn-sm" data-action="_galeriaSubir" data-arg0="${this._esc(animalId)}" data-arg1="foto">+ Foto</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="_galeriaSubir" data-arg0="${this._esc(animalId)}" data-arg1="video">+ Video</button>
         </div>
       </div>`;
     }
 
     const dots = fotos.map((_, i) =>
-      `<button type="button" class="galeria-dot ${i === idx ? 'galeria-dot--active' : ''}" onclick="Dashboard._galeriaIr('${this._esc(animalId)}', ${i})" aria-label="Ir a ${i + 1}"></button>`
+      `<button type="button" class="galeria-dot ${i === idx ? 'galeria-dot--active' : ''}" data-action="_galeriaIr" data-arg0="${this._esc(animalId)}" data-arg1="${i}" aria-label="Ir a ${i + 1}"></button>`
     ).join('');
 
     const slides = fotos.map((f, i) => {
@@ -1191,8 +1211,8 @@ const Dashboard = {
           ${slides}
         </div>
         ${total > 1 ? `
-          <button type="button" class="galeria-btn galeria-btn--prev" onclick="Dashboard._galeriaPrev('${this._esc(animalId)}')" aria-label="Anterior">&#10094;</button>
-          <button type="button" class="galeria-btn galeria-btn--next" onclick="Dashboard._galeriaNext('${this._esc(animalId)}')" aria-label="Siguiente">&#10095;</button>
+          <button type="button" class="galeria-btn galeria-btn--prev" data-action="_galeriaPrev" data-arg0="${this._esc(animalId)}" aria-label="Anterior">&#10094;</button>
+          <button type="button" class="galeria-btn galeria-btn--next" data-action="_galeriaNext" data-arg0="${this._esc(animalId)}" aria-label="Siguiente">&#10095;</button>
         ` : ''}
         <div class="galeria-dots">${dots}</div>
       </div>
@@ -1202,10 +1222,10 @@ const Dashboard = {
       </div>
       <div class="galeria-actions">
         ${total < 10 ? `
-          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'foto')">+ Foto</button>
-          <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._galeriaSubir('${this._esc(animalId)}', 'video')">+ Video</button>
+          <button type="button" class="btn btn-primary btn-sm" data-action="_galeriaSubir" data-arg0="${this._esc(animalId)}" data-arg1="foto">+ Foto</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="_galeriaSubir" data-arg0="${this._esc(animalId)}" data-arg1="video">+ Video</button>
         ` : '<span class="galeria-limite">Límite de 10 archivos alcanzado</span>'}
-        ${total > 0 ? `<button type="button" class="btn btn-danger btn-sm" onclick="Dashboard._galeriaBorrar('${this._esc(animalId)}')">Borrar actual</button>` : ''}
+        ${total > 0 ? `<button type="button" class="btn btn-danger btn-sm" data-action="_galeriaBorrar" data-arg0="${this._esc(animalId)}">Borrar actual</button>` : ''}
       </div>
     `;
   },
@@ -1447,7 +1467,7 @@ const Dashboard = {
       detailEl.dataset.detailKey = detailKey || '';
       detailEl.innerHTML = `
       <div class="detail-actions">
-        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._hideDetail('${pageId}')">${Icons.arrowLeft} Volver</button>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="_hideDetail" data-arg0="${pageId}">${Icons.arrowLeft} Volver</button>
         <span class="detail-toolbar-title">${this._esc(title)}</span>
       </div>
       ${contentHTML}`;
@@ -1590,25 +1610,25 @@ const Dashboard = {
       </section>
 
       <div class="dash-kpis">
-        <button type="button" class="dash-kpi" onclick="location.hash='encuestas'">
+        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="encuestas">
           <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.clipboard}</span><span class="dash-delta ${dSol.cls}">${dSol.text}</span></span>
           <span class="dash-kpi-value">${solNuevas.cur}</span>
           <span class="dash-kpi-label">Solicitudes este mes</span>
           <span class="dash-kpi-foot">${this._sparkline(serie.map(b => b.count))}</span>
         </button>
-        <button type="button" class="dash-kpi" onclick="Dashboard._currentAnimalFilter='en_acogida';location.hash='animales'">
+        <button type="button" class="dash-kpi" data-action="goAnimalesEnAcogida">
           <span class="dash-kpi-top"><span class="dash-kpi-icon blue">${Icons.heart}</span><span class="dash-delta flat">en casa</span></span>
           <span class="dash-kpi-value">${enAcogida}</span>
           <span class="dash-kpi-label">Animales en acogida</span>
           <span class="dash-kpi-foot">${familiasLibres} familias libres</span>
         </button>
-        <button type="button" class="dash-kpi" onclick="location.hash='adopciones'">
+        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="adopciones">
           <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.checkCircle}</span><span class="dash-delta ${dAdop.cls}">${dAdop.text}</span></span>
           <span class="dash-kpi-value">${adopMes.cur}</span>
           <span class="dash-kpi-label">Adopciones este mes</span>
           <span class="dash-kpi-foot">${adopMes.prev} el mes pasado</span>
         </button>
-        <button type="button" class="dash-kpi" onclick="location.hash='socios'">
+        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="socios">
           <span class="dash-kpi-top"><span class="dash-kpi-icon orange">${Icons.users}</span><span class="dash-delta ${cuotasPend ? 'down' : 'up'}">${cuotasPend ? cuotasPend + ' pendientes' : 'al dia'}</span></span>
           <span class="dash-kpi-value">${apadActivos.length}</span>
           <span class="dash-kpi-label">Apadrinamientos activos</span>
@@ -1654,7 +1674,7 @@ const Dashboard = {
               <h3 class="dash-panel-title">Acción requerida</h3>
               <p class="dash-panel-sub">Lo que toca hoy</p>
             </div>
-            <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.showRecordatorioForm()">${Icons.plus} Recordatorio</button>
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="showRecordatorioForm">${Icons.plus} Recordatorio</button>
           </header>
           <div class="dash-actions">${this._accionListHtml()}</div>
         </section>
@@ -1746,7 +1766,7 @@ const Dashboard = {
       ${grid}
       <polygon class="dash-chart-area" points="${area}"/>
       <polyline class="dash-chart-line" points="${pts}"/>
-      ${buckets.map((b, i) => `<circle class="dash-chart-dot" data-label="${this._esc(b.label)}" data-count="${b.count}" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="4.5" tabindex="0" role="button" aria-label="${this._esc(b.label)}: ${b.count} solicitudes" onclick="Dashboard._chartTip(this)" onmouseenter="Dashboard._chartTip(this)" onmouseleave="Dashboard._chartTipHide()" onfocus="Dashboard._chartTip(this)" onblur="Dashboard._chartTipHide()"><title>${this._esc(b.label)}: ${b.count}</title></circle>`).join('')}
+      ${buckets.map((b, i) => `<circle class="dash-chart-dot" data-label="${this._esc(b.label)}" data-count="${b.count}" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="4.5" tabindex="0" role="button" aria-label="${this._esc(b.label)}: ${b.count} solicitudes" data-action="_chartTip" data-pass="el" onmouseenter="Dashboard._chartTip(this)" onmouseleave="Dashboard._chartTipHide()" onfocus="Dashboard._chartTip(this)" onblur="Dashboard._chartTipHide()"><title>${this._esc(b.label)}: ${b.count}</title></circle>`).join('')}
     </svg>
     <div class="dash-chart-tooltip" id="dash-chart-tooltip" aria-live="polite"></div>
     <div class="dash-chart-labels">${buckets.map(b => `<span class="dash-chart-label">${b.label}</span>`).join('')}</div>
@@ -1838,7 +1858,7 @@ const Dashboard = {
           <button type="button" class="btn btn-outline-green btn-sm" data-action="toggleRecordatorio" data-arg0="${this._esc(it.ref.id)}">Hecho</button>
         </div>`;
       }
-      return `<div class="dash-action" role="button" tabindex="0" aria-label="Abrir cuestionario de ${this._esc(it.nombre || 'solicitud')}" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')">
+      return `<div class="dash-action" role="button" tabindex="0" aria-label="Abrir cuestionario de ${this._esc(it.nombre || 'solicitud')}" data-action="openCuestionarioEnPagina" data-arg0="${it.surveyId}" data-arg1="${it.id}">
         <span class="dash-action-icon">${Icons.clipboard}</span>
         <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.nombre)}</span><span class="dash-action-sub">${this._esc(it.survey)}</span></span>
         <span class="dash-action-meta"><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span><span class="dash-action-wait">${this._diasEspera(it.fecha)}</span></span>
@@ -1876,7 +1896,7 @@ const Dashboard = {
 
   _recentRows() {
     const pageMap={'pre-adopcion-perros':'encuestas-perros','pre-adopcion-gatos':'encuestas-gatos','pre-acogida':'encuestas-acogida'};
-    return this._recentItems(5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" onclick="location.hash='${page}'"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
+    return this._recentItems(5).map(r=>{const e=this.getEstado(r.id, r._surveyId);const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const page=pageMap[r._surveyId]||'dashboard';return`<tr style="cursor:pointer" data-action="goHash" data-arg0="${page}"><td>${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')}</td><td>${this._esc(r._survey)}</td><td><span class="estado-badge ${e}">${e}</span></td><td>${d}</td></tr>`;}).join('');
   },
 
   // Conteo/suma por mes natural (actual vs anterior) para KPIs.
@@ -1953,7 +1973,7 @@ const Dashboard = {
         const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
         return `<tr><td>${this._esc(it.titulo)}<div style="font-size:var(--text-xs);color:var(--gray-500)">Vencimiento</div></td><td><span class="estado-badge ${e.cls}">${e.label}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="toggleRecordatorio" data-arg0="${this._esc(it.ref.id)}">Hecho</button></td></tr>`;
       }
-      return `<tr style="cursor:pointer" onclick="Dashboard.openCuestionarioEnPagina('${it.surveyId}','${it.id}')"><td>${this._esc(it.nombre)}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
+      return `<tr style="cursor:pointer" data-action="openCuestionarioEnPagina" data-arg0="${it.surveyId}" data-arg1="${it.id}"><td>${this._esc(it.nombre)}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.survey)}</div></td><td><span class="estado-badge ${this._estadoCls(it.estado)}">${this._estadoLabel(it.estado)}</span></td><td>${this._diasEspera(it.fecha)}</td></tr>`;
     }).join('');
   },
 
@@ -2091,7 +2111,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}'))"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
-        <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSurvey('${surveyId}')">${Icons.download} Exportar</button></div>
+        <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -2137,7 +2157,7 @@ const Dashboard = {
 
   _renderResponseCards(responses, surveyId, emptyMsg) {
     if(!responses.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.clipboard+'</div><h3>'+(emptyMsg||'No hay solicitudes')+'</h3></div>';
-    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" onclick="Dashboard.viewDetail('${surveyId}','${r.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
+    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" data-action="viewDetail" data-arg0="${surveyId}" data-arg1="${r.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
   async viewDetail(surveyId, responseId, opts) {
@@ -2167,16 +2187,16 @@ const Dashboard = {
     const cands=this._candidaturasDe(surveyId, responseId);
     const candCls={en_lista:'',elegido:'aprobada',descartado:'descartada'};
     const actionButtons = e==='descartada'
-      ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.check} Restaurar</button>`
+      ? `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="en_proceso" data-arg2="${surveyId}">${Icons.check} Restaurar</button>`
       : e==='aprobada'
-        ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} Reabrir</button>
-           <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
+        ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="en_proceso" data-arg2="${surveyId}">${Icons.arrowRight} Reabrir</button>
+           <button type="button" class="btn btn-danger btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="descartada" data-arg2="${surveyId}">${Icons.xCircle} Descartar</button>`
         : e==='en_proceso'
-          ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.aprobarEncuesta('${surveyId}','${r.id}')">${Icons.checkCircle} Aprobar</button>
-             <button type="button" class="btn btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','pendiente','${surveyId}')">${Icons.arrowRight} Pendiente</button>
-             <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`
-          : `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','en_proceso','${surveyId}')">${Icons.arrowRight} En proceso</button>
-             <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.cambiarEstado(this,'${r.id}','descartada','${surveyId}')">${Icons.xCircle} Descartar</button>`;
+          ? `<button type="button" class="btn btn-primary btn-sm" data-action="aprobarEncuesta" data-arg0="${surveyId}" data-arg1="${r.id}">${Icons.checkCircle} Aprobar</button>
+             <button type="button" class="btn btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="pendiente" data-arg2="${surveyId}">${Icons.arrowRight} Pendiente</button>
+             <button type="button" class="btn btn-danger btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="descartada" data-arg2="${surveyId}">${Icons.xCircle} Descartar</button>`
+          : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="en_proceso" data-arg2="${surveyId}">${Icons.arrowRight} En proceso</button>
+             <button type="button" class="btn btn-danger btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="descartada" data-arg2="${surveyId}">${Icons.xCircle} Descartar</button>`;
     const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${c.fecha ? this._fmtFecha(c.fecha) : '—'}</div></div>`).join('')}</div>` : '';
     const asig = cands.length ? !!cands[0].animal_id : false;
     const assignBox = e==='aprobada' && !asig ? `<div class="detail-section"><div class="detail-section-title">${Icons.arrowRight} Asignar animal${cands[0]&&cands[0].tipo==='acogida'?' y familia':''}</div><div id="assign-box-${responseId}" style="min-height:70px"><div class="page-loader"><div class="spinner"></div><p>Cargando animales...</p></div></div></div>` : '';
@@ -2192,7 +2212,7 @@ const Dashboard = {
         </div>
       </div>
       <div class="detail-actions-wrap">
-        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="exportSingle" data-arg0="${surveyId}" data-arg1="${r.id}">${Icons.download} PDF</button>
         ${actionButtons}
       </div>
       ${blBanner}
@@ -2255,7 +2275,7 @@ const Dashboard = {
       ['gestion', 'Gestion diaria', 'Gastos, vencimientos, donaciones y socios.', Icons.calendar, 'var(--info-light)', 'var(--info-strong)'],
       ['estados', 'Estados y consejos', 'Que significa cada estado.', Icons.checkCircle, 'var(--primary-lighter)', 'var(--success)']
     ];
-    return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button type="button" class="guide-menu-item" onclick="Dashboard.showTutorial('${k}')"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
+    return `<div class="guide-menu">${guides.map(([k, t, d, ic, bg, fg]) => `<button type="button" class="guide-menu-item" data-action="showTutorial" data-arg0="${k}"><span class="guide-menu-icon" style="background:${bg};color:${fg}">${ic}</span><span class="guide-menu-text"><b>${t}</b><small>${d}</small></span><span class="guide-menu-chevron">${Icons.chevronRight}</span></button>`).join('')}</div>
     <div class="guide-note">${Icons.info} <span>Los estados se pueden mover hacia delante y hacia atras en cualquier momento desde la ficha de cada solicitud.</span></div>
     <h4 class="tutorial-section-title">Accesos directos</h4>
     ${this._tutorialIndex()}`;
@@ -2468,20 +2488,20 @@ const Dashboard = {
   _tutorialIndex() {
     return `
       <div class="guide-index">
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-perros')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-gatos')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('encuestas-acogida')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('animales')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('acogidas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('acogidas-activas')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase y generar el contrato de acogida opcional.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('adopciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('socios')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('blacklist')"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="encuestas-perros"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.dog}</span><div><b>Encuestas > Perros</b><small>Revisar solicitudes, aprobar/descartar, notas y asignar animal en la ficha.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="encuestas-gatos"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.cat}</span><div><b>Encuestas > Gatos</b><small>Igual que perros, para la encuesta de gatos.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="encuestas-acogida"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Encuestas > Acogida</b><small>Solicitudes de acogida. Al aprobar se crea la familia.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="animales"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Animales</b><small>Registrar animales, camadas/grupos y ver disponibilidad (Disponible / En acogida / Adoptado).</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="acogidas"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas (familias)</b><small>Familias acogedoras, su capacidad y animales que tienen.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="acogidas-activas"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.home}</span><div><b>Acogidas activas</b><small>Casos en curso: avanzar la fase y generar el contrato de acogida opcional.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="adopciones"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.fileText}</span><div><b>Adopciones</b><small>Casos de adopcion y contratos con firma en pantalla + PDF.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="socios"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.users}</span><div><b>Socios</b><small>Socios activos/inactivos con generacion del carnet.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="blacklist"><span class="guide-index-icon" style="background:#fee2e2;color:#dc2626">${Icons.ban}</span><div><b>Lista negra</b><small>Personas apartadas: apareceran avisos al abrir su solicitud.</small></div></button>
         <!-- Redes oculto temporalmente -->
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('reportes')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('actividad')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('donaciones')"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
-        <button type="button" class="guide-index-item" onclick="Dashboard._jumpTo('almacen')"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="reportes"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.barChart}</span><div><b>Reportes</b><small>Analitica, memoria anual y exportaciones por ejercicio.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="actividad"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.clipboard}</span><div><b>Registro de actividad</b><small>Traza de cambios con filtro y exportacion CSV.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="donaciones"><span class="guide-index-icon" style="background:var(--primary-lighter);color:var(--success)">${Icons.heart}</span><div><b>Donaciones</b><small>Libro de donaciones puntuales con total.</small></div></button>
+        <button type="button" class="guide-index-item" data-action="_jumpTo" data-arg0="almacen"><span class="guide-index-icon" style="background:var(--info-light);color:var(--info-strong)">${Icons.box}</span><div><b>Almacén</b><small>Inventario compartido con aviso de bajo stock.</small></div></button>
         <button type="button" class="guide-index-item" data-action="showTutorial" data-arg0="apadrinamiento"><span class="guide-index-icon" style="background:#f3e8ff;color:#7c3aed">${Icons.paw}</span><div><b>Apadrinamiento</b><small>Varios padrinos (socios o externos) por animal, con aporte mensual.</small></div></button>
       </div>`;
   },
@@ -2599,7 +2619,7 @@ const Dashboard = {
         <div class="empty-state-icon">${Icons.alertTriangle}</div>
         <h3>No se pudo cargar</h3>
         <p>${this._esc(this._errMsg(err))}</p>
-        <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="Dashboard.viewCuestionarioModal('${surveyId}','${responseId}')">Reintentar</button>
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="viewCuestionarioModal" data-arg0="${surveyId}" data-arg1="${responseId}">Reintentar</button>
       </div>`);
       return;
     }
@@ -2622,8 +2642,8 @@ const Dashboard = {
       ${this._seccionesHtml(sections)}
       ${this._notasFichaHtml(surveyId, r.id, { readonly: true, ctx: 'modal' })}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.exportSingle('${surveyId}','${r.id}')">${Icons.download} PDF</button>
-        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openCuestionarioEnPagina('${surveyId}','${r.id}')">${Icons.arrowRight} Abrir en Encuestas</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="exportSingle" data-arg0="${surveyId}" data-arg1="${r.id}">${Icons.download} PDF</button>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="openCuestionarioEnPagina" data-arg0="${surveyId}" data-arg1="${r.id}">${Icons.arrowRight} Abrir en Encuestas</button>
       </div>`);
   },
 
@@ -2666,7 +2686,7 @@ const Dashboard = {
         <select id="asg-animal-${selKey}" class="form-input">${disp.length ? disp.map(a=>`<option value="${a.id}">${this._esPrioritario(a)?'URGENTE · ':''}${this._esc(a.nombre)} (${this._esc(a.especie)} · ${this._esc(a.raza)})</option>`).join('') : `<option value="">(Sin animales disponibles)</option>`}</select>
       </div>
       ${needsFam ? `<div class="detail-field"><div class="detail-question">Familia de acogida</div><select id="asg-familia-${selKey}" class="form-input">${fams.length ? fams.map(f=>`<option value="${f.id}">${this._esc(f.nombre)}${f.ubicacion?' · '+this._esc(f.ubicacion):''}</option>`).join('') : `<option value="">(Sin familias libres)</option>`}</select></div>` : ''}
-      <div style="padding:12px 0 0;border-top:1px solid var(--gray-100);margin-top:8px"><button type="button" class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} onclick="Dashboard.asignarCandidatura('${surveyId}','${responseId}')">${Icons.checkCircle} Asignar animal</button></div>`;
+      <div style="padding:12px 0 0;border-top:1px solid var(--gray-100);margin-top:8px"><button type="button" class="btn btn-primary btn-sm" ${disp.length?'':'disabled'} data-action="asignarCandidatura" data-arg0="${surveyId}" data-arg1="${responseId}">${Icons.checkCircle} Asignar animal</button></div>`;
   },
 
   async asignarCandidatura(surveyId, responseId) {
@@ -2953,7 +2973,7 @@ const Dashboard = {
         <textarea id="nota-input-${this._esc(cid)}" rows="3" placeholder="Añadir una nota (llamada, visita, acuerdo...)"></textarea>
         <div class="notas-compose-actions">
           <span class="notas-compose-hint">${Icons.info} Se guarda con tu nombre y la fecha.</span>
-          <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.notaAddUI('${this._esc(kind)}','${this._esc(id)}','${this._esc(ctx)}',this)">${Icons.plus} Añadir nota</button>
+          <button type="button" class="btn btn-primary btn-sm" data-action="notaAddUI" data-pass="el" data-arg0="${this._esc(kind)}" data-arg1="${this._esc(id)}" data-arg2="${this._esc(ctx)}">${Icons.plus} Añadir nota</button>
         </div>
       </div>`;
     return `<div class="detail-section notas-panel" id="${this._esc(cid)}">
@@ -3167,7 +3187,7 @@ const Dashboard = {
           <div class="form-group"><label>Tipo *</label><select id="rd-tipo" onchange="Dashboard._rellenarPlantilla()"><option value="adopcion">Adopcion (contrato)</option><option value="acogida">Acogida (acuerdo temporal)</option></select></div></div>
           <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div>
           <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:var(--text-xs);color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
-          <div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="Dashboard._copiarCaption()">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
+          <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="_copiarCaption">Copiar texto</button><button type="button" class="btn btn-primary" onclick="Dashboard.publicarRedes()">${Icons.check} Publicar (simulado)</button></div>
         </div>
         <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Vista previa</h3></div><div class="card-body"><div id="rd-preview"></div></div></div>
         <div class="card"><div class="card-header"><h3>Historial</h3></div><div class="card-body-flush"><div id="redes-historial">${this._renderRedesHistorial()}</div></div></div>
@@ -3253,7 +3273,7 @@ const Dashboard = {
   _renderRedesHistorial() {
     const items = (this.publicaciones || []).slice().reverse();
     if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
-    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver</a> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.borrarPublicacion('${this._esc(p.id)}')">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td>${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td>${this._fmtFecha(p.fecha)}</td><td>${this._esc(p.animal || '')}</td><td>${p.tipo === 'acogida' ? 'Acogida' : 'Adopcion'}</td><td><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver</a> <button type="button" class="btn btn-danger btn-sm" data-action="borrarPublicacion" data-arg0="${this._esc(p.id)}">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
   },
 
   async borrarPublicacion(id) {
@@ -3269,7 +3289,7 @@ const Dashboard = {
       ? pubs.slice().reverse().map(p => `<div class="detail-field"><div class="detail-question">${this._fmtFecha(p.fecha)} · Instagram</div><div class="detail-answer">${p.permalink ? `<a href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver post</a>` : '<span style="color:var(--gray-400)">Simulada (sin enlace)</span>'} · <span class="estado-badge en_proceso">${this._esc(p.estado)}</span></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin publicaciones todavia</div></div>`;
     const badgePubs = pubs.length ? ` · ${pubs.length}` : '';
-    return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.publicarAnimal('${animalId}')">${Icons.plus} Publicar</button></div>`);
+    return this._collapsibleSection('pubs', `${Icons.heart} Publicaciones${badgePubs}`, `${items}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="publicarAnimal" data-arg0="${animalId}">${Icons.plus} Publicar</button></div>`);
   },
 
   _apadrinamientosFicha(animalId) {
@@ -3280,7 +3300,7 @@ const Dashboard = {
     const rows = list.length
       ? list.slice().reverse().map(p => {
         const quien = p.padrino_id
-          ? `<a href="javascript:void(0)" onclick="Dashboard.openSocioFicha('${this._esc(p.padrino_id)}')">${this._esc(p.padrino_nombre || 'Socio')}</a>`
+          ? `<a href="javascript:void(0)" data-action="openSocioFicha" data-arg0="${this._esc(p.padrino_id)}">${this._esc(p.padrino_nombre || 'Socio')}</a>`
           : this._esc(p.padrino_nombre || 'Padrino');
         const acc = [];
         if (p.estado === 'activo') acc.push(`<button type="button" class="btn btn-outline-green btn-sm" data-action="finalizarApadrinamiento" data-arg0="${this._esc(p.id)}">Finalizar</button>`);
@@ -3748,7 +3768,7 @@ const Dashboard = {
             <option value="all" ${prioridad==='all'?'selected':''}>Prioridad: Todas</option>
             <option value="solo" ${prioridad==='solo'?'selected':''}>Solo urgentes (${nUrgentes})</option>
           </select>
-          ${prioridad==='solo'?`<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard._currentPrioridadFilter='all';Dashboard.renderAnimales(document.getElementById('page-animales'))">Ver todas</button>`:''}
+          ${prioridad==='solo'?`<button type="button" class="btn btn-outline-green btn-sm" data-action="resetPrioridadFilter">Ver todas</button>`:''}
         </div></div>
         <div id="animales-form-container"></div>
         ${bloquesHtml}
@@ -4039,7 +4059,7 @@ const Dashboard = {
       </div>
       <div style="display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showGrupoForm('${gid}')">${Icons.pencil} Editar grupo</button>
-        <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.closeInfoModal();Dashboard.showAnimalFormInGroup('${gid}')">${Icons.plus} Anadir animal</button>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="showAnimalFormInGroup" data-arg0="${gid}" data-close-info="1">${Icons.plus} Anadir animal</button>
       </div>
       ${g && g.descripcion ? `<div class="detail-section"><div class="detail-section-title">${Icons.info} Descripcion</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5">${this._esc(g.descripcion)}</p></div>` : ''}
       ${g && g.notas ? `<div class="detail-section"><div class="detail-section-title">${Icons.pencil} Notas</div><p style="font-size:.9rem;color:var(--gray-700);line-height:1.5;white-space:pre-wrap">${this._esc(g.notas)}</p></div>` : ''}
@@ -4469,9 +4489,9 @@ const Dashboard = {
     const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && p.desenlace !== 'devuelto' && p.fase !== 'Seguimiento');
     const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && c.fase !== 'finalizada');
     const estadoBanner = casoAdopcion
-      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAdopcionFicha('${this._esc(casoAdopcion.id)}')">${Icons.eye} Ver caso</button></div>`
+      ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button type="button" class="btn btn-outline-green btn-sm" data-action="openAdopcionFicha" data-arg0="${this._esc(casoAdopcion.id)}">${Icons.eye} Ver caso</button></div>`
       : (casoAcogida
-        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(casoAcogida.id)}')">${Icons.eye} Ver caso</button></div>`
+        ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>${this._esc(casoAcogida.familia)} · fase <b>${this._esc(this._faseAcogidaLabel(casoAcogida.fase))}</b></span><button type="button" class="btn btn-outline-green btn-sm" data-action="openAcogidaFicha" data-arg0="${this._esc(casoAcogida.id)}">${Icons.eye} Ver caso</button></div>`
         : (foster ? `<div class="animal-context-banner"><span class="estado-badge aprobada">En acogida</span><span>Familia <b>${this._esc(foster.nombre)}</b> · ${this._esc(foster.ubicacion || '')}</span></div>` : ''));
     this._showDetail('animales', a.nombre, `
       <div class="responder-hero">
@@ -4500,7 +4520,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esPrioritario(a)?'<span class="urgente-badge">Urgente</span>':'Normal'}</div></div>
         <div class="detail-field detail-field--wide"><div class="detail-question">Descripción</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
-        ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" data-action="viewGrupo" data-arg0="${a.grupo_id}">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.separarDelGrupo('${a.id}')">${Icons.users} Separar</button></div></div>` : ''}
+        ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" data-action="viewGrupo" data-arg0="${a.grupo_id}">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="separarDelGrupo" data-arg0="${a.id}">${Icons.users} Separar</button></div></div>` : ''}
       </div>
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
       <details class="detail-collapse">
@@ -4580,7 +4600,7 @@ const Dashboard = {
         </select>
       </div></div>
       <div id="familias-form-container"></div>
-      <div class="response-list">${filtered.length ? filtered.map(f=>`          <div class="response-card" role="button" tabindex="0" onclick="Dashboard.viewFosterFamily('${f.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+      <div class="response-list">${filtered.length ? filtered.map(f=>`          <div class="response-card" role="button" tabindex="0" data-action="viewFosterFamily" data-arg0="${f.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
           <div class="response-card-header">
             <div class="response-avatar" style="background:var(--info-light);color:var(--info)">${this._esc(String(f.nombre).charAt(0))}</div>
             <div class="response-info">
@@ -4690,7 +4710,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${this._esc(this._fmtFecha(f.fecha_registro))}</div></div>
       </div>
       ${f.notas?`<div class="detail-section"><div class="detail-section-title">Notas</div><div class="detail-field"><div class="detail-answer">${this._esc(f.notas)}</div></div></div>`:''}
-      ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.openAcogidaFicha('${this._esc(c.id)}')">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
+      ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button type="button" class="btn btn-outline-green btn-sm" data-action="openAcogidaFicha" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
       ${animalesEnAcogida.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Animales en Acogida</div>${animalesEnAcogida.map(a=>`<div class="detail-field"><div class="detail-question">${this._esc(a.nombre)}</div><div class="detail-answer">${this._esc(a.especie)} &middot; ${this._esc(a.raza)} &middot; ${this._esc(a.edad||'')}</div></div>`).join('')}</div>`:''}
       `);
   },
@@ -4751,8 +4771,8 @@ const Dashboard = {
       </div>
       <div class="acogida-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
       <div class="acogida-card-actions">
-        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.checkCircle} En casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-sm btn-primary" onclick="Dashboard.avanzarFaseAcogida('${c.id}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.checkCircle} En casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-sm btn-primary" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.check} Finalizar acogida</button>` : ''}
         <button type="button" class="btn btn-sm btn-outline-green" data-action="viewAcogida" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button>
         <button type="button" class="btn btn-sm btn-outline-green" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
         <button type="button" class="btn btn-danger btn-sm" title="Eliminar caso" data-action="deleteAcogida" data-arg0="${this._esc(c.id)}">${Icons.trash}</button>
@@ -4824,8 +4844,8 @@ const Dashboard = {
       </div>
       ${finalizada ? `<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Acogida finalizada. El animal volvió a <b>Disponible</b> y la familia quedó libre.</span></div>` : ''}
       <div class="detail-actions-wrap">
-        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.checkCircle} Marcar en casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.avanzarFaseAcogida('${this._esc(c.id)}',this)">${Icons.check} Finalizar acogida</button>` : ''}
+        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Marcar en casa</button>` : ''}
+        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.check} Finalizar acogida</button>` : ''}
         <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
         ${a ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="openAnimalFicha" data-arg0="${this._esc(a.id)}">${Icons.paw} Ver ficha del animal</button>` : ''}
       </div>
@@ -5113,7 +5133,7 @@ const Dashboard = {
       ? `Copia guardada${fechaGuardado && fechaGuardado !== '—' ? ' el ' + this._esc(fechaGuardado) : ''}. El PDF se genera con estos datos aunque cambie la ficha; usa Actualizar copia para reemplazarlos.`
       : 'Documento de apoyo para firmar en papel. Guarda una copia de los datos para poder regenerarlo mas adelante; al descargar el PDF tambien se guarda.';
     const acciones = snapshot
-      ? `<button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.actualizarContratoAcogida('${this._esc(c.id)}')">${Icons.refresh} Actualizar copia</button>
+      ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="actualizarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.refresh} Actualizar copia</button>
          <button type="button" class="btn btn-primary btn-sm" data-action="descargarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.download} Descargar PDF</button>`
       : `<button type="button" class="btn btn-primary btn-sm" data-action="guardarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Guardar contrato</button>
          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.download} Descargar PDF</button>`;
@@ -5438,7 +5458,7 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado) || '—'}</div></div>
             ${p.notas ? `<div class="detail-field"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(p.notas)}</div></div>` : ''}
           </div>
-          ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.viewCuestionarioModal('${sol.surveyId}','${sol.responseId}')">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
+          ${sol ? `<div class="detail-section"><div class="detail-section-title">${Icons.clipboard} Solicitud de origen</div><div class="detail-field"><div class="detail-question">Cuestionario</div><div class="detail-answer"><button type="button" class="btn btn-outline-green btn-sm" data-action="viewCuestionarioModal" data-arg0="${sol.surveyId}" data-arg1="${sol.responseId}">${Icons.eye} Ver cuestionario</button></div></div></div>` : ''}
           <div class="detail-actions-inline detail-actions-inline--danger">
             ${puedeDevolucion ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="showDevolucionForm" data-arg0="${p.id}">${Icons.arrowLeft} Registrar devolución</button>` : ''}
           </div>
@@ -7266,7 +7286,7 @@ const Dashboard = {
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>
         <div class="form-group"><label>Otro email del contrato (opcional)</label><input type="email" id="ce-otro" placeholder="otro@email.com"><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Solo se enviara si pertenece al contrato o a Grupo Nebak.</div></div>
-        <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="button" class="btn btn-outline-green" onclick="Dashboard._mailtoContrato('${adopcionId}')">${Icons.mail} Abrir en mi correo</button><button type="submit" class="btn btn-primary">${Icons.mail} Enviar</button></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="button" class="btn btn-outline-green" data-action="_mailtoContrato" data-arg0="${adopcionId}">${Icons.mail} Abrir en mi correo</button><button type="submit" class="btn btn-primary">${Icons.mail} Enviar</button></div>
       </form>`);
   },
 
@@ -7688,7 +7708,7 @@ const Dashboard = {
 
   _blacklistFormHTML(data, id) {
     const isEdit = id !== undefined;
-    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form onsubmit="Dashboard.saveBlacklistItem(event,'${isEdit ? this._esc(String(id)) : ''}')"><div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label>Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label>Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" onclick="document.getElementById('blacklist-form-container').innerHTML=''">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
+    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form onsubmit="Dashboard.saveBlacklistItem(event,'${isEdit ? this._esc(String(id)) : ''}')"><div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label>Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label>Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="clearBlacklistForm">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
   },
 
   async saveBlacklistItem(e, id) {
@@ -7757,7 +7777,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showDonacionForm()">${Icons.plus} Nueva</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteDonacion('${this._esc(d.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td>${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td>${this._esc(d.donante || '')}</td><td>${this._euros(d.importe)} €</td><td><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -7826,7 +7846,7 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
         <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" onclick="Dashboard.showInventarioForm()">${Icons.plus} Nuevo</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button type="button" class="btn btn-sm btn-outline-green" onclick="Dashboard.showInventarioForm('${this._esc(it.id)}')">Editar</button> <button type="button" class="btn btn-danger btn-sm" onclick="Dashboard.deleteInventario('${this._esc(it.id)}')">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td>${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',1)">+1</button> <button type="button" class="btn btn-outline-green btn-sm" onclick="Dashboard.ajustarInventario('${this._esc(it.id)}',-1)">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
