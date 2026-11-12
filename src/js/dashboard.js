@@ -1894,12 +1894,27 @@ const Dashboard = {
   },
 
   _paintHome(el) {
-    const all = Object.values(this.responses).flat();
+    const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
+    const puedeEdit = (m) => (typeof this.puedeEditar === 'function' ? this.puedeEditar(m) : true);
+    const rol = (typeof this._rolActual === 'function') ? this._rolActual() : 'consulta';
+    const isAdmin = rol === 'admin';
+    const showEncuestas = puede('encuestas') || puede('encuestas-perros') || puede('encuestas-gatos') || puede('encuestas-acogida');
+    const showAdopciones = puede('adopciones');
+    const showAnimales = puede('animales');
+    const showAcogidas = puede('acogidas') || puede('acogidas-activas');
+    const showSocios = puede('socios');
+    const showDonaciones = puede('donaciones');
+    const showAlmacen = puede('almacen');
+    const showReportes = puede('reportes');
+    const showActividad = puede('actividad');
+    const showTesoreriaPanel = showDonaciones || showAlmacen || (isAdmin && (showDonaciones || showAlmacen || showReportes));
+
+    const all = Object.values(this.responses || {}).flat();
     const activas = all.filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
     const pendientes = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'pendiente').length;
     const enProceso = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'en_proceso').length;
-    const enAcogida = this.animales.filter(a => a.estado === 'en_acogida').length;
-    const familiasLibres = this.familias.filter(f => f.capacidad === 'Libre').length;
+    const enAcogida = (this.animales || []).filter(a => a.estado === 'en_acogida').length;
+    const familiasLibres = (this.familias || []).filter(f => f.capacidad === 'Libre').length;
     const apadActivos = (this.apadrinamientos || []).filter(p => p.estado === 'activo');
     const apadEuros = this._totalAportes(this.apadrinamientos);
     const solNuevas = this._cuentaMes(activas, r => r.fecha_creacion);
@@ -1909,83 +1924,128 @@ const Dashboard = {
     const balance = donMes.cur - gastoMes.cur;
     const cuotasPend = (this.socios || []).filter(s => (this._cuotaEstado(s) || {}).label === 'Pendiente').length;
     const vencidos = (this.recordatorios || []).filter(r => !r.hecho && (this._diasHasta(r.fecha) ?? 99) < 0).length;
-    const hoyN = pendientes + vencidos + enProceso;
     const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
     const fechaHoy = this._fechaCorta(new Date(), false);
-    const serie = this._serieSolicitudes();
+    const serie = showEncuestas ? this._serieSolicitudes() : [];
     const totalSerie = serie.reduce((a, b) => a + b.count, 0);
-    const stages = this._funnelStages();
+    const stages = (showEncuestas || showAdopciones) ? this._funnelStages() : [];
     const totalEmbudo = stages.reduce((a, s) => a + s[1], 0);
     const dSol = this._deltaInfo(solNuevas.cur, solNuevas.prev);
     const dAdop = this._deltaInfo(adopMes.cur, adopMes.prev);
     const euro = n => this._eur(n);
+
+    const heroStats = [];
+    if (showEncuestas) {
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${pendientes}</span><span class="dash-hero-stat-label">Pendientes</span></div>`);
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enProceso}</span><span class="dash-hero-stat-label">En proceso</span></div>`);
+    }
+    if (showAnimales) {
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enAcogida}</span><span class="dash-hero-stat-label">En acogida</span></div>`);
+    }
+    if (showReportes || showActividad || isAdmin) {
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>`);
+    }
+    if (!heroStats.length) {
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${(this.animales || []).length}</span><span class="dash-hero-stat-label">Animales</span></div>`);
+    }
+
+    const heroBtns = [];
+    if (showAnimales) heroBtns.push(`<a class="dash-hero-btn" href="#animales">${Icons.paw} Ver animales</a>`);
+    if (showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>`);
+    if (!heroBtns.length && showActividad) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#actividad">${Icons.activity} Actividad</a>`);
+    if (!heroBtns.length) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#dashboard">${Icons.dashboard} Inicio</a>`);
+
+    const kpis = [];
+    if (showEncuestas) {
+      kpis.push(`<button type="button" class="dash-kpi" data-action="goHash" data-arg0="encuestas">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.clipboard}</span><span class="dash-delta ${dSol.cls}">${dSol.text}</span></span>
+          <span class="dash-kpi-value">${solNuevas.cur}</span>
+          <span class="dash-kpi-label">Solicitudes este mes</span>
+          <span class="dash-kpi-foot">${this._sparkline(serie.map(b => b.count))}</span>
+        </button>`);
+    }
+    if (showAnimales || showAcogidas) {
+      kpis.push(`<button type="button" class="dash-kpi" data-action="${showAnimales ? 'goAnimalesEnAcogida' : 'goHash'}" data-arg0="${showAcogidas ? 'acogidas-activas' : 'animales'}">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon blue">${Icons.heart}</span><span class="dash-delta flat">en casa</span></span>
+          <span class="dash-kpi-value">${enAcogida}</span>
+          <span class="dash-kpi-label">Animales en acogida</span>
+          <span class="dash-kpi-foot">${showAcogidas ? `${familiasLibres} familias libres` : 'Seguimiento'}</span>
+        </button>`);
+    }
+    if (showAdopciones) {
+      kpis.push(`<button type="button" class="dash-kpi" data-action="goHash" data-arg0="adopciones">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.checkCircle}</span><span class="dash-delta ${dAdop.cls}">${dAdop.text}</span></span>
+          <span class="dash-kpi-value">${adopMes.cur}</span>
+          <span class="dash-kpi-label">Adopciones este mes</span>
+          <span class="dash-kpi-foot">${adopMes.prev} el mes pasado</span>
+        </button>`);
+    }
+    if (showSocios) {
+      kpis.push(`<button type="button" class="dash-kpi" data-action="goHash" data-arg0="socios">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon orange">${Icons.users}</span><span class="dash-delta ${cuotasPend ? 'down' : 'up'}">${cuotasPend ? cuotasPend + ' pendientes' : 'al dia'}</span></span>
+          <span class="dash-kpi-value">${apadActivos.length}</span>
+          <span class="dash-kpi-label">Apadrinamientos activos</span>
+          <span class="dash-kpi-foot">${euro(apadEuros)} / mes</span>
+        </button>`);
+    }
+    if (showDonaciones && !showSocios && !showAdopciones && !showEncuestas) {
+      kpis.push(`<button type="button" class="dash-kpi" data-action="goHash" data-arg0="donaciones">
+          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.trendingUp}</span><span class="dash-delta ${balance >= 0 ? 'up' : 'down'}">${balance >= 0 ? 'positivo' : 'negativo'}</span></span>
+          <span class="dash-kpi-value">${euro(donMes.cur)}</span>
+          <span class="dash-kpi-label">Donaciones este mes</span>
+          <span class="dash-kpi-foot">Balance ${euro(balance)}</span>
+        </button>`);
+    }
+
+    const canAddRecordatorio = puedeEdit('reportes') || puedeEdit('actividad');
+    const quickLinks = [];
+    if (showDonaciones) quickLinks.push(`<a class="dash-quick-card" href="#donaciones"><span class="dash-quick-icon">${Icons.trendingUp}</span><span class="dash-quick-label">Donaciones</span></a>`);
+    if (showAlmacen) quickLinks.push(`<a class="dash-quick-card" href="#almacen"><span class="dash-quick-icon">${Icons.box}</span><span class="dash-quick-label">Almacén</span></a>`);
+    if (showActividad) quickLinks.push(`<a class="dash-quick-card" href="#actividad"><span class="dash-quick-icon">${Icons.activity}</span><span class="dash-quick-label">Actividad</span></a>`);
+    if (showAcogidas) quickLinks.push(`<a class="dash-quick-card" href="#acogidas-activas"><span class="dash-quick-icon">${Icons.home}</span><span class="dash-quick-label">Acogidas</span></a>`);
+    if (showAnimales && !quickLinks.some(q => q.includes('#animales'))) quickLinks.push(`<a class="dash-quick-card" href="#animales"><span class="dash-quick-icon">${Icons.paw || Icons.heart}</span><span class="dash-quick-label">Animales</span></a>`);
+    if (showReportes && !quickLinks.some(q => q.includes('#reportes'))) quickLinks.push(`<a class="dash-quick-card" href="#reportes"><span class="dash-quick-icon">${Icons.barChart}</span><span class="dash-quick-label">Reportes</span></a>`);
+
+    const showChart = showEncuestas;
+    const showFunnel = showEncuestas || showAdopciones;
+    const showRecent = showEncuestas;
+    const showActionPanel = showEncuestas || showReportes || showActividad || vencidos > 0;
+    const hoyResumen = showEncuestas ? (pendientes + vencidos + enProceso) : (vencidos + (showAnimales ? 0 : 0));
 
     el.innerHTML = `
       <section class="dash-hero">
         <div class="dash-hero-copy">
           <span class="dash-hero-eyebrow">Panel de gestión · Grupo Nebak</span>
           <h2 class="dash-hero-title">${this._saludo()}, ${this._esc(nombre)}</h2>
-          <p class="dash-hero-sub">${this._esc(fechaHoy)} · ${hoyN ? `${hoyN} ${hoyN === 1 ? 'asunto' : 'asuntos'} por resolver` : 'Todo al dia, sin pendientes'}</p>
-          <div class="dash-hero-actions">
-            <a class="dash-hero-btn" href="#animales">${Icons.paw} Ver animales</a>
-            <a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>
-          </div>
+          <p class="dash-hero-sub">${this._esc(fechaHoy)} · ${hoyResumen ? `${hoyResumen} ${hoyResumen === 1 ? 'asunto' : 'asuntos'} por revisar` : 'Resumen disponible según tu rol'}</p>
+          <div class="dash-hero-actions">${heroBtns.join('')}</div>
         </div>
-        <div class="dash-hero-stats">
-          <div class="dash-hero-stat"><span class="dash-hero-stat-value">${pendientes}</span><span class="dash-hero-stat-label">Pendientes</span></div>
-          <div class="dash-hero-stat"><span class="dash-hero-stat-value">${enProceso}</span><span class="dash-hero-stat-label">En proceso</span></div>
-          <div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>
-        </div>
+        <div class="dash-hero-stats">${heroStats.join('')}</div>
       </section>
 
-      <div class="dash-kpis">
-        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="encuestas">
-          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.clipboard}</span><span class="dash-delta ${dSol.cls}">${dSol.text}</span></span>
-          <span class="dash-kpi-value">${solNuevas.cur}</span>
-          <span class="dash-kpi-label">Solicitudes este mes</span>
-          <span class="dash-kpi-foot">${this._sparkline(serie.map(b => b.count))}</span>
-        </button>
-        <button type="button" class="dash-kpi" data-action="goAnimalesEnAcogida">
-          <span class="dash-kpi-top"><span class="dash-kpi-icon blue">${Icons.heart}</span><span class="dash-delta flat">en casa</span></span>
-          <span class="dash-kpi-value">${enAcogida}</span>
-          <span class="dash-kpi-label">Animales en acogida</span>
-          <span class="dash-kpi-foot">${familiasLibres} familias libres</span>
-        </button>
-        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="adopciones">
-          <span class="dash-kpi-top"><span class="dash-kpi-icon green">${Icons.checkCircle}</span><span class="dash-delta ${dAdop.cls}">${dAdop.text}</span></span>
-          <span class="dash-kpi-value">${adopMes.cur}</span>
-          <span class="dash-kpi-label">Adopciones este mes</span>
-          <span class="dash-kpi-foot">${adopMes.prev} el mes pasado</span>
-        </button>
-        <button type="button" class="dash-kpi" data-action="goHash" data-arg0="socios">
-          <span class="dash-kpi-top"><span class="dash-kpi-icon orange">${Icons.users}</span><span class="dash-delta ${cuotasPend ? 'down' : 'up'}">${cuotasPend ? cuotasPend + ' pendientes' : 'al dia'}</span></span>
-          <span class="dash-kpi-value">${apadActivos.length}</span>
-          <span class="dash-kpi-label">Apadrinamientos activos</span>
-          <span class="dash-kpi-foot">${euro(apadEuros)} / mes</span>
-        </button>
-      </div>
+      ${kpis.length ? `<div class="dash-kpis">${kpis.join('')}</div>` : ''}
 
       <div class="dash-grid">
-        <section class="dash-panel dash-panel--wide">
+        ${showChart ? `<section class="dash-panel dash-panel--wide">
           <header class="dash-panel-head">
             <div>
               <h3 class="dash-panel-title">Solicitudes</h3>
-              <p class="dash-panel-sub">Ultimos 12 meses</p>
+              <p class="dash-panel-sub">Últimos 12 meses</p>
             </div>
             <span class="dash-panel-total">${totalSerie}<small>recibidas</small></span>
           </header>
           <div class="dash-chart">${this._chartSvg(serie)}</div>
-        </section>
+        </section>` : ''}
 
-        <section class="dash-panel">
+        ${showFunnel ? `<section class="dash-panel">
           <header class="dash-panel-head">
             <div>
-              <h3 class="dash-panel-title">Embudo de adopcion</h3>
+              <h3 class="dash-panel-title">Embudo de adopción</h3>
               <p class="dash-panel-sub">Estado de los procesos</p>
             </div>
           </header>
           <div class="dash-donut-wrap">
-            <div class="dash-donut" style="background:${this._donaGradiente(stages)}" role="img" aria-label="Distribucion de procesos">
+            <div class="dash-donut" style="background:${this._donaGradiente(stages)}" role="img" aria-label="Distribución de procesos">
               <div class="dash-donut-hole">
                 <span class="dash-donut-value">${totalEmbudo}</span>
                 <span class="dash-donut-label">procesos</span>
@@ -1995,20 +2055,20 @@ const Dashboard = {
               ${stages.map(([label, n, color]) => `<li class="dash-legend-item"><span class="dash-legend-dot" style="background:${color}"></span><span class="dash-legend-label">${label}</span><span class="dash-legend-value">${n}</span></li>`).join('')}
             </ul>
           </div>
-        </section>
+        </section>` : ''}
 
-        <section class="dash-panel dash-panel--wide" id="accion-card">
+        ${showActionPanel ? `<section class="dash-panel dash-panel--wide" id="accion-card">
           <header class="dash-panel-head">
             <div>
               <h3 class="dash-panel-title">Acción requerida</h3>
-              <p class="dash-panel-sub">Lo que toca hoy</p>
+              <p class="dash-panel-sub">Lo que toca revisar</p>
             </div>
-            <button type="button" class="btn btn-outline-green btn-sm" data-action="showRecordatorioForm">${Icons.plus} Recordatorio</button>
+            ${canAddRecordatorio ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showRecordatorioForm">${Icons.plus} Recordatorio</button>` : ''}
           </header>
           <div class="dash-actions">${this._accionListHtml()}</div>
-        </section>
+        </section>` : ''}
 
-        <section class="dash-panel">
+        ${showTesoreriaPanel ? `<section class="dash-panel">
           <header class="dash-panel-head">
             <div>
               <h3 class="dash-panel-title">Tesorería del mes</h3>
@@ -2016,28 +2076,31 @@ const Dashboard = {
             </div>
           </header>
           <div class="dash-money">
-            <div class="dash-money-row"><span class="dash-money-label">Donaciones</span><span class="dash-money-value dash-money-value--pos">${euro(donMes.cur)}</span></div>
-            <div class="dash-money-row"><span class="dash-money-label">Gastos</span><span class="dash-money-value dash-money-value--neg">${euro(gastoMes.cur)}</span></div>
-            <div class="dash-money-row dash-money-row--total"><span class="dash-money-label">Balance</span><span class="dash-money-value ${balance >= 0 ? 'dash-money-value--pos' : 'dash-money-value--neg'}">${euro(balance)}</span></div>
+            ${showDonaciones ? `<div class="dash-money-row"><span class="dash-money-label">Donaciones</span><span class="dash-money-value dash-money-value--pos">${euro(donMes.cur)}</span></div>` : ''}
+            ${(showDonaciones || isAdmin) ? `<div class="dash-money-row"><span class="dash-money-label">Gastos</span><span class="dash-money-value dash-money-value--neg">${euro(gastoMes.cur)}</span></div>` : ''}
+            ${(showDonaciones || isAdmin) ? `<div class="dash-money-row dash-money-row--total"><span class="dash-money-label">Balance</span><span class="dash-money-value ${balance >= 0 ? 'dash-money-value--pos' : 'dash-money-value--neg'}">${euro(balance)}</span></div>` : (!showDonaciones && showAlmacen ? `<div class="dash-money-row"><span class="dash-money-label">Acceso</span><span class="dash-money-value">Almacén disponible</span></div>` : '')}
           </div>
-          <div class="dash-quick">
-            <a class="dash-quick-card" href="#donaciones"><span class="dash-quick-icon">${Icons.trendingUp}</span><span class="dash-quick-label">Donaciones</span></a>
-            <a class="dash-quick-card" href="#almacen"><span class="dash-quick-icon">${Icons.box}</span><span class="dash-quick-label">Almacen</span></a>
-            <a class="dash-quick-card" href="#actividad"><span class="dash-quick-icon">${Icons.activity}</span><span class="dash-quick-label">Actividad</span></a>
-            <a class="dash-quick-card" href="#acogidas-activas"><span class="dash-quick-icon">${Icons.home}</span><span class="dash-quick-label">Acogidas</span></a>
-          </div>
-        </section>
+          ${quickLinks.length ? `<div class="dash-quick">${quickLinks.join('')}</div>` : ''}
+        </section>` : (quickLinks.length ? `<section class="dash-panel">
+          <header class="dash-panel-head">
+            <div>
+              <h3 class="dash-panel-title">Accesos rápidos</h3>
+              <p class="dash-panel-sub">Módulos disponibles para tu rol</p>
+            </div>
+          </header>
+          <div class="dash-quick">${quickLinks.join('')}</div>
+        </section>` : '')}
 
-        <section class="dash-panel dash-panel--full">
+        ${showRecent ? `<section class="dash-panel dash-panel--full">
           <header class="dash-panel-head">
             <div>
               <h3 class="dash-panel-title">Solicitudes recientes</h3>
-              <p class="dash-panel-sub">Ultimas entradas de las encuestas</p>
+              <p class="dash-panel-sub">Últimas entradas de las encuestas</p>
             </div>
             <a class="dash-panel-link" href="#encuestas">Ver todas ${Icons.chevronRight}</a>
           </header>
           <div class="dash-recent">${this._recentListHtml()}</div>
-        </section>
+        </section>` : ''}
       </div>`;
   },
 
@@ -2176,17 +2239,24 @@ const Dashboard = {
   },
 
   _accionListHtml() {
-    const items = this._accionItems(6);
-    if (!items.length) return `<div class="dash-action-empty">Todo al dia. No hay nada pendiente.</div>`;
+    const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
+    const puedeEdit = (m) => (typeof this.puedeEditar === 'function' ? this.puedeEditar(m) : true);
+    const canVerEncuestas = puede('encuestas') || puede('encuestas-perros') || puede('encuestas-gatos') || puede('encuestas-acogida');
+    const canToggleRecordatorio = puedeEdit('reportes') || puedeEdit('actividad');
+    let items = this._accionItems(6);
+    if (!canVerEncuestas) items = items.filter(it => it.kind === 'vencimiento');
+    if (!items.length) return `<div class="dash-action-empty">No hay acciones pendientes para tu rol.</div>`;
     return items.map(it => {
       if (it.kind === 'vencimiento') {
         const e = this._estadoRecordatorio({ fecha: it.fecha, hecho: false });
+        const action = canToggleRecordatorio ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="toggleRecordatorio" data-arg0="${this._esc(it.ref.id)}">Hecho</button>` : `<span class="dash-action-wait">${this._esc(e.label)}</span>`;
         return `<div class="dash-action">
           <span class="dash-action-icon orange">${Icons.clock}</span>
           <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.titulo)}</span><span class="dash-action-sub">Vencimiento · ${this._esc(e.label)}</span></span>
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="toggleRecordatorio" data-arg0="${this._esc(it.ref.id)}">Hecho</button>
+          ${action}
         </div>`;
       }
+      if (!canVerEncuestas) return '';
       return `<div class="dash-action" role="button" tabindex="0" aria-label="Abrir cuestionario de ${this._esc(it.nombre || 'solicitud')}" data-action="openCuestionarioEnPagina" data-arg0="${it.surveyId}" data-arg1="${it.id}">
         <span class="dash-action-icon">${Icons.clipboard}</span>
         <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.nombre)}</span><span class="dash-action-sub">${this._esc(it.survey)}</span></span>

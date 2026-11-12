@@ -13,9 +13,10 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 **Hallazgos principales:**
 - **Seguridad:** CSP en modo *report-only* (sin enforcement), token API en query string (restricción backend/CORS), datos sensibles cacheados en `localStorage`, posibles carreras auth/perfil en transiciones rápidas, y necesidad de auditoría continua de sinks `innerHTML`.
+- **Limitaciones de plataforma (no accionables en este stack):** S1 (CSP enforcement/report-only por cabeceras HTTP) y S2 (token en `Authorization` + preflight CORS) **no son posibles** con **GitHub Pages + Google Apps Script Web App** tal como está desplegado. Se dejan documentados como **ignorados/no aplicables** en las fases (no ejecutar cambios adicionales sobre ellos).
 - **UI/UX móvil/tablet:** objetivos táctiles pequeños en acciones/iconos (31–36px) y gráficos (11px), campos de búsqueda/filtro sin etiqueta accesible explícita, botones icon-only sin `aria-label` en algunos contextos, tablas con scroll horizontal (mejorables a tarjetas en móvil), y toggle “Más” implementado como `<a href="javascript:void(0)">`.
 - **UI/UX desktop:** base funcional correcta; oportunidades en accesibilidad (foco, etiquetas, targets), densidad de tablas y consistencia de estados.
-- **Roles/permisos:** funcionamiento correcto en sesiones limpias (menú, rutas, acciones por módulo/rol). Riesgo residual de estados transitorios por carreras de sesión/perfil.
+- **Roles/permisos:** funcionamiento correcto en sesiones limpias (menú, rutas, acciones por módulo/rol). Riesgo residual de estados transitorios por carreras de sesión/perfil. Pendiente mejorar dashboards/vistas y limitación de botones por rol para mostrar solo datos y acciones relevantes.
 
 ---
 
@@ -43,8 +44,8 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 | ID | Severidad | Hallazgo | Estado | Acción |
 |---|---|---|---|---|
-| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | Parcial (no efectiva en `<meta>`) | Política endurecida en `src/index.html`, pero verificación en navegador mostró que **CSP Report-Only entregada vía `<meta>` es ignorada** por el navegador. Para que tenga efecto real se requiere entregarla por cabecera HTTP (o CSP enforcing por cabecera) en el hosting/CDN; enforcement/meta-only no es suficiente. |
-| S2 | Alta | Token API en query string `?token=` (GET/POST) | Bloqueado por backend | Migrar a `Authorization: Bearer` + preflight CORS cuando GAS lo soporte (B3). No abordable en frontend sin romper contrato. |
+| S1 | Alta | CSP en `Content-Security-Policy-Report-Only` (no enforcement) | **Ignorado / no aplicable (GitHub Pages)** | CSP report-only en `<meta>` es ignorada por el navegador y GitHub Pages no permite cabeceras HTTP. **No es posible realizarlo en esta infraestructura**; se considera descartado para este plan. Mantener política endurecida en código como referencia, sin más acciones. |
+| S2 | Alta | Token API en query string `?token=` (GET/POST) | **Ignorado / no aplicable (GAS+CORS)** | Migración a `Authorization: Bearer` requiere preflight CORS fiable; **no es posible con Google Apps Script Web App** en esta arquitectura (verificado: `Failed to fetch` por preflight). **Descartado para este plan**; mantener token en `?token=` y `useAuthorizationHeader` desactivado. |
 | S3 | Media | Datos sensibles/PII cacheados en `localStorage` (`gn_cache_*`) | Completado (frontend) | Caché API con TTL (7 días) y envoltorio versionado compatible con formato legacy; limpieza de `gn_cache_*`/datos de usuario en logout y cambio de usuario mantenida. Segmentación adicional por rol/módulo queda como mejora opcional. |
 | S4 | Media | Carreras auth/perfil en transiciones rápidas → UI/estado transitorio inconsistente | Completado (frontend) | Guards para no fetch sin sesión en loaders, control por token de página/render y gating de cargas del dashboard por permisos/módulo; fallback de rol `consulta` mantiene seguridad mientras se resuelve perfil. Cancelación HTTP nativa no implementada (sin abort centralizado), pero respuestas obsoletas se descartan por contexto/token en flujos clave. |
 | S5 | Media | Uso extensivo de `innerHTML` (riesgo XSS si falta escape/sanitización) | Completado (auditoría dirigida) | Revisión dirigida de sinks/renderizados de campos de usuario, encuestas, notas y motivos: uso de `_esc`/escape presente en puntos revisados; sin hallazgos evidentes sin escapar en la pasada realizada. Recomendable auditoría continua en cambios futuros. |
@@ -90,14 +91,14 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 1 — Seguridad frontend (impacto alto, sin romper contrato backend)
 **Objetivo:** reducir superficie de riesgo en cliente sin requerir cambios incompatibles en GAS.
-- [~] **S1:** CSP endurecida/alineada en código, pero **CSP Report-Only en `<meta>` es ignorada por el navegador** (verificado en producción). Requiere cabeceras HTTP en hosting/CDN para reportes/enforcement efectivos.
-- [~] **S2:** **Bloqueado por backend/CORS (GAS)** — token sigue en `?token=`; migración a `Authorization: Bearer` + preflight requiere despliegue coordinado.
+- [x] **S1:** **Ignorado/no aplicable** en esta infraestructura (GitHub Pages no permite cabeceras HTTP y CSP report-only en `<meta>` es ignorada). No se realizarán más cambios.
+- [x] **S2:** **Ignorado/no aplicable** en esta infraestructura (GAS Web App no soporta preflight CORS fiable para `Authorization`, verificado). Se mantiene `?token=`; no se realizarán más cambios.
 - [x] **S3:** Caché API con TTL (7 días), migración compatible de formato legacy y limpieza en logout/cambio de usuario.
 - [x] **S4/S6:** Guards sin sesión, gating por permisos/módulo en dashboard y renders/cargas defensivas, y descarte por contexto/token para evitar aplicar estados obsoletos en navegación rápida.
 - [x] **S5:** Auditoría dirigida de sinks `innerHTML` en áreas de riesgo (usuarios/encuestas/notas/motivos) sin hallazgos evidentes sin escape en la pasada realizada; mantener vigilancia en cambios futuros.
 - [x] **S7:** Toggle “Más” móvil como `<button>` semántico con ARIA y foco.
 - **Archivos modificados (fase):** `src/index.html`, `src/js/app.js`, `src/js/dashboard.js`, `src/css/styles.css`, `src/sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md`.
-- **Criterio de salida:** alcanzado en alcance frontend (S2 bloqueado por backend). Sin regresiones conocidas en tests (`357/357`), menos cargas no autorizadas/races visibles y caché con expiración.
+- **Criterio de salida:** alcanzado en alcance frontend. **S1/S2 descartados por limitación de plataforma** (sin acciones pendientes). Sin regresiones conocidas en tests (`357/357`), menos cargas no autorizadas/races visibles y caché con expiración.
 
 ### Fase 2 — Accesibilidad y objetivos táctiles
 **Objetivo:** cumplir buenas prácticas de accesibilidad y usabilidad táctil.
@@ -155,19 +156,18 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 - [~] **Móvil:** bottom-nav/menú “Más”, targets táctiles, tablas→tarjetas y modales/formularios mejorados en código; **validación en dispositivo real pendiente**
 
 ### 5.3 Seguridad/estabilidad
-- [~] Token sigue en query por restricción CORS/GAS (S2); frontend preparado para `Authorization` opt-in y backend acepta ambos formatos (pendiente despliegue/config CORS en GAS para migrar)
+- [x] **S2 ignorado/no aplicable:** token en query se mantiene por limitación GAS+CORS (no viable migrar a `Authorization` en esta arquitectura). Sin acciones pendientes.
 - [x] Sin acciones mutantes visibles para roles sin permiso (refuerzo UI) y cargas/gating condicionados por permisos en frontend
 - [~] Reducción de peticiones/carreras no autorizadas y estados obsoletos (guards, perfil/rol, tokens de página); verificación exhaustiva en sesiones reales multirol pendiente
 - [x] Caché `gn_cache_*` con TTL y limpieza en logout/cambio de usuario
-- [x] CSP/meta revisadas y endurecidas en modo report-only; enforcement y validación final de reportes pendientes de entorno/operación
+- [x] **S1 ignorado/no aplicable:** CSP efectiva por cabeceras HTTP no posible en GitHub Pages; se mantiene endurecimiento en `<meta>` como referencia, sin acciones pendientes.
 
 ---
 
 ## 6. Dependencias y bloqueos / acciones fuera del frontend
-- **S2/B3 (token fuera de query + preflight CORS):** aplicado en código/local workspace, **bloqueado por plataforma GAS/CORS**
-  - Frontend: `src/js/api.js` preparado para enviar `Authorization: Bearer` cuando `CONFIG.useAuthorizationHeader=true` (mantiene token en query por compatibilidad). Por defecto desactivado para no romper producción con preflight GAS.
-  - Backend (local, no versionado): `apps-script/Code.gs` ya acepta token en `Authorization` o query (`extractToken`) y se añadió `doOptions` best-effort. Usuario indicó que subió `Code.gs`.
-  - **Verificación (2026-11-12, navegador/producción):** petición cross-origin con cabecera `Authorization` falla en navegador (`Failed to fetch`) por preflight/CORS incompatible con Apps Script Web Apps. **Conclusión:** no es viable completar S2 en esta arquitectura sin un proxy/backend que controle cabeceras CORS/preflight. Mantener token en query y no habilitar `useAuthorizationHeader` en producción.
+
+> **Nota:** S1 (CSP por cabeceras HTTP) y S2 (token en `Authorization` + preflight CORS) **no son posibles** con la infraestructura actual (**GitHub Pages + Google Apps Script Web App**). Aunque se consideraron en fases, quedan **descartados/ignorados** para este plan y **no requieren más trabajo**.
+
 - **Auditoría y backups (backend/operación):**
   - Código local presente (`apps-script/Code.gs` registra auditoría sensible si `CONFIG.sheets.auditoria` está configurado; `apps-script/Backup.gs` incluye exportación ZIP, envío email y helpers de triggers).
   - **Pendiente externo:** configurar IDs reales de hojas de auditoría/historial, `BACKUP_EMAIL`/`BACKUP_DRIVE_FOLDER_ID`, permisos de Drive/Spreadsheet y crear/activar triggers en entorno GAS (`crearTriggerBackupDiario/Semanal/CadaXDias`).
@@ -191,7 +191,8 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | `907cf9a` (v173) | 357 tests OK, desplegado (`gn-encuestas-v173`) | Completado (frontend) |
 | 2026-11-12 | 5 | Fase 5 validación/hardening: tests 357/357, revisión residual seguridad/UI, preparación S2 (Authorization opt-in en frontend + soporte/doOptions en backend local), actualización de matriz/checklists y registro de pendientes externos | `1764fe4` (v174) | 357 tests OK, desplegado (`gn-encuestas-v174`) | Completado (frontend/código; pendientes externos) |
 | 2026-11-12 | 5+ | Verificación adicional en navegador (producción): S2 con cabecera `Authorization` falla por preflight/CORS en GAS (`Failed to fetch`); CSP report-only en `<meta>` es ignorada por el navegador. Plan actualizado con hallazgos y bloqueos reales | `fa4ea3f` | Verificación browser en `gn-admin.github.io` (sesión admin) | Completado (análisis) |
-| 2026-11-12 | 5+ | Verificación multi-rol con navegador (producción, `gn.test.*@example.test` / `asdf@1234`): login correcto para los 5 roles; **backend `user-profile` devuelve el rol esperado** (admin/coordinador/voluntario/tesoreria/consulta), pero en el flujo UI `Dashboard.userProfile` quedaba `null` y se aplicaba fallback `Consulta` (sidebar/permisos incorrectos) por fallo/race al cargar perfil en `init`. Fix frontend: espera/reintento robusto de token/perfil (`src/js/auth.js`, `src/js/dashboard.js`) + bump SW `v175`. Roles backend configurados OK; verificación visual final por rol requiere despliegue de este fix. | Pendiente commit | Browser producción + tests 357/357 | Completado (fix frontend; verificación post-deploy pendiente) |
+| 2026-11-12 | 5+ | Verificación multi-rol con navegador (producción, `gn.test.*@example.test` / `asdf@1234`): login correcto para los 5 roles; **backend `user-profile` devuelve el rol esperado** (admin/coordinador/voluntario/tesoreria/consulta), pero en el flujo UI `Dashboard.userProfile` quedaba `null` y se aplicaba fallback `Consulta` (sidebar/permisos incorrectos) por fallo/race al cargar perfil en `init`. Fix frontend: espera/reintento robusto de token/perfil (`src/js/auth.js`, `src/js/dashboard.js`) + bump SW `v175`. Roles backend configurados OK; verificación visual final por rol requiere despliegue de este fix. | `f6c0999` (v175) | Browser producción + tests 357/357 | Completado (fix frontend; verificación post-deploy pendiente) |
+| 2026-11-12 | 5+ | S1/S2 marcados como **ignorados/no aplicables** por limitación de plataforma (GitHub Pages + GAS/CORS). Mejora frontend: dashboard de inicio diferenciado por rol (admin completo, resto solo widgets/datos/accesos de módulos permitidos) y refuerzo de limitación de botones/acciones en home según permisos (`puedeAccederPagina`/`puedeEditar`), sin romper vista admin. | Pendiente commit | 357/357 tests | Completado (frontend; verificación post-deploy pendiente) |
 
 ---
 
@@ -199,5 +200,5 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 - Mantener **rutas relativas** (GitHub Pages `/admin-dashboard/`).
 - No versionar secretos: `.env`, `src/js/config.js`, `apps-script/*`, `.internal-docs/*`.
 - Subir `CACHE_NAME` en `src/sw.js` ante cambios de JS/CSS/HTML relevantes.
-- Token API en query hasta soporte backend de preflight/Authorization.
-- Backend como fuente de verdad para autorización; frontend como refuerzo UX.
+- **S1/S2 descartados por plataforma (GitHub Pages + GAS):** no implementar CSP por cabeceras HTTP ni migración a `Authorization` en esta arquitectura; mantener token en `?token=` (`useAuthorizationHeader` desactivado).
+- Backend como fuente de verdad para autorización; frontend como refuerzo UX (mostrar/ocultar datos y acciones según rol y módulo permitido).
