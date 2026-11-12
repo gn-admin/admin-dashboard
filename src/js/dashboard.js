@@ -3518,31 +3518,43 @@ const Dashboard = {
   },
 
   async finalizarApadrinamiento(id) {
-    const p = this._byId(this.apadrinamientos, id);
-    if (!p) return;
-    if (!(await this._confirm('Finalizar este apadrinamiento?', 'Finalizar'))) return;
-    p.estado = 'finalizada';
-    p.fecha_fin = new Date().toISOString().slice(0, 10);
-    this.saveLocal();
-    if (this.APADRINAMIENTOS_REMOTE) await this._updateLocalYApi('apadrinamientos', p);
-    this._regLog('apadrinamiento-fin', 'Fin apadrinamiento de ' + (p.padrino_nombre || '') + ' a ' + (p.animal || ''), 'apadrinamiento', p.id);
-    this.viewAnimal(p.animal_id);
-    this.showSnackbar('Apadrinamiento finalizado', 'success');
+    const busyKey = 'fin-ap:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const p = this._byId(this.apadrinamientos, id);
+      if (!p) return;
+      if (!(await this._confirm('Finalizar este apadrinamiento?', 'Finalizar'))) return;
+      p.estado = 'finalizada';
+      p.fecha_fin = new Date().toISOString().slice(0, 10);
+      this.saveLocal();
+      if (this.APADRINAMIENTOS_REMOTE) await this._updateLocalYApi('apadrinamientos', p);
+      this._regLog('apadrinamiento-fin', 'Fin apadrinamiento de ' + (p.padrino_nombre || '') + ' a ' + (p.animal || ''), 'apadrinamiento', p.id);
+      this.viewAnimal(p.animal_id);
+      this.showSnackbar('Apadrinamiento finalizado', 'success');
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async deleteApadrinamiento(id) {
-    const p = this._byId(this.apadrinamientos, id);
-    if (!(await this._confirm('Eliminar este apadrinamiento?', 'Eliminar'))) return;
-    if (this.APADRINAMIENTOS_REMOTE) {
-      try {
-        const res = await API.deleteApadrinamiento(id);
-        this._assertDeleted(res, 'El apadrinamiento');
-      } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
+    const busyKey = 'del-ap:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      const p = this._byId(this.apadrinamientos, id);
+      if (!(await this._confirm('Eliminar este apadrinamiento?', 'Eliminar'))) return;
+      if (this.APADRINAMIENTOS_REMOTE) {
+        try {
+          const res = await API.deleteApadrinamiento(id);
+          this._assertDeleted(res, 'El apadrinamiento');
+        } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
+      }
+      this.apadrinamientos = (this.apadrinamientos || []).filter(x => x.id !== id);
+      this.saveLocal();
+      if (p) this.viewAnimal(p.animal_id);
+      this.showSnackbar('Apadrinamiento eliminado', 'success');
+    } finally {
+      this._busyEnd(busyKey);
     }
-    this.apadrinamientos = (this.apadrinamientos || []).filter(x => x.id !== id);
-    this.saveLocal();
-    if (p) this.viewAnimal(p.animal_id);
-    this.showSnackbar('Apadrinamiento eliminado', 'success');
   },
 
   async convertirPadrino(id) {
@@ -3699,6 +3711,9 @@ const Dashboard = {
   },
 
   async deleteGasto(id) {
+    const busyKey = 'del-gasto:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const g = this._byId(this.gastos, id);
     if (!(await this._confirm('Eliminar este gasto?', 'Eliminar'))) return;
     try {
@@ -3709,6 +3724,10 @@ const Dashboard = {
     this.saveLocal();
     if (g) this.viewAnimal(g.animal_id);
     this.showSnackbar('Gasto eliminado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // Lee un fichero del input y lo sube a Drive. `tipo` decide la carpeta
@@ -3809,6 +3828,9 @@ const Dashboard = {
   },
 
   async deleteDocumento(id) {
+    const busyKey = 'del-doc:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const d = this._byId(this.documentos, id);
     if (!(await this._confirm('Eliminar este documento? Se borra tambien de Drive.', 'Eliminar'))) return;
     try {
@@ -3819,6 +3841,10 @@ const Dashboard = {
     this.saveLocal();
     if (d) this.viewAnimal(d.animal_id);
     this.showSnackbar('Referencia eliminada', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ANIMALES CRUD ====================
@@ -4144,6 +4170,9 @@ const Dashboard = {
   },
 
   async separarDelGrupo(id) {
+    const busyKey = 'sep-grupo:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const a = this._byId(this.animales, id);
     if (!a || !a.grupo_id) return;
     const gid = a.grupo_id;
@@ -4165,6 +4194,10 @@ const Dashboard = {
     this.showSnackbar(a.nombre + ' separado del grupo', 'success');
     await this._repintarAnimales();
     this.viewAnimal(id);
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   viewGrupo(gid) {
@@ -4677,6 +4710,9 @@ const Dashboard = {
   },
 
   async deleteAnimal(id) {
+    const busyKey = 'del-animal:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
     await this._ensureListas(['acogidas', 'candidaturas', 'adopciones']);
     try { const res = await API.deleteAnimal(id); this._assertDeleted(res, 'El animal'); }
@@ -4704,6 +4740,10 @@ const Dashboard = {
     this._hideDetail('animales');
     this.renderAnimales(document.getElementById('page-animales'));
     this.showSnackbar('Animal eliminado (y casos asociados liberados)', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ACOGIDAS CRUD ====================
@@ -4843,6 +4883,9 @@ const Dashboard = {
   },
 
   async deleteFamilia(id) {
+    const busyKey = 'del-familia:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
     await this._ensureListas(['acogidas']);
     try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
@@ -4866,6 +4909,10 @@ const Dashboard = {
     this._hideDetail('acogidas');
     this.renderAcogidas(document.getElementById('page-acogidas'));
     this.showSnackbar('Familia eliminada', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ACOGIDAS ACTIVAS ====================
@@ -5314,6 +5361,9 @@ const Dashboard = {
   },
 
   async deleteAcogida(id) {
+    const busyKey = 'del-acogida:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar este caso de acogida? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar acogida'))) return;
     const target = this._byId(this.acogidas, id);
     try {
@@ -5337,6 +5387,10 @@ const Dashboard = {
     this.saveLocal();
     this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
     this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ADOPCIONES CRUD ====================
@@ -6792,6 +6846,9 @@ const Dashboard = {
   },
 
   async deleteSeguimiento(id) {
+    const busyKey = 'del-seg:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const s = this._byId(this.seguimientos, id);
     if (!(await this._confirm('Eliminar este seguimiento?', 'Eliminar'))) return;
     try {
@@ -6802,6 +6859,10 @@ const Dashboard = {
     this.saveLocal();
     if (s) this.viewAdopcion(s.adopcion_id);
     this.showSnackbar('Seguimiento eliminado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async anularCaso(id) {
@@ -6873,6 +6934,9 @@ const Dashboard = {
   },
 
   async deleteAdopcion(id) {
+    const busyKey = 'del-adopcion:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
     const target = this._byId(this.adopciones, id);
     try { const res = await API.deleteAdopcion(id); this._assertDeleted(res, 'El caso'); }
@@ -6888,6 +6952,10 @@ const Dashboard = {
     this._hideDetail('adopciones');
     this.renderAdopciones(document.getElementById('page-adopciones'));
     this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== CONTRATOS DE ADOPCION ====================
@@ -7467,27 +7535,33 @@ const Dashboard = {
   },
 
   async anularContrato(adopcionId) {
-    if (!(await this._confirm('Anular la firma del contrato?'))) return;
-    await this._ensureListas(['contratos']);
-    const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
-    if (!c) { this.showSnackbar('No hay contrato que anular', 'warning'); return; }
-    this.contratos = this.contratos.filter(x => x.id !== c.id);
-    this.saveLocal();
-    if (c) { try { await API.deleteContrato(c.id); } catch (err) { /* local only */ } }
-    const p = this._byId(this.adopciones, adopcionId);
-    if (p) {
-      p.estado = 'Fase: Contrato';
-      p.estado_firma = '';
-      try { await API.updateAdopcion(adopcionId, { estado: 'Fase: Contrato', estado_firma: '' }); } catch (err) { /* local only */ }
+    const busyKey = 'anular-contrato:' + adopcionId;
+    if (!this._busyStart(busyKey)) return;
+    try {
+      if (!(await this._confirm('Anular la firma del contrato?'))) return;
+      await this._ensureListas(['contratos']);
+      const c = (this.contratos || []).find(x => x.adopcion_id === adopcionId);
+      if (!c) { this.showSnackbar('No hay contrato que anular', 'warning'); return; }
+      this.contratos = this.contratos.filter(x => x.id !== c.id);
+      this.saveLocal();
+      if (c) { try { await API.deleteContrato(c.id); } catch (err) { /* local only */ } }
+      const p = this._byId(this.adopciones, adopcionId);
+      if (p) {
+        p.estado = 'Fase: Contrato';
+        p.estado_firma = '';
+        try { await API.updateAdopcion(adopcionId, { estado: 'Fase: Contrato', estado_firma: '' }); } catch (err) { /* local only */ }
+      }
+      const a = p && p.animal_id ? this._byId(this.animales, p.animal_id) : null;
+      if (a && a.estado === 'adoptado') {
+        a.estado = 'en_adopcion';
+        await this._updateLocalYApi('animales', a);
+      }
+      this._regLog('contrato', 'Firma anulada para ' + (p ? p.animal : ''), 'contrato', c.id);
+      this.viewAdopcion(adopcionId);
+      this.showSnackbar('Firma anulada', 'success');
+    } finally {
+      this._busyEnd(busyKey);
     }
-    const a = p && p.animal_id ? this._byId(this.animales, p.animal_id) : null;
-    if (a && a.estado === 'adoptado') {
-      a.estado = 'en_adopcion';
-      await this._updateLocalYApi('animales', a);
-    }
-    this._regLog('contrato', 'Firma anulada para ' + (p ? p.animal : ''), 'contrato', c.id);
-    this.viewAdopcion(adopcionId);
-    this.showSnackbar('Firma anulada', 'success');
   },
 
   // ==================== SOCIOS CRUD ====================
@@ -7736,6 +7810,9 @@ const Dashboard = {
   // la hoja Socios) y se sellan con `ultima_actividad`; dejan traza en el
   // registro de actividad. Sin columnas nuevas -> funciona con el backend actual.
   async registrarHoras(id) {
+    const busyKey = 'horas:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const s = this._byId(this.socios, id);
     if (!s) return;
     const input = document.getElementById('hs-horas');
@@ -7751,9 +7828,16 @@ const Dashboard = {
     this._regLog('voluntariado', v + ' h de voluntariado de ' + s.nombre + ' (' + total + ' h este mes)', 'socio', s.id);
     this.viewSocio(id);
     this.showSnackbar('+' + v + ' h registradas a ' + s.nombre, 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async reiniciarHorasMes(id) {
+    const busyKey = 'rein-horas:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const s = this._byId(this.socios, id);
     if (!s) return;
     if (!(await this._confirm('Poner a cero las horas de este mes de ' + s.nombre + '?', 'Reiniciar horas'))) return;
@@ -7763,9 +7847,16 @@ const Dashboard = {
     this._regLog('voluntariado', 'Horas del mes reiniciadas de ' + s.nombre, 'socio', s.id);
     this.viewSocio(id);
     this.showSnackbar('Contador de horas reiniciado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async toggleSocio(id) {
+    const busyKey = 'tog-socio:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     const s = this._byId(this.socios, id);
     if (!s) return;
     const newActivo = !s.activo;
@@ -7774,9 +7865,16 @@ const Dashboard = {
     s.activo = newActivo;
     this.viewSocio(id);
     this.showSnackbar(newActivo ? 'Socio activado' : 'Socio desactivado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async deleteSocio(id) {
+    const busyKey = 'del-socio:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar este socio permanentemente?'))) return;
     try { const res = await API.deleteSocio(id); this._assertDeleted(res, 'El socio'); }
     catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
@@ -7784,6 +7882,10 @@ const Dashboard = {
     this._hideDetail('socios');
     this.renderSocios(document.getElementById('page-socios'));
     this.showSnackbar('Socio eliminado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== BLACKLIST ====================
@@ -7871,6 +7973,9 @@ const Dashboard = {
   },
 
   async removeBlacklistItem(id) {
+    const busyKey = 'del-bl:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar esta persona de la lista negra?'))) return;
     const hit = this._blPorClave(id);
     if (!hit) return;
@@ -7883,6 +7988,10 @@ const Dashboard = {
     this.saveLocal();
     const lc=document.getElementById('blacklist-list-container'); if(lc) lc.innerHTML=this._renderBlacklistCards();
     this.showSnackbar('Eliminado de la lista negra', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== DONACIONES ====================
@@ -7945,6 +8054,9 @@ const Dashboard = {
   },
 
   async deleteDonacion(id) {
+    const busyKey = 'del-don:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar esta donacion?', 'Eliminar'))) return;
     try {
       const res = await API.deleteDonacion(id);
@@ -7954,6 +8066,10 @@ const Dashboard = {
     this.saveLocal();
     this.renderDonaciones(document.getElementById('page-donaciones'));
     this.showSnackbar('Donacion eliminada', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== ALMACEN (dummy local: sin backend) ====================
@@ -8048,6 +8164,9 @@ const Dashboard = {
   },
 
   async deleteInventario(id) {
+    const busyKey = 'del-inv:' + id;
+    if (!this._busyStart(busyKey)) return;
+    try {
     if (!(await this._confirm('Eliminar este artículo?', 'Eliminar'))) return;
     try {
       const res = await API.deleteInventario(id);
@@ -8057,6 +8176,10 @@ const Dashboard = {
     this.saveLocal();
     this.renderAlmacen(document.getElementById('page-almacen'));
     this.showSnackbar('Artículo eliminado', 'success');
+  
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   // ==================== REGISTRO DE ACTIVIDAD ====================
