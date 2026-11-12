@@ -294,3 +294,5 @@ Dependencias runtime externas: Google Fonts (Inter), Firebase/gstatic, qrcodejs 
 | 2026-11-12 | 3 | ExtracciÃ³n de helpers de fecha a `utils.js` (`partesFecha`, `tsFecha`, `fechaCorta`, `fmtFecha`, `fmtFechaHora`) con delegaciÃ³n desde `Dashboard` y fallbacks compatibles para entornos/tests sin `Utils`; bump `gn-encuestas-v185` | 0aeab5b (v185) | 357/357 tests, push `main` | En progreso (cluster de fechas modularizado; pendiente seguir extrayendo helpers/servicios y particiÃ³n controlada de vistas del monolito) |
 | 2026-11-12 | 4 | Carga no bloqueante de tipografÃ­a: `Inter` via `preload` + `onload` con fallback `noscript` en `index.html`; bump `gn-encuestas-v186` | 0cf6069 (v186) | 357/357 tests, push `main` | En progreso (mejoras de entrega aplicadas; pendiente lazy-load por vista y optimizaciÃ³n adicional de assets/precache) |
 
+| 2026-11-12 | 3 | ExtracciÃ³n de helpers de actividad/log a `utils.js` (`tipoLogLabel`, `tipoLogCls`) con delegaciÃ³n y fallbacks compatibles; bump `gn-encuestas-v187` | 92ee35c (v187) | 357/357 tests, push `main` | En progreso (mÃ³dulo `utils.js` ampliado; pendiente extracciÃ³n adicional y particiÃ³n controlada de vistas) |
+
