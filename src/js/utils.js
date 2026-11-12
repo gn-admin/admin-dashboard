@@ -82,5 +82,23 @@ const Utils = {
       const pad = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch { return Utils.fmtFecha(v); }
+  },
+
+  tipoLogLabel(tipo) {
+    const m = {
+      adopcion: 'Adopcion', acogida: 'Acogida', candidatura: 'Candidatura',
+      apadrinamiento: 'Apadrinamiento', 'apadrinamiento-fin': 'Fin apadrinamiento',
+      'padrino-convertido': 'Padrino a socio', gasto: 'Gasto', donacion: 'Donacion',
+      contrato: 'Contrato', seguimiento: 'Seguimiento', blacklist: 'Lista negra',
+      voluntariado: 'Voluntariado'
+    };
+    return m[tipo] || tipo || 'General';
+  },
+
+  tipoLogCls(tipo) {
+    if (tipo === 'blacklist') return 'descartada';
+    if (tipo === 'gasto' || tipo === 'donacion') return 'en_proceso';
+    if (tipo === 'adopcion' || tipo === 'candidatura' || tipo === 'contrato') return 'aprobada';
+    return '';
   }
 };

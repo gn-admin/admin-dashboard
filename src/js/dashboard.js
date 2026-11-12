@@ -8591,6 +8591,7 @@ const Dashboard = {
 
   // ==================== REGISTRO DE ACTIVIDAD ====================
   _tipoLogLabel(tipo) {
+    if (typeof Utils !== 'undefined' && Utils.tipoLogLabel) return Utils.tipoLogLabel(tipo);
     const m = {
       adopcion: 'Adopcion', acogida: 'Acogida', candidatura: 'Candidatura',
       apadrinamiento: 'Apadrinamiento', 'apadrinamiento-fin': 'Fin apadrinamiento',
@@ -8602,6 +8603,7 @@ const Dashboard = {
   },
 
   _tipoLogCls(tipo) {
+    if (typeof Utils !== 'undefined' && Utils.tipoLogCls) return Utils.tipoLogCls(tipo);
     if (tipo === 'blacklist') return 'descartada';
     if (tipo === 'gasto' || tipo === 'donacion') return 'en_proceso';
     if (tipo === 'adopcion' || tipo === 'candidatura' || tipo === 'contrato') return 'aprobada';
