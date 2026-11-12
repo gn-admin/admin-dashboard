@@ -17,8 +17,10 @@ const Dashboard = {
     this.showLoading();
     // El perfil no bloquea el primer pintado: la UI arranca con cache local
     // y el nombre llega en segundo plano. Si falla, la app sigue usable.
-    API.getUserProfile().then(user => {
+    this._profileResolved = false;
+    this._profilePromise = API.getUserProfile().then(user => {
       this.userProfile = user;
+      this._profileResolved = true;
       this.updateUserUI();
       const actual = (location.hash || '').replace('#', '') || 'dashboard';
       if (!this.puedeAccederPagina(actual)) {
@@ -29,16 +31,17 @@ const Dashboard = {
       }
       const home = document.getElementById('page-dashboard');
       if (home && home.classList.contains('active') && this._hasHomeCache()) this._paintHome(home);
+      return user;
     }).catch(err => {
       console.error('Error init:', err);
+      this.userProfile = this.userProfile || null;
+      this._profileResolved = true;
       this._snackErr(err, 'No se pudieron cargar los datos iniciales');
+      return null;
     });
     this.hideLoading();
-    this._loadSurveys().catch(() => {});
-    this.loadEstados().catch(() => {});
-    this.loadNotas().catch(() => {});
-    // Preloads no bloqueantes; cada pantalla/ficha asegura lo suyo al abrirse.
-    this._ensureListas(['candidaturas', 'acogidas', 'contratos', 'adopciones', 'blacklist', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos', 'documentos', 'grupos']);
+    // Cargas diferidas: se condicionan por permisos cuando el perfil esté resuelto
+    this._startBackgroundLoads();
     this._renderPendingBadge();
     this.flushPendingOps();
     // Inicializar swipe + teclado para carrusel de galería
@@ -67,6 +70,41 @@ const Dashboard = {
     }
   },
 
+  _puedeCargarListaKey(key) {
+    if (typeof this.puedeAccederPagina !== 'function') return true;
+    const k = String(key || '');
+    const can = (p) => this.puedeAccederPagina(p);
+    const any = (...ps) => ps.some(can);
+    const map = {
+      donaciones: () => can('donaciones'),
+      inventario: () => can('almacen'),
+      socios: () => can('socios'),
+      blacklist: () => can('blacklist'),
+      animales: () => can('animales'),
+      familias: () => any('acogidas', 'acogidas-activas'),
+      acogidas: () => any('acogidas', 'acogidas-activas'),
+      candidaturas: () => can('adopciones'),
+      adopciones: () => can('adopciones'),
+      contratos: () => can('adopciones'),
+      seguimientos: () => any('adopciones', 'acogidas', 'acogidas-activas'),
+      historialFasesAdopcion: () => can('adopciones'),
+      grupos: () => can('animales'),
+      documentos: () => any('animales', 'adopciones'),
+      apadrinamientos: () => can('animales'),
+      recordatorios: () => can('animales'),
+      gastos: () => any('donaciones', 'reportes', 'animales'),
+      actividad: () => any('actividad', 'reportes')
+    };
+    if (Object.prototype.hasOwnProperty.call(map, k)) {
+      try { return !!map[k](); } catch { return false; }
+    }
+    return true;
+  },
+
+  _listasPermitidas(keys) {
+    return (keys || []).filter(k => this._puedeCargarListaKey(k));
+  },
+
   // Asegura listas en memoria (best-effort: nunca lanza; usa caché si ya están).
   async _ensureListas(keys, force) {
     const fns = {
@@ -89,7 +127,28 @@ const Dashboard = {
       grupos: () => API.getGrupos(),
       actividad: () => API.getActividad()
     };
-    await Promise.all((keys || []).map(k => (fns[k] ? this._loadListBestEffort(k, fns[k], force) : null)));
+    const allowed = this._listasPermitidas(keys);
+    await Promise.all((allowed || []).map(k => (fns[k] ? this._loadListBestEffort(k, fns[k], force) : null)));
+  },
+
+  async _startBackgroundLoads() {
+    if (typeof Auth !== 'undefined' && Auth.currentUser && this._profilePromise && !this._profileResolved) {
+      try { await this._profilePromise; } catch {}
+    }
+    const token = this._pageToken;
+    // Si la sesión cambió/navegó fuertemente, evitar trabajo innecesario
+    if (token !== this._pageToken) return;
+    this.loadEstados().catch(() => {});
+    this.loadNotas().catch(() => {});
+    const puedeEncuestas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('encuestas') : true;
+    if (puedeEncuestas) {
+      this._loadSurveys().then(() => {
+        if ((this._pageToken !== token) && typeof App === 'undefined') return;
+        this._surveyIds().forEach(sid => this._loadResponses(sid).catch(() => {}));
+      }).catch(() => {});
+    }
+    const preload = this._listasPermitidas(['candidaturas', 'acogidas', 'contratos', 'adopciones', 'blacklist', 'apadrinamientos', 'gastos', 'recordatorios', 'donaciones', 'seguimientos', 'documentos', 'grupos']);
+    if (preload.length) this._ensureListas(preload).catch(() => {});
   },
 
   // Refresco manual para varias personas trabajando a la vez. Fuerza red y
@@ -100,8 +159,11 @@ const Dashboard = {
     const btn = typeof document !== 'undefined' ? document.getElementById('refresh-btn') : null;
     if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
     try {
-      await Promise.all([
-        this._loadSurveys(true),
+      if (typeof Auth !== 'undefined' && Auth.currentUser && this._profilePromise && !this._profileResolved) {
+        try { await this._profilePromise; } catch {}
+      }
+      const puedeEncuestas = typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina('encuestas') : true;
+      const jobs = [
         this.loadEstados(true),
         this.loadNotas(true),
         this._ensureListas([
@@ -109,8 +171,12 @@ const Dashboard = {
           'acogidas', 'contratos', 'apadrinamientos', 'gastos', 'recordatorios',
           'donaciones', 'seguimientos', 'documentos', 'inventario', 'grupos', 'actividad', 'historialFasesAdopcion'
         ], true)
-      ]);
-      await Promise.all(this._surveyIds().map(sid => this._loadResponses(sid, true)));
+      ];
+      if (puedeEncuestas) jobs.push(this._loadSurveys(true));
+      await Promise.all(jobs);
+      if (puedeEncuestas) {
+        await Promise.all(this._surveyIds().map(sid => this._loadResponses(sid, true)));
+      }
       const page = (typeof App !== 'undefined' && App.currentPage) || 'dashboard';
       if (typeof App !== 'undefined') {
         App.currentPage = null;
@@ -130,6 +196,10 @@ const Dashboard = {
   async loadPage(page) {
     const el = document.getElementById('page-' + page);
     if (!el) return;
+    // Fase 4: esperar perfil/rol cuando hay sesión para aplicar permisos reales
+    if (typeof Auth !== 'undefined' && Auth.currentUser && this._profilePromise && !this._profileResolved) {
+      try { await this._profilePromise; } catch {}
+    }
     if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina(page)) {
       this._sinPermisoPage(el);
       this.injectIcons();

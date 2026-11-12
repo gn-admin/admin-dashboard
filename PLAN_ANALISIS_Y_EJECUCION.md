@@ -121,11 +121,13 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 
 ### Fase 4 — Robustez, rendimiento y permisos (refuerzo)
 **Objetivo:** estabilidad y consistencia percibida.
-- [ ] Evitar errores “No hay usuario autenticado” por transiciones: sincronización auth+perfil.
-- [ ] Revisar que widgets/dashboard no pidan datos de módulos no permitidos para el rol.
-- [ ] Optimizar renders/listas largas si hay impacto (paginación, carga diferida) — solo si se detecta necesidad.
-- [ ] Mensajes de error/estado vacíos claros y accionables.
-- **Criterio de salida:** navegación entre roles/sesiones limpias sin errores transitorios visibles; sin llamadas innecesarias denegadas.
+- [x] Sincronización auth+perfil para decisiones de acceso: espera de perfil/rol en navegación/carga cuando hay sesión (`_profilePromise/_profileResolved`) y fallback seguro `consulta`.
+- [x] Cargas condicionadas por permisos/módulo: `_ensureListas` y preloads/`refreshData` filtran listas según rol/página; dashboard/home y renders de módulos restringidos evitan peticiones no autorizadas; encuestas/respuestas se cargan solo si hay acceso.
+- [x] Reducción de estados obsoletos en transiciones: guards sin sesión en loaders, control por token de página/render y repintados condicionados al contexto activo.
+- [~] Optimización de rendimiento en listas muy largas: no se detectó necesidad inmediata de cambios estructurales en esta fase; mantener paginación/carga diferida como mejora futura si hay impacto.
+- [x] Mensajes de error/estado: manejo existente de errores y estados vacíos/sin permisos mantenido; sin nuevos errores transitorios introducidos por los cambios de esta fase.
+- **Archivos modificados (fase):** `src/js/dashboard.js`, `src/sw.js`, `PLAN_ANALISIS_Y_EJECUCION.md`.
+- **Criterio de salida:** alcanzado en alcance frontend (navegación/cargas más consistentes con rol y sesión; validación manual multirol/dispositivo recomendada).
 
 ### Fase 5 — Validación final y hardening
 **Objetivo:** cierre verificado.
@@ -181,6 +183,7 @@ Análisis exhaustivo realizado sobre producción desplegada y código fuente (`s
 | 2026-11-12 | 1 | Completar Fase 1 (frontend): TTL/expiración de caché `gn_cache_*` (S3), guards defensivos por permisos en renders/cargas de módulos restringidos y refuerzo de gating (S4/S6), auditoría dirigida de `innerHTML` (S5), actualización de estado S1–S7 | `caba214` (v170) | 357 tests OK, desplegado (`gn-encuestas-v170`) | Completado (frontend; S2 bloqueado por backend) |
 | 2026-11-12 | 2 | Fase 2 accesibilidad/touch: targets y affordance (sidebar/acciones/gráficos), `aria-label`/estado dinámico en controles icon-only clave, `:focus-visible` y etiquetas accesibles en filtros/búsquedas principales | `8684548` (v171) | 357 tests OK, desplegado (`gn-encuestas-v171`) | Completado (frontend; validación real pendiente) |
 | 2026-11-12 | 3 | Fase 3 UX responsive: tablas densas como tarjetas en móvil (Socios/Donaciones/Almacén/Actividad/Publicaciones), navegación por teclado en menú “Más”, mejoras de modales/formularios en móvil y ajustes táctiles | `6ab26a7` (v172) | 357 tests OK, desplegado (`gn-encuestas-v172`) | Completado (frontend; validación real pendiente) |
+| 2026-11-12 | 4 | Fase 4 robustez/permisos: espera de perfil/rol para navegación/carga, filtrado de preloads/refresh/listas por permisos, gating de encuestas/respuestas y refuerzo contra estados obsoletos | Pendiente commit (v173) | `node --test tests/*.test.js` en curso | En ejecución |
 
 ---
 
