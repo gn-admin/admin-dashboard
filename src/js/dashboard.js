@@ -987,10 +987,17 @@ const Dashboard = {
       if (!action || typeof this[action] !== 'function') return;
       const d = el.dataset || {};
       try {
-        if (d.cpass === 'el') this[action].call(this, el);
-        else if (d.cpass === 'value') this[action].call(this, el.value);
-        else if (d.cpass === 'checked') this[action].call(this, el.checked);
-        else if (d.carg0 !== undefined) {
+        if (d.cpass === 'el') {
+          if (d.carg0 !== undefined) {
+            const args=[el]; for(let i=0;i<6;i++){const k='carg'+i; if(d[k]===undefined) break; let v=d[k]; if(v==='true') v=true; else if(v==='false') v=false; args.push(v);} this[action].apply(this,args);
+          } else this[action].call(this, el);
+        } else if (d.cpass === 'value') {
+          if (d.carg0 !== undefined) {
+            const args=[el.value]; for(let i=0;i<6;i++){const k='carg'+i; if(d[k]===undefined) break; let v=d[k]; if(v==='true') v=true; else if(v==='false') v=false; args.push(v);} this[action].apply(this,args);
+          } else this[action].call(this, el.value);
+        } else if (d.cpass === 'checked') {
+          this[action].call(this, el.checked);
+        } else if (d.carg0 !== undefined) {
           const args=[]; for(let i=0;i<6;i++){const k='carg'+i; if(d[k]===undefined) break; let v=d[k]; if(v==='true') v=true; else if(v==='false') v=false; args.push(v);} this[action].apply(this,args);
         } else this[action].call(this, el);
       } catch (err) {
@@ -1003,6 +1010,17 @@ const Dashboard = {
       const action = el.dataset.input;
       if (!action || typeof this[action] !== 'function') return;
       try { this[action].call(this, el); } catch (err) { console.error('Input delegado fallido:', action, err); }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      // Evitar interferir con controles nativos interactivos
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'button' || tag === 'a' || tag === 'input' || tag === 'select' || tag === 'textarea') return;
+      if (!el.hasAttribute('tabindex')) return;
+      e.preventDefault();
+      el.click();
     });
   },
 
@@ -1032,6 +1050,18 @@ const Dashboard = {
   onSocioTipoFilterChange(el) { this._currentSocioTipoFilter = el.value; this.renderSocios(document.getElementById('page-socios')); },
   onActividadFilterChange(el) { this.filterActividad(el.closest('.page')); },
   onMemoriaAnioChange() { this._pintarMemoria(); },
+  onEncuestaSearchInput(el) {
+    const surveyId = el.dataset.survey || (el.closest('[data-survey]') && el.closest('[data-survey]').dataset.survey) || '';
+    this._debounceFilter(el, () => this.filterEncuesta(el.closest('.page'), surveyId));
+  },
+  onEncuestaFilterChange(el) {
+    const surveyId = el.dataset.survey || (el.closest('[data-survey]') && el.closest('[data-survey]').dataset.survey) || '';
+    this.filterEncuesta(el.closest('.page'), surveyId);
+  },
+  onAnimalesSearchInput(el) { this._debounceFilter(el, () => this.filterAnimales(el)); },
+  onSociosSearchInput(el) { this._debounceFilter(el, () => this.filterSocios(el)); },
+  onBlacklistSearchInput(el) { this._debounceFilter(el, () => this.filterBlacklist(el)); },
+  onActividadSearchInput(el) { this._debounceFilter(el, () => this.filterActividad(el.closest('.page'))); },
 
   showTutorialFromProfile() {
     this.closeProfile();
@@ -2184,7 +2214,7 @@ const Dashboard = {
     this._shown[surveyId] = 20;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}'))"></div><div class="filter-row"><select onchange="Dashboard.filterEncuesta(this.closest('.page'),'${surveyId}')"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
         <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
@@ -2231,7 +2261,7 @@ const Dashboard = {
 
   _renderResponseCards(responses, surveyId, emptyMsg) {
     if(!responses.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.clipboard+'</div><h3>'+(emptyMsg||'No hay solicitudes')+'</h3></div>';
-    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" data-action="viewDetail" data-arg0="${surveyId}" data-arg1="${r.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
+    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" data-action="viewDetail" data-arg0="${surveyId}" data-arg1="${r.id}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
   async viewDetail(surveyId, responseId, opts) {
@@ -3260,7 +3290,7 @@ const Dashboard = {
           <div class="form-row"><div class="form-group"><label>Animal *</label><select id="rd-animal" data-change="_rellenarPlantilla">${this.animales.map(a => `<option value="${this._esc(a.id)}" ${String(a.id) === String(selId) ? 'selected' : ''}>${this._esc(a.nombre)} · ${this._esc(a.especie || '')}</option>`).join('')}</select></div>
           <div class="form-group"><label>Tipo *</label><select id="rd-tipo" data-change="_rellenarPlantilla"><option value="adopcion">Adopcion (contrato)</option><option value="acogida">Acogida (acuerdo temporal)</option></select></div></div>
           <div class="form-group"><label>Foto principal</label><div id="rd-foto"></div></div>
-          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" oninput="Dashboard._actualizarPreviewRedes()"></textarea><div style="text-align:right;font-size:var(--text-xs);color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
+          <div class="form-group"><label>Texto (plantilla editable)</label><textarea id="rd-caption" rows="8" maxlength="2200" data-input="_actualizarPreviewRedes"></textarea><div style="text-align:right;font-size:var(--text-xs);color:var(--gray-400)"><span id="rd-count">0</span>/2200</div></div>
           <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="_copiarCaption">Copiar texto</button><button type="button" class="btn btn-primary" data-action="publicarRedes">${Icons.check} Publicar (simulado)</button></div>
         </div>
         <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Vista previa</h3></div><div class="card-body"><div id="rd-preview"></div></div></div>
@@ -3800,7 +3830,7 @@ const Dashboard = {
     filtered = this._ordenaUrgentes(filtered);
     const { bloques, sueltos } = this._bloquesDeGrupo(filtered);
     const tarjeta = (a, enBloque) => `
-          <div class="animal-card" role="button" tabindex="0" data-action="viewAnimal" data-arg0="${a.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+          <div class="animal-card" role="button" tabindex="0" data-action="viewAnimal" data-arg0="${a.id}">
             ${this._fotoSrc(a) ? `<div class="animal-card-img"><img loading="lazy" src="${this._esc(this._fotoSrc(a, 'w200'))}" alt="${this._esc(a.nombre)}" style="width:100%;height:100%;object-fit:cover"></div>` : `<div class="animal-card-img" style="display:flex;align-items:center;justify-content:center;background:${a.especie==='Perro'?'var(--primary-lighter)':'var(--info-light)'};color:${a.especie==='Perro'?'var(--primary-hover)':'var(--info)'}">${a.especie==='Perro'?Icons.dog:(a.especie==='Gato'?Icons.cat:Icons.paw)}</div>`}
             <div class="animal-card-body">
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
@@ -3825,7 +3855,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" oninput="Dashboard._debounceFilter(this, () => Dashboard.filterAnimales(this))"></div><div class="filter-row">
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
           <select data-change="onAnimalEstadoFilterChange" data-cpass="el">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
@@ -4312,10 +4342,10 @@ const Dashboard = {
       + (grupoVal && !enLista ? `<option value="${this._esc(grupoVal)}" selected>${this._esc(grupoVal)}</option>` : '')
       + `<option value="__nuevo__">Crear grupo nuevo...</option>`;
     this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form data-submit="saveAnimal" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required onchange="Dashboard._toggleEspecieOtra(this.value)">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
+      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Especie *</label><select id="an-especie" required data-change="_toggleEspecieOtra" data-cpass="value">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
       <div class="form-row"><div class="form-group"><label>Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label>Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label>Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label>Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
-      <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" onchange="Dashboard._onChangeGrupo(this.value, ${isEdit?'true':'false'})">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" onchange="Dashboard._onChangeGrupoNuevo(${isEdit?'true':'false'})"><p style="font-size:var(--text-xs);color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" data-change="_onChangeGrupo" data-cpass="value" data-carg0="${isEdit?'true':'false'}">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" data-change="_onChangeGrupoNuevo" data-carg0="${isEdit?'true':'false'}"><p style="font-size:var(--text-xs);color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-urgente" ${this._esUrgente(data)?'checked':''}> Necesita acogida/adopcion urgente</label></div></div>
       <div class="form-row"><div class="form-group"><label>Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="an-foto-preview"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:var(--text-xs);color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label>Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label>Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label>Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
@@ -4674,7 +4704,7 @@ const Dashboard = {
         </select>
       </div></div>
       <div id="familias-form-container"></div>
-      <div class="response-list">${filtered.length ? filtered.map(f=>`          <div class="response-card" role="button" tabindex="0" data-action="viewFosterFamily" data-arg0="${f.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+      <div class="response-list">${filtered.length ? filtered.map(f=>`          <div class="response-card" role="button" tabindex="0" data-action="viewFosterFamily" data-arg0="${f.id}">
           <div class="response-card-header">
             <div class="response-avatar" style="background:var(--info-light);color:var(--info)">${this._esc(String(f.nombre).charAt(0))}</div>
             <div class="response-info">
@@ -5319,7 +5349,7 @@ const Dashboard = {
     const ct = this._contratoDeAdopcion(p.id);
     const prog = this._faseProgreso(p);
     const faseCls = p.desenlace === 'devuelto' ? 'descartada' : (p.fase === 'Contrato' ? 'en_proceso' : 'pendiente');
-    return `<div class="response-card proceso-card" role="button" tabindex="0" data-action="viewAdopcion" data-arg0="${p.id}" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+    return `<div class="response-card proceso-card" role="button" tabindex="0" data-action="viewAdopcion" data-arg0="${p.id}">
       <div class="response-card-header">
         <div class="response-avatar proceso-avatar">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(p.animal)}">` : Icons.heart}</div>
         <div class="response-info">
@@ -7456,7 +7486,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" oninput="Dashboard._debounceFilter(this, () => Dashboard.filterSocios(this))"></div><div class="filter-row">
+      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
         <select data-change="onSocioTipoFilterChange" data-cpass="el">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
@@ -7737,7 +7767,7 @@ const Dashboard = {
   async renderBlacklist(el) {
     await this._loadList('blacklist', () => API.getBlacklist());
     el.innerHTML = `
-      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterBlacklist(this))"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
+      <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon"></span><input type="text" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
       <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>`;
     this._animaListado(document.getElementById('blacklist-list-container'));
   },
@@ -8033,7 +8063,7 @@ const Dashboard = {
     const cuerpo = this._renderActividadTabla(rows);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterActividad(this.closest('.page')))"></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
@@ -8154,7 +8184,7 @@ const Dashboard = {
         <div class="alert-item warning" style="cursor:pointer" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." oninput="Dashboard._debounceFilter(this, () => Dashboard.filterActividad(this.closest('.page')))"></div>
+        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
