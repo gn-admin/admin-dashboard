@@ -3491,30 +3491,22 @@ const Dashboard = {
   // Conservador: lo que no es fecha inequivoca se devuelve tal cual
   // (un "2024" suelto o un microchip no se tocan). Vacio -> "—".
   _fmtFecha(v) {
+    if (typeof Utils !== 'undefined' && Utils.fmtFecha) return Utils.fmtFecha(v);
     if (v === undefined || v === null || v === '') return '—';
-    if (v instanceof Date) {
-      return isNaN(v.getTime()) ? '—' : this._fechaCorta(v, !!(v.getHours() || v.getMinutes()));
-    }
+    if (v instanceof Date) return isNaN(v.getTime()) ? '—' : this._fechaCorta(v, !!(v.getHours() || v.getMinutes()));
     const s = String(v).trim();
     if (!s) return '—';
     let d = null, conHora = false;
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (m) {
-      d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
-      conHora = !!m[4];
-    } else if ((m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/))) {
-      d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
-      conHora = !!m[4];
-    } else {
-      // Texto es-ES que guardan algunas hojas: '13 abr 2025', '1 sept 2025'.
-      const p = this._partesFecha(s);
-      if (p) d = new Date(p.y, p.m, p.d);
-    }
+    if (m) { d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)); conHora = !!m[4]; }
+    else if ((m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/))) { d = new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)); conHora = !!m[4]; }
+    else { const p = this._partesFecha(s); if (p) d = new Date(p.y, p.m, p.d); }
     if (!d || isNaN(d.getTime())) return s;
     return this._fechaCorta(d, conHora);
   },
 
   _fechaCorta(d, conHora) {
+    if (typeof Utils !== 'undefined' && Utils.fechaCorta) return Utils.fechaCorta(d, conHora);
     const pad = n => String(n).padStart(2, '0');
     const fecha = `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
     if (!conHora) return fecha;
@@ -6021,6 +6013,7 @@ const Dashboard = {
   },
 
   _fmtFechaHora(v) {
+    if (typeof Utils !== 'undefined' && Utils.fmtFechaHora) return Utils.fmtFechaHora(v);
     if (!v) return '';
     try {
       const d = new Date(String(v).replace(' ', 'T'));
@@ -8765,6 +8758,7 @@ const Dashboard = {
   // y texto es-ES ('13 abr 2025', el formato con el que se guardan las
   // fechas de acogida). Devuelve {y, m (0-11), d} o null si no es reconocible.
   _partesFecha(f) {
+    if (typeof Utils !== 'undefined' && Utils.partesFecha) return Utils.partesFecha(f);
     if (!f) return null;
     const s = String(f).trim();
     let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -8783,6 +8777,7 @@ const Dashboard = {
   // Normaliza fechas de las hojas (ISO, ISO con hora, dd/mm/aaaa, dd-mm-aaaa
   // o '13 abr 2025') a timestamp.
   _tsFecha(f) {
+    if (typeof Utils !== 'undefined' && Utils.tsFecha) return Utils.tsFecha(f);
     if (!f) return 0;
     const p = this._partesFecha(f);
     if (p) return Date.UTC(p.y, p.m, p.d);
