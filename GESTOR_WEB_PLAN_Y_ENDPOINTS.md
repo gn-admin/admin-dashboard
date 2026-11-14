@@ -20,10 +20,11 @@
 | Endpoints del cliente | `src/js/api.js` | `- [x]` implementado |
 | Navegación, permisos y ruta | `src/js/app.js`, `src/js/dashboard.js`, `src/index.html` | `- [x]` implementado |
 | Estilos | `src/css/styles.css` | `- [x]` implementado |
-| Visor público (referencia de lo que verá la web) | `src/publico.html`, `src/css/publico.css`, `src/js/publico.js` | `- [x]` listado + detalle + SEO |
+| Visor público (referencia de lo que verá la web) | `src/publico.html`, `src/css/publico.css`, `src/js/publico.js` | `- [x]` listado + detalle + SEO, con el tema de `nueva-version` |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
-| Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v217`, assets `js/web.js` y `js/publico.js` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 444 en total (incluye cabeceras en hoja vacía, canonical condicional y pestaña única) |
+| Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 454 en total (incluye cabeceras en hoja vacía, canonical condicional y pestaña única) |
+| Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
 
 **Pasos manuales pendientes (fuera de git):**
 
@@ -32,7 +33,7 @@
 - [x] `CONFIG.PUBLIC_WEB_BASE_URL` con valor actual `https://gn-admin.github.io/admin-dashboard`; cuando exista el dominio propio, cambiarlo a `https://gruponebak.net` (sin barra final).
 - [x] Origen de la web pública permitido: `https://gn-admin.github.io` cubre `/admin-dashboard/` (la comprobación reduce a esquema+host y también lee `Referer`, necesario para JSONP). Al pasar a dominio propio, añadir `https://gruponebak.net` a `CONFIG.ALLOWED_ORIGINS`.
 - [x] Canal público accesible sin token confirmado en el despliegue (`?endpoint=publicaciones` responde sin sesión); los endpoints del gestor siguen devolviendo 401 sin token.
-- [ ] Desplegar GitHub Pages: `publico.html` viaja en `src/`, así que el botón del login funciona en cuanto se publique el workflow.
+- [x] Desplegar GitHub Pages: `publico.html` viaja en `src/` y responde **200** en `https://gn-admin.github.io/admin-dashboard/publico.html` (verificado con `sw` `v223` y el tema del visor).
 
 ### Decisiones cerradas en Fase 0
 
@@ -264,11 +265,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 449 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-14, 454 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **449 tests** en ambos entornos.
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **454 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -297,6 +298,82 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 6. **Estados.** Distinguir *sin resultados* (filtros), *canal sin configurar* (`status:"warning"`), *error de red* (con reintento) y *no disponible* (`status:"error"`). Los dos últimos, `noindex,nofollow` y enlace al listado.
 7. **Antes de dar el port por bueno.** Repetir la lista de §7.1 en el dominio real: listado con filtros/paginación, fichas de los tres tipos, canonical ausente o correcto según base, JSON-LD correcto, 404, redirect de slug histórico, estados, y revisión visual a 360/1280 px.
 8. **Indexación real (opcional, siguiente paso).** Prerender por slug en build usando el canal como fuente y `sitemap.xml`/`robots.txt` físicos; el sitemap del backend solo emite URLs cuando hay dominio propio.
+
+### 7.3 Ficha de animal configurable desde la publicación — análisis y plan (pendiente)
+
+**Pregunta de partida.** La ficha de `custom-page/nueva-version` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
+
+**Criterio de esta pasada.** Solo análisis y plan: **no se implementa nada**. El contrato que se propone es **aditivo**: si una publicación no trae la configuración nueva, endpoint y visor se comportan exactamente como hoy.
+
+#### A. Anatomía de la ficha de referencia
+
+| Bloque | Qué pinta `blog-render.js` | Fuente en el payload | Configurable hoy |
+|---|---|---|---|
+| Cabecera | `eyebrow` con la categoría, `h1`, `lead` (extracto), línea `meta` (categoría · fecha · `readTime`) y CTA | `category`, `title`, `excerpt`, `publishedAt`, `readTime`, `cta` | Parcial: textos sí, CTA único |
+| Datos destacados | rejilla de tarjetas `feature-card` con icono + etiqueta + valor | `icons[]` `{icon,label,value}` | Sí, como texto libre `icono\|etiqueta\|valor` |
+| Etiquetas | chips bajo los datos | `tags[]` | **No**: el formulario de animal no edita `tags` |
+| Sobre este caso | HTML libre | `contentHtml` | Sí |
+| Galería | carrusel de imágenes 16/10 con pie | `gallery[]` `{src,alt,caption}` | Solo `src` |
+| Vídeo | iframe 16/9 + nota | `videos[]` `{url,title,note}` | Solo `título\|url`; el visor **enlaza**, no incrusta |
+| Ficha del animal | tabla de datos, salud y temperamento | `animal.{names,species,breed,sex,age,size,color,health,temperament,compatibility,adoption,foster,location,contact}` | Parcial (ver C.5) |
+| CTA final | repite CTA + botón «volver» | `cta` | Igual que la cabecera |
+
+La plantilla se elige por categoría (`isFichaPost`): `Adoptados` cae a formato historia y el resto de fichas usa el layout compacto. Esa decisión hoy es **implícita en la web**, no viene del gestor.
+
+#### B. Huecos detectados (payload ↔ ficha real)
+
+| # | Hueco | Efecto actual | Propuesta |
+|---|---|---|---|
+| 1 | **Plantilla y visibilidad de bloques** | La web decide por categoría; el gestor no puede pedir «ficha sin galería» ni «historia con datos» | Bloque `ficha` opcional: `plantilla` (`ficha`\|`historia`) y `bloques` (booleanos de `datos`, `galeria`, `videos`, `fichaAnimal`, `etiquetas`, `cta`) |
+| 2 | **Catálogo de iconos** | `icon` se guarda pero el render decide el dibujo por regex de la etiqueta; dos fichas con la misma etiqueta pueden salir con iconos distintos | Catálogo cerrado de claves (edad, ubicacion, caracter, salud, adopcion, acogida, contacto, urgente, hogar) + fallback por etiqueta para no romper datos viejos |
+| 3 | **Galería sin alt ni pie** | Se pierde accesibilidad y el pie de foto que sí soporta el contrato | Formato `url\|alt\|pie` por línea (retrocompatible: `url` sola sigue valiendo) |
+| 4 | **Vídeo sin nota ni miniatura** | La ficha de referencia muestra nota bajo el vídeo | Añadir `nota` y `miniatura` al parser `título\|url`; decidir incrustar (ver D) |
+| 5 | **Salud no curada** | `vaccinated/dewormed/neutered/microchipped` salen de la hoja interna (`vacunas`, `esterilizada`, `microchip`); en la web no se pueden corregir sin tocar el animal | Cinco checkboxes en «Ficha pública del animal» con **heredar** por defecto; el backend ya respeta el valor explícito de `animal.health` |
+| 6 | **Campos de animal ausentes en el formulario** | `age.value/unit`, `names[]`, `adoption.includes`, `foster.reason/expensesPolicy`, `location.shelter` existen en el contrato pero no se editan | Añadirlos al desplegable «Ficha pública del animal»; el payload ya los compone |
+| 7 | **CTA sin intención** | La web real abre formularios de adopción/acogida por `data-open-form`; el contrato solo manda `label`+`url` | `cta.kind`: `adopcion`\|`acogida`\|`contacto`\|`url` (por defecto `url`); el gestor puede sugerir el formulario y la web decide cómo abrirlo |
+| 8 | **Tiempo de lectura** | `readTime` se deriva del HTML y no se puede ocultar | Flag `ficha.mostrarLectura` (por defecto `true`) |
+| 9 | **Secciones libres** | La ficha real solo tiene «Sobre este caso»; no hay forma de añadir «Cómo es» o «Salud» como bloques propios | **Opcional/fase posterior**: `sections[]` `{titulo,html}` (máx. 3), saneado en backend |
+
+#### C. Contrato propuesto (v1.1, aditivo)
+
+```jsonc
+// GET ?endpoint=publicacion&slug=…  (solo se añade si está configurado)
+"ficha": {
+  "plantilla": "ficha",              // ficha | historia
+  "bloques": { "datos": true, "galeria": true, "videos": true,
+                "fichaAnimal": true, "etiquetas": true, "cta": true },
+  "mostrarLectura": true
+},
+"cta": { "label": "Quiero adoptar", "url": "…", "kind": "adopcion" },
+"gallery": [{ "src": "…", "alt": "…", "caption": "…", "order": 0 }],
+"videos": [{ "title": "…", "url": "…", "provider": "youtube", "note": "…" }],
+"icons": [{ "icon": "edad", "label": "Edad", "value": "2 años" }]
+```
+
+Reglas:
+- **Aditivo y opcional:** ausencia de `ficha` = comportamiento actual; el visor y la web ignoran claves desconocidas.
+- **Compatibilidad:** `icon` pasa a ser clave sugerida, no obligatoria; `label` manda para el texto y el icono cae al catálogo o al regex.
+- **Persistencia:** nueva columna `ficha_json` en `WebPublicaciones` (27 columnas). `appendToSheet` escribe cabeceras nuevas solo en hoja vacía; en hojas ya creadas hay que añadir la columna a mano (misma operación que `slug_historial`).
+- **Validación:** `plantilla` y `bloques` cerrados a valores conocidos; `cta.kind` cerrado; el resto, texto saneado. Publicar **no** exige la configuración nueva.
+
+#### D. Decisiones abiertas antes de implementar
+
+- [ ] **Vídeo incrustado o enlace.** La ficha real usa `<iframe>`; `src/publico.html` tiene hoy `frame-src 'none'` y `publico.js` enlaza. Incrustar exige abrir CSP a `youtube-nocookie.com`/`player.vimeo.com` y decidir consentimiento de cookies. Recomendación: mantener enlace hasta que la web final lo pida.
+- [ ] **Catálogo de iconos compartido.** Copiarlo en `publico.js` y en `blog-render.js` (hoy ya está duplicado el `svgFor`), o publicarlo como `GET ?endpoint=taxonomias`.
+- [ ] **HTML libre en `contentHtml` y `sections`.** El gestor admite HTML; falta decidir si se sanea en el backend (lista blanca) o se confía en el rol `admin`/`coordinador`.
+- [ ] **Orden de bloques configurable.** Se propone solo visibilidad; un orden libre complica el layout y el render de la web.
+- [ ] **Retrocompatibilidad de `tags` en animales.** Añadir el campo al formulario no rompe nada, pero hay publicaciones antiguas sin etiquetas.
+
+#### E. Plan de implementación (sin empezar)
+
+1. **Contrato y validación** (`WebPublicaciones.gs`): `ficha_json` → objeto `ficha` en `webConstruirPublicacion`; valores cerrados; tests de ausencia (payload idéntico al actual).
+2. **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.
+3. **Gestor (`src/js/web.js`):** nueva sección «Presentación de la ficha» (plantilla, toggles de bloques, `mostrarLectura`), selectores de icono con catálogo, galería `url\|alt\|pie`, salud con tres estados, CTA con intención y `tags`.
+4. **Visor (`publico.js` + `publico.css`):** render condicionado por `ficha.bloques`, plantilla `historia`, CTA por `kind` y salud explícita. Mantener el fallback actual cuando no venga `ficha`.
+5. **Port a `custom-page/nueva-version`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story` y ocultar bloques; `publication.icons` con clave de catálogo.
+6. **Aceptación:** payload sin `ficha` idéntico byte a byte al actual (test de regresión); ficha con `bloques` desactivados no pinta esos bloques; publicación antigua sigue renderizando igual; 360/1280 sin desbordes.
+
+**Fuera de alcance:** exponer la ficha interna del animal, editor WYSIWYG, CSS/tema por publicación y multiplantilla más allá de `ficha`/`historia`.
 
 ### Fase 5 — Ajustes, calidad y operación — parcial
 **Objetivo:** estabilizar y mantener el flujo gestor → web.
