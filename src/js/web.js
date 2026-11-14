@@ -102,6 +102,16 @@ const Web = {
     return m[estado] || '';
   },
 
+  /** Animales que YA tienen publicación web (es lo único que se lista). */
+  publicacionesAnimales(lista) {
+    return (lista || []).filter(a => a && a.publicacion_id);
+  },
+
+  /** Animales sin publicación web: candidatos del selector "Nueva publicación". */
+  animalesSinPublicacion(lista) {
+    return (lista || []).filter(a => a && !a.publicacion_id);
+  },
+
   // ==================== ACCIONES DE UI (desde Dashboard) ====================
 
   async render(el) {
@@ -157,17 +167,22 @@ const Web = {
         <div class="filter-row">
           <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
             <option value="">Todos los estados</option>
-            ${['publicado', 'borrador', 'oculto'].concat(this.tab === 'animal' ? ['sin_publicar'] : []).map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
+            ${['publicado', 'borrador', 'oculto'].map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
           </select>
-          ${this.tab === 'evento' ? `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>` : ''}
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
-          <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
+          <div class="web-acciones">
+            ${this.tab === 'animal'
+              ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionWeb">${Icons.plus} Nueva publicación</button>`
+              : `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>`}
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
+            <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
+          </div>
         </div>
       </div>
       ${this._avisoPublicados()}
-      <div id="web-listado">${this._tabla()}</div>
+      <div id="web-listado" class="web-lista">${this._tabla()}</div>
       <p class="web-nota">Los campos SEO son los metadatos que la web pública usará al renderizar cada ficha (title, description, canonical, robots, OG). La previsualización muestra exactamente el payload que entregará el canal público.</p>
     </div>
+    <div id="web-picker" class="web-picker" hidden></div>
     <div class="page-detail-container"></div>`;
   },
 
@@ -175,13 +190,13 @@ const Web = {
   _avisoPublicados() {
     const t = (this.resumen && this.resumen.totales) || {};
     if (Number(t.publicados) > 0) return '';
-    return `<div class="web-aviso"><span aria-hidden="true">ℹ️</span><span>Todavía no hay nada visible en la web. Configura un animal o crea un evento y pulsa <b>Publicar</b> para que aparezca en <a href="publico.html" target="_blank" rel="noopener">la web pública</a>.</span></div>`;
+    return `<div class="web-aviso"><span aria-hidden="true">ℹ️</span><span>Todavía no hay nada visible en la web. Pulsa <b>Nueva publicación</b> para elegir un animal (o crea un evento) y publica para que aparezca en <a href="publico.html" target="_blank" rel="noopener">la web pública</a>.</span></div>`;
   },
 
   _statsHtml() {
     const t = (this.resumen && this.resumen.totales) || {};
     const card = (label, valor, icono, extra) => `<div class="stat-card"><div class="stat-card-icon green">${icono}</div><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value">${Number(valor) || 0}</div>${extra ? `<div class="stat-card-change">${extra}</div>` : ''}</div></div>`;
-    return `<div class="stats-grid" style="margin-bottom:16px">
+    return `<div class="stats-grid web-stats" style="margin-bottom:16px">
       ${card('Publicados', t.publicados, Icons.checkCircle, 'Visibles en la web')}
       ${card('Borradores', t.borradores, Icons.fileText, 'Sin publicar todavía')}
       ${card('Ocultos', t.ocultos, Icons.eye, 'Retirados de la web')}
@@ -193,13 +208,16 @@ const Web = {
   _tabla() {
     const q = this._filtros.q.toLowerCase();
     if (this.tab === 'animal') {
-      const filas = this.animales.filter(a => {
+      // Solo publicaciones web: las fichas internas no se listan. Para crear una
+      // nueva se usa el selector ("Nueva publicación"), que muestra los animales
+      // que todavía no tienen publicación.
+      const filas = this.publicacionesAnimales(this.animales).filter(a => {
         if (this._filtros.estado && a.estado_publicacion !== this._filtros.estado) return false;
         if (!q) return true;
         return ((a.nombre || '') + ' ' + (a.titulo || '') + ' ' + (a.slug || '') + ' ' + (a.especie || '')).toLowerCase().includes(q);
       });
-      if (!filas.length) return this._vacio('No hay animales para este filtro', 'Ajusta la búsqueda o el estado de publicación.');
-      return `<div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Animal</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
+      if (!filas.length) return this._sinPublicaciones();
+      return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th>Animal</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
     }
     const filas = this.eventos.filter(e => {
       if (this._filtros.estado && e.estado_publicacion !== this._filtros.estado) return false;
@@ -207,7 +225,7 @@ const Web = {
       return ((e.titulo || '') + ' ' + (e.slug || '') + ' ' + (e.categoria || '')).toLowerCase().includes(q);
     });
     if (!filas.length) return this._vacio('No hay eventos ni historias', 'Crea el primero con el botón "Nuevo evento/historia".');
-    return `<div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Título</th><th>Tipo</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
+    return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th>Título</th><th>Tipo</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
   },
 
   _filaAnimal(a) {
@@ -217,7 +235,7 @@ const Web = {
       <td data-label="Estado web"><span class="estado-badge ${this.estadoCls(a.estado_publicacion)}">${this._esc(this.estadoLabel(a.estado_publicacion))}</span>${a.featured ? ' <span class="chip-neutral">Destacado</span>' : ''}</td>
       <td data-label="Slug">${a.slug ? `<code>${this._esc(a.slug)}</code>` : '<span class="web-sub">sin slug</span>'}</td>
       <td data-label="Completitud">${this._chips(faltan)}</td>
-      <td data-label="Acciones" class="table-actions" style="white-space:nowrap">
+      <td data-label="Acciones" class="table-actions">
         <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirAnimalWeb" data-arg0="${this._esc(a.animal_id)}">${Icons.pencil} ${a.publicacion_id ? 'Editar' : 'Configurar'}</button>
         ${a.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}">${Icons.eye} Preview</button>` : ''}
         ${a.estado_publicacion === 'publicado' && a.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(a.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
@@ -238,7 +256,7 @@ const Web = {
       <td data-label="Estado web"><span class="estado-badge ${this.estadoCls(e.estado_publicacion)}">${this._esc(this.estadoLabel(e.estado_publicacion))}</span></td>
       <td data-label="Slug">${e.slug ? `<code>${this._esc(e.slug)}</code>` : '<span class="web-sub">sin slug</span>'}</td>
       <td data-label="Completitud">${this._chips(faltan)}</td>
-      <td data-label="Acciones" class="table-actions" style="white-space:nowrap">
+      <td data-label="Acciones" class="table-actions">
         <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
         ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
@@ -258,6 +276,17 @@ const Web = {
 
   _vacio(titulo, texto) {
     return `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.eye}</div><h3>${this._esc(titulo)}</h3><p>${this._esc(texto)}</p></div>`;
+  },
+
+  /** Listado de animales vacío: no hay publicaciones (las internas no se listan). */
+  _sinPublicaciones() {
+    const n = this.animalesSinPublicacion(this.animales).length;
+    return `<div class="empty-state empty-state-illustrated">
+      <div class="empty-state-icon">${Icons.eye}</div>
+      <h3>Sin publicaciones de animales</h3>
+      <p>${n ? `Hay ${n} animal${n === 1 ? '' : 'es'} sin publicación web. Elige cuál publicar.` : 'Cuando des de alta un animal podrás crear su publicación web desde aquí.'}</p>
+      ${n ? `<button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="nuevaPublicacionWeb">${Icons.plus} Nueva publicación</button>` : ''}
+    </div>`;
   },
 
   _esc(str) {
@@ -295,6 +324,81 @@ const Web = {
     this._filtros.estado = String(estado || '');
     const c = document.getElementById('web-listado');
     if (c) c.innerHTML = this._tabla();
+  },
+
+  // ==================== NUEVA PUBLICACIÓN (selector) ====================
+
+  nuevaPublicacion() {
+    const host = document.getElementById('web-picker');
+    if (!host) return;
+    // El panel de la página se anima con transform: eso rompería position:fixed.
+    // El selector vive en <body> para cubrir la pantalla completa.
+    if (host.parentElement !== document.body) document.body.appendChild(host);
+    this._pickerQ = '';
+    host.innerHTML = this._pickerHtml();
+    host.hidden = false;
+    document.body.classList.add('web-picker-abierto');
+    this._pickerEsc = this._pickerEsc || ((ev) => { if (ev.key === 'Escape') this.cerrarPicker(); });
+    document.addEventListener('keydown', this._pickerEsc);
+    const input = host.querySelector('input');
+    if (input && typeof input.focus === 'function') input.focus();
+  },
+
+  cerrarPicker() {
+    const host = document.getElementById('web-picker');
+    if (host) { host.hidden = true; host.innerHTML = ''; }
+    document.body.classList.remove('web-picker-abierto');
+    if (this._pickerEsc) {
+      document.removeEventListener('keydown', this._pickerEsc);
+      this._pickerEsc = null;
+    }
+  },
+
+  filtrarPicker(q) {
+    this._pickerQ = String(q || '');
+    const lista = document.getElementById('web-picker-lista');
+    if (lista) lista.innerHTML = this._pickerLista();
+  },
+
+  _pickerHtml() {
+    const total = this.animalesSinPublicacion(this.animales).length;
+    const cerrar = (typeof Icons !== 'undefined' && Icons.close) ? Icons.close : '✕';
+    return `<div class="web-picker-overlay" data-action="cerrarPickerWeb" aria-hidden="true"></div>
+      <div class="web-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="web-picker-titulo">
+        <div class="web-picker-head">
+          <div>
+            <h2 id="web-picker-titulo">Nueva publicación</h2>
+            <p class="web-sub">Solo animales sin publicación web (${total}). La ficha interna del animal no se expone.</p>
+          </div>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="cerrarPickerWeb" aria-label="Cerrar">${cerrar}</button>
+        </div>
+        <div class="search-box"><span class="search-icon"></span><input type="search" aria-label="Buscar animal sin publicación" placeholder="Buscar por nombre o especie..." data-input="onPickerWebBuscar"></div>
+        <div id="web-picker-lista" class="web-picker-lista">${this._pickerLista()}</div>
+      </div>`;
+  },
+
+  /** Lista de candidatos del selector (solo animales sin publicación). */
+  _pickerLista() {
+    const q = String(this._pickerQ || '').toLowerCase();
+    const libres = this.animalesSinPublicacion(this.animales).filter(a => {
+      if (!q) return true;
+      return ((a.nombre || '') + ' ' + (a.especie || '') + ' ' + (a.raza || '')).toLowerCase().includes(q);
+    });
+    if (!libres.length) {
+      return `<p class="web-picker-vacio">${q ? 'Ningún animal sin publicar coincide con la búsqueda.' : 'No quedan animales sin publicación web.'}</p>`;
+    }
+    return libres.map(a => `<div class="web-picker-item">
+        <div class="web-picker-datos">
+          <b>${this._esc(a.nombre || '—')}</b>
+          <span class="web-sub">${this._esc([a.especie, a.estado].filter(Boolean).join(' · '))}</span>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" data-action="crearPublicacionWeb" data-arg0="${this._esc(a.animal_id)}">Crear publicación</button>
+      </div>`).join('');
+  },
+
+  async crearPublicacion(animalId) {
+    this.cerrarPicker();
+    return this.abrirAnimal(animalId);
   },
 
   async recargar() {

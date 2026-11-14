@@ -8212,3 +8212,63 @@ body.modal-open { overflow: hidden; }
   border-radius: 8px; padding: 12px;
 }
 
+/* Acciones de la barra de filtros (nueva publicación, actualizar, ver web) */
+.web-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.web-tabla td.table-actions { white-space: nowrap; }
+
+/* Selector "Nueva publicación": solo animales sin publicación web */
+body.web-picker-abierto { overflow: hidden; }
+.web-picker[hidden] { display: none; }
+.web-picker {
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.web-picker-overlay { position: absolute; inset: 0; background: rgba(17, 24, 39, 0.45); }
+.web-picker-dialog {
+  position: relative; display: flex; flex-direction: column; gap: 10px;
+  width: min(620px, 100%); max-height: min(85vh, 720px); padding: 18px;
+  background: var(--white, #fff); border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+}
+.web-picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.web-picker-head h2 { margin: 0 0 2px; font-size: var(--text-lg, 1.125rem); color: var(--gray-900, #111827); }
+.web-picker-head .web-sub { margin: 0; }
+.web-picker .search-box { width: 100%; }
+.web-picker-lista { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding: 2px; }
+.web-picker-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; border: 1px solid var(--gray-200, #e5e7eb); border-radius: 10px;
+}
+.web-picker-datos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.web-picker-vacio { margin: 8px 0; font-size: var(--text-sm, 0.875rem); color: var(--gray-500, #6b7280); }
+
+/* Móvil: acciones a lo ancho y botones de fila que no se aprietan.
+   El paso tabla → tarjetas ya lo hace el patrón global (≤767px, U4). */
+@media (max-width: 767px) {
+  .card .data-table.web-tabla td.table-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .card .data-table.web-tabla td.table-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 720px) {
+  .web-tab { flex: 1 1 0; padding: 12px 8px; }
+  .web-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .web-stats .stat-card { padding: 12px; gap: 10px; }
+  .web-acciones { width: 100%; }
+  .web-acciones > .btn, .web-acciones > a.btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+  .web-acciones > .btn-primary { flex-basis: 100%; }
+  .web-picker { padding: 0; align-items: flex-end; }
+  .web-picker-dialog {
+    width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .web-picker-item { flex-direction: column; align-items: stretch; }
+  .web-picker-item .btn { width: 100%; }
+}
+

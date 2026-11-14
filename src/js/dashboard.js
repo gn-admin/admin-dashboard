@@ -500,6 +500,7 @@ const Dashboard = {
         showDonacionForm: 'donaciones', saveDonacion: 'donaciones', deleteDonacion: 'donaciones',
         abrirAnimalWeb: 'web', abrirEventoWeb: 'web', saveWebAnimal: 'web', saveWebEvento: 'web',
         cambiarEstadoWeb: 'web', archivarWeb: 'web', recargarWeb: 'web', abrirPublicacionWebAnimal: 'web',
+        nuevaPublicacionWeb: 'web', cerrarPickerWeb: 'web', crearPublicacionWeb: 'web',
         showInventarioForm: 'almacen', saveInventario: 'almacen', deleteInventario: 'almacen',
         showRecordatorioForm: 'reportes', saveRecordatorio: 'reportes', deleteRecordatorio: 'reportes',
         descartar2025: 'reportes'
@@ -9113,6 +9114,10 @@ const Dashboard = {
   onWebSlugChange(el, id, tipo) { return Web.validarSlugInput(el, id, tipo); },
   onWebTipoChange(valor) { return Web.onChangeTipo(valor); },
   onWebSearch(el) { return Web.buscar(el.value); },
+  nuevaPublicacionWeb() { return Web.nuevaPublicacion(); },
+  cerrarPickerWeb() { return Web.cerrarPicker(); },
+  crearPublicacionWeb(animalId) { return Web.crearPublicacion(animalId); },
+  onPickerWebBuscar(el) { return Web.filtrarPicker(el.value); },
   onWebEstadoFilter(valor) { return Web.filtrarEstado(valor); },
   cambiarTabWeb(tab) { return Web.cambiarTab(tab); },
   recargarWeb() { return Web.recargar(); },

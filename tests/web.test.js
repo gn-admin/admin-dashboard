@@ -31,6 +31,59 @@ describe('Web.normalizarSlug', () => {
   });
 });
 
+describe('Web: publicaciones frente a fichas internas', () => {
+  const lista = [
+    { animal_id: 'a1', nombre: 'Luna', publicacion_id: 'p1' },
+    { animal_id: 'a2', nombre: 'Nube' },
+    { animal_id: 'a3', nombre: 'Laia', publicacion_id: 'p2' },
+    null
+  ];
+
+  it('publicacionesAnimales solo devuelve las que ya tienen publicación', () => {
+    assert.deepEqual(Web.publicacionesAnimales(lista).map(a => a.animal_id), ['a1', 'a3']);
+  });
+
+  it('animalesSinPublicacion devuelve las internas (candidatas del selector)', () => {
+    assert.deepEqual(Web.animalesSinPublicacion(lista).map(a => a.animal_id), ['a2']);
+  });
+
+  it('tolera listas nulas o vacías', () => {
+    assert.deepEqual(Web.publicacionesAnimales(null), []);
+    assert.deepEqual(Web.animalesSinPublicacion(undefined), []);
+  });
+});
+
+describe('Web._pickerLista', () => {
+  it('solo lista animales sin publicación y filtra por búsqueda', () => {
+    Web.animales = [
+      { animal_id: 'a1', nombre: 'Luna', especie: 'perro' },
+      { animal_id: 'a2', nombre: 'Laia', publicacion_id: 'p1' },
+      { animal_id: 'a3', nombre: 'Nube', especie: 'gato' }
+    ];
+    Web._pickerQ = '';
+    const html = Web._pickerLista();
+    assert.match(html, /Luna/);
+    assert.match(html, /Nube/);
+    assert.doesNotMatch(html, /Laia/);
+    assert.match(html, /crearPublicacionWeb/);
+
+    Web._pickerQ = 'nub';
+    assert.match(Web._pickerLista(), /Nube/);
+    assert.doesNotMatch(Web._pickerLista(), /Luna/);
+
+    Web._pickerQ = 'zzz';
+    assert.match(Web._pickerLista(), /Ningún animal sin publicar coincide/);
+  });
+
+  it('sin candidatos lo dice y no ofrece botones', () => {
+    Web.animales = [{ animal_id: 'a2', nombre: 'Laia', publicacion_id: 'p1' }];
+    Web._pickerQ = '';
+    const html = Web._pickerLista();
+    assert.match(html, /No quedan animales sin publicación web/);
+    assert.doesNotMatch(html, /crearPublicacionWeb/);
+  });
+});
+
 describe('Web.seoTitle', () => {
   it('respeta el meta título guardado', () => {
     assert.equal(Web.seoTitle({ titulo: 'Laia', seo: { metaTitle: 'Laia, border collie en adopción' } }), 'Laia, border collie en adopción');

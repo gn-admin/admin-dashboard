@@ -58,7 +58,8 @@
 
 ### 1.1 Apartado Gestor web (en el admin)
 Un módulo dentro del panel de administración para gestionar el contenido que se publica en la web:
-- [x] **Visión global:** sección “Web / Contenido público” con listado de animales y eventos/historias publicables, estado (borrador/publicado/oculto), `indexable`, indicadores de completitud (sin slug/SEO de publicación/imagen/descripción), filtros y búsqueda.
+- [x] **Visión global:** sección “Web / Contenido público” con listado de animales y eventos/historias publicables, estado (borrador/publicado/oculto), `indexable`, indicadores de completitud (sin slug/SEO de publicación/imagen/descripción), filtros y búsqueda. **Solo se listan publicaciones web**: las fichas internas no aparecen.
+- [x] **Alta guiada:** botón **Nueva publicación** → selector con los animales que aún **no** tienen publicación web (con búsqueda). Al elegir uno se abre su ficha pública para completarla.
 - [x] **Curación de animales:** configurar la capa pública de cada animal (sin exponer la ficha interna): título/extracto/descripción pública, estado/categoría pública, selección de `coverImage/gallery/videos`, `icons`, CTA y metadatos SEO de la publicación para la web (`slug`, `seo_title/description`, OG/Twitter, canonical, robots/indexable).
 - [x] **Gestión de eventos/historias publicables:** CRUD de contenido propio (fechas/lugar/media/estado) con campos del bloque `event` y metadatos SEO de la publicación para la web.
 - [x] **Acciones rápidas contextuales:** desde la ficha de animal, botón “Publicación web” (estado, publicar/ocultar, edición completa).
@@ -279,6 +280,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Estados de canal:** “Canal público sin activar” vs “No se pudieron cargar las publicaciones”, con botón **Reintentar**; ambos `noindex,nofollow` (corregido en esta pasada: antes se indexaban).
 - [x] **Accesibilidad básica:** `role="search"` en la barra, `label for` en todos los campos, `alt` de portada, placeholder “Sin imagen”, `role="status"` al cargar, `aria-label` en el paginador.
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
+- [x] **Gestor responsive:** listado solo de publicaciones; en ≤767 px la tabla pasa a tarjetas (patrón U4), acciones a lo ancho, stats en 2 columnas y el selector “Nueva publicación” como hoja inferior; tablet y escritorio mantienen tabla y diálogo centrado de 620 px. Verificado a 360/768/1280 px.
 - [~] **Pages en vivo:** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200**, carga `publico.css` y `js/publico.js`, el canal JSONP responde y se ve el estado vacío (0 publicaciones) sin errores de consola; canonical y `og:url` apuntan a la propia página. Falta la revisión de píxeles con contenido real publicado.
 
 ### 7.2 Guía de port a `custom-page/nueva-version`
