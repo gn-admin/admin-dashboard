@@ -2,9 +2,10 @@
 
 > **Objetivo:** crear un apartado **Gestor web** en el admin para preparar, curar y publicar contenido, y exponer los **endpoints necesarios** para que el proyecto web (`custom-page` / `nueva-version`) pueda consultar y visualizar fichas de animales, eventos e historias.
 > **Alcance:** análisis y plan de implementación (sin implementar en este documento). Un solo documento de referencia para construir la gestión y los endpoints que consumirá la web.
+> **Nota importante (SEO):** los campos/metadatos de SEO se gestionan aquí como parte de las **publicaciones** para que la **otra web** los use al renderizarlas (metas, OG, canonical, indexación, sitemap, etc.); no se refieren al SEO del gestor/admin.
 > **Fuentes de referencia (proyecto web, leídas):**
 > - `../custom-page/docs/estructura-endpoint-publicaciones.md` — contrato de publicaciones: `GET /api/publicaciones` (filtros, paginación), `GET /api/publicaciones/:slug`, esquema `Publicacion` (`icons`, `gallery`, `videos[]/video`, bloques `animal`/`event`, `contentHtml`, `coverImage`, `cta`, `publication/nebak-post-v1`).
-> - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario/consumo `nueva-version` (`HistoriasAPI`, `../data/blog-posts.json`, `post.html?slug`, listados `[data-adoption-list]`), propuesta GAS/Sheets `/v1/*` (contenido, config, taxonomías, `forms/submit`), SEO (prerender/build por slug, metas/OG/JSON-LD, sitemap/robots, redirects 301).
+> - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario/consumo `nueva-version` (`HistoriasAPI`, `../data/blog-posts.json`, `post.html?slug`, listados `[data-adoption-list]`), propuesta GAS/Sheets `/v1/*` (contenido, config, taxonomías, `forms/submit`) y requisitos SEO de las publicaciones en la web pública (prerender/build por slug, metas/OG/JSON-LD, sitemap/robots, redirects 301).
 >
 > **Notas:** seguridad/privacidad del módulo tratada aparte en `PLAN_SEGURIDAD.md` (no incluida aquí). Dependencias externas: Apps Script (`.gs`), hojas/Sheets, despliegue del canal público y estrategia de render/SEO de la web.
 
@@ -14,9 +15,9 @@
 
 ### 1.1 Apartado Gestor web (en el admin)
 Un módulo dentro del panel de administración para gestionar el contenido que se publica en la web:
-- **Visión global:** sección “Web / Contenido público” con listado de animales y eventos/historias publicables, estado (borrador/publicado/oculto), `indexable`, indicadores de completitud (sin slug/SEO/imagen/descripción), filtros y búsqueda.
-- **Curación de animales:** configurar la capa pública de cada animal (sin exponer la ficha interna): título/extracto/descripción pública, estado/categoría pública, selección de `coverImage/gallery/videos`, `icons`, CTA y metadatos SEO (`slug`, `seo_title/description`, OG/Twitter, canonical, robots/indexable).
-- **Gestión de eventos/historias publicables:** CRUD de contenido propio (fechas/lugar/media/estado) con campos del bloque `event` y SEO.
+- **Visión global:** sección “Web / Contenido público” con listado de animales y eventos/historias publicables, estado (borrador/publicado/oculto), `indexable`, indicadores de completitud (sin slug/SEO de publicación/imagen/descripción), filtros y búsqueda.
+- **Curación de animales:** configurar la capa pública de cada animal (sin exponer la ficha interna): título/extracto/descripción pública, estado/categoría pública, selección de `coverImage/gallery/videos`, `icons`, CTA y metadatos SEO de la publicación para la web (`slug`, `seo_title/description`, OG/Twitter, canonical, robots/indexable).
+- **Gestión de eventos/historias publicables:** CRUD de contenido propio (fechas/lugar/media/estado) con campos del bloque `event` y metadatos SEO de la publicación para la web.
 - **Acciones rápidas contextuales:** desde la ficha de animal, acceso a “Publicación web” (estado, publicar/ocultar, enlace a edición completa).
 - **Previsualización:** vista previa del payload público (`preview`) para validar que el contenido publicado coincide con lo que consumirá la web.
 - **Utilidades:** validación de `slug` y resumen/contadores de publicación.
@@ -57,7 +58,7 @@ Campos alineados con `estructura-endpoint-publicaciones.md`:
 - **Base:** `id`, `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt` (ISO), `updatedAt?`, `coverImage:{src,alt}`, `contentHtml`, `author?`, `tags[]?`, `cta:{label,url}?`.
 - **Presentación:** `icons[]` (`{icon,label,value}`), `gallery[]` (`{src,alt,caption?,order?}`), `videos[]` (`{title?,provider,url,thumbnail?,durationSec?,note?}`) y compatibilidad `video`.
 - **Condicionales:** `animal` cuando `type="animal"`, `event` cuando `type="evento"`.
-- **SEO/extensiones (según alcance):** bloque `seo` (`metaTitle`, `metaDescription`, `ogImage`, `canonical`, `robots`, `og/twitter`), flags/compatibilidad legacy (`image/imageAlt/dateFormatted/readTime`), `featured`, `listed`.
+- **Metadatos SEO de la publicación (para la otra web, según alcance):** bloque `seo` (`metaTitle`, `metaDescription`, `ogImage`, `canonical`, `robots`, `og/twitter`), flags/compatibilidad legacy (`image/imageAlt/dateFormatted/readTime`), `featured`, `listed`.
 
 ### 3.3 Bloque `animal` (ficha pública curada)
 `names[]`, `species`, `breed`, `sex[]`, `age{value,unit,label}`, `size`, `color?`, `health{vaccinated,dewormed,neutered,microchipped,specialNeeds}`, `temperament[]`, `compatibility{dogs,cats,kids}`, `adoption{mode,feeEur,includes,requirements}`, `foster{temporary,reason,durationLabel,expensesPolicy}`, `location{city,province,shelter?}`, `contact{email,phone}`.
@@ -81,7 +82,7 @@ Campos alineados con `estructura-endpoint-publicaciones.md`:
 | Endpoint/acción (propuesto) | Método | Función | Datos clave |
 |---|---|---|---|
 | `GET ?endpoint=web-animales` | GET | Listar animales con estado/configuración web | filtros (`estado_publicacion`, `q`, `publicado`, paginación), flags de completitud (slug/SEO/imagen) |
-| `GET ?endpoint=web-animales&id={animal_id}` | GET | Obtener configuración pública/SEO del animal | campos editoriales, `slug`, flags, estado/categoría pública, media, SEO/OG, validaciones |
+| `GET ?endpoint=web-animales&id={animal_id}` | GET | Obtener configuración pública y metadatos SEO de la publicación (para la web) | campos editoriales, `slug`, flags, estado/categoría pública, media, SEO/OG, validaciones |
 | `POST web-animales` (upsert) | POST | Crear/actualizar configuración pública | `animal_id`, `estado_publicacion/publicado_web`, `indexable`, `slug`, campos públicos/SEO, media, `orden/destacado` |
 | `POST web-animales-estado` | POST | Publicar/ocultar/despublicar | `animal_id`, `estado_publicacion` |
 | `GET ?endpoint=web-animales-preview&id={animal_id}` | GET | Previsualizar payload público (`Publicacion`) | mismo objeto que entregará el canal público |
@@ -92,15 +93,15 @@ Campos alineados con `estructura-endpoint-publicaciones.md`:
 ### 4.2 Eventos/historias publicables
 | Endpoint/acción (propuesto) | Método | Función |
 |---|---|---|
-| `GET/POST web-eventos` | GET/POST | Listar/obtener/crear/actualizar/archivar eventos con datos públicos y SEO |
+| `GET/POST web-eventos` | GET/POST | Listar/obtener/crear/actualizar/archivar eventos con datos públicos y metadatos SEO de la publicación (para la web) |
 | `GET web-eventos&id=...` | GET | Detalle para edición |
 | `POST web-eventos-estado` | POST | Cambiar estado publicación/indexación |
 
 Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica).
 
 ### 4.3 Utilidades de gestor
-- `GET ?endpoint=web-resumen`: contadores (publicados, borradores, sin SEO/slug/imagen).
-- Registro operativo de acciones de publicación/SEO (según capacidad del backend).
+- `GET ?endpoint=web-resumen`: contadores (publicados, borradores, sin SEO de publicación/slug/imagen).
+- Registro operativo de acciones de publicación y cambios de metadatos SEO de las publicaciones (según capacidad del backend).
 
 ---
 
@@ -142,11 +143,13 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 
 ---
 
-## 6. SEO técnico en la web (requisitos para consumir/publicar)
+## 6. SEO de las publicaciones en la web pública (requisitos para la otra web)
+
+> Aplica a las fichas/publicaciones renderizadas en `custom-page/nueva-version`, no al gestor/admin. El gestor provee los campos/metadatos; la web los consume y los aplica.
 
 - **Fichas dinámicas:** `post.html?slug=` solo cliente es insuficiente para indexación/OG; estrategia recomendada **prerender/build por slug** (o SSG/export) usando el endpoint como fuente.
 - **URLs canónicas:** rutas limpias por tipo/slug y redirect 301 desde `post.html?slug=` y rutas antiguas.
-- **Por página/detalle:** `<title>`, meta description, canonical, robots, Open Graph/Twitter y JSON-LD (`Article/BlogPosting`, `Event`, `BreadcrumbList`, `Organization/WebSite` según aplique).
+- **Por página/detalle:** `<title>`, meta description, canonical, robots, Open Graph/Twitter y JSON-LD (`Article/BlogPosting`, `Event`, `BreadcrumbList`, `Organization/WebSite` según aplique) a partir de los metadatos de la publicación.
 - **`sitemap.xml` y `robots.txt`:** desde contenido publicado/indexable con `lastmod`; 404/410 o redirección para retirados; parámetros como `?from=` no indexables.
 
 ---
@@ -171,9 +174,9 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 - **Criterio de salida:** se puede curar/publicar/ocultar y obtener `preview` conforme al esquema.
 
 ### Fase 2 — UI Gestor web en el admin
-**Objetivo:** gestionar contenido público y SEO desde el panel.
+**Objetivo:** gestionar contenido público y los metadatos SEO de las publicaciones (para la web) desde el panel.
 - Sección “Web / Contenido público” (listados animales/eventos, estados, completitud, filtros, búsqueda, acciones publicar/ocultar/editar/preview).
-- Formularios de curación: campos públicos, selección de media/`icons`/CTA, SEO y bloque `event`.
+- Formularios de curación: campos públicos, selección de media/`icons`/CTA, metadatos SEO de la publicación (para la web) y bloque `event`.
 - Integración contextual en ficha de animal (“Publicación web”) y utilidades (slug-check, resumen).
 - UX/validaciones, permisos de UI, rutas relativas, actualizar `CACHE_NAME` en `src/sw.js` ante cambios frontend y `npm test` en verde.
 - **Criterio de salida:** preparación, previsualización y publicación/ocultación operativas desde el admin.
@@ -186,12 +189,12 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 - Validar con casos de consumo de `nueva-version` (listados, detalle, adopción/acogidas/eventos).
 - **Criterio de salida:** la web obtiene listados y detalles por contrato definido.
 
-### Fase 4 — Integración web y SEO técnico (`custom-page`)
-**Objetivo:** visualizar contenido publicado con SEO correcto.
+### Fase 4 — Integración en la web y SEO de publicaciones (`custom-page`)
+**Objetivo:** visualizar contenido publicado en la web con metadatos/SEO correctos (según lo definido en las publicaciones).
 - Sustituir `blog-posts.json` por consumo del endpoint (`HistoriasAPI`/adaptadores), filtros/búsqueda/paginación y estados vacíos/error.
 - Rutas canónicas, prerender/build por slug, redirects 301 (desde `post.html?slug=`), metas/OG/canonical/robots/JSON-LD, `sitemap.xml`/`robots.txt`, 404/410.
 - Rendimiento/accesibilidad (imágenes, semántica). (Opcional) `forms/submit` y cookies/políticas según alcance.
-- **Criterio de salida:** fichas y listados visibles e indexables con metadatos correctos.
+- **Criterio de salida:** fichas y listados visibles e indexables con metadatos correctos en la web pública.
 
 ### Fase 5 — Ajustes, calidad y operación
 **Objetivo:** estabilizar y mantener el flujo gestor → web.
