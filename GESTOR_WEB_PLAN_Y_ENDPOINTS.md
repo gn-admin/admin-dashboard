@@ -51,7 +51,7 @@
 - [x] **Selección de pestaña:** se exige el nombre configurado (`sheetName`). Si no existe pero el documento tiene **una única pestaña** (`Hoja 1`), se acepta: no hay ambigüedad. Con **dos o más pestañas** y sin coincidencia, el canal responde `sheet_not_found` y el gestor no escribe nada; nunca se adivina con la primera.
 - [x] **Cabeceras:** si la hoja está vacía, `appendToSheet` escribe las 26 columnas de §3.6 antes de la fila. Cubierto por `tests/sheets.test.js` (hoja vacía, primera publicación y segunda reutilizando cabecera).
 - [x] **Canonical condicional:** con base `*.github.io` el backend devuelve `canonical: ""` y sitemap vacío con `notice` (las rutas `/animales/<slug>` aún no existen en Pages); con dominio propio vuelve a `dominio + ruta`. El visor omite `<link rel="canonical">` y `og:url` cuando viene vacío (la ruta relativa `url` del payload nunca se usa como canonical).
-- [x] **`getSheet()` endurecido (2026-11-14).** Mantiene el fallback a la primera pestaña solo cuando el documento tiene **una** pestaña; con dos o más y sin coincidencia registra las pestañas en `Logger` y lanza error, para no leer ni escribir en la hoja equivocada. Cubierto en `tests/sheets.test.js` (nombre exacto, pestaña única, ambigüedad y “sin `sheetName`”). **Pendiente de pegar y desplegar** en Apps Script: ese cambio no viaja en git.
+- [x] **`getSheet()` endurecido (2026-11-14).** Mantiene el fallback a la primera pestaña solo cuando el documento tiene **una** pestaña; con dos o más y sin coincidencia registra las pestañas en `Logger` y lanza error, para no leer ni escribir en la hoja equivocada. Cubierto en `tests/sheets.test.js` (nombre exacto, pestaña única, ambigüedad y “sin `sheetName`”). **Desplegado** en Apps Script como nueva versión (confirmado 2026-11-14); el canal sigue respondiendo `success` con la lectura estricta activa.
 
 ---
 
@@ -282,7 +282,8 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Accesibilidad básica:** `role="search"` en la barra, `label for` en todos los campos, `alt` de portada, placeholder “Sin imagen”, `role="status"` al cargar, `aria-label` en el paginador.
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
 - [x] **Gestor responsive:** listado solo de publicaciones; en ≤767 px la tabla pasa a tarjetas (patrón U4), acciones a lo ancho, stats en 2 columnas y el selector “Nueva publicación” como hoja inferior; tablet y escritorio mantienen tabla y diálogo centrado de 620 px. Verificado a 360/768/1280 px.
-- [~] **Pages en vivo:** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200**, carga `publico.css` y `js/publico.js`, el canal JSONP responde y se ve el estado vacío (0 publicaciones) sin errores de consola; canonical y `og:url` apuntan a la propia página. Falta la revisión de píxeles con contenido real publicado.
+- [x] **Pages en vivo (2026-11-14):** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200** con el tema nuevo (`Montserrat` 48 px a 1280, contenedor 1160), canal JSONP real, listado vacío “0 publicaciones”, 404 lógico (`#/publicacion/no-existe-xyz`) con **`noindex,nofollow`**, sin JSON-LD, canonical propio de la página, sin desbordes a 360/1280 y sin errores de consola.
+- [~] Revisión de píxeles con una **ficha real publicada**: requiere publicar un animal desde el panel (hoy “Laia” está `oculto`), así que la composición con datos reales sigue pendiente.
 
 ### 7.2 Guía de port a `custom-page/nueva-version`
 
@@ -392,7 +393,7 @@ Reglas:
 2. **Fase 1** → base (datos + gestor + payload). `[x]`
 3. **Fase 2** y preparación de **Fase 3** en paralelo con contrato estable. `[x]`
 4. **Fase 3** → canal público. `[x]`
-5. **Fase 4** → integración web + SEO. `[ ]`
+5. **Fase 4** → integración web + SEO. `[~]` aceptada en el visor y en Pages; port a la web pendiente
 6. **Fase 5** → estabilización. `[~]` parcial
 
 ## 9. Riesgos y mitigaciones (funcionales)
@@ -419,3 +420,7 @@ Reglas:
 | 2026-11-14 | 5 | Procedimiento operativo de publicación y redirects | — | `.internal-docs/GESTOR_WEB_OPERATIVA.md` |
 | 2026-11-14 | 5 | Distinguir hoja sin configurar/pestaña inexistente de “sin publicaciones”; sin fallback a la primera pestaña | — | `tests/web-backend.test.js` |
 | 2026-11-14 | 5 | SEO simplificado: solo meta title (auto desde el título) y meta description; canonical/OG/robots derivados. Base por defecto = GitHub Pages | — | `tests/web-backend.test.js`, `tests/web.test.js` |
+| 2026-11-14 | 4 | Visor con el tema de `custom-page/nueva-version`: tokens, Inter/Montserrat, hero a dos columnas, datos destacados con iconos y tarjetas de 24 px | — | `src/css/publico.css`, `tests` 454 en verde, `sw` v223 |
+| 2026-11-14 | 4 | Revisión en Pages con el canal real: listado vacío, 404 con `noindex`, canonical propio, 360/1280 sin desbordes | — | §7.1 |
+| 2026-11-14 | 5 | `Code.gs` endurecido desplegado como nueva versión en Apps Script y canal verificado en vivo (`publicaciones`, `sitemap`, `redirects`, `taxonomias`, JSONP y 401 sin token) | — | Peticiones reales al `/exec` |
+| 2026-11-14 | 7.3 | Análisis y plan de la ficha de animal configurable (plantilla, bloques, iconos, galería, salud, CTA) sin implementar | — | §7.3 |
