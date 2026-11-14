@@ -1,0 +1,1103 @@
+/**
+ * GESTOR WEB · capa de publicaciones
+ * ---------------------------------------------------------------------------
+ * Una sola hoja (`CONFIG.sheets.webPublicaciones`) guarda la capa pública:
+ * los animales se referencian por `origen_id` (fila de `Animales`) y los
+ * eventos/historias viven aquí como contenido propio.
+ *
+ * Un único compositor (`webConstruirPublicacion`) genera el payload
+ * `Publicacion` y se reutiliza en la previsualización del gestor y en el
+ * canal público, para que preview === feed (riesgo de inconsistencia, §9).
+ *
+ * Tipos: animal | evento | historia
+ * Estados de publicación: borrador | publicado | oculto
+ */
+
+var WEB_TIPOS = ['animal', 'evento', 'historia'];
+var WEB_ESTADOS = ['borrador', 'publicado', 'oculto'];
+var WEB_PAGE_SIZE_DEF = 12;
+var WEB_PAGE_SIZE_MAX = 50;      // canal publico
+var WEB_ADMIN_PAGE_SIZE_MAX = 500; // listado del gestor (admin)
+
+// ==================== HELPERS BÁSICOS ====================
+
+function webSinAcentos(valor) {
+  var mapa = {
+    'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a',
+    'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e',
+    'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
+    'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o',
+    'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u',
+    'ñ': 'n', 'ç': 'c'
+  };
+  return String(valor == null ? '' : valor)
+    .toLowerCase()
+    .replace(/[áàäâãåéèëêíìïîóòöôõúùüûñç]/g, function (c) { return mapa[c] || c; });
+}
+
+/** Minúsculas, sin acentos, separado por guiones, máximo 80 caracteres. */
+function webNormalizarSlug(valor) {
+  var s = webSinAcentos(valor).trim();
+  s = s.replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  if (s.length > 80) s = s.slice(0, 80).replace(/-+$/g, '');
+  return s;
+}
+
+function webSlugValido(slug) {
+  return !!slug && slug.length <= 80 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
+}
+
+function webBool(valor, porDefecto) {
+  if (valor === undefined || valor === null || valor === '') return porDefecto !== false;
+  if (typeof valor === 'boolean') return valor;
+  var s = String(valor).toLowerCase().trim();
+  if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false;
+  if (s === 'true' || s === '1' || s === 'si' || s === 'yes') return true;
+  return !!valor;
+}
+
+function webParseJson(valor, porDefecto) {
+  if (valor === undefined || valor === null || valor === '') return porDefecto;
+  if (typeof valor === 'object') return valor;
+  try {
+    var o = JSON.parse(String(valor));
+    return (o === undefined || o === null) ? porDefecto : o;
+  } catch (e) { return porDefecto; }
+}
+
+function webArray(valor) {
+  if (Array.isArray(valor)) return valor;
+  if (valor === undefined || valor === null || valor === '') return [];
+  if (typeof valor === 'string') {
+    return valor.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
+  }
+  return [];
+}
+
+function webTexto(valor) {
+  return String(valor == null ? '' : valor).trim();
+}
+
+function webIsoFecha(valor) {
+  if (!valor) return '';
+  if (valor instanceof Date) {
+    try { return valor.toISOString(); } catch (e) { return ''; }
+  }
+  var s = String(valor).trim();
+  if (!s) return '';
+  var d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    try { return d.toISOString(); } catch (e2) { return s; }
+  }
+  return s;
+}
+
+function webFechaLegible(valor) {
+  if (!valor) return '';
+  var d = new Date(String(valor));
+  if (isNaN(d.getTime())) return String(valor);
+  var meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+}
+
+/** Tiempo de lectura aproximado (200 palabras/minuto) sin etiquetas HTML. */
+function webTiempoLectura(html) {
+  var texto = String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!texto) return 1;
+  return Math.max(1, Math.round(texto.split(' ').length / 200));
+}
+
+function webAhora() {
+  try { return new Date().toISOString(); } catch (e) { return ''; }
+}
+
+function webUuid() {
+  try { return Utilities.getUuid(); } catch (e) { return 'web_' + new Date().getTime(); }
+}
+
+// ==================== ORIGEN / HOJA ====================
+
+/** Config tal cual viene de CONFIG (sin comprobar la hoja). */
+function webConfigWeb() {
+  var cfg = (typeof CONFIG !== 'undefined' && CONFIG.sheets) ? CONFIG.sheets.webPublicaciones : null;
+  if (!cfg || !cfg.sheetId || String(cfg.sheetId).indexOf('REEMPLAZAR_') === 0) return null;
+  return cfg;
+}
+
+/**
+ * ¿Existe la hoja configurada? Se exige el nombre, salvo que el documento tenga
+ * una única pestaña ("Hoja 1"): ahí no hay ambigüedad y se acepta, igual que
+ * getSheet(). Con dos o más pestañas nunca se adivina.
+ */
+function webHojaExiste(cfg) {
+  if (!cfg || !cfg.sheetId || !cfg.sheetName) return false;
+  try {
+    var ss = SpreadsheetApp.openById(cfg.sheetId);
+    return !!ss.getSheetByName(cfg.sheetName) || ss.getSheets().length === 1;
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Config operativa: null si falta el ID o si la pestaña no existe. */
+function webSheetConfig() {
+  var cfg = webConfigWeb();
+  if (!cfg) return null;
+  return webHojaExiste(cfg) ? cfg : null;
+}
+
+/**
+ * Aviso que distingue "hoja sin configurar" de "sin publicaciones".
+ * `null` = canal listo (puede estar simplemente vacío).
+ */
+function webDiagnostico() {
+  if (!webConfigWeb()) {
+    return {
+      status: 'warning',
+      code: 'sheet_missing',
+      error: 'Hoja WebPublicaciones sin configurar: crea la hoja y rellena SHEET_WEB_PUBLICACIONES_ID'
+    };
+  }
+  if (!webConfigWeb().sheetName) {
+    return {
+      status: 'warning',
+      code: 'sheet_missing',
+      error: 'Hoja WebPublicaciones sin configurar: falta el nombre de la hoja (sheetName)'
+    };
+  }
+  if (!webSheetConfig()) {
+    var cfg = webConfigWeb();
+    return {
+      status: 'warning',
+      code: 'sheet_not_found',
+      error: 'Hoja WebPublicaciones sin configurar: no existe la pestaña "' + (cfg.sheetName || 'WebPublicaciones') + '" o no se puede abrir el spreadsheet. Renombra la pestaña con ese nombre exacto'
+    };
+  }
+  return null;
+}
+
+function webFilasWeb() {
+  var cfg = webSheetConfig();
+  if (!cfg) return [];
+  return readSheet(cfg).map(webFilaAPublicacion);
+}
+
+function webFilaAPublicacion(fila) {
+  var f = fila || {};
+  return {
+    _row: f._row,
+    id: webTexto(f.id),
+    tipo: webTexto(f.tipo) || 'animal',
+    origen_id: webTexto(f.origen_id),
+    slug: webNormalizarSlug(f.slug),
+    estado_publicacion: WEB_ESTADOS.indexOf(webTexto(f.estado_publicacion)) !== -1 ? webTexto(f.estado_publicacion) : 'borrador',
+    indexable: webBool(f.indexable, true),
+    listed: webBool(f.listed, true),
+    featured: webBool(f.featured, false),
+    orden: Number(f.orden || 0) || 0,
+    titulo: webTexto(f.titulo),
+    extracto: webTexto(f.extracto),
+    contenido_html: String(f.contenido_html || ''),
+    categoria: webTexto(f.categoria),
+    estado_publico: webTexto(f.estado_publico),
+    especie: webTexto(f.especie),
+    autor: webTexto(f.autor),
+    tags: webArray(webParseJson(f.tags_json, [])),
+    media: webParseJson(f.media_json, {}),
+    seo: webParseJson(f.seo_json, {}),
+    cta: webParseJson(f.cta_json, null),
+    animal: webParseJson(f.animal_json, null),
+    evento: webParseJson(f.evento_json, null),
+    publicado_en: webIsoFecha(f.publicado_en),
+    actualizado_en: webIsoFecha(f.actualizado_en),
+    creado_en: webIsoFecha(f.creado_en),
+    slug_historial: webHistorial(f.slug_historial)
+  };
+}
+
+/** Historial de slugs: acepta [{slug,fecha}] o ['slug'] y normaliza. */
+function webHistorial(valor) {
+  var arr = webParseJson(valor, []);
+  if (!Array.isArray(arr)) return [];
+  return arr.map(function (x) {
+    if (typeof x === 'string') return { slug: webNormalizarSlug(x), fecha: '' };
+    return { slug: webNormalizarSlug(x && x.slug), fecha: (x && x.fecha) ? webIsoFecha(x.fecha) : '' };
+  }).filter(function (x) { return !!x.slug; });
+}
+
+/**
+ * Historial al cambiar de slug: conserva los anteriores (para redirigir) y
+ * elimina el actual. Si el slug vuelve a uno antiguo, deja de ser historico.
+ */
+function webHistorialDeCambio(previa, slugNuevo) {
+  var hist = (previa && Array.isArray(previa.slug_historial)) ? previa.slug_historial.slice() : [];
+  if (previa && previa.slug && previa.slug !== slugNuevo) {
+    var existe = false;
+    for (var i = 0; i < hist.length; i++) if (hist[i].slug === previa.slug) { existe = true; break; }
+    if (!existe) hist.push({ slug: previa.slug, fecha: webAhora() });
+  }
+  return hist.filter(function (h) { return h.slug && h.slug !== slugNuevo; });
+}
+
+function webMapaAnimales() {
+  var mapa = {};
+  var cfg = CONFIG.sheets && CONFIG.sheets.animales;
+  if (!cfg) return mapa;
+  readSheet(cfg).forEach(function (a) {
+    if (a && a.id !== undefined && a.id !== null) mapa[String(a.id)] = a;
+  });
+  return mapa;
+}
+
+/** Foto del animal como cover por defecto (misma normalización que el panel). */
+function webFotoOrigen(animal) {
+  if (!animal) return '';
+  var directa = webTexto(animal.foto_url || animal.foto);
+  if (directa) {
+    var m = directa.match(/\/d\/([A-Za-z0-9_-]{10,})/) || directa.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1200';
+    return directa;
+  }
+  var fileId = webTexto(animal.foto_drive_id);
+  if (fileId) return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1200';
+  return '';
+}
+
+function webOrigen(publicacion, mapa) {
+  if (!publicacion || publicacion.tipo !== 'animal') return null;
+  var m = mapa || webMapaAnimales();
+  return m[String(publicacion.origen_id)] || null;
+}
+
+function webPublicacionPorId(id) {
+  var filas = webFilasWeb();
+  for (var i = 0; i < filas.length; i++) if (String(filas[i].id) === String(id)) return filas[i];
+  return null;
+}
+
+function webPublicacionDeOrigen(tipo, origenId) {
+  var filas = webFilasWeb();
+  for (var i = 0; i < filas.length; i++) {
+    if (filas[i].tipo === tipo && String(filas[i].origen_id) === String(origenId)) return filas[i];
+  }
+  return null;
+}
+
+/**
+ * Slug único por tipo, contando tambien los slugs historicos: reutilizar uno
+ * antiguo romperia la redireccion 301 que ya apunta a la ficha actual.
+ * Ignora la propia publicación al editar.
+ */
+function webSlugOcupado(tipo, slug, idActual) {
+  var s = webNormalizarSlug(slug);
+  if (!s) return false;
+  var filas = webFilasWeb();
+  for (var i = 0; i < filas.length; i++) {
+    if (filas[i].tipo !== tipo) continue;
+    if (idActual && String(filas[i].id) === String(idActual)) continue;
+    if (filas[i].slug === s) return true;
+    var hist = filas[i].slug_historial || [];
+    for (var k = 0; k < hist.length; k++) if (hist[k].slug === s) return true;
+  }
+  return false;
+}
+
+// ==================== VALIDACIÓN Y COMPOSICIÓN ====================
+
+/**
+ * Reglas mínimas para publicar. Devuelve { ok, faltan:[{campo, mensaje}] }.
+ * `publicado` exige todo; borrador/oculto solo avisa (no bloquea guardar).
+ */
+function webValidarPublicacion(publicacion, origen) {
+  var faltan = [];
+  var p = publicacion || {};
+  var o = origen || null;
+  if (!webTexto(p.titulo)) faltan.push({ campo: 'titulo', mensaje: 'Falta el título público' });
+  if (!webTexto(p.slug) || !webSlugValido(p.slug)) faltan.push({ campo: 'slug', mensaje: 'El slug no es válido' });
+  if (!webTexto(p.categoria)) faltan.push({ campo: 'categoria', mensaje: 'Falta la categoría pública' });
+  if (!webTexto(p.estado_publico)) faltan.push({ campo: 'estado_publico', mensaje: 'Falta el estado público' });
+  var contenido = webTexto(p.contenido_html);
+  if (!contenido || contenido.length < 40) faltan.push({ campo: 'contenido_html', mensaje: 'La descripción pública es demasiado corta' });
+  var cover = (p.media && p.media.coverImage && p.media.coverImage.src) || webFotoOrigen(o);
+  if (!cover) faltan.push({ campo: 'coverImage', mensaje: 'Falta la imagen de portada' });
+  var seo = p.seo || {};
+  if (!webTexto(seo.metaDescription) && !webTexto(p.extracto)) faltan.push({ campo: 'seo.metaDescription', mensaje: 'Falta la meta descripción (o un extracto)' });
+  return { ok: faltan.length === 0, faltan: faltan };
+}
+
+function webBloqueAnimal(curado, origen) {
+  var c = curado || {};
+  var o = origen || {};
+  var salud = c.health || {};
+  var edad = c.age || {};
+  var vacunas = webTexto(o.vacunas);
+  var sexo = webTexto(o.sexo).toLowerCase();
+  var sexos = webArray(c.sex);
+  if (!sexos.length && sexo) sexos = [sexo === 'm' || sexo === 'macho' ? 'macho' : (sexo === 'h' || sexo === 'hembra' ? 'hembra' : sexo)];
+  var nombres = webArray(c.names);
+  if (!nombres.length && o.nombre) nombres = [webTexto(o.nombre)];
+  return {
+    names: nombres,
+    species: webTexto(c.species) || webTexto(o.especie),
+    breed: webTexto(c.breed) || webTexto(o.raza),
+    sex: sexos,
+    age: {
+      value: (edad.value !== undefined && edad.value !== null && edad.value !== '') ? edad.value : webTexto(o.edad),
+      unit: webTexto(edad.unit),
+      label: webTexto(edad.label) || webTexto(o.edad)
+    },
+    size: webTexto(c.size),
+    color: webTexto(c.color),
+    health: {
+      vaccinated: salud.vaccinated !== undefined ? webBool(salud.vaccinated, false) : (!!vacunas && vacunas.toLowerCase() !== 'no'),
+      dewormed: webBool(salud.dewormed, false),
+      neutered: salud.neutered !== undefined ? webBool(salud.neutered, false) : webBool(o.esterilizada, false),
+      microchipped: salud.microchipped !== undefined ? webBool(salud.microchipped, false) : !!webTexto(o.microchip),
+      specialNeeds: webBool(salud.specialNeeds, false)
+    },
+    temperament: webArray(c.temperament),
+    compatibility: c.compatibility || {},
+    adoption: c.adoption || {},
+    foster: c.foster || {},
+    location: c.location || {},
+    contact: c.contact || {}
+  };
+}
+
+function webBloqueEvento(curado) {
+  var c = curado || {};
+  return {
+    kind: webTexto(c.kind),
+    startDate: webIsoFecha(c.startDate),
+    endDate: webIsoFecha(c.endDate),
+    timezone: webTexto(c.timezone) || 'Europe/Madrid',
+    location: c.location || {},
+    organizer: c.organizer || {},
+    audience: webArray(c.audience),
+    agenda: Array.isArray(c.agenda) ? c.agenda : [],
+    registration: c.registration || {},
+    milestone: c.milestone || null
+  };
+}
+
+/**
+ * Composición ÚNICA del contrato `Publicacion`.
+ * La usan `web-animales-preview` y el canal público: mismo objeto.
+ */
+function webConstruirPublicacion(publicacion, origen) {
+  var p = publicacion || {};
+  var media = p.media || {};
+  var seoIn = p.seo || {};
+  var cover = media.coverImage || {};
+  var src = webTexto(cover.src) || webFotoOrigen(origen);
+  var alt = webTexto(cover.alt) || webTexto(p.titulo) || webTexto(origen && origen.nombre);
+  var gallery = Array.isArray(media.gallery) ? media.gallery : [];
+  var videos = Array.isArray(media.videos) ? media.videos : [];
+  var icons = Array.isArray(media.icons) ? media.icons : [];
+  var dominio = webDominioPublico();
+  var ruta = webRutaPublica(p.tipo, p.slug);
+  var canonical = webTexto(seoIn.canonical) || (dominio ? dominio + ruta : '');
+
+  var out = {
+    id: p.id || '',
+    slug: p.slug || '',
+    type: p.tipo || 'animal',
+    category: p.categoria || '',
+    status: p.estado_publico || '',
+    title: p.titulo || '',
+    excerpt: p.extracto || '',
+    publishedAt: p.publicado_en || '',
+    updatedAt: p.actualizado_en || '',
+    coverImage: { src: src, alt: alt },
+    contentHtml: p.contenido_html || '',
+    author: p.autor || '',
+    tags: Array.isArray(p.tags) ? p.tags : [],
+    icons: icons,
+    gallery: gallery,
+    videos: videos,
+    featured: !!p.featured,
+    listed: p.listed !== false,
+    url: ruta,
+    canonical: canonical,
+    seo: {
+      metaTitle: webTexto(seoIn.metaTitle) || webTexto(p.titulo),
+      metaDescription: webTexto(seoIn.metaDescription) || webTexto(p.extracto),
+      ogImage: webTexto(seoIn.ogImage) || src,
+      canonical: canonical,
+      robots: webTexto(seoIn.robots) || (p.indexable ? 'index,follow' : 'noindex,follow'),
+      og: seoIn.og || null,
+      twitter: seoIn.twitter || null
+    },
+    // Compatibilidad con el render actual (`image`, `dateFormatted`, `readTime`).
+    image: src,
+    imageAlt: alt,
+    dateFormatted: webFechaLegible(p.publicado_en),
+    readTime: webTiempoLectura(p.contenido_html)
+  };
+
+  if (p.cta && webTexto(p.cta.label) && webTexto(p.cta.url)) {
+    out.cta = { label: webTexto(p.cta.label), url: webTexto(p.cta.url) };
+  }
+  if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
+  if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
+  return out;
+}
+
+function webPublicacionBaseUrl() {
+  var base = webTexto(typeof CONFIG !== 'undefined' ? CONFIG.PUBLIC_WEB_BASE_URL : '');
+  return base ? base.replace(/\/+$/g, '') : '';
+}
+
+/**
+ * Dominio público real para canonical/sitemap. Mientras la base sea la demo de
+ * GitHub Pages devuelve '' (allí las rutas `/animales/<slug>` aún no existen).
+ */
+function webDominioPublico() {
+  var base = webPublicacionBaseUrl();
+  if (!base) return '';
+  if (/^https?:\/\/[^/]*github\.io(\/|$)/i.test(base)) return '';
+  return base;
+}
+
+function webRutaPublica(tipo, slug) {
+  if (!slug) return '';
+  if (tipo === 'animal') return '/animales/' + slug;
+  if (tipo === 'evento') return '/eventos/' + slug;
+  return '/historias/' + slug;
+}
+
+// ==================== GESTOR · ANIMALES ====================
+
+function webListarAnimales(params) {
+  params = params || {};
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var animales = readSheet(CONFIG.sheets.animales);
+  var mapaPub = {};
+  webFilasWeb().forEach(function (p) { if (p.tipo === 'animal') mapaPub[String(p.origen_id)] = p; });
+
+  var q = webTexto(params.q).toLowerCase();
+  var estadoFiltro = webTexto(params.estado_publicacion);
+  var publicado = params.publicado === undefined || params.publicado === '' ? '' : String(params.publicado);
+
+  var filas = animales.map(function (a) {
+    var pub = mapaPub[String(a.id)] || null;
+    var origen = a;
+    var valida = pub ? webValidarPublicacion(pub, origen) : { ok: false, faltan: [{ campo: 'publicacion', mensaje: 'Sin publicación web' }] };
+    return {
+      animal_id: String(a.id),
+      publicacion_id: pub ? pub.id : '',
+      nombre: webTexto(a.nombre),
+      especie: webTexto(a.especie),
+      estado_animal: webTexto(a.estado),
+      slug: pub ? pub.slug : '',
+      titulo: pub ? pub.titulo : '',
+      categoria: pub ? pub.categoria : '',
+      estado_publicacion: pub ? pub.estado_publicacion : 'sin_publicar',
+      indexable: pub ? pub.indexable : false,
+      listed: pub ? pub.listed : false,
+      featured: pub ? pub.featured : false,
+      orden: pub ? pub.orden : 0,
+      actualizado_en: pub ? pub.actualizado_en : '',
+      completitud: { ok: valida.ok, faltan: valida.faltan.map(function (f) { return f.campo; }) }
+    };
+  });
+
+  if (q) {
+    filas = filas.filter(function (f) {
+      return (f.nombre + ' ' + f.titulo + ' ' + f.slug + ' ' + f.especie).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  if (estadoFiltro) filas = filas.filter(function (f) { return f.estado_publicacion === estadoFiltro; });
+  if (publicado !== '') {
+    var quieroPublicado = webBool(publicado, false);
+    filas = filas.filter(function (f) { return (f.estado_publicacion === 'publicado') === quieroPublicado; });
+  }
+  filas.sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+
+  var page = Math.max(1, parseInt(params.page, 10) || 1);
+  var pageSize = Math.min(WEB_ADMIN_PAGE_SIZE_MAX, Math.max(1, parseInt(params.pageSize, 10) || 200));
+  var total = filas.length;
+  var data = filas.slice((page - 1) * pageSize, page * pageSize);
+  return {
+    status: 'success',
+    data: data,
+    pagination: { page: page, pageSize: pageSize, total: total, totalPages: Math.ceil(total / pageSize) || 1 }
+  };
+}
+
+function webGetAnimal(animalId) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var a = webMapaAnimales()[String(animalId)];
+  if (!a) return { status: 'error', error: 'Animal no encontrado' };
+  var pub = webPublicacionDeOrigen('animal', animalId);
+  if (!pub) {
+    pub = {
+      id: '', tipo: 'animal', origen_id: String(animalId), slug: webNormalizarSlug(a.nombre),
+      estado_publicacion: 'borrador', indexable: true, listed: true, featured: false, orden: 0,
+      titulo: webTexto(a.nombre), extracto: '', contenido_html: webTexto(a.descripcion),
+      categoria: '', estado_publico: webTexto(a.estado), especie: webTexto(a.especie),
+      autor: '', tags: [], media: {}, seo: {}, cta: null, animal: {}, evento: null,
+      publicado_en: '', actualizado_en: '', creado_en: ''
+    };
+  }
+  return {
+    status: 'success',
+    data: pub,
+    origen: {
+      id: String(a.id), nombre: webTexto(a.nombre), especie: webTexto(a.especie),
+      raza: webTexto(a.raza), sexo: webTexto(a.sexo), edad: webTexto(a.edad),
+      estado: webTexto(a.estado), descripcion: webTexto(a.descripcion), foto: webFotoOrigen(a)
+    },
+    completitud: webValidarPublicacion(pub, a)
+  };
+}
+
+function webUpsertAnimal(body) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var animalId = webTexto(body && body.animal_id);
+  if (!animalId) return { status: 'error', error: 'Falta animal_id' };
+  var a = webMapaAnimales()[animalId];
+  if (!a) return { status: 'error', error: 'Animal no encontrado' };
+
+  var previa = webPublicacionDeOrigen('animal', animalId);
+  var slug = webNormalizarSlug(body.slug || body.titulo || a.nombre);
+  if (!webSlugValido(slug)) return { status: 'error', error: 'Slug no válido' };
+  if (webSlugOcupado('animal', slug, previa && previa.id)) {
+    return { status: 'error', error: 'El slug "' + slug + '" ya está en uso por otra publicación' };
+  }
+
+  var registro = {
+    id: (previa && previa.id) || ('web_' + webUuid()),
+    tipo: 'animal',
+    origen_id: animalId,
+    slug: slug,
+    estado_publicacion: WEB_ESTADOS.indexOf(webTexto(body.estado_publicacion)) !== -1 ? webTexto(body.estado_publicacion) : 'borrador',
+    indexable: webBool(body.indexable, true),
+    listed: webBool(body.listed, true),
+    featured: webBool(body.featured, false),
+    orden: Number(body.orden || 0) || 0,
+    titulo: webTexto(body.titulo) || webTexto(a.nombre),
+    extracto: webTexto(body.extracto),
+    contenido_html: String(body.contenido_html || ''),
+    categoria: webTexto(body.categoria),
+    estado_publico: webTexto(body.estado_publico) || webTexto(a.estado),
+    especie: webTexto(body.especie) || webTexto(a.especie),
+    autor: webTexto(body.autor),
+    tags_json: JSON.stringify(webArray(body.tags)),
+    media_json: JSON.stringify(body.media || {}),
+    seo_json: JSON.stringify(body.seo || {}),
+    cta_json: JSON.stringify(body.cta || null),
+    animal_json: JSON.stringify(body.animal || {}),
+    evento_json: '',
+    publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
+    actualizado_en: webAhora(),
+    creado_en: (previa && previa.creado_en) || webAhora()
+  };
+  if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
+  registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
+
+  if (registro.estado_publicacion === 'publicado') {
+    var check = webValidarPublicacion(webFilaAPublicacion(registro), a);
+    if (!check.ok) {
+      return {
+        status: 'warning',
+        error: 'No se puede publicar: completa los campos obligatorios',
+        detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '),
+        data: check.faltan
+      };
+    }
+  }
+
+  var guardado;
+  try {
+    if (previa && previa.id) {
+      guardado = updateSheetRow(cfg, previa.id, registro);
+      if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
+    } else {
+      guardado = appendToSheet(cfg, registro);
+    }
+  } catch (err) {
+    return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
+  }
+  return { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
+}
+
+function webEstadoAnimal(body, user) {
+  var animalId = webTexto(body && body.animal_id);
+  if (!animalId) return { status: 'error', error: 'Falta animal_id' };
+  var estado = webTexto(body.estado_publicacion);
+  if (WEB_ESTADOS.indexOf(estado) === -1) return { status: 'error', error: 'Estado de publicación no válido' };
+  var previa = webPublicacionDeOrigen('animal', animalId);
+  if (!previa) return { status: 'error', error: 'Este animal aún no tiene publicación web. Abre "Publicación web" para configurarla.' };
+  var a = webMapaAnimales()[animalId];
+  if (estado === 'publicado') {
+    var check = webValidarPublicacion(previa, a);
+    if (!check.ok) {
+      return {
+        status: 'warning',
+        error: 'No se puede publicar todavía',
+        detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '),
+        data: check.faltan
+      };
+    }
+  }
+  var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
+  if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
+  var ok = updateSheetRow(webSheetConfig(), previa.id, cambios);
+  if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
+  try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
+  return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
+}
+
+function webPreviewAnimal(animalId) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var pub = webPublicacionDeOrigen('animal', animalId);
+  if (!pub) return { status: 'error', error: 'Este animal aún no tiene configuración web' };
+  var a = webMapaAnimales()[String(animalId)] || null;
+  return { status: 'success', data: webConstruirPublicacion(pub, a) };
+}
+
+// ==================== GESTOR · EVENTOS E HISTORIAS ====================
+
+function webListarEventos(params) {
+  params = params || {};
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var q = webTexto(params.q).toLowerCase();
+  var estadoFiltro = webTexto(params.estado_publicacion);
+  var tipoFiltro = webTexto(params.tipo);
+
+  var filas = webFilasWeb().filter(function (p) { return p.tipo === 'evento' || p.tipo === 'historia'; });
+  if (tipoFiltro) filas = filas.filter(function (p) { return p.tipo === tipoFiltro; });
+  if (estadoFiltro) filas = filas.filter(function (p) { return p.estado_publicacion === estadoFiltro; });
+  if (q) {
+    filas = filas.filter(function (p) {
+      return (p.titulo + ' ' + p.slug + ' ' + p.categoria).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  filas.sort(function (a, b) {
+    var da = a.publicado_en || a.actualizado_en || '';
+    var db = b.publicado_en || b.actualizado_en || '';
+    return String(db).localeCompare(String(da));
+  });
+  var data = filas.map(function (p) {
+    var check = webValidarPublicacion(p, null);
+    return {
+      id: p.id, tipo: p.tipo, slug: p.slug, titulo: p.titulo, categoria: p.categoria,
+      estado_publicacion: p.estado_publicacion, indexable: p.indexable, listed: p.listed,
+      featured: p.featured, orden: p.orden, publicado_en: p.publicado_en, actualizado_en: p.actualizado_en,
+      completitud: { ok: check.ok, faltan: check.faltan.map(function (f) { return f.campo; }) }
+    };
+  });
+  return { status: 'success', data: data };
+}
+
+function webPreviewEvento(id) {
+  var pub = webPublicacionPorId(id);
+  if (!pub) return { status: 'error', error: 'Publicación no encontrada' };
+  return { status: 'success', data: webConstruirPublicacion(pub, null) };
+}
+
+function webGetEvento(id) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var pub = webPublicacionPorId(id);
+  if (!pub || (pub.tipo !== 'evento' && pub.tipo !== 'historia')) return { status: 'error', error: 'Publicación no encontrada' };
+  return { status: 'success', data: pub, completitud: webValidarPublicacion(pub, null) };
+}
+
+function webUpsertEvento(body, user) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var id = webTexto(body && body.id);
+  var previa = id ? webPublicacionPorId(id) : null;
+  if (id && !previa) return { status: 'error', error: 'Publicación no encontrada' };
+  if (previa && previa.tipo === 'animal') return { status: 'error', error: 'Los animales se gestionan desde su ficha' };
+
+  var tipo = webTexto(body.tipo);
+  if (tipo !== 'evento' && tipo !== 'historia') tipo = previa ? previa.tipo : 'evento';
+  var titulo = webTexto(body.titulo);
+  if (!titulo) return { status: 'error', error: 'Falta el título' };
+  var slug = webNormalizarSlug(body.slug || titulo);
+  if (!webSlugValido(slug)) return { status: 'error', error: 'Slug no válido' };
+  if (webSlugOcupado(tipo, slug, previa && previa.id)) {
+    return { status: 'error', error: 'El slug "' + slug + '" ya está en uso por otra publicación' };
+  }
+
+  var registro = {
+    id: (previa && previa.id) || ('web_' + webUuid()),
+    tipo: tipo,
+    origen_id: '',
+    slug: slug,
+    estado_publicacion: WEB_ESTADOS.indexOf(webTexto(body.estado_publicacion)) !== -1 ? webTexto(body.estado_publicacion) : 'borrador',
+    indexable: webBool(body.indexable, true),
+    listed: webBool(body.listed, true),
+    featured: webBool(body.featured, false),
+    orden: Number(body.orden || 0) || 0,
+    titulo: titulo,
+    extracto: webTexto(body.extracto),
+    contenido_html: String(body.contenido_html || ''),
+    categoria: webTexto(body.categoria) || (tipo === 'evento' ? 'Eventos' : 'Historias'),
+    estado_publico: webTexto(body.estado_publico) || (tipo === 'evento' ? 'programado' : 'publicado'),
+    especie: '',
+    autor: webTexto(body.autor),
+    tags_json: JSON.stringify(webArray(body.tags)),
+    media_json: JSON.stringify(body.media || {}),
+    seo_json: JSON.stringify(body.seo || {}),
+    cta_json: JSON.stringify(body.cta || null),
+    animal_json: '',
+    evento_json: JSON.stringify(body.event || {}),
+    publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
+    actualizado_en: webAhora(),
+    creado_en: (previa && previa.creado_en) || webAhora()
+  };
+  if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
+  registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
+
+  if (registro.estado_publicacion === 'publicado') {
+    var check = webValidarPublicacion(webFilaAPublicacion(registro), null);
+    if (!check.ok) {
+      return {
+        status: 'warning',
+        error: 'No se puede publicar: completa los campos obligatorios',
+        detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '),
+        data: check.faltan
+      };
+    }
+  }
+
+  try {
+    if (previa && previa.id) {
+      if (!updateSheetRow(cfg, previa.id, registro)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
+    } else {
+      appendToSheet(cfg, registro);
+    }
+  } catch (err) {
+    return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
+  }
+  try { registrarAuditoria('publicacion_web', 'web_' + tipo, registro.id, user, { estado: registro.estado_publicacion, slug: registro.slug }); } catch (e) {}
+  return { status: 'success', data: webFilaAPublicacion(registro) };
+}
+
+function webEstadoEvento(body, user) {
+  var id = webTexto(body && body.id);
+  if (!id) return { status: 'error', error: 'Falta id' };
+  var estado = webTexto(body.estado_publicacion);
+  if (WEB_ESTADOS.indexOf(estado) === -1) return { status: 'error', error: 'Estado de publicación no válido' };
+  var previa = webPublicacionPorId(id);
+  if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
+  if (estado === 'publicado') {
+    var check = webValidarPublicacion(previa, null);
+    if (!check.ok) {
+      return {
+        status: 'warning',
+        error: 'No se puede publicar todavía',
+        detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '),
+        data: check.faltan
+      };
+    }
+  }
+  var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
+  if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
+  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
+  try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
+  return { status: 'success', data: { id: id, estado_publicacion: estado } };
+}
+
+function webArchivarEvento(body, user) {
+  var id = webTexto(body && body.id);
+  if (!id) return { status: 'error', error: 'Falta id' };
+  var previa = webPublicacionPorId(id);
+  if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
+  if (previa.tipo === 'animal') return { status: 'error', error: 'Los animales no se archivan desde aquí' };
+  if (!deleteSheetRow(webSheetConfig(), id)) return { status: 'error', error: 'No se encontró la publicación a archivar' };
+  try { registrarAuditoria('archivar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
+  return { status: 'success', success: true };
+}
+
+// ==================== UTILIDADES DEL GESTOR ====================
+
+function webSlugCheck(params) {
+  var tipo = webTexto(params.tipo) || 'animal';
+  if (WEB_TIPOS.indexOf(tipo) === -1) return { status: 'error', error: 'Tipo no válido' };
+  var normalizado = webNormalizarSlug(params.slug);
+  var conflicto = null;
+  var filas = webFilasWeb();
+  for (var i = 0; i < filas.length; i++) {
+    if (filas[i].tipo !== tipo) continue;
+    if (params.id && String(filas[i].id) === String(params.id)) continue;
+    if (filas[i].slug === normalizado) { conflicto = { id: filas[i].id, titulo: filas[i].titulo }; break; }
+    var hist = filas[i].slug_historial || [];
+    for (var k = 0; k < hist.length; k++) {
+      if (hist[k].slug === normalizado) { conflicto = { id: filas[i].id, titulo: filas[i].titulo, historico: true }; break; }
+    }
+    if (conflicto) break;
+  }
+  return {
+    status: 'success',
+    data: {
+      disponible: !!normalizado && webSlugValido(normalizado) && !conflicto,
+      normalizado: normalizado,
+      valido: webSlugValido(normalizado),
+      conflicto: conflicto
+    }
+  };
+}
+
+function webResumen() {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var filas = webFilasWeb();
+  var mapa = webMapaAnimales();
+  var resumen = { animal: { total: 0, publicados: 0, borradores: 0, ocultos: 0, sin_publicar: 0 }, evento: { total: 0, publicados: 0, borradores: 0, ocultos: 0 }, historia: { total: 0, publicados: 0, borradores: 0, ocultos: 0 } };
+
+  Object.keys(mapa).forEach(function (id) {
+    var pub = null;
+    for (var i = 0; i < filas.length; i++) if (filas[i].tipo === 'animal' && String(filas[i].origen_id) === String(id)) { pub = filas[i]; break; }
+    resumen.animal.total++;
+    if (!pub) resumen.animal.sin_publicar++;
+    else if (pub.estado_publicacion === 'publicado') resumen.animal.publicados++;
+    else if (pub.estado_publicacion === 'oculto') resumen.animal.ocultos++;
+    else resumen.animal.borradores++;
+  });
+  filas.forEach(function (p) {
+    if (p.tipo === 'animal') return;
+    var r = resumen[p.tipo] || resumen.historia;
+    r.total++;
+    if (p.estado_publicacion === 'publicado') r.publicados++;
+    else if (p.estado_publicacion === 'oculto') r.ocultos++;
+    else r.borradores++;
+  });
+
+  var incompletas = 0;
+  var sinSeo = 0;
+  filas.forEach(function (p) {
+    var origen = p.tipo === 'animal' ? mapa[String(p.origen_id)] : null;
+    if (!webValidarPublicacion(p, origen).ok) incompletas++;
+    if (!webTexto((p.seo || {}).metaDescription) && !p.extracto) sinSeo++;
+  });
+
+  return {
+    status: 'success',
+    data: {
+      resumen: resumen,
+      totales: {
+        publicados: resumen.animal.publicados + resumen.evento.publicados + resumen.historia.publicados,
+        borradores: resumen.animal.borradores + resumen.evento.borradores + resumen.historia.borradores,
+        ocultos: resumen.animal.ocultos + resumen.evento.ocultos + resumen.historia.ocultos,
+        sin_publicar: resumen.animal.sin_publicar,
+        incompletas: incompletas,
+        sin_seo: sinSeo
+      },
+      generado_en: webAhora()
+    }
+  };
+}
+
+// ==================== CANAL PÚBLICO ====================
+
+function webPublicables() {
+  return webFilasWeb().filter(function (p) {
+    return p.estado_publicacion === 'publicado' && p.listed !== false;
+  });
+}
+
+function webListarPublicas(params) {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  params = params || {};
+  var mapa = webMapaAnimales();
+  var pubs = webPublicables();
+  var todas = pubs.map(function (p) {
+    return webConstruirPublicacion(p, p.tipo === 'animal' ? mapa[String(p.origen_id)] : null);
+  });
+
+  var disponibles = {
+    type: [], category: [], status: [], species: []
+  };
+  var push = function (arr, v) { if (v && arr.indexOf(v) === -1) arr.push(v); };
+  todas.forEach(function (p) {
+    push(disponibles.type, p.type);
+    push(disponibles.category, p.category);
+    push(disponibles.status, p.status);
+    if (p.animal && p.animal.species) push(disponibles.species, String(p.animal.species).toLowerCase());
+  });
+
+  var f = {
+    type: webTexto(params.type),
+    category: webTexto(params.category),
+    status: webTexto(params.status),
+    species: webTexto(params.species).toLowerCase(),
+    q: webTexto(params.q)
+  };
+  var data = todas.filter(function (p) {
+    if (f.type && p.type !== f.type) return false;
+    if (f.category && p.category !== f.category) return false;
+    if (f.status && p.status !== f.status) return false;
+    if (f.species && String((p.animal && p.animal.species) || '').toLowerCase() !== f.species) return false;
+    if (f.q) {
+      var heno = (p.title + ' ' + p.excerpt + ' ' + p.contentHtml + ' ' + (p.tags || []).join(' ')).toLowerCase();
+      if (heno.indexOf(f.q.toLowerCase()) === -1) return false;
+    }
+    return true;
+  });
+
+  var orden = webTexto(params.sort) || '-publishedAt';
+  var campo = orden.charAt(0) === '-' ? orden.slice(1) : orden;
+  var desc = orden.charAt(0) === '-';
+  data.sort(function (a, b) {
+    var va = campo === 'title' ? a.title : (campo === 'updatedAt' ? a.updatedAt : a.publishedAt);
+    var vb = campo === 'title' ? b.title : (campo === 'updatedAt' ? b.updatedAt : b.publishedAt);
+    var r = String(va || '').localeCompare(String(vb || ''));
+    return desc ? -r : r;
+  });
+
+  var page = Math.max(1, parseInt(params.page, 10) || 1);
+  var pageSize = Math.min(WEB_PAGE_SIZE_MAX, Math.max(1, parseInt(params.pageSize, 10) || WEB_PAGE_SIZE_DEF));
+  var total = data.length;
+  var paginadas = data.slice((page - 1) * pageSize, page * pageSize);
+  var card = webTexto(params.fields) === 'card';
+  if (card) paginadas = paginadas.map(webProyeccionCard);
+
+  return {
+    status: 'success',
+    endpoint: 'GET /api/publicaciones',
+    generatedAt: webAhora(),
+    filters: {
+      type: disponibles.type,
+      category: disponibles.category,
+      status: disponibles.status,
+      species: disponibles.species,
+      q: f.q
+    },
+    applied: f,
+    pagination: { page: page, pageSize: pageSize, total: total, totalPages: Math.ceil(total / pageSize) || 0 },
+    data: paginadas
+  };
+}
+
+function webProyeccionCard(p) {
+  return {
+    id: p.id, slug: p.slug, type: p.type, category: p.category, status: p.status,
+    title: p.title, excerpt: p.excerpt, publishedAt: p.publishedAt, updatedAt: p.updatedAt,
+    coverImage: p.coverImage, image: p.image, imageAlt: p.imageAlt,
+    url: p.url, featured: p.featured, animal: p.animal ? { species: p.animal.species, age: p.animal.age, sex: p.animal.sex } : undefined
+  };
+}
+
+function webPublicacionPublica(slug) {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  var s = webNormalizarSlug(slug);
+  if (!s) return { status: 'error', error: 'Falta slug' };
+  var mapa = webMapaAnimales();
+  var pubs = webPublicables();
+  for (var i = 0; i < pubs.length; i++) {
+    if (pubs[i].slug === s) {
+      return { status: 'success', data: webConstruirPublicacion(pubs[i], pubs[i].tipo === 'animal' ? mapa[String(pubs[i].origen_id)] : null) };
+    }
+  }
+  // Slug antiguo: se devuelve la ficha actual con la redireccion permanente.
+  for (var j = 0; j < pubs.length; j++) {
+    var hist = pubs[j].slug_historial || [];
+    for (var k = 0; k < hist.length; k++) {
+      if (hist[k].slug !== s) continue;
+      return {
+        status: 'success',
+        redirect: {
+          from: webRutaPublica(pubs[j].tipo, s),
+          to: webRutaPublica(pubs[j].tipo, pubs[j].slug),
+          slug: pubs[j].slug,
+          permanent: true
+        },
+        data: webConstruirPublicacion(pubs[j], pubs[j].tipo === 'animal' ? mapa[String(pubs[j].origen_id)] : null)
+      };
+    }
+  }
+  return { status: 'error', error: 'Publicación no encontrada' };
+}
+
+/** Mapa de redirecciones 301 (slugs antiguos -> slug actual) para la web. */
+function webRedirects() {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  var base = webDominioPublico();
+  var out = [];
+  webPublicables().forEach(function (p) {
+    (p.slug_historial || []).forEach(function (h) {
+      if (!h.slug || h.slug === p.slug) return;
+      out.push({
+        from: (base || '') + webRutaPublica(p.tipo, h.slug),
+        to: (base || '') + webRutaPublica(p.tipo, p.slug),
+        status: 301,
+        type: p.tipo,
+        slug: h.slug,
+        currentSlug: p.slug,
+        changedAt: h.fecha || ''
+      });
+    });
+  });
+  return { status: 'success', generatedAt: webAhora(), data: out };
+}
+
+function webTaxonomias() {
+  var lista = webListarPublicas({ pageSize: WEB_PAGE_SIZE_MAX });
+  if (lista.status === 'warning') return lista;
+  return {
+    status: 'success',
+    data: {
+      type: lista.filters.type,
+      category: lista.filters.category,
+      status: lista.filters.status,
+      species: lista.filters.species
+    }
+  };
+}
+
+function webConfigPublica() {
+  var base = webPublicacionBaseUrl();
+  return {
+    status: 'success',
+    data: {
+      site: { name: 'Grupo Nebak', url: base },
+      contact: { email: webTexto(typeof CONFIG !== 'undefined' ? CONFIG.CONTACT_EMAIL : ''), phone: '' },
+      seo: {
+        defaultTitle: 'Grupo Nebak · Protección animal',
+        defaultDescription: 'Adopciones, acogidas e historias de la protectora Grupo Nebak.',
+        robots: 'index,follow',
+        baseUrl: base
+      },
+      locales: { default: 'es-ES' }
+    }
+  };
+}
+
+function webSitemap() {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  var base = webDominioPublico();
+  if (!base) {
+    // Sin dominio real no hay URLs de ficha válidas: mejor un sitemap vacío.
+    return { status: 'success', generatedAt: webAhora(), data: [], notice: 'Sin dominio público: la base actual es la demo de GitHub Pages' };
+  }
+  var mapa = webMapaAnimales();
+  var urls = webFilasWeb()
+    .filter(function (p) { return p.estado_publicacion === 'publicado' && p.indexable; })
+    .map(function (p) {
+      var ruta = webRutaPublica(p.tipo, p.slug);
+      return {
+        loc: base ? base + ruta : ruta,
+        lastmod: p.actualizado_en || p.publicado_en || '',
+        changefreq: p.tipo === 'animal' ? 'weekly' : 'monthly',
+        priority: p.featured ? 0.9 : 0.7,
+        type: p.tipo,
+        slug: p.slug,
+        title: p.titulo
+      };
+    });
+  return { status: 'success', generatedAt: webAhora(), data: urls };
+}

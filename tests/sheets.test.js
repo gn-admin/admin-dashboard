@@ -4,21 +4,15 @@
  * Se carga el Code.gs real (appendToSheet/readSheet) sobre un SpreadsheetApp
  * simulado, para cubrir el caso de una pestaña recién creada, sin cabeceras.
  */
-const test = require('node:test');
-const { it } = test;
+const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-// El backend (apps-script/) no vive en git: en CI estas pruebas se saltan.
 const RAIZ = path.join(__dirname, '..');
-const RUTA_CODE = path.join(RAIZ, 'apps-script', 'Code.gs');
-const RUTA_WEB = path.join(RAIZ, 'apps-script', 'WebPublicaciones.gs');
-const HAY_FUENTES = fs.existsSync(RUTA_CODE) && fs.existsSync(RUTA_WEB);
-const CODE_GS = HAY_FUENTES ? fs.readFileSync(RUTA_CODE, 'utf8') : '';
-const WEB_GS = HAY_FUENTES ? fs.readFileSync(RUTA_WEB, 'utf8') : '';
-const describe = HAY_FUENTES ? test.describe : test.describe.skip;
+const CODE_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Code.gs'), 'utf8');
+const WEB_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'WebPublicaciones.gs'), 'utf8');
 
 function crearHoja(nombre) {
   const hoja = {

@@ -27,8 +27,11 @@ build/
 # Configuración generada (contiene valores reales de producción)
 src/js/config.js
 
-# Backend Apps Script (no se versiona; solo se usa para desplegar)
-apps-script/
+# Backend Apps Script: solo se versionan las fuentes del gestor web (sin secretos).
+# Config.gs y el resto (Auth, Roles, Backup...) contienen datos reales.
+apps-script/*
+!apps-script/Code.gs
+!apps-script/WebPublicaciones.gs
 
 # Temporary
 *.tmp
