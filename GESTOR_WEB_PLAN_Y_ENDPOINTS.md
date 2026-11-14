@@ -3,9 +3,7 @@
 > **Objetivo:** crear un apartado **Gestor web** en el admin para preparar, curar y publicar contenido, y exponer los **endpoints necesarios** para que el proyecto web (`custom-page` / `nueva-version`) pueda consultar y visualizar fichas de animales, eventos e historias.
 > **Alcance:** análisis y plan de implementación (sin implementar en este documento). Un solo documento de referencia para construir la gestión y los endpoints que consumirá la web.
 > **Nota importante (SEO):** los campos/metadatos de SEO se gestionan aquí como parte de las **publicaciones** para que la **otra web** los use al renderizarlas (metas, OG, canonical, indexación, sitemap, etc.); no se refieren al SEO del gestor/admin.
-> **Fuentes de referencia (proyecto web, leídas):**
-> - `../custom-page/docs/estructura-endpoint-publicaciones.md` — contrato de publicaciones: `GET /api/publicaciones` (filtros, paginación), `GET /api/publicaciones/:slug`, esquema `Publicacion` (`icons`, `gallery`, `videos[]/video`, bloques `animal`/`event`, `contentHtml`, `coverImage`, `cta`, `publication/nebak-post-v1`).
-> - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario/consumo `nueva-version` (`HistoriasAPI`, `../data/blog-posts.json`, `post.html?slug`, listados `[data-adoption-list]`), propuesta GAS/Sheets `/v1/*` (contenido, config, taxonomías, `forms/submit`) y requisitos SEO de las publicaciones en la web pública (prerender/build por slug, metas/OG/JSON-LD, sitemap/robots, redirects 301).
+> **Base de planificación:** este documento ya incorpora la información analizada sobre el proyecto web (contratos, consumo esperado y requisitos de publicación/SEO) y debe tratarse como fuente autosuficiente para la implementación. No depende de documentación externa adicional.
 >
 > **Notas:** seguridad/privacidad del módulo tratada aparte en `PLAN_SEGURIDAD.md` (no incluida aquí). Dependencias externas: Apps Script (`.gs`), hojas/Sheets, despliegue del canal público y estrategia de render/SEO de la web.
 
@@ -29,7 +27,7 @@ Endpoints/servicio para que el proyecto web obtenga el contenido publicado y ren
 
 ---
 
-## 2. Información del proyecto web y consumo esperado (alineado a `custom-page/docs`)
+## 2. Información del proyecto web y consumo esperado (alineado al análisis realizado)
 
 | Zona/componente (`nueva-version`) | Fuente/consumo actual | Necesidad de endpoint/contrato |
 |---|---|---|
@@ -107,7 +105,7 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 
 ## 5. Endpoints para la web (canal público de contenido)
 
-> Contrato que consumirá `custom-page/nueva-version` para mostrar fichas y listados. Alineado a `estructura-endpoint-publicaciones.md`.
+> Contrato que consumirá `custom-page/nueva-version` para mostrar fichas y listados.
 
 ### 5.1 Listado de publicaciones
 - **`GET /api/publicaciones`** (contrato de referencia)
@@ -163,7 +161,7 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 - Definir campos de curación por tipo, media (`cover/gallery/videos/icons`), reglas de publicación y `slug`.
 - Definir contratos de endpoints del gestor (list/get/upsert/estado/preview/slug-check/resumen) y diseño SEO/URL (rutas, prerender/export, redirects, sitemap).
 - (Opcional) cerrar alcance de `forms/submit`.
-- **Criterio de salida:** contratos y modelo aprobados y alineados con `custom-page/docs`.
+- **Criterio de salida:** contratos y modelo aprobados y definidos en este documento.
 
 ### Fase 1 — Modelo de datos y backend gestor (GAS/Sheets)
 **Objetivo:** almacenamiento y APIs de gestión con payload normalizado.
@@ -226,4 +224,4 @@ Campos según §3.4 y contrato `event` (soporte `icons/gallery/videos` si aplica
 ## 10. Registro de avance (implementación)
 | Fecha | Fase/Tarea | Cambio | Responsable | Evidencia/Notas |
 |---|---|---|---|---|
-| 2026-11-14 | 0 | Documento único creado: plan por fases del Gestor web y endpoints para la web, alineado a `../custom-page/docs` (seguridad en `PLAN_SEGURIDAD.md`) | — | Este documento |
+| 2026-11-14 | 0 | Documento único creado: plan por fases del Gestor web y endpoints para la web (autosuficiente, seguridad en `PLAN_SEGURIDAD.md`) | — | Este documento |
