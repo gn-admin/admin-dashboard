@@ -1,0 +1,22 @@
+{
+  "publicaciones": [
+    {
+      "slug": "jornada-acogida",
+      "type": "evento",
+      "category": "Eventos",
+      "status": "proximo",
+      "title": "Jornada de acogida",
+      "excerpt": "Puertas abiertas en el refugio para familias interesadas en acoger.",
+      "contentHtml": "<p>Ven a conocer a los animales y al equipo de acogida.</p>",
+      "seo": {
+        "metaTitle": "Jornada de acogida",
+        "metaDescription": "Puertas abiertas en el refugio para familias interesadas en acoger.",
+        "robots": "index,follow",
+        "canonical": ""
+      },
+      "publishedAt": "2026-11-01T08:00:00Z",
+      "updatedAt": "2026-11-02T08:00:00Z"
+    }
+  ],
+  "retiradas": []
+}

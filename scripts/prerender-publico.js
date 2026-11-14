@@ -83,6 +83,22 @@ function sitemapXml(urls) {
     cuerpo + '\n</urlset>\n';
 }
 
+/**
+ * Anotación de GitHub Actions: el aviso sale en el resumen del run y no solo
+ * enterrado en el log. Fuera de Actions se imprime como línea normal.
+ */
+function anotacion(nivel, mensaje) {
+  const texto = String(mensaje == null ? '' : mensaje)
+    .replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  return '::' + nivel + '::' + texto;
+}
+
+function anotar(nivel, mensaje) {
+  if (process.env.GITHUB_ACTIONS === 'true') console.log(anotacion(nivel, mensaje));
+  else if (nivel === 'error') console.error('[prerender] ' + mensaje);
+  else console.warn('[prerender] ' + mensaje);
+}
+
 function validarSalida(salida) {
   const errores = [];
   const sitemap = String((salida && salida.sitemap) || '');
@@ -329,7 +345,7 @@ async function main(argv = process.argv.slice(2)) {
       try {
         retiradas = await recolectarRetiradas(api);
       } catch (e) {
-        console.warn('[prerender] Aviso: no se pudieron leer las retiradas (' + e.message +
+        anotar('warning', 'No se pudieron leer las retiradas (' + e.message +
           '). ¿Falta desplegar WebPublicaciones.gs? Se continúa sin páginas de retirada.');
       }
     }
@@ -337,14 +353,14 @@ async function main(argv = process.argv.slice(2)) {
     const mensaje = 'No se pudo leer el canal: ' + err.message +
       '. Sin datos no hay sitemap ni robots que publicar.';
     if (!args.soft) throw new Error(mensaje + ' Se detiene el despliegue.');
-    console.warn('[prerender] Aviso: ' + mensaje + ' Se continúa por --soft.');
+    anotar('warning', mensaje + ' Se continúa por --soft.');
     return { paginas: [], sitemap: '', robots: '' };
   }
 
   if (fallos.length) {
     const mensaje = 'No se pudieron generar ' + fallos.length + ' ficha(s): ' + fallos.join(' · ');
     if (!args.soft) throw new Error(mensaje + '. Se detiene el despliegue para no dejar páginas sin generar.');
-    console.warn('[prerender] Aviso: ' + mensaje);
+    anotar('warning', mensaje);
   }
 
   const salida = construirSalida(publicaciones, base, retiradas);
@@ -354,7 +370,7 @@ async function main(argv = process.argv.slice(2)) {
     if (!args.soft) {
       throw new Error(mensaje + '. Se detiene el despliegue para no publicar sin sitemap ni robots.');
     }
-    console.warn('[prerender] Aviso: ' + mensaje);
+    anotar('warning', mensaje);
     return salida;
   }
 
@@ -379,12 +395,13 @@ async function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, validarSalida, paginaEstatica, paginaRetirada, construirSalida, main
+  sitemapXml, robotsTxt, validarSalida, anotacion, anotar,
+  paginaEstatica, paginaRetirada, construirSalida, main
 };
 
 if (require.main === module) {
   main().catch(err => {
-    console.error('[prerender] ' + err.message);
+    anotar('error', err.message);
     process.exit(1);
   });
 }

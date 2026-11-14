@@ -1,0 +1,26 @@
+{
+  "publicaciones": [
+    {
+      "slug": "laia",
+      "type": "animal",
+      "category": "Perros en adopción",
+      "status": "en_adopcion",
+      "title": "Laia",
+      "excerpt": "Border collie de 4 años, busca familia sin niños pequeños.",
+      "contentHtml": "<p>Laia sigue en adopción.</p>",
+      "coverImage": { "src": "assets/fotos/laia.jpg", "alt": "Laia" },
+      "seo": {
+        "metaTitle": "Laia en adopción",
+        "metaDescription": "Laia, border collie de 4 años, busca familia.",
+        "robots": "index,follow",
+        "canonical": ""
+      },
+      "publishedAt": "2026-10-02T10:00:00Z",
+      "updatedAt": "2026-10-03T10:00:00Z"
+    }
+  ],
+  "retiradas": [
+    { "slug": "historia-retirada", "tipo": "historia", "retiradoEn": "2026-11-10T09:00:00Z" },
+    { "slug": "historia-vieja", "tipo": "historia", "retiradoEn": "2026-11-10T09:00:00Z" }
+  ]
+}

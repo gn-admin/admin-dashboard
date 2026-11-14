@@ -24,7 +24,7 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 470 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 474 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
 | Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
 
@@ -270,11 +270,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 470 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-14, 474 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **470 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **474 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -404,12 +404,14 @@ Reglas:
 - GitHub desactiva los programados tras 60 días sin actividad en el repositorio; un push o relanzarlo a mano los reactiva.
 - El hosting es estático: entre la retirada y ese despliegue la página antigua sigue sirviéndose. Lo que garantiza el cron es que después quede la página de retirada y no un 404.
 - Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, **bloquea el deploy** y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--soft`).
+- **Avisos visibles en el run:** con `GITHUB_ACTIONS=true` los avisos salen como anotaciones (`::warning::`, p. ej. si no puede leer retiradas) y los fallos bloqueantes como `::error::`, con saltos y `%` escapados; en local se imprimen como líneas normales.
+- **Fixtures versionadas:** `tests/fixtures/prerender/{ficha-normal,retirada,sin-portada}.json` generan el sitio completo en un directorio temporal y se validan en `tests/prerender.test.js` (canonical, OG con y sin portada, JSON-LD, lápidas `noindex` y sitemap), sin depender del canal real.
 
 **Resultados (2026-11-14, ficha real de Laia)**
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **470/470** (16 nuevas: prerender, canónica única, 410, páginas de retirada y gestor).
+- `npm test`: **474/474** (prerender, canónica única, 410, páginas de retirada, fixtures y gestor).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 

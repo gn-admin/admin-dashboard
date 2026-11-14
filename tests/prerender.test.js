@@ -2,8 +2,20 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const prerender = require('../scripts/prerender-publico.js');
 const Publico = require('../src/js/publico.js');
+
+const FIXTURES = path.join(__dirname, 'fixtures', 'prerender');
+
+/** Genera la salida completa a un directorio temporal desde una fixture. */
+function generar(fixture) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-'));
+  return prerender.main(['--fixture', path.join(FIXTURES, fixture), '--base', BASE, '--out', out])
+    .then(salida => ({ out: out, salida: salida }));
+}
 
 const BASE = 'https://gn-admin.github.io/admin-dashboard';
 
@@ -100,6 +112,60 @@ test('construirSalida omite lo no listado y normaliza los slugs', () => {
   assert.equal(salida.paginas[0].slug, 'laia-2026');
   assert.equal(salida.sitemap.split('<url>').length - 1, 2); // listado + ficha
   assert.match(salida.sitemap, /publicaciones\/laia-2026\.html/);
+});
+
+test('anotacion produce comandos de GitHub Actions escapados', () => {
+  assert.equal(prerender.anotacion('warning', 'linea1\nlinea2 100%'),
+    '::warning::linea1%0Alinea2 100%25');
+  assert.equal(prerender.anotacion('error', 'sin salto'), '::error::sin salto');
+});
+
+test('fixture ficha normal: HTML completo sin JavaScript', async () => {
+  const { out } = await generar('ficha-normal.json');
+  try {
+    const html = fs.readFileSync(path.join(out, 'publicaciones', 'laia.html'), 'utf8');
+    assert.match(html, /<title>Laia, border collie en adopción<\/title>/);
+    assert.match(html, /rel="canonical" href="https:\/\/gn-admin\.github\.io\/admin-dashboard\/publicaciones\/laia\.html"/);
+    assert.match(html, /<meta property="og:image"/);
+    assert.match(html, /application\/ld\+json/);
+    assert.match(html, /Border collie de 4 años/);
+    assert.doesNotMatch(html, /<script src=/);
+    const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
+    assert.equal((sitemap.match(/<url>/g) || []).length, 2);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('fixture sin portada: OG sin imagen y tarjeta simple', async () => {
+  const { out } = await generar('sin-portada.json');
+  try {
+    const html = fs.readFileSync(path.join(out, 'publicaciones', 'jornada-acogida.html'), 'utf8');
+    assert.match(html, /Jornada de acogida/);
+    assert.doesNotMatch(html, /og:image/);
+    assert.match(html, /name="twitter:card" content="summary"/);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('fixture retirada: lapidas noindex fuera del sitemap', async () => {
+  const { out } = await generar('retirada.json');
+  try {
+    const retirada = fs.readFileSync(path.join(out, 'publicaciones', 'historia-retirada.html'), 'utf8');
+    assert.match(retirada, /<meta name="robots" content="noindex,nofollow">/);
+    assert.match(retirada, /Publicación retirada/);
+    assert.doesNotMatch(retirada, /rel="canonical"/);
+    assert.ok(fs.existsSync(path.join(out, 'publicaciones', 'historia-vieja.html')));
+    assert.ok(fs.existsSync(path.join(out, 'publicaciones', 'laia.html')));
+    const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
+    assert.equal((sitemap.match(/<url>/g) || []).length, 2);
+    assert.doesNotMatch(sitemap, /historia-retirada/);
+    const robots = fs.readFileSync(path.join(out, 'robots.txt'), 'utf8');
+    assert.match(robots, /Sitemap: https:\/\/gn-admin\.github\.io\/admin-dashboard\/sitemap\.xml/);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
 });
 
 test('validarSalida exige sitemap y robots utilizables', () => {
