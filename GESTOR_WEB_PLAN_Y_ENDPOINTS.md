@@ -284,7 +284,8 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Accesibilidad básica:** `role="search"` en la barra, `label for` en todos los campos, `alt` de portada, placeholder “Sin imagen”, `role="status"` al cargar, `aria-label` en el paginador.
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
 - [x] **Gestor responsive:** listado solo de publicaciones; en ≤767 px la tabla pasa a tarjetas (patrón U4), acciones a lo ancho, stats en 2 columnas y el selector “Nueva publicación” como hoja inferior; tablet y escritorio mantienen tabla y diálogo centrado de 620 px. Verificado a 360/768/1280 px.
-- [x] **Pages en vivo (2026-11-14):** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200** con el tema nuevo (`Montserrat` 48 px a 1280, contenedor 1160), canal JSONP real, listado vacío “0 publicaciones”, 404 lógico (`#/publicacion/no-existe-xyz`) con **`noindex,nofollow`**, sin JSON-LD, canonical propio de la página, sin desbordes a 360/1280 y sin errores de consola.
+- [x] **Pages en vivo (2026-11-14):** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200** con el tema nuevo (`Montserrat` 48 px a 1280, contenedor 1160), canal JSONP real, **1 publicación real (Laia)** en el listado, 404 lógico (`#/publicacion/no-existe-xyz`) con **`noindex,nofollow`**, sin JSON-LD en errores, canonical propio de la página, sin desbordes a 360/1280 y sin errores de consola.
+- [x] **Prerender en Pages:** CI genera y publica `sitemap.xml` (200, con Laia y `lastmod`), `robots.txt` (200, con `Sitemap:`) y `publicaciones/laia.html` (200) con canonical absoluto, OG y JSON-LD sin JavaScript.
 - [x] **Ficha real publicada (Laia):** el listado la muestra y la ficha se compone con datos reales; el prerender genera `publicaciones/laia.html` con metas, canonical y JSON-LD (§7.4).
 - [x] **Prerender SEO:** una página estática por ficha sin JavaScript, `sitemap.xml` y `robots.txt` generados desde el canal y verificados a 360/1280 (§7.4).
 
@@ -394,6 +395,7 @@ Reglas:
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
 - `npm test`: **464/464** (10 nuevas de prerender).
+- **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
 **Cómo aplicarlo en el proyecto correspondiente**
