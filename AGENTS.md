@@ -4,7 +4,7 @@
 
 ## Qué es
 
-PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos + solicitud de acogida), gestión de animales, familias acogedoras, adopciones, socios, lista negra y reportes. Backend en Google Apps Script (hojas de cálculo), auth con Firebase (email/contraseña).
+PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos + solicitud de acogida), gestión de animales, familias acogedoras, adopciones, socios, lista negra y reportes. Backend en Google Apps Script (hojas de cálculo), auth con Firebase (email/contraseña). Incluye un **visor público** (`src/publico.html`, simulación de la web real) y un **gestor de contenido** (`src/js/web.js`) que publica en el canal público del backend.
 
 ## Comandos
 
@@ -20,15 +20,23 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Urgencias de animal**: campo booleano `urgente`. Se pinta y ordena con `_esPrioritario(a)` (urgente y estado `disponible`/`en_acogida`).
 - **Selects sueltos** dentro de `.detail-field` usan la clase `.form-input`. `.form-control` no existe.
 - **Contraste WCAG AA**: snackbar éxito/error y `.urgente-badge` respetan los tokens de diseño. Revisar `tests/diseno.test.js` si se cambian variables CSS.
-- **Service worker**: al tocar `src/js/dashboard.js`, `app.js`, `api.js`, `auth.js`, `pwa.js` u otros, subir `CACHE_NAME` en `src/sw.js`.
+- **Service worker**: al tocar `src/js/dashboard.js`, `app.js`, `api.js`, `auth.js`, `pwa.js`, `web.js`, `publico.js` u otros, subir `CACHE_NAME` en `src/sw.js`.
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/`.
+- **Contenido público**: la canónica de una ficha es su página estática `publicaciones/<slug>.html`, no la URL del SPA. Los estados `borrador` y `oculto` no salen del canal; `retirado` responde `gone` (410 lógico) y deja una lápida que conserva el slug.
+- **Prerender**: `npm run prerender` genera fichas, `sitemap.xml` y `robots.txt`; el deploy lo ejecuta tras los tests y bloquea si falla. Sus avisos salen como anotaciones (`::warning::`/`::error::`) en el run.
+- **No tocar `custom-page/` desde este repositorio**: el port del SEO se documenta como entrega externa (§7.2 y §7.4 del plan).
+- **Sin secretos**: nada de tokens, IDs de hojas ni claves en el código, fixtures o documentación versionada (el repo es público).
 
 ## Arquitectura
 
 - Frontend: `src/index.html` + `src/js/*` + `src/sw.js` + `manifest.webmanifest`. Router por hash en `src/js/app.js`.
-- Backend: Google Apps Script (desplegado por separado, no versionado aquí).
-- Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`), rama `main`.
+- Visor público: `src/publico.html` + `src/js/publico.js` + `src/css/publico.css`; las páginas estáticas van a `src/publicaciones/` (generadas, ignoradas por git).
+- Prerender y fixtures: `scripts/prerender-publico.js`, `tests/fixtures/prerender/`.
+- Backend: Google Apps Script (desplegado por separado). El canal web y el gestor viven en `apps-script/WebPublicaciones.gs` y los endpoints públicos en `Code.gs`.
+- Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`), rama `main`, con ejecución programada diaria.
 
 ## Documentación interna
 
 La documentación operativa detallada (`AGENTS.md` completo, `PROGRESO.md`, `PLANNING.md`, `docs/`, `apps-script/README.md`) se ha movido a `.internal-docs/` y **no se sube a git**. Allí están los IDs de hojas, formularios, detalles de endpoints, reglas de seguridad interna y estado de pendientes.
+
+En el repo, [`memory.md`](memory.md) resume qué se ha hecho (entregado, decisiones, pendientes manuales y verificación) y [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md) contiene contratos, estados y plan por fases.
