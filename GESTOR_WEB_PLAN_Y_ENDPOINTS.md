@@ -21,9 +21,10 @@
 | Navegación, permisos y ruta | `src/js/app.js`, `src/js/dashboard.js`, `src/index.html` | `- [x]` implementado |
 | Estilos | `src/css/styles.css` | `- [x]` implementado |
 | Visor público (referencia de lo que verá la web) | `src/publico.html`, `src/css/publico.css`, `src/js/publico.js` | `- [x]` listado + detalle + SEO, con el tema de `nueva-version` |
+| Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 454 en total (incluye cabeceras en hoja vacía, canonical condicional y pestaña única) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 464 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única y prerender SEO) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
 | Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
 
@@ -219,7 +220,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - [~] **URLs canónicas:** `seo.canonical` aplicado en el visor; el canonical, la imagen OG y los robots se derivan solos (dominio + ruta, portada e `indexable`). Rutas limpias y redirect 301 desde `post.html?slug=` pendientes en la web real.
 - [x] **Por página/detalle:** `<title>`, meta description, canonical, robots, OG/Twitter y JSON-LD, aplicados desde la publicación en `src/js/publico.js`.
 - [x] **`web-sitemap`:** endpoint listo (published + indexable + `lastmod`).
-- [ ] **`sitemap.xml` y `robots.txt` físicos:** generarlos en el hosting de la web; 404/410 para retirados.
+- [x] **`sitemap.xml` y `robots.txt` físicos:** generados desde el canal en el build del visor (§7.4); en la web se replican en su hosting. 404/410 para retirados sigue pendiente (ver §9).
 
 ---
 
@@ -261,16 +262,16 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - [x] Consumo del canal sin JSON estático, con filtros/búsqueda/paginación y estados vacío/error.
 - [x] Metas/OG/canonical/robots y JSON-LD (`Article`/`Event`/`BlogPosting`) aplicados desde la publicación, validados en el visor (§7.1).
 - [x] **Traspaso del port a `custom-page/nueva-version` — fuera del alcance de este proyecto.** Aquí se entrega el contrato, el visor de referencia y la guía §7.2; la sustitución de `blog-posts.json`/`HistoriasAPI`, las metas, el JSON-LD, los 301 y los estados se ejecutan **desde el repositorio de la web**. No se marca como pendiente de este plan.
-- [~] **Prerender/build por slug y `sitemap.xml`/`robots.txt` físicos → tarea del proyecto web:** se resuelven en su build/hosting; aquí solo se entrega el **mapa 301** (`GET /v1/redirects`) y el endpoint `sitemap`.
+- [x] **Prerender por slug y `sitemap.xml`/`robots.txt` físicos aplicados en la simulación** (`scripts/prerender-publico.js`, §7.4): una página estática por ficha con metas/JSON-LD, sitemap con `lastmod` y robots con `Sitemap:`. En la web se replica en su build; aquí queda además el **mapa 301** (`GET /v1/redirects`).
 - [~] **Auditoría formal de rendimiento/accesibilidad → tarea del proyecto web:** aquí está medido lo básico (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles).
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 454 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-14, 464 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **454 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **464 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version` y añadir el prerender SEO).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -284,7 +285,8 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
 - [x] **Gestor responsive:** listado solo de publicaciones; en ≤767 px la tabla pasa a tarjetas (patrón U4), acciones a lo ancho, stats en 2 columnas y el selector “Nueva publicación” como hoja inferior; tablet y escritorio mantienen tabla y diálogo centrado de 620 px. Verificado a 360/768/1280 px.
 - [x] **Pages en vivo (2026-11-14):** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200** con el tema nuevo (`Montserrat` 48 px a 1280, contenedor 1160), canal JSONP real, listado vacío “0 publicaciones”, 404 lógico (`#/publicacion/no-existe-xyz`) con **`noindex,nofollow`**, sin JSON-LD, canonical propio de la página, sin desbordes a 360/1280 y sin errores de consola.
-- [~] Revisión de píxeles con una **ficha real publicada**: requiere publicar un animal desde el panel (hoy “Laia” está `oculto`), así que la composición con datos reales sigue pendiente.
+- [x] **Ficha real publicada (Laia):** el listado la muestra y la ficha se compone con datos reales; el prerender genera `publicaciones/laia.html` con metas, canonical y JSON-LD (§7.4).
+- [x] **Prerender SEO:** una página estática por ficha sin JavaScript, `sitemap.xml` y `robots.txt` generados desde el canal y verificados a 360/1280 (§7.4).
 
 ### 7.2 Guía de port a `custom-page/nueva-version`
 
@@ -377,13 +379,37 @@ Reglas:
 
 **Fuera de alcance:** exponer la ficha interna del animal, editor WYSIWYG, CSS/tema por publicación y multiplantilla más allá de `ficha`/`historia`.
 
+### 7.4 SEO aplicado en la simulación (prerender, sitemap y robots) — verificado
+
+> `publico` es la simulación de la web: cada requisito SEO se implementa y se comprueba **aquí** antes de documentarlo para el proyecto real.
+
+**Qué se ha implementado**
+- `scripts/prerender-publico.js`: lee el canal (`publicaciones` paginado + `publicacion&slug=`), y escribe una **página estática por ficha** en `src/publicaciones/<slug>.html` con `<title>`, description, robots, canonical absoluto, OG/Twitter, JSON-LD y el HTML de la ficha **ya renderizado (sin JavaScript)**.
+- `sitemap.xml` con el listado y cada ficha publicada/listada (`lastmod` desde `updatedAt`/`publishedAt`), y `robots.txt` que permite lo público y bloquea el resto del panel.
+- `Publico.htmlDetalle(p)`: el HTML de la ficha se extrajo del render para reutilizarlo desde Node (una sola composición para SPA y estático).
+- Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, avisa y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--strict`).
+
+**Resultados (2026-11-14, ficha real de Laia)**
+- `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
+- Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
+- `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
+- `npm test`: **464/464** (10 nuevas de prerender).
+- **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
+
+**Cómo aplicarlo en el proyecto correspondiente**
+1. Generar en su build una página por `slug` usando el canal como fuente (SSG o script equivalente).
+2. Metas desde `seo.*`; canonical `dominio + ruta` (con dominio propio, sin `.html`); OG/Twitter con `ogImage`; JSON-LD por tipo y `mainEntityOfPage`.
+3. `sitemap.xml` en la raíz con `lastmod` y `robots.txt` con `Sitemap:`; excluir borradores, ocultos y `listed: false`.
+4. 404 real del hosting para slugs inexistentes y redirecciones 301 desde `GET /v1/redirects` (mapa ya disponible).
+5. Comprobar: HTML con contenido sin JS, `canonical` propio, JSON-LD válido, sitemap sin borradores y robots correcto.
+
 ### Fase 5 — Ajustes, calidad y operación — parcial
 **Objetivo:** estabilizar y mantener el flujo gestor → web.
 - [x] Validaciones de completitud/publicación y consistencia preview↔público (con pruebas).
 - [x] Caché interna del canal público y control de límites (paginación máx. 50, 60 s de caché).
 - [x] Diagnóstico de configuración en gestor y canal (`sheet_missing` / `sheet_not_found` vs lista vacía) y lectura estricta de la pestaña `WebPublicaciones`.
 - [x] Gestión de cambios de slug: historial `slug_historial` + redirección 301 en el detalle y mapa `GET /v1/redirects`; un slug histórico no se puede reutilizar.
-- [~] Pruebas de SEO/render: validadas en el visor (metas/OG/canonical/JSON-LD, 404 y estados vacíos); falta la verificación de indexación real en la web (Fase 4).
+- [~] Pruebas de SEO/render: visor y prerender validados (metas/OG/canonical/JSON-LD, 404, estados vacíos, sitemap y robots); falta la indexación real en la web, que depende del dominio propio.
 - [x] Documentación operativa: contratos y cabeceras de hoja en este documento.
 - [x] Procedimiento de publicación/redirects para el equipo en `.internal-docs/GESTOR_WEB_OPERATIVA.md`.
 
@@ -426,3 +452,5 @@ Reglas:
 | 2026-11-14 | 5 | `Code.gs` endurecido desplegado como nueva versión en Apps Script y canal verificado en vivo (`publicaciones`, `sitemap`, `redirects`, `taxonomias`, JSONP y 401 sin token) | — | Peticiones reales al `/exec` |
 | 2026-11-14 | 7.3 | Análisis y plan de la ficha de animal configurable (plantilla, bloques, iconos, galería, salud, CTA) sin implementar | — | §7.3 |
 | 2026-11-14 | 4 | Port a la web declarado **tarea del proyecto `custom-page/nueva-version`**: se entrega contrato + guía §7.2 + criterios §7.1 | — | §7.2 |
+| 2026-11-14 | 4 | Prerender SEO en la simulación: página estática por ficha, `sitemap.xml` y `robots.txt` desde el canal, integrados en el despliegue | — | `scripts/prerender-publico.js`, `tests/prerender.test.js`, §7.4 |
+| 2026-11-14 | 4 | Verificación con ficha real (Laia): estática con canonical/JSON-LD sin JS, 360/1280 sin desbordes; SPA sin regresiones | — | §7.4 |

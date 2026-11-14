@@ -27,6 +27,11 @@ build/
 # Configuración generada (contiene valores reales de producción)
 src/js/config.js
 
+# Prerender SEO del visor público (se genera en cada despliegue)
+src/publicaciones/
+src/sitemap.xml
+src/robots.txt
+
 # Backend Apps Script: solo se versionan las fuentes del gestor web (sin secretos).
 # Config.gs y el resto (Auth, Roles, Backup...) contienen datos reales.
 apps-script/*

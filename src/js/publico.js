@@ -400,6 +400,15 @@ const Publico = {
   renderDetalle(p) {
     const cont = this._contenedor();
     if (!cont) return;
+    cont.innerHTML = this.htmlDetalle(p);
+    this.aplicarSeo(p);
+  },
+
+  /**
+   * HTML de la ficha sin tocar el DOM: lo comparten el visor y el prerender
+   * estático (`scripts/prerender-publico.js`).
+   */
+  htmlDetalle(p) {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const estado = p.status ? `<span class="pub-tag pub-tag--estado">${this.esc(this.estadoTexto(p.status))}</span>` : '';
@@ -437,7 +446,7 @@ const Publico = {
       p.author ? `<span>${this.esc(p.author)}</span>` : ''
     ].filter(Boolean).join('');
 
-    cont.innerHTML = `
+    return `
       <a class="pub-back" href="#/">← Todas las publicaciones</a>
       <article class="pub-detalle">
         <header class="pub-ficha-hero">
@@ -462,8 +471,6 @@ const Publico = {
         ${p.event ? this._bloqueEvento(p.event) : ''}
         ${cta ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>` : ''}
       </article>`;
-
-    this.aplicarSeo(p);
   },
 
   // Icono y tono de cada dato destacado, calcado de la ficha de nueva-version.

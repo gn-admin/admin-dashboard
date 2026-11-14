@@ -5,6 +5,7 @@
   "main": "src/index.html",
   "scripts": {
     "build": "node scripts/gen-config.js",
+    "prerender": "node scripts/prerender-publico.js",
     "predev": "node scripts/gen-config.js",
     "dev": "npx serve src -p 8080",
     "dev:open": "npx serve src -p 8080 --open",

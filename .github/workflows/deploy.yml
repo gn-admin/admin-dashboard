@@ -47,6 +47,13 @@ jobs:
       - name: Tests
         run: npm test
 
+      # Prerender SEO del visor: una página estática por ficha, sitemap y robots.
+      # Si el canal no responde, avisa y no borra lo generado (no bloquea el deploy).
+      - name: Prerender público
+        env:
+          PUBLIC_WEB_BASE_URL: ${{ vars.PUBLIC_WEB_BASE_URL }}
+        run: node scripts/prerender-publico.js
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
