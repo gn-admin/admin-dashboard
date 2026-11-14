@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0A431E">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://script.google.com https://script.googleusercontent.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self' data:;
+    connect-src 'self' https://script.google.com https://script.googleusercontent.com;
+    frame-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    object-src 'none';
+  ">
+  <title>Publicaciones · Grupo Nebak</title>
+  <meta name="description" content="Animales en adopción, acogidas, eventos e historias de Grupo Nebak.">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="">
+  <meta property="og:site_name" content="Grupo Nebak">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Publicaciones · Grupo Nebak">
+  <meta property="og:description" content="Animales en adopción, acogidas, eventos e historias de Grupo Nebak.">
+  <meta property="og:image" content="">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="assets/icons/logo-nebak.jpg">
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+  <link rel="stylesheet" href="css/publico.css">
+</head>
+<body>
+  <header class="pub-header">
+    <a class="pub-brand" href="publico.html">
+      <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak" width="44" height="44">
+      <span>
+        <strong>Grupo Nebak</strong>
+        <small>Publicaciones</small>
+      </span>
+    </a>
+    <a class="pub-link-panel" href="index.html">Volver al panel</a>
+  </header>
+
+  <main id="pub-contenido" class="pub-main" aria-live="polite">
+    <div class="pub-estado" role="status">
+      <span class="pub-spinner" aria-hidden="true"></span>
+      <p>Cargando publicaciones...</p>
+    </div>
+  </main>
+
+  <footer class="pub-footer">
+    <p>Grupo Nebak · Contenido público. <a href="index.html">Acceso al panel</a></p>
+  </footer>
+
+  <noscript>
+    <p class="pub-noscript">Activa JavaScript para ver las publicaciones.</p>
+  </noscript>
+
+  <script src="js/config.js"></script>
+  <script src="js/publico.js"></script>
+</body>
+</html>

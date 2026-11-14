@@ -99,9 +99,22 @@ writeFile('src/js/config.js', frontConfig);
 function sheetsBlock() {
   const rows = [
     ['estados', 'SHEET_ESTADOS_ID', 'Estados'],
-    ['notas', 'SHEET_NOTAS_ID', 'Notas']
+    ['notas', 'SHEET_NOTAS_ID', 'Notas'],
+    // Valores opcionales: si no están en .env se mantiene el placeholder original
+    // (nunca se escribe vacío, para no romper un Config.gs que ya funcionaba).
+    ['historialFasesAdopcion', 'SHEET_HISTORIAL_FASES_ID', 'HistorialFasesAdopcion', 'REEMPLAZAR_CON_ID_HOJA_HISTORIAL_FASES_ADOPCION'],
+    ['auditoria', 'SHEET_AUDITORIA_ID', 'Auditoria', 'REEMPLAZAR_CON_ID_HOJA_AUDITORIA']
   ];
-  return rows.map(([key, envK, name]) => `    ${key}: { sheetId: '${env(envK)}', sheetName: '${name}' }`).join(',\n');
+  return rows.map(([key, envK, name, def]) => `    ${key}: { sheetId: '${env(envK, def || '')}', sheetName: '${name}' }`).join(',\n');
+}
+
+/** Lista separada por comas -> array de strings en minúsculas. */
+function envLista(k) {
+  return env(k).split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+if (!envLista('ADMIN_EMAILS').length) {
+  console.warn('AVISO: ADMIN_EMAILS está vacío en .env; el Config.gs generado no tendrá admins explícitos (cualquier usuario autenticado se trataría como admin).');
 }
 
 const backendConfig = `var CONFIG = {
@@ -115,7 +128,14 @@ const backendConfig = `var CONFIG = {
   DRIVE_DOCS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_DOCS_FOLDER_ID', '')}',
   DRIVE_FACTURAS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FACTURAS_FOLDER_ID', '')}',
   CONTACT_EMAIL: '${env('CONTACTO_EMAIL', '')}',
-  ROLES: { ADMIN: 'admin', USER: 'usuario' },
+  PUBLIC_WEB_BASE_URL: '${env('PUBLIC_WEB_BASE_URL', 'https://gn-admin.github.io/admin-dashboard')}',
+  ROLES: { ADMIN: 'admin', USER: 'usuario', COORDINADOR: 'coordinador', VOLUNTARIO: 'voluntario', TESORERIA: 'tesoreria', CONSULTA: 'consulta' },
+  MAX_UPLOAD_BYTES: ${env('MAX_UPLOAD_BYTES', String(5 * 1024 * 1024))},
+  BACKUP_EMAIL: '${env('BACKUP_EMAIL', 'PON_AQUI_EL_EMAIL_DESTINO@example.com')}',
+  BACKUP_DRIVE_FOLDER_ID: '${env('BACKUP_DRIVE_FOLDER_ID')}',
+  BACKUP_INCLUDE_DRIVE_FILES: ${env('BACKUP_INCLUDE_DRIVE_FILES', 'false') === 'true' ? 'true' : 'false'},
+  // Admins por email (desde .env: ADMIN_EMAILS=a@x.es,b@y.es).
+  ADMIN_EMAILS: ${JSON.stringify(envLista('ADMIN_EMAILS'))},
 
   surveys: {
     'pre-adopcion-perros': {
@@ -159,6 +179,7 @@ const backendConfig = `var CONFIG = {
     documentos: { sheetId: '${env('SHEET_DOCUMENTOS_ID')}', sheetName: 'Documentos' },
     inventario: { sheetId: '${env('SHEET_INVENTARIO_ID')}', sheetName: 'Inventario' },
     grupos: { sheetId: '${env('SHEET_GRUPOS_ID')}', sheetName: 'Grupos' },
+    webPublicaciones: { sheetId: '${env('SHEET_WEB_PUBLICACIONES_ID', 'REEMPLAZAR_CON_ID_HOJA_WEB_PUBLICACIONES')}', sheetName: '${env('SHEET_WEB_PUBLICACIONES_TAB', 'WebPublicaciones')}' },
 ${sheetsBlock()}
   }
 };

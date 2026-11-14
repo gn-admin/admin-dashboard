@@ -1,0 +1,776 @@
+/**
+ * GESTOR WEB · capa pública de contenido (admin)
+ * ---------------------------------------------------------------------------
+ * Sección "Web / Contenido público": cura qué se publica en la web
+ * (animales, eventos e historias), con estado, completitud, media, CTA y
+ * metadatos SEO de la publicación. Consume los endpoints `web-*`.
+ *
+ * La lógica pura (slug, completitud, parsers) vive aquí sin DOM para poder
+ * testearla con `node --test`.
+ */
+
+const Web = {
+  tab: 'animal',
+  animales: [],
+  eventos: [],
+  resumen: null,
+  error: '',
+  _filtros: { q: '', estado: '' },
+  _ultimoPreview: null,
+
+  // ==================== LÓGICA PURA ====================
+
+  normalizarSlug(valor) {
+    const mapa = { 'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a', 'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'ñ': 'n', 'ç': 'c' };
+    let s = String(valor == null ? '' : valor).toLowerCase().replace(/[áàäâãåéèëêíìïîóòöôõúùüûñç]/g, c => mapa[c] || c);
+    s = s.replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+    if (s.length > 80) s = s.slice(0, 80).replace(/-+$/g, '');
+    return s;
+  },
+
+  slugValido(slug) {
+    return !!slug && slug.length <= 80 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
+  },
+
+  /**
+   * Campos que impiden publicar. Devuelve claves estables para pintar chips.
+   * Para animales se combina con lo que ya calcula el backend (portada del
+   * animal como respaldo), por eso se acepta `faltan` externo.
+   */
+  completitud(pub) {
+    const p = pub || {};
+    const media = p.media || {};
+    const faltan = [];
+    if (!String(p.titulo || '').trim()) faltan.push('titulo');
+    if (!this.slugValido(this.normalizarSlug(p.slug))) faltan.push('slug');
+    if (!String(p.categoria || '').trim()) faltan.push('categoria');
+    if (String(p.contenido_html || '').trim().length < 40) faltan.push('contenido');
+    if (!String((media.coverImage && media.coverImage.src) || p.foto || '').trim()) faltan.push('imagen');
+    if (!String((p.seo && p.seo.metaDescription) || p.extracto || '').trim()) faltan.push('seo');
+    return faltan;
+  },
+
+  /* Convierte texto multilínea en galería `{src,alt,order}`. */
+  parseGaleria(texto, altBase) {
+    return String(texto || '')
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(Boolean)
+      .map((src, i) => ({ src, alt: (altBase ? altBase + ' ' : 'Imagen ') + (i + 1), order: i }));
+  },
+
+  /* "icono|etiqueta|valor" por línea -> icons[] */
+  parseIconos(texto) {
+    return String(texto || '')
+      .split(/\r?\n/)
+      .map(l => l.split('|').map(x => String(x || '').trim()))
+      .filter(p => p.length >= 2 && (p[0] || p[1]))
+      .map(p => ({ icon: p[0] || '', label: p[1] || '', value: p[2] || '' }));
+  },
+
+  /* "título|url" por línea -> videos[] */
+  parseVideos(texto) {
+    return String(texto || '')
+      .split(/\r?\n/)
+      .map(l => l.split('|').map(x => String(x || '').trim()))
+      .filter(p => p.length >= 2 && p[1])
+      .map(p => ({ title: p[0] || '', url: p[1], provider: /youtu/.test(p[1]) ? 'youtube' : (/vimeo/.test(p[1]) ? 'vimeo' : '') }));
+  },
+
+  /* Lista separada por comas. */
+  parseLista(texto) {
+    return String(texto || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(Boolean);
+  },
+
+  /** Meta título SEO: el guardado o, si está vacío, el propio título. */
+  seoTitle(pub) {
+    const p = pub || {};
+    const meta = String((p.seo && p.seo.metaTitle) || '').trim();
+    return meta || String(p.titulo || '').trim();
+  },
+
+  estadoLabel(estado) {
+    const m = { publicado: 'Publicado', borrador: 'Borrador', oculto: 'Oculto', sin_publicar: 'Sin publicar' };
+    return m[estado] || 'Sin publicar';
+  },
+
+  estadoCls(estado) {
+    const m = { publicado: 'aprobada', borrador: 'pendiente', oculto: 'descartada' };
+    return m[estado] || '';
+  },
+
+  // ==================== ACCIONES DE UI (desde Dashboard) ====================
+
+  async render(el) {
+    if (!el) return;
+    if (typeof Dashboard !== 'undefined' && typeof Dashboard.puedeAccederPagina === 'function' && !Dashboard.puedeAccederPagina('web')) {
+      Dashboard._sinPermisoPage(el);
+      Dashboard.injectIcons();
+      return;
+    }
+    el.innerHTML = (typeof Dashboard !== 'undefined' && Dashboard._pageSkeleton) ? Dashboard._pageSkeleton('web') : '';
+    await this.cargar();
+    el.innerHTML = this._html();
+    if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+  },
+
+  async cargar() {
+    this.error = '';
+    try {
+      const [resumen, animales, eventos] = await Promise.all([
+        API.getWebResumen(),
+        API.getWebAnimales({ pageSize: 200 }),
+        API.getWebEventos()
+      ]);
+      this.resumen = resumen.data || null;
+      this.animales = animales.data || [];
+      this.eventos = eventos.data || [];
+    } catch (err) {
+      this.error = (typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : String((err && err.message) || err);
+      this.animales = [];
+      this.eventos = [];
+    }
+  },
+
+  _html() {
+    if (this.error) {
+      const sinHoja = /sin configurar|no configurado/i.test(this.error);
+      return `<div class="empty-state empty-state-illustrated">
+        <div class="empty-state-icon">${Icons.alertTriangle}</div>
+        <h3>${sinHoja ? 'Gestor web sin activar' : 'No se pudo cargar el gestor web'}</h3>
+        <p>${this._esc(sinHoja ? 'Falta la hoja de publicaciones en el backend. Créala y configura SHEET_WEB_PUBLICACIONES_ID; después vuelve a entrar.' : this.error)}</p>
+        ${sinHoja && this.error ? `<p class="web-sub">${this._esc(this.error)}</p>` : ''}
+        <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="loadPage" data-arg0="web">Reintentar</button>
+      </div>`;
+    }
+    return `<div class="page-list-container">
+      ${this._statsHtml()}
+      <div class="web-tabs" role="tablist" aria-label="Contenido publicable">
+        <button type="button" role="tab" class="web-tab ${this.tab === 'animal' ? 'active' : ''}" aria-selected="${this.tab === 'animal'}" data-action="cambiarTabWeb" data-arg0="animal">Animales</button>
+        <button type="button" role="tab" class="web-tab ${this.tab === 'evento' ? 'active' : ''}" aria-selected="${this.tab === 'evento'}" data-action="cambiarTabWeb" data-arg0="evento">Eventos e historias</button>
+      </div>
+      <div class="filters-bar">
+        <div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar publicación" placeholder="Buscar por título, slug o nombre..." value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
+        <div class="filter-row">
+          <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
+            <option value="">Todos los estados</option>
+            ${['publicado', 'borrador', 'oculto'].concat(this.tab === 'animal' ? ['sin_publicar'] : []).map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
+          </select>
+          ${this.tab === 'evento' ? `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>` : ''}
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
+          <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
+        </div>
+      </div>
+      ${this._avisoPublicados()}
+      <div id="web-listado">${this._tabla()}</div>
+      <p class="web-nota">Los campos SEO son los metadatos que la web pública usará al renderizar cada ficha (title, description, canonical, robots, OG). La previsualización muestra exactamente el payload que entregará el canal público.</p>
+    </div>
+    <div class="page-detail-container"></div>`;
+  },
+
+  /** Aviso cuando nada está visible en la web: explica el siguiente paso. */
+  _avisoPublicados() {
+    const t = (this.resumen && this.resumen.totales) || {};
+    if (Number(t.publicados) > 0) return '';
+    return `<div class="web-aviso"><span aria-hidden="true">ℹ️</span><span>Todavía no hay nada visible en la web. Configura un animal o crea un evento y pulsa <b>Publicar</b> para que aparezca en <a href="publico.html" target="_blank" rel="noopener">la web pública</a>.</span></div>`;
+  },
+
+  _statsHtml() {
+    const t = (this.resumen && this.resumen.totales) || {};
+    const card = (label, valor, icono, extra) => `<div class="stat-card"><div class="stat-card-icon green">${icono}</div><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value">${Number(valor) || 0}</div>${extra ? `<div class="stat-card-change">${extra}</div>` : ''}</div></div>`;
+    return `<div class="stats-grid" style="margin-bottom:16px">
+      ${card('Publicados', t.publicados, Icons.checkCircle, 'Visibles en la web')}
+      ${card('Borradores', t.borradores, Icons.fileText, 'Sin publicar todavía')}
+      ${card('Ocultos', t.ocultos, Icons.eye, 'Retirados de la web')}
+      ${card('Sin configurar', t.sin_publicar, Icons.alertTriangle, 'Animales sin ficha web')}
+      ${card('Incompletos', t.incompletas, Icons.alertTriangle, (Number(t.sin_seo) || 0) + ' sin SEO/descripción')}
+    </div>`;
+  },
+
+  _tabla() {
+    const q = this._filtros.q.toLowerCase();
+    if (this.tab === 'animal') {
+      const filas = this.animales.filter(a => {
+        if (this._filtros.estado && a.estado_publicacion !== this._filtros.estado) return false;
+        if (!q) return true;
+        return ((a.nombre || '') + ' ' + (a.titulo || '') + ' ' + (a.slug || '') + ' ' + (a.especie || '')).toLowerCase().includes(q);
+      });
+      if (!filas.length) return this._vacio('No hay animales para este filtro', 'Ajusta la búsqueda o el estado de publicación.');
+      return `<div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Animal</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
+    }
+    const filas = this.eventos.filter(e => {
+      if (this._filtros.estado && e.estado_publicacion !== this._filtros.estado) return false;
+      if (!q) return true;
+      return ((e.titulo || '') + ' ' + (e.slug || '') + ' ' + (e.categoria || '')).toLowerCase().includes(q);
+    });
+    if (!filas.length) return this._vacio('No hay eventos ni historias', 'Crea el primero con el botón "Nuevo evento/historia".');
+    return `<div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Título</th><th>Tipo</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
+  },
+
+  _filaAnimal(a) {
+    const faltan = (a.completitud && a.completitud.faltan) || [];
+    return `<tr>
+      <td data-label="Animal"><b>${this._esc(a.nombre || '—')}</b><div class="web-sub">${this._esc(a.especie || '')}</div></td>
+      <td data-label="Estado web"><span class="estado-badge ${this.estadoCls(a.estado_publicacion)}">${this._esc(this.estadoLabel(a.estado_publicacion))}</span>${a.featured ? ' <span class="chip-neutral">Destacado</span>' : ''}</td>
+      <td data-label="Slug">${a.slug ? `<code>${this._esc(a.slug)}</code>` : '<span class="web-sub">sin slug</span>'}</td>
+      <td data-label="Completitud">${this._chips(faltan)}</td>
+      <td data-label="Acciones" class="table-actions" style="white-space:nowrap">
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirAnimalWeb" data-arg0="${this._esc(a.animal_id)}">${Icons.pencil} ${a.publicacion_id ? 'Editar' : 'Configurar'}</button>
+        ${a.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}">${Icons.eye} Preview</button>` : ''}
+        ${a.estado_publicacion === 'publicado' && a.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(a.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
+        ${a.publicacion_id
+          ? (a.estado_publicacion === 'publicado'
+            ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="oculto">Ocultar</button>`
+            : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="publicado">Publicar</button>`)
+          : ''}
+      </td>
+    </tr>`;
+  },
+
+  _filaEvento(e) {
+    const faltan = (e.completitud && e.completitud.faltan) || [];
+    return `<tr>
+      <td data-label="Título"><b>${this._esc(e.titulo || '—')}</b><div class="web-sub">${this._esc(e.categoria || '')}</div></td>
+      <td data-label="Tipo"><span class="chip-neutral">${this._esc(e.tipo === 'historia' ? 'Historia' : 'Evento')}</span></td>
+      <td data-label="Estado web"><span class="estado-badge ${this.estadoCls(e.estado_publicacion)}">${this._esc(this.estadoLabel(e.estado_publicacion))}</span></td>
+      <td data-label="Slug">${e.slug ? `<code>${this._esc(e.slug)}</code>` : '<span class="web-sub">sin slug</span>'}</td>
+      <td data-label="Completitud">${this._chips(faltan)}</td>
+      <td data-label="Acciones" class="table-actions" style="white-space:nowrap">
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
+        ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
+        ${e.estado_publicacion === 'publicado'
+          ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
+          : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
+        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Archivar ${this._esc(e.titulo || 'publicación')}" title="Archivar">${Icons.trash}</button>
+      </td>
+    </tr>`;
+  },
+
+  _chips(faltan) {
+    const labels = { titulo: 'Título', slug: 'Slug', categoria: 'Categoría', contenido: 'Descripción', imagen: 'Imagen', seo: 'SEO', publicacion: 'Sin configurar' };
+    if (!faltan || !faltan.length) return `<span class="estado-badge aprobada">Completa</span>`;
+    return faltan.map(f => `<span class="web-chip-missing">${this._esc(labels[f] || f)}</span>`).join(' ');
+  },
+
+  _vacio(titulo, texto) {
+    return `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.eye}</div><h3>${this._esc(titulo)}</h3><p>${this._esc(texto)}</p></div>`;
+  },
+
+  _esc(str) {
+    if (typeof Dashboard !== 'undefined' && Dashboard._esc) return Dashboard._esc(str);
+    if (str == null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+
+  _snack(msg, tipo) {
+    if (typeof Dashboard !== 'undefined' && Dashboard.showSnackbar) Dashboard.showSnackbar(msg, tipo || 'success');
+  },
+
+  _snackErr(err, msg) {
+    if (typeof Dashboard !== 'undefined' && Dashboard._snackErr) Dashboard._snackErr(err, msg);
+    else this._snack(msg, 'error');
+  },
+
+  // ==================== FILTROS / NAVEGACIÓN ====================
+
+  cambiarTab(tab) {
+    this.tab = tab === 'evento' ? 'evento' : 'animal';
+    this._filtros.estado = '';
+    const el = document.getElementById('page-web');
+    if (el) el.innerHTML = this._html();
+    if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+  },
+
+  buscar(q) {
+    this._filtros.q = String(q || '');
+    const c = document.getElementById('web-listado');
+    if (c) c.innerHTML = this._tabla();
+  },
+
+  filtrarEstado(estado) {
+    this._filtros.estado = String(estado || '');
+    const c = document.getElementById('web-listado');
+    if (c) c.innerHTML = this._tabla();
+  },
+
+  async recargar() {
+    const el = document.getElementById('page-web');
+    if (el) {
+      el.innerHTML = (typeof Dashboard !== 'undefined' && Dashboard._pageSkeleton) ? Dashboard._pageSkeleton('web') : '';
+      await this.cargar();
+      el.innerHTML = this._html();
+      if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+    }
+  },
+
+  // ==================== FORMULARIO: ANIMAL ====================
+
+  async abrirAnimal(animalId) {
+    try {
+      const res = await API.getWebAnimal(animalId);
+      const d = res.data || {};
+      const origen = res.origen || {};
+      const faltan = (res.completitud && res.completitud.faltan) ? res.completitud.faltan.map(f => f.campo) : [];
+      this._mostrarFormAnimal(d, origen, faltan);
+    } catch (err) {
+      this._snackErr(err, 'No se pudo abrir la publicación web');
+    }
+  },
+
+  _mostrarFormAnimal(d, origen, faltan) {
+    const media = d.media || {};
+    const seo = d.seo || {};
+    const animal = d.animal || {};
+    const cover = media.coverImage || {};
+    const gallery = Array.isArray(media.gallery) ? media.gallery : [];
+    const icons = Array.isArray(media.icons) ? media.icons : [];
+    const videos = Array.isArray(media.videos) ? media.videos : [];
+    const cta = d.cta || {};
+    const compat = animal.compatibility || {};
+    const adop = animal.adoption || {};
+    const foster = animal.foster || {};
+    const loc = animal.location || {};
+    const contacto = animal.contact || {};
+    const health = animal.health || {};
+
+    const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
+      <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. La ficha interna del animal no se expone: solo lo que rellenes aquí.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Estado de publicación *</label>
+          <select id="web-estado" class="form-input">
+            ${['borrador', 'publicado', 'oculto'].map(e => `<option value="${e}" ${(d.estado_publicacion || 'borrador') === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label>Slug *</label>
+          <input type="text" id="web-slug" class="form-input" value="${this._esc(d.slug || '')}" placeholder="luna-en-adopcion" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="animal">
+          <p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
+      </div>
+      <div class="form-group"><label>Título público *</label><input type="text" id="web-titulo" class="form-input" value="${this._esc(d.titulo || origen.nombre || '')}" required></div>
+      <div class="form-row">
+        <div class="form-group"><label>Categoría pública *</label>
+          <select id="web-categoria" class="form-input">
+            <option value="">Seleccionar...</option>
+            ${['Gatos en adopción', 'Perros en adopción', 'Acogidas', 'Adoptados', 'Caso externo', 'Eventos', 'Historias'].map(c => `<option ${d.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label>Estado público *</label>
+          <select id="web-estado-publico" class="form-input">
+            ${['en_adopcion', 'en_acogida', 'adoptado', 'reservado', 'urgente', 'cerrado'].map(e => `<option value="${e}" ${(d.estado_publico || origen.estado) === e ? 'selected' : ''}>${e.replace(/_/g, ' ')}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="form-group"><label>Extracto</label><textarea id="web-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
+      <div class="form-group"><label>Descripción pública * (admite HTML)</label><textarea id="web-contenido" class="form-input" rows="6" placeholder="<p>Texto de la ficha pública...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+
+      <details class="detail-collapse" ${cover.src ? '' : 'open'}><summary>${Icons.fileText} Media (portada, galería, vídeos, iconos)</summary>
+        <div class="detail-collapse-body">
+          <div class="form-row">
+            <div class="form-group"><label>Portada (URL)</label><input type="text" id="web-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
+            <div class="form-group"><label>Texto alternativo</label><input type="text" id="web-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
+          </div>
+          <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
+          <div class="form-group"><label>Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
+          <div class="form-group"><label>Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.paw} Ficha pública del animal</summary>
+        <div class="detail-collapse-body">
+          <div class="form-row">
+            <div class="form-group"><label>Tamaño</label><input type="text" id="web-size" class="form-input" value="${this._esc(animal.size || '')}" placeholder="pequeño / mediano / grande"></div>
+            <div class="form-group"><label>Color</label><input type="text" id="web-color" class="form-input" value="${this._esc(animal.color || '')}"></div>
+          </div>
+          <div class="form-group"><label>Temperamento (separado por comas)</label><input type="text" id="web-temperamento" class="form-input" value="${this._esc((animal.temperament || []).join(', '))}"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Compatibilidad con perros</label><input type="text" id="web-compat-perros" class="form-input" value="${this._esc(compat.dogs || '')}"></div>
+            <div class="form-group"><label>Compatibilidad con gatos</label><input type="text" id="web-compat-gatos" class="form-input" value="${this._esc(compat.cats || '')}"></div>
+            <div class="form-group"><label>Compatibilidad con niños</label><input type="text" id="web-compat-ninos" class="form-input" value="${this._esc(compat.kids || '')}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Modalidad de adopción</label><input type="text" id="web-adop-mode" class="form-input" value="${this._esc(adop.mode || '')}" placeholder="presencial / a distancia"></div>
+            <div class="form-group"><label>Tasa (€)</label><input type="text" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
+          </div>
+          <div class="form-group"><label>Requisitos de adopción</label><textarea id="web-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Acogida temporal</label>
+              <select id="web-foster-temp" class="form-input"><option value="no" ${foster.temporary ? '' : 'selected'}>No</option><option value="si" ${foster.temporary ? 'selected' : ''}>Sí</option></select></div>
+            <div class="form-group"><label>Duración de la acogida</label><input type="text" id="web-foster-dur" class="form-input" value="${this._esc(foster.durationLabel || '')}" placeholder="Ej: 3 meses"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Ciudad</label><input type="text" id="web-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
+            <div class="form-group"><label>Provincia</label><input type="text" id="web-loc-prov" class="form-input" value="${this._esc(loc.province || '')}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Email de contacto</label><input type="email" id="web-contact-email" class="form-input" value="${this._esc(contacto.email || '')}"></div>
+            <div class="form-group"><label>Teléfono de contacto</label><input type="text" id="web-contact-tel" class="form-input" value="${this._esc(contacto.phone || '')}"></div>
+          </div>
+          <div class="form-group"><label><input type="checkbox" id="web-special-needs" ${health.specialNeeds ? 'checked' : ''}> Necesidades especiales</label></div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
+        <div class="detail-collapse-body">
+          <div class="form-row">
+            <div class="form-group"><label>CTA · etiqueta</label><input type="text" id="web-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar"></div>
+            <div class="form-group"><label>CTA · URL</label><input type="text" id="web-cta-url" class="form-input" value="${this._esc(cta.url || '')}" placeholder="https://..."></div>
+          </div>
+          <div class="form-group"><label>Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
+          <div class="form-group"><label>Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
+          <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
+          <div class="form-row">
+            <div class="form-group"><label><input type="checkbox" id="web-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
+            <div class="form-group"><label><input type="checkbox" id="web-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
+            <div class="form-group"><label><input type="checkbox" id="web-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
+            <div class="form-group"><label>Orden</label><input type="number" id="web-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
+          </div>
+        </div>
+      </details>
+
+      ${faltan.length ? `<p class="web-nota">Pendiente para publicar: ${faltan.map(f => this._esc(f)).join(', ')}.</p>` : ''}
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar publicación</button></div>
+    </form>`;
+    if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) Dashboard.showFormModal('Publicación web · ' + (origen.nombre || 'Animal'), html);
+  },
+
+  _leerFormAnimal() {
+    const v = id => document.getElementById(id);
+    const txt = id => (v(id) ? String(v(id).value || '').trim() : '');
+    const checked = id => !!(v(id) && v(id).checked);
+    const alt = txt('web-cover-alt') || txt('web-titulo');
+    return {
+      estado_publicacion: txt('web-estado') || 'borrador',
+      slug: this.normalizarSlug(txt('web-slug') || txt('web-titulo')),
+      titulo: txt('web-titulo'),
+      categoria: txt('web-categoria'),
+      estado_publico: txt('web-estado-publico'),
+      extracto: txt('web-extracto'),
+      contenido_html: v('web-contenido') ? v('web-contenido').value : '',
+      indexable: checked('web-indexable'),
+      listed: checked('web-listed'),
+      featured: checked('web-featured'),
+      orden: Number(txt('web-orden')) || 0,
+      media: {
+        coverImage: { src: txt('web-cover'), alt },
+        gallery: this.parseGaleria(v('web-galeria') ? v('web-galeria').value : '', alt),
+        videos: this.parseVideos(v('web-videos') ? v('web-videos').value : ''),
+        icons: this.parseIconos(v('web-iconos') ? v('web-iconos').value : '')
+      },
+      cta: txt('web-cta-label') && txt('web-cta-url') ? { label: txt('web-cta-label'), url: txt('web-cta-url') } : null,
+      // Solo lo editable: canonical, OG y robots los deriva el backend.
+      seo: {
+        metaTitle: txt('web-seo-title'),
+        metaDescription: txt('web-seo-desc')
+      },
+      animal: {
+        size: txt('web-size'),
+        color: txt('web-color'),
+        temperament: this.parseLista(txt('web-temperamento')),
+        compatibility: { dogs: txt('web-compat-perros'), cats: txt('web-compat-gatos'), kids: txt('web-compat-ninos') },
+        adoption: { mode: txt('web-adop-mode'), feeEur: txt('web-adop-fee'), requirements: txt('web-adop-req') },
+        foster: { temporary: txt('web-foster-temp') === 'si', durationLabel: txt('web-foster-dur') },
+        location: { city: txt('web-loc-city'), province: txt('web-loc-prov') },
+        contact: { email: txt('web-contact-email'), phone: txt('web-contact-tel') },
+        health: { specialNeeds: checked('web-special-needs') }
+      }
+    };
+  },
+
+  async guardarAnimal(e, animalId) {
+    if (e && e.preventDefault) e.preventDefault();
+    const fin = (typeof Dashboard !== 'undefined' && Dashboard._guardando) ? Dashboard._guardando(e && e.target) : () => {};
+    if (!fin) return;
+    const datos = this._leerFormAnimal();
+    if (!datos.titulo) { this._snack('Falta el título público', 'warning'); fin(); return; }
+    try {
+      await API.saveWebAnimal({ animal_id: animalId, ...datos });
+      fin();
+      if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
+      this._snack('Publicación guardada');
+      await this.recargar();
+    } catch (err) {
+      fin();
+      this._snackErr(err, 'No se pudo guardar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  // ==================== FORMULARIO: EVENTO / HISTORIA ====================
+
+  async abrirEvento(id) {
+    if (!id) {
+      this._mostrarFormEvento({ tipo: 'evento', categoria: 'Eventos' });
+      return;
+    }
+    try {
+      const res = await API.getWebEvento(id);
+      this._mostrarFormEvento(res.data || {}, (res.completitud && res.completitud.faltan) ? res.completitud.faltan.map(f => f.campo) : []);
+    } catch (err) {
+      this._snackErr(err, 'No se pudo abrir la publicación');
+    }
+  },
+
+  _mostrarFormEvento(d, faltan) {
+    const media = d.media || {};
+    const seo = d.seo || {};
+    const ev = d.evento || d.event || {};
+    const cover = media.coverImage || {};
+    const gallery = Array.isArray(media.gallery) ? media.gallery : [];
+    const loc = ev.location || {};
+    const org = ev.organizer || {};
+    const reg = ev.registration || {};
+    const cta = d.cta || {};
+    const hoy = new Date().toISOString().slice(0, 10);
+
+    const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
+      <div class="form-row">
+        <div class="form-group"><label>Tipo de contenido *</label>
+          <select id="we-tipo" class="form-input" data-change="onWebTipoChange" data-cpass="value">
+            <option value="evento" ${d.tipo !== 'historia' ? 'selected' : ''}>Evento</option>
+            <option value="historia" ${d.tipo === 'historia' ? 'selected' : ''}>Historia / blog</option>
+          </select></div>
+        <div class="form-group"><label>Estado de publicación *</label>
+          <select id="we-estado" class="form-input">
+            ${['borrador', 'publicado', 'oculto'].map(e => `<option value="${e}" ${(d.estado_publicacion || 'borrador') === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Título *</label><input type="text" id="we-titulo" class="form-input" value="${this._esc(d.titulo || '')}" required></div>
+        <div class="form-group"><label>Slug *</label><input type="text" id="we-slug" class="form-input" value="${this._esc(d.slug || '')}" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="${this._esc(d.tipo || 'evento')}"><p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Categoría *</label><input type="text" id="we-categoria" class="form-input" value="${this._esc(d.categoria || (d.tipo === 'historia' ? 'Historias' : 'Eventos'))}"></div>
+        <div class="form-group"><label>Estado público</label><input type="text" id="we-estado-publico" class="form-input" value="${this._esc(d.estado_publico || (d.tipo === 'historia' ? 'publicado' : 'programado'))}" placeholder="programado / activo / finalizado"></div>
+      </div>
+      <div class="form-group"><label>Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>
+      <div class="form-group"><label>Contenido * (admite HTML)</label><textarea id="we-contenido" class="form-input" rows="6">${this._esc(d.contenido_html || '')}</textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Portada (URL)</label><input type="text" id="we-cover" class="form-input" value="${this._esc(cover.src || '')}"></div>
+        <div class="form-group"><label>Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
+      </div>
+      <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
+
+      <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
+        <div class="detail-collapse-body">
+          <div class="form-row">
+            <div class="form-group"><label>Modalidad / tipo</label><input type="text" id="we-kind" class="form-input" value="${this._esc(ev.kind || '')}" placeholder="jornada, mercadillo, puertas abiertas"></div>
+            <div class="form-group"><label>Zona horaria</label><input type="text" id="we-timezone" class="form-input" value="${this._esc(ev.timezone || 'Europe/Madrid')}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Inicio</label><input type="date" id="we-start" class="form-input" value="${this._esc((ev.startDate || hoy).slice(0, 10))}"></div>
+            <div class="form-group"><label>Fin</label><input type="date" id="we-end" class="form-input" value="${this._esc((ev.endDate || '').slice(0, 10))}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Lugar</label><input type="text" id="we-loc-name" class="form-input" value="${this._esc(loc.name || '')}"></div>
+            <div class="form-group"><label>Dirección</label><input type="text" id="we-loc-address" class="form-input" value="${this._esc(loc.address || '')}"></div>
+            <div class="form-group"><label>Ciudad</label><input type="text" id="we-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
+            <div class="form-group"><label>URL online</label><input type="text" id="we-loc-online" class="form-input" value="${this._esc(loc.onlineUrl || '')}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Organiza</label><input type="text" id="we-org-name" class="form-input" value="${this._esc(org.name || '')}"></div>
+            <div class="form-group"><label>Email de contacto</label><input type="email" id="we-org-email" class="form-input" value="${this._esc(org.contactEmail || '')}"></div>
+            <div class="form-group"><label>Teléfono</label><input type="text" id="we-org-phone" class="form-input" value="${this._esc(org.phone || '')}"></div>
+          </div>
+          <div class="form-group"><label>Público destinatario (separado por comas)</label><input type="text" id="we-audience" class="form-input" value="${this._esc((ev.audience || []).join(', '))}"></div>
+          <div class="form-row">
+            <div class="form-group"><label><input type="checkbox" id="we-reg-required" ${reg.required ? 'checked' : ''}> Requiere inscripción</label></div>
+            <div class="form-group"><label>URL de inscripción</label><input type="text" id="we-reg-url" class="form-input" value="${this._esc(reg.url || '')}"></div>
+            <div class="form-group"><label>Texto del botón</label><input type="text" id="we-reg-label" class="form-input" value="${this._esc(reg.label || '')}"></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
+        <div class="detail-collapse-body">
+          <div class="form-row">
+            <div class="form-group"><label>CTA · etiqueta</label><input type="text" id="we-cta-label" class="form-input" value="${this._esc(cta.label || '')}"></div>
+            <div class="form-group"><label>CTA · URL</label><input type="text" id="we-cta-url" class="form-input" value="${this._esc(cta.url || '')}"></div>
+          </div>
+          <div class="form-group"><label>Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
+          <div class="form-group"><label>Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
+          <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
+          <div class="form-row">
+            <div class="form-group"><label><input type="checkbox" id="we-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable</label></div>
+            <div class="form-group"><label><input type="checkbox" id="we-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
+            <div class="form-group"><label><input type="checkbox" id="we-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
+          </div>
+        </div>
+      </details>
+
+      ${faltan && faltan.length ? `<p class="web-nota">Pendiente para publicar: ${faltan.map(f => this._esc(f)).join(', ')}.</p>` : ''}
+      <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar publicación</button></div>
+    </form>`;
+    if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) Dashboard.showFormModal((d.tipo === 'historia' ? 'Historia web' : 'Evento web') + (d.id ? '' : ' · nueva'), html);
+  },
+
+  _leerFormEvento() {
+    const v = id => document.getElementById(id);
+    const txt = id => (v(id) ? String(v(id).value || '').trim() : '');
+    const checked = id => !!(v(id) && v(id).checked);
+    const alt = txt('we-cover-alt') || txt('we-titulo');
+    const tipo = txt('we-tipo') === 'historia' ? 'historia' : 'evento';
+    return {
+      tipo,
+      estado_publicacion: txt('we-estado') || 'borrador',
+      slug: this.normalizarSlug(txt('we-slug') || txt('we-titulo')),
+      titulo: txt('we-titulo'),
+      categoria: txt('we-categoria'),
+      estado_publico: txt('we-estado-publico'),
+      extracto: txt('we-extracto'),
+      contenido_html: v('we-contenido') ? v('we-contenido').value : '',
+      indexable: checked('we-indexable'),
+      listed: checked('we-listed'),
+      featured: checked('we-featured'),
+      media: {
+        coverImage: { src: txt('we-cover'), alt },
+        gallery: this.parseGaleria(v('we-galeria') ? v('we-galeria').value : '', alt)
+      },
+      cta: txt('we-cta-label') && txt('we-cta-url') ? { label: txt('we-cta-label'), url: txt('we-cta-url') } : null,
+      // Solo lo editable: canonical, OG y robots los deriva el backend.
+      seo: {
+        metaTitle: txt('we-seo-title'),
+        metaDescription: txt('we-seo-desc')
+      },
+      event: {
+        kind: txt('we-kind'),
+        startDate: txt('we-start'),
+        endDate: txt('we-end'),
+        timezone: txt('we-timezone'),
+        location: { name: txt('we-loc-name'), address: txt('we-loc-address'), city: txt('we-loc-city'), onlineUrl: txt('we-loc-online') },
+        organizer: { name: txt('we-org-name'), contactEmail: txt('we-org-email'), phone: txt('we-org-phone') },
+        audience: this.parseLista(txt('we-audience')),
+        registration: { required: checked('we-reg-required'), url: txt('we-reg-url'), label: txt('we-reg-label') }
+      }
+    };
+  },
+
+  async guardarEvento(e, id) {
+    if (e && e.preventDefault) e.preventDefault();
+    const fin = (typeof Dashboard !== 'undefined' && Dashboard._guardando) ? Dashboard._guardando(e && e.target) : () => {};
+    if (!fin) return;
+    const datos = this._leerFormEvento();
+    if (!datos.titulo) { this._snack('Falta el título', 'warning'); fin(); return; }
+    try {
+      await API.saveWebEvento({ id: id || undefined, ...datos });
+      fin();
+      if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
+      this._snack('Publicación guardada');
+      await this.recargar();
+    } catch (err) {
+      fin();
+      this._snackErr(err, 'No se pudo guardar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  // ==================== ESTADO / PREVIEW / SLUG ====================
+
+  async cambiarEstado(tipo, identificador, estado) {
+    if (tipo === 'animal') {
+      const fila = (this.animales || []).find(a => String(a.animal_id) === String(identificador));
+      if (fila && !fila.publicacion_id) {
+        this._snack('Configura primero la publicación web de este animal', 'warning');
+        return this.abrirAnimal(identificador);
+      }
+      try {
+        await API.setWebAnimalEstado(identificador, estado);
+        this._snack(estado === 'publicado' ? 'Publicado en la web' : 'Publicación ocultada');
+        await this.recargar();
+      } catch (err) {
+        this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+      }
+      return;
+    }
+    try {
+      await API.setWebEventoEstado(identificador, estado);
+      this._snack(estado === 'publicado' ? 'Publicado en la web' : 'Publicación ocultada');
+      await this.recargar();
+    } catch (err) {
+      this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  async archivar(id) {
+    if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
+      const ok = await Dashboard._confirm('Archivar esta publicación? Dejará de estar disponible en la web.', 'Archivar', 'Archivar');
+      if (!ok) return;
+    }
+    try {
+      await API.deleteWebEvento(id);
+      this._snack('Publicación archivada');
+      await this.recargar();
+    } catch (err) {
+      this._snackErr(err, 'No se pudo archivar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  async preview(tipo, id) {
+    try {
+      const res = tipo === 'animal' ? await API.previewWebAnimal(id) : await API.previewWebEvento(id);
+      this._ultimoPreview = res.data || null;
+      const json = JSON.stringify(this._ultimoPreview, null, 2);
+      const titulo = (this._ultimoPreview && this._ultimoPreview.title) || 'Publicación';
+      const html = `<p class="web-nota">Este es el objeto <code>Publicacion</code> que entregará <code>/api/publicaciones/:slug</code>.</p>
+        <pre class="web-preview-json">${this._esc(json)}</pre>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="copiarPreviewWeb">Copiar JSON</button><button type="button" class="btn btn-primary" data-action="closeInfoModal">Cerrar</button></div>`;
+      if (typeof Dashboard !== 'undefined' && Dashboard.showInfoModal) Dashboard.showInfoModal('Previsualización · ' + titulo, html);
+    } catch (err) {
+      this._snackErr(err, 'No se pudo generar la previsualización');
+    }
+  },
+
+  copiarPreview() {
+    const json = JSON.stringify(this._ultimoPreview || {}, null, 2);
+    try {
+      navigator.clipboard.writeText(json).then(() => this._snack('JSON copiado'), () => this._snack('No se pudo copiar', 'warning'));
+    } catch (e) {
+      this._snack('No se pudo copiar', 'warning');
+    }
+  },
+
+  /** Slugs anteriores que ya redirigen (301) a esta publicación. */
+  historialSlugHtml(hist) {
+    const lista = (Array.isArray(hist) ? hist : []).filter(h => h && h.slug);
+    if (!lista.length) return '';
+    const slugs = lista.map(h => `<code>${this._esc(h.slug)}</code>`).join(', ');
+    return `<p class="web-slug-hint web-slug-hist">Slugs anteriores con redirección 301: ${slugs}</p>`;
+  },
+
+  async validarSlugInput(el, id, tipo) {
+    const hint = document.getElementById('web-slug-hint');
+    if (!hint || !el) return;
+    const normalizado = this.normalizarSlug(el.value);
+    hint.className = 'web-slug-hint';
+    hint.textContent = '';
+    if (!normalizado) { hint.textContent = 'El slug se generará a partir del título.'; return; }
+    if (normalizado !== String(el.value || '').trim()) { el.value = normalizado; }
+    hint.textContent = 'Comprobando disponibilidad...';
+    try {
+      const res = await API.checkWebSlug(tipo === 'animal' ? 'animal' : tipo, normalizado, id || '');
+      const d = res.data || {};
+      if (d.disponible) {
+        hint.textContent = 'Slug disponible';
+        hint.classList.add('ok');
+      } else {
+        hint.textContent = d.conflicto ? ('Ya lo usa «' + (d.conflicto.titulo || d.conflicto.id) + '»') : 'Slug no válido';
+        hint.classList.add('ko');
+      }
+    } catch (err) {
+      hint.textContent = 'No se pudo comprobar el slug (se valida al guardar)';
+    }
+  },
+
+  // ==================== INTEGRACIÓN DESDE LA FICHA DEL ANIMAL ====================
+
+  async abrirParaAnimal(animalId) {
+    return this.abrirAnimal(animalId);
+  },
+
+  onChangeTipo(valor) {
+    const det = document.querySelector('#form-body details.detail-collapse');
+    if (det) {
+      if (valor === 'historia') det.removeAttribute('open');
+      else det.setAttribute('open', '');
+    }
+  }
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Web;

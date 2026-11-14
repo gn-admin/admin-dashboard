@@ -106,7 +106,7 @@ const App = {
     const p = String(page || '');
     if (p === 'dashboard' || p === 'animales') return p;
     if (p.indexOf('encuestas') === 0) return 'encuestas';
-    const mas = ['acogidas', 'acogidas-activas', 'adopciones', 'socios', 'blacklist', 'reportes', 'redes', 'donaciones', 'almacen'];
+    const mas = ['acogidas', 'acogidas-activas', 'adopciones', 'socios', 'blacklist', 'reportes', 'redes', 'donaciones', 'almacen', 'web'];
     return mas.includes(p) ? 'mas' : '';
   },
 
@@ -153,7 +153,8 @@ const App = {
         reportes: 'Reportes y actividad',
         redes: 'Redes Sociales',
         donaciones: 'Donaciones',
-        almacen: 'Almacén'
+        almacen: 'Almacén',
+        web: 'Web / Contenido público'
       };
       document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
       this.closeSidebar();

@@ -194,6 +194,21 @@ const API = {
   async updateGrupo(id, data) { const r = await this._post('update-grupo', { id, ...data }); if (!r.data) throw new Error('El backend no devolvio el registro (id sin sincronizar)'); return r; },
   async deleteGrupo(id) { return this._post('delete-grupo', { id }); },
 
+  // Gestor web: capa publica y metadatos SEO de las publicaciones
+  async getWebAnimales(params = {}) { return this._get('web-animales', params); },
+  async getWebAnimal(id) { return this._get('web-animales', { id }); },
+  async saveWebAnimal(data) { return this._post('web-animales', data); },
+  async setWebAnimalEstado(animalId, estado) { return this._post('web-animales-estado', { animal_id: animalId, estado_publicacion: estado }); },
+  async previewWebAnimal(id) { return this._get('web-animales-preview', { id }); },
+  async getWebEventos(params = {}) { return this._get('web-eventos', params); },
+  async getWebEvento(id) { return this._get('web-eventos', { id }); },
+  async saveWebEvento(data) { return this._post('web-eventos', data); },
+  async setWebEventoEstado(id, estado) { return this._post('web-eventos-estado', { id, estado_publicacion: estado }); },
+  async previewWebEvento(id) { return this._get('web-eventos-preview', { id }); },
+  async deleteWebEvento(id) { return this._post('web-eventos', { id, accion: 'archivar' }); },
+  async checkWebSlug(tipo, slug, id) { return this._get('web-slug-check', { tipo, slug, id: id || '' }); },
+  async getWebResumen() { return this._get('web-resumen'); },
+
   // Actividad
   async getActividad() { return this._get('actividad'); },
   async createActividad(data) { return this._post('actividad', data); },

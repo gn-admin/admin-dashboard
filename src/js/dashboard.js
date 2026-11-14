@@ -250,6 +250,7 @@ const Dashboard = {
       redes: () => this.renderRedes(el),
       donaciones: () => this.renderDonaciones(el),
       almacen: () => this.renderAlmacen(el),
+      web: () => (typeof Web !== 'undefined' ? Web.render(el) : Promise.resolve()),
     };
     el.innerHTML = this._pageSkeleton(page);
     el.setAttribute('aria-busy', 'true');
@@ -326,10 +327,11 @@ const Dashboard = {
     set('mas-icon-redes', Icons.eye);
     set('mas-icon-donaciones', Icons.trendingUp);
     set('mas-icon-almacen', Icons.box);
+    set('mas-icon-web', Icons.eye);
     set('mas-icon-blacklist', Icons.ban);
     document.querySelectorAll('.sidebar-link-icon').forEach(el => {
       const p = el.closest('.sidebar-link')?.dataset.page;
-      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, actividad: Icons.activity, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box };
+      const m = { dashboard: Icons.dashboard, 'encuestas-perros': Icons.dog, 'encuestas-gatos': Icons.cat, 'encuestas-acogida': Icons.clipboard, animales: Icons.heart, acogidas: Icons.home, 'acogidas-activas': Icons.activity, adopciones: Icons.fileText, socios: Icons.users, blacklist: Icons.ban, reportes: Icons.barChart, actividad: Icons.activity, redes: Icons.eye, donaciones: Icons.trendingUp, almacen: Icons.box, web: Icons.eye };
       el.innerHTML = m[p] || Icons.clipboard;
     });
     document.querySelectorAll('.bottom-nav-icon').forEach(el => {
@@ -369,7 +371,7 @@ const Dashboard = {
 
   _paginasPorRol: {
     admin: '*',
-    coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad'],
+    coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad','web'],
     voluntario: ['dashboard','animales','reportes','actividad'],
     tesoreria: ['dashboard','animales','donaciones','almacen','reportes','actividad'],
     consulta: ['dashboard','animales'],
@@ -401,7 +403,7 @@ const Dashboard = {
     const rol = this._rolActual();
     if (rol === 'admin') return true;
     if (rol === 'consulta') return false;
-    if (rol === 'coordinador') return ['encuestas','animales','acogidas','adopciones','socios','blacklist','reportes','actividad'].indexOf(modulo) !== -1;
+    if (rol === 'coordinador') return ['encuestas','animales','acogidas','adopciones','socios','blacklist','reportes','actividad','web'].indexOf(modulo) !== -1;
     if (rol === 'voluntario') return ['animales','reportes','actividad'].indexOf(modulo) !== -1;
     if (rol === 'tesoreria') return ['donaciones','almacen','animales','reportes','actividad'].indexOf(modulo) !== -1;
     return false;
@@ -473,6 +475,7 @@ const Dashboard = {
         blacklist: 'blacklist',
         donaciones: 'donaciones',
         almacen: 'almacen',
+        web: 'web',
         reportes: 'reportes', actividad: 'actividad'
       };
       const currentMod = pageToMod[hash] || hash;
@@ -495,6 +498,8 @@ const Dashboard = {
         showSocioForm: 'socios', showSocioFormById: 'socios', saveSocio: 'socios', deleteSocio: 'socios',
         showAddBlacklist: 'blacklist', showEditBlacklistItem: 'blacklist', saveBlacklist: 'blacklist', removeBlacklistItem: 'blacklist',
         showDonacionForm: 'donaciones', saveDonacion: 'donaciones', deleteDonacion: 'donaciones',
+        abrirAnimalWeb: 'web', abrirEventoWeb: 'web', saveWebAnimal: 'web', saveWebEvento: 'web',
+        cambiarEstadoWeb: 'web', archivarWeb: 'web', recargarWeb: 'web', abrirPublicacionWebAnimal: 'web',
         showInventarioForm: 'almacen', saveInventario: 'almacen', deleteInventario: 'almacen',
         showRecordatorioForm: 'reportes', saveRecordatorio: 'reportes', deleteRecordatorio: 'reportes',
         descartar2025: 'reportes'
@@ -5057,6 +5062,7 @@ const Dashboard = {
       ${estadoBanner}
       <div class="detail-actions-wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showAnimalFormById" data-arg0="${a.id}">${Icons.pencil} Editar</button>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${a.id}">${Icons.eye} Publicación web</button>
         <button type="button" class="btn btn-danger btn-sm" data-action="deleteAnimal" data-arg0="${a.id}">${Icons.trash} Eliminar</button>
       </div>
       <div class="detail-section detail-section--fields">
@@ -9093,6 +9099,23 @@ const Dashboard = {
 
   showLoading() { document.getElementById('loading')?.classList.add('active'); },
   hideLoading() { document.getElementById('loading')?.classList.remove('active'); },
+
+  // ==================== GESTOR WEB (delegacion a Web) ====================
+  abrirAnimalWeb(animalId) { return Web.abrirAnimal(animalId); },
+  abrirEventoWeb(id) { return Web.abrirEvento(id); },
+  abrirPublicacionWebAnimal(animalId) { return Web.abrirParaAnimal(animalId); },
+  saveWebAnimal(e, animalId) { return Web.guardarAnimal(e, animalId); },
+  saveWebEvento(e, id) { return Web.guardarEvento(e, id); },
+  cambiarEstadoWeb(tipo, id, estado) { return Web.cambiarEstado(tipo, id, estado); },
+  archivarWeb(id) { return Web.archivar(id); },
+  previewWeb(tipo, id) { return Web.preview(tipo, id); },
+  copiarPreviewWeb() { return Web.copiarPreview(); },
+  onWebSlugChange(el, id, tipo) { return Web.validarSlugInput(el, id, tipo); },
+  onWebTipoChange(valor) { return Web.onChangeTipo(valor); },
+  onWebSearch(el) { return Web.buscar(el.value); },
+  onWebEstadoFilter(valor) { return Web.filtrarEstado(valor); },
+  cambiarTabWeb(tab) { return Web.cambiarTab(tab); },
+  recargarWeb() { return Web.recargar(); },
 
   _errMsg(err) {
     if (!err) return 'Error desconocido';
