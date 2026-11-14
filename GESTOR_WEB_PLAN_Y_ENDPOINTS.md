@@ -36,7 +36,7 @@
 - [x] Origen de la web pública permitido: `https://gn-admin.github.io` cubre `/admin-dashboard/` (la comprobación reduce a esquema+host y también lee `Referer`, necesario para JSONP). Al pasar a dominio propio, añadir `https://gruponebak.net` a `CONFIG.ALLOWED_ORIGINS`.
 - [x] Canal público accesible sin token confirmado en el despliegue (`?endpoint=publicaciones` responde sin sesión); los endpoints del gestor siguen devolviendo 401 sin token.
 - [x] Desplegar GitHub Pages: `publico.html` viaja en `src/` y responde **200** en `https://gn-admin.github.io/admin-dashboard/publico.html` (verificado con `sw` `v225` y el tema del visor).
-- [ ] Pegar y desplegar `apps-script/Code.gs` **y** `apps-script/WebPublicaciones.gs` como **nueva versión** para activar el estado `retirado`, la respuesta `gone` (410) y `?endpoint=retiradas`. Hasta ese paso el `/exec` sigue borrando la fila al archivar y el prerender avisa de que no puede leer retiradas.
+- [x] `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` desplegados en Apps Script (confirmado). Pendiente: verificar en producción `retirado`/`gone` (410 lógico) y `?endpoint=retiradas`.
 
 ### Decisiones cerradas en Fase 0
 

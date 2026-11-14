@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta, con SEO prerenderizado, canónica única, retiradas con 410 lógico y despliegue diario; queda desplegar dos ficheros de Apps Script y llevar el SEO al proyecto real.
+El flujo gestor → canal público → visor funciona de punta a punta, con SEO prerenderizado, canónica única, retiradas con 410 lógico y despliegue diario. Los `.gs` del backend ya están desplegados en Apps Script (según confirmación); queda verificar en producción el comportamiento de retiradas/`gone` y llevar el SEO al proyecto real.
 
 ## Entregado
 
@@ -63,21 +63,20 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 - El port a `custom-page/nueva-version` **no pertenece a este repositorio**: se entrega documentado (§7.2 y §7.4 del plan).
 - No implementar la ficha configurable (§7.3) sin aprobación.
 
-## Pendiente manual (fuera de git)
+## Pendiente manual / verificación (fuera de git)
 
-1. **Desplegar `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** como nueva versión en Apps Script. Hasta entonces no hay `gone` (410), ni `?endpoint=retiradas`, ni `web-media-subir`.
-2. **Raíz de media configurada** en `.env` y `Config.gs` (carpeta «Fichas Animales»; ID en `.internal-docs`, no versionado). Falta pegar `Config.gs` en Apps Script junto a los dos `.gs`.
+1. **Verificar en producción (tras despliegue de `.gs`)**: `?endpoint=publicaciones`, `?endpoint=publicacion&slug=...`, `?endpoint=retiradas` y respuesta `gone` (410 lógico) para retiradas; comprobar también `web-media-subir` si aplica. Los `.gs` ya están desplegados (confirmado); falta validar el comportamiento en vivo.
+2. **Raíz de media**: configurada en `.env` y `Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
 3. Dominio propio (`gruponebak.net`) y Search Console: `sitemap.xml`/`robots.txt` en la raíz, envío del sitemap y canonical `dominio + ruta` sin `.html`.
 4. Port del SEO al proyecto real (páginas por slug, 410 real en el hosting, 301 desde `slug_historial`).
 5. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
 
 ## Siguientes pasos propuestos (no implementados)
 
-1. Desplegar los dos `.gs` (desbloquea 410 y el canal de retiradas).
-2. Tras desplegarlo, convertir el aviso de retiradas en error si vuelve a fallar (que una lápida rota no pase desapercibida).
-3. Salida de una retirada desde el panel («Restaurar») y auditoría de quién retira.
-4. Dominio propio + Search Console (lo único que queda de indexación).
-5. Fixtures adicionales (301, ficha oculta) y validación de JSON-LD/canonical único sobre el HTML generado.
+1. Tras verificar el despliegue de `.gs`, convertir el aviso de retiradas en error si vuelve a fallar (que una lápida rota no pase desapercibida).
+2. Salida de una retirada desde el panel (“Restaurar”) y auditoría de quién retira.
+3. Dominio propio + Search Console (lo único que queda de indexación).
+4. Fixtures adicionales (301, ficha oculta) y validación de JSON-LD/canonical único sobre el HTML generado.
 
 ## Mapa rápido
 
