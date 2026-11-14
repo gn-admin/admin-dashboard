@@ -215,6 +215,7 @@ const API = {
   async setWebEventoEstado(id, estado) { return this._post('web-eventos-estado', { id, estado_publicacion: estado }); },
   async previewWebEvento(id) { return this._get('web-eventos-preview', { id }); },
   async deleteWebEvento(id) { return this._post('web-eventos', { id, accion: 'archivar' }); },
+  async restaurarWebEvento(id) { return this._post('web-eventos', { id, accion: 'restaurar' }); },
   async checkWebSlug(tipo, slug, id) { return this._get('web-slug-check', { tipo, slug, id: id || '' }); },
   async getWebResumen() { return this._get('web-resumen'); },
 

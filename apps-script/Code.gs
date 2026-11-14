@@ -331,6 +331,7 @@ function handlePost(endpoint, user, e) {
       return jsonResponse(webEstadoAnimal(body, user));
     case 'web-eventos':
       if (body && body.accion === 'archivar') return jsonResponse(webArchivarEvento(body, user));
+      if (body && body.accion === 'restaurar') return jsonResponse(webRestaurarEvento(body, user));
       return jsonResponse(webUpsertEvento(body, user));
     case 'web-eventos-estado':
       return jsonResponse(webEstadoEvento(body, user));

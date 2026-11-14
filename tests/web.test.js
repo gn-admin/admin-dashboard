@@ -332,7 +332,7 @@ describe('Web: retiradas en el gestor', () => {
     assert.match(html, /Enlace retirado \(410\)/);
   });
 
-  it('la fila retirada se ve pero no ofrece republicar ni volver a retirar', () => {
+  it('la fila retirada se ve, permite restaurar y no ofrece retirar ni publicar directo', () => {
     const ctx = Object.assign({}, Web);
     const html = ctx._filaEvento({
       id: 'web_1', tipo: 'historia', titulo: 'Historia retirada', slug: 'historia-retirada',
@@ -340,8 +340,10 @@ describe('Web: retiradas en el gestor', () => {
     });
     assert.match(html, /Retirado/);
     assert.match(html, /slug sigue reservado/);
-    assert.doesNotMatch(html, /data-action="cambiarEstadoWeb"/);
+    assert.match(html, /data-action="restaurarWebEvento"/);
+    assert.match(html, />Restaurar</);
     assert.doesNotMatch(html, /data-action="archivarWeb"/);
+    assert.doesNotMatch(html, /data-action="cambiarEstadoWeb"[^>]*data-arg2="publicado"/);
   });
 });
 

@@ -316,14 +316,15 @@ const Web = {
       <td data-label="Completitud">${this._chips(faltan)}</td>
       <td data-label="Acciones" class="table-actions">
         ${e.estado_publicacion === 'retirado'
-          ? '<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>'
+          ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
+        <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebEvento" data-arg0="${this._esc(e.id)}" data-arg1="${this._esc(e.titulo || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
         ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
         ${e.estado_publicacion === 'publicado'
           ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
-        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>`}
+        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicaciA3n')}" title="Retirar (410)">${Icons.trash}</button>`}}
       </td>
     </tr>`;
   },
@@ -983,6 +984,25 @@ const Web = {
     }
   },
 
+
+  async restaurarWebEvento(id, titulo) {
+    const nombreTxt = titulo || 'esta publicaciA3n';
+    if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
+      const ok = await Dashboard._confirm(
+        `A­Restaurar ${nombreTxt}? VolverA­ a borrador (no publicada) manteniendo su slug; podrA­s revisarla y publicarla de nuevo.`,
+        'Restaurar',
+        'Restaurar'
+      );
+      if (!ok) return;
+    }
+    try {
+      await API.restaurarWebEvento(id);
+      this._snack('PublicaciA3n restaurada a borrador');
+      await this.recargar();
+    } catch (err) {
+      this._snackErr(err, 'No se pudo restaurar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
   async eliminarWebAnimal(animalId, nombre) {
     const nombreTxt = nombre || 'este animal';
     if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
