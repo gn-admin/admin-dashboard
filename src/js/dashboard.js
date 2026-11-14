@@ -714,10 +714,14 @@ const Dashboard = {
 
   _cacheGet(key) {
     try {
+      if (this._cacheSoloMemoria && this._cacheSoloMemoria(key)) {
+        try { localStorage.removeItem('gn_cache_' + key); } catch {}
+        return null;
+      }
       const raw = localStorage.getItem('gn_cache_' + key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      const ttlMs = 7 * 24 * 60 * 60 * 1000; // 7 dias (S3: minimizar exposición de caché sensible)
+      const ttlMs = 7 * 24 * 60 * 60 * 1000; // 7 dias (minimizar exposición de caché sensible)
       if (parsed && typeof parsed === 'object' && Object.prototype.hasOwnProperty.call(parsed, '_t') && Object.prototype.hasOwnProperty.call(parsed, 'v')) {
         if (typeof parsed._t === 'number' && (Date.now() - parsed._t) > ttlMs) {
           try { localStorage.removeItem('gn_cache_' + key); } catch {}
@@ -766,9 +770,18 @@ const Dashboard = {
     return true;
   },
 
+  _cacheSoloMemoria(key) {
+    // Datos con mayor sensibilidad: mantener en memoria de sesión, no persistir en disco local.
+    return ['responses', 'notas'].indexOf(String(key || '')) !== -1;
+  },
+
   _cacheSet(key, val) {
     if (!this._canPersistUserData()) return;
     if (!this._cachePermitido(key)) return;
+    if (this._cacheSoloMemoria(key)) {
+      try { localStorage.removeItem('gn_cache_' + key); } catch {}
+      return;
+    }
     try { localStorage.setItem('gn_cache_' + key, JSON.stringify({ _t: Date.now(), v: val })); } catch {}
   },
 
