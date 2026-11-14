@@ -6,18 +6,20 @@
 > - `../custom-page/docs/estructura-endpoint-publicaciones.md` — contrato de publicaciones para la web pública: `GET /api/publicaciones` (filtros, paginación), `GET /api/publicaciones/:slug`, esquema `Publicacion` con `icons`, `gallery`, `videos[]/video`, bloques `animal`/`event`, mapeo `publication` (`nebak-post-v1`).
 > - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario `nueva-version`, consumo actual (`../data/blog-posts.json`, `HistoriasAPI`, listados `[data-adoption-list]`), propuesta GAS/Sheets, endpoints `/v1/*` (contenido, taxonomías, config, formularios), SEO (prerender/build por slug, sitemap, redirects, metas/OG/JSON-LD), formularios/reCAPTCHA y cookies/políticas.
 >
-> Este documento unifica la información necesaria para diseñar los **endpoints del gestor** y los **endpoints públicos**, manteniendo separación de seguridad. Donde conviven convenciones (`/api/publicaciones` vs `/v1/publicaciones`), se propone compatibilidad (ver §4.4).
+> Este documento unifica la información necesaria para diseñar los **endpoints del gestor** y los **endpoints públicos** (canales separados). Donde conviven convenciones (`/api/publicaciones` vs `/v1/publicaciones`), se propone compatibilidad (ver §4.4).
 
 ---
 
 ## 1. Objetivos y principios
 
-- **Separación de superficies:** web pública y admin son despliegues/apps distintos. El admin no expone API/token ni datos internos.
-- **Capa pública curada (lista blanca):** solo contenido `published`/publicable y solo campos permitidos. Nunca la ficha interna completa (especialmente animales).
+- **Separación de superficies:** web pública y admin son despliegues/apps distintos con propósitos diferentes (gestión vs visualización pública).
+- **Capa pública curada:** la web consume contenido preparado para publicación (campos/medios seleccionados) y no la ficha interna completa, especialmente para animales.
 - **Un contrato de publicación estable:** la web (`nueva-version`) consume un esquema único compatible con el render actual (`publication`, `icons`, `gallery`, `videos[]`, `animal`/`event`, `contentHtml`, `cta`).
-- **Gestión híbrida en el gestor:** sección dedicada “Web/Contenido público” (visión global, SEO, publicación) + acciones rápidas desde la ficha de la entidad.
-- **SEO real para fichas dinámicas:** las fichas/eventos cargados desde endpoint requieren HTML indexable por URL/slug (prerender/build o estrategia equivalente), metas/OG/canonical/JSON-LD, sitemap y redirects (ver §6).
-- **Backend como fuente de verdad:** validación, autorización por rol en cada endpoint gestor, filtrado de campos/estados y composición del payload público en servidor (GAS).
+- **Gestión híbrida en el gestor:** sección dedicada “Web/Contenido público” (visión global, publicación, SEO) + acciones rápidas desde la ficha de la entidad.
+- **SEO para fichas dinámicas:** las fichas/eventos cargados desde endpoint requieren HTML indexable por URL/slug (prerender/build o estrategia equivalente), metas/OG/canonical/JSON-LD, sitemap y redirects (ver §6).
+- **Backend como fuente de verdad funcional:** composición del contenido público, estados de publicación y normalización del contrato se resuelven en servidor/GAS según el modelo definido.
+
+> Aspectos de seguridad/privacidad del módulo: ver `SEGURIDAD-WEB-PUBLICA-NOTAS.md` (separado, no incluido en este plan).
 
 ---
 
@@ -72,7 +74,7 @@ Estructura base: `names[]`, `species`, `breed`, `sex[]`, `age{value,unit,label}`
 
 ## 4. Endpoints públicos (web, solo lectura)
 
-> Canal **separado** del API de administración: sin token admin, sin datos internos, CORS restringido al dominio público, respuestas construidas por lista blanca.
+> Canal de **consumo público** para la web, separado del API de administración del gestor. Entrega contenido publicado conforme al contrato `Publicacion` y a la capa de curación definida. (Detalles de acceso/protección: `SEGURIDAD-WEB-PUBLICA-NOTAS.md`.)
 
 ### 4.1 Listado de publicaciones
 - **Contrato de referencia (`estructura-endpoint-publicaciones.md`):** `GET /api/publicaciones`
@@ -103,16 +105,16 @@ Para simplificar consumo de `nueva-version` y evolución (alineado con el análi
 **Compatibilidad:** exponer `/api/publicaciones` (y detalle por `slug`) como alias estable para la web actual, o adaptar el cliente a `/v1`; mantener un único handler/mapeo interno.
 
 ### 4.4 Requisitos no funcionales del canal público
-- **CORS:** solo dominios de la web pública.
 - **Caché:** `Cache-Control` y/o ETag/`Last-Modified` (por `updatedAt`/versión), cacheo en GAS (`CacheService`) cuando aplique.
-- **Errores:** JSON consistente, sin detalles internos.
-- **Rendimiento:** paginación, lecturas agrupadas, opción de exportación JSON estática si crece tráfico (contrato estable).
+- **Consistencia de respuesta:** JSON estable y paginación acotada.
+- **Rendimiento:** lecturas agrupadas y, si crece el tráfico, opción de exportación JSON estática manteniendo el mismo contrato.
+- Configuración de acceso/CORS y manejo de errores: ver `SEGURIDAD-WEB-PUBLICA-NOTAS.md`.
 
 ---
 
-## 5. Endpoints del gestor (admin, autenticados y autorizados)
+## 5. Endpoints del gestor (admin)
 
-> Requieren token/identidad y **autorización por rol en cada acción** (denegar por defecto). Separados del canal público.
+> Endpoints usados por el apartado **Gestor Web** dentro del admin para configurar, curar y publicar contenido. Son independientes del canal público de consumo de la web. (Control de acceso/autorización: `SEGURIDAD-WEB-PUBLICA-NOTAS.md`, fuera del alcance de este plan.)
 
 ### 5.1 Gestión de publicación web de animales
 Objetivo: curar y configurar lo que se publica (sin exponer ficha interna).
@@ -161,12 +163,13 @@ Alineado con el análisis de `nueva-version` (no mezclar con publicaciones):
 
 ---
 
-## 7. Seguridad, privacidad y cumplimiento
+## 7. Consideraciones transversales (alcance funcional)
 
-- **Gestor:** autenticación + autorización por rol en cada endpoint `.gs`; `sin_acceso`/no autorizado denegado (alineado al plan de seguridad).
-- **Público:** sin token admin, lista blanca estricta, sin datos personales/sensibles, CORS limitado, errores genéricos.
-- **Cookies/privacidad (web pública):** consentimiento previo real para no esenciales, bloqueo condicional de terceros (Maps/YouTube/Analytics/reCAPTCHA según implementación) y políticas adaptadas a protectora (ver análisis integral en `custom-page/docs`).
-- **Datos:** ubicación general (no exacta) en público; retención/minimización en formularios y auditoría de publicaciones.
+- **Separación de canales:** el gestor (admin) y la web pública consumen canales distintos; la web no debe usar credenciales/token de administración.
+- **Curación de datos:** la ficha pública se basa en campos seleccionados (capa pública) y no en la ficha interna completa, especialmente para animales.
+- **Formularios y políticas:** si se incluyen en el alcance, se tratan como flujo separado del feed de publicaciones (ver Fase 4 del plan y `custom-page/docs`).
+
+> **Nota:** las consideraciones de seguridad/privacidad de este módulo se han separado en `SEGURIDAD-WEB-PUBLICA-NOTAS.md` para no mezclar con el plan de implementación del gestor y endpoints. De momento no forman parte del trabajo a aplicar en este plan.
 
 ---
 
@@ -178,15 +181,15 @@ Alineado con el análisis de `nueva-version` (no mezclar con publicaciones):
 - **Selección de media pública:** origen (galería/documentos/URLs) y permisos.
 - **Convención de API pública:** `/api/publicaciones` (compatibilidad actual) vs `/v1/*` (versionado) o ambos (alias).
 - **Entrega:** endpoint dinámico GAS vs exportación JSON estática programada (o híbrido).
-- **Dominio(s) web pública** para CORS/canonical y roles con permiso de gestión web.
+- **Dominio(s) web pública** para canonical/configuración de despliegue y roles/operativa de gestión web en el admin.
 - **Alineación fina** con `docs/custom-page` ante cambios futuros en sus contratos.
 
 ---
 
 ## 9. Resumen de entregables para implementación
 
-- **Backend gestor (`.gs`/Sheets):** modelo de publicación/SEO, endpoints CRUD/config/preview/slug-check, autorización, normalización de payload público.
-- **Backend público (`.gs`/feed):** `/api/publicaciones` y/o `/v1/*` de solo lectura con lista blanca, filtros, detalle por slug, config/taxonomías/sitemap según alcance.
-- **Admin (este repo):** sección Web + edición contextual, validaciones, previsualización y permisos.
-- **Web pública (`custom-page`):** consumo del contrato, render/SEO técnico (prerender, metas/schema, sitemap/redirects) y formularios/cookies según plan integral.
-- **Documentación operativa:** contratos, `CONFIG`, CORS, procedimiento de publicación y actualización de datos.
+- **Backend gestor (`.gs`/Sheets):** modelo de publicación/SEO, endpoints CRUD/config/preview/slug-check y normalización de payload público.
+- **Backend público (`.gs`/feed):** `/api/publicaciones` y/o `/v1/*` de solo lectura con contenido curado, filtros, detalle por slug, config/taxonomías/sitemap según alcance.
+- **Admin (este repo):** apartado Gestor web + edición contextual, validaciones, previsualización y permisos de UI.
+- **Web pública (`custom-page`):** consumo del contrato, render/SEO técnico (prerender, metas/schema, sitemap/redirects) y (si aplica) formularios/cookies según alcance.
+- **Documentación operativa:** contratos, `CONFIG`, procedimiento de publicación y actualización de datos.
