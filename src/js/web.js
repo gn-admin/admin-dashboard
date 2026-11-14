@@ -299,6 +299,9 @@ const Web = {
             ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="oculto">Ocultar</button>`
             : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="publicado">Publicar</button>`)
           : ''}
+        ${a.publicacion_id && a.estado_publicacion !== 'publicado' && a.estado_publicacion !== 'retirado'
+          ? `<button type="button" class="btn btn-danger btn-sm" data-action="eliminarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}" title="Eliminar publicación web (solo configuración, la ficha del animal no se modifica)">${Icons.trash} Eliminar borrador</button>`
+          : ''}
       </td>
     </tr>`;
   },
@@ -977,6 +980,25 @@ const Web = {
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo archivar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  async eliminarWebAnimal(animalId, nombre) {
+    const nombreTxt = nombre || 'este animal';
+    if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
+      const ok = await Dashboard._confirm(
+        `¿Eliminar la publicación web (borrador/configuración) de ${nombreTxt}? Se borrará solo en Publicaciones web; la ficha del animal y sus datos se mantienen.`,
+        'Eliminar',
+        'Eliminar borrador'
+      );
+      if (!ok) return;
+    }
+    try {
+      await API.deleteWebAnimal(animalId);
+      this._snack('Publicación web eliminada (la ficha del animal no se ha modificado)');
+      await this.recargar();
+    } catch (err) {
+      this._snackErr(err, 'No se pudo eliminar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
     }
   },
 

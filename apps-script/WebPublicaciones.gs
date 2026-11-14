@@ -652,6 +652,24 @@ function webEstadoAnimal(body, user) {
   return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
 }
 
+function webEliminarAnimal(body) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var animalId = webTexto(body && body.animal_id);
+  if (!animalId) return { status: 'error', error: 'Falta animal_id' };
+  var previa = webPublicacionDeOrigen('animal', animalId);
+  if (!previa) return { status: 'error', error: 'Este animal no tiene publicación web para eliminar' };
+  if (previa.estado_publicacion === 'publicado') {
+    return { status: 'error', error: 'No se puede eliminar una publicación publicada. Ocúltala antes.' };
+  }
+  if (previa.estado_publicacion === 'retirado') {
+    return { status: 'error', error: 'No se puede eliminar una publicación retirada.' };
+  }
+  var ok = deleteSheetRow(cfg, previa.id);
+  if (!ok) return { status: 'error', error: 'No se pudo eliminar la publicación web' };
+  return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, eliminado: true } };
+}
+
 function webPreviewAnimal(animalId) {
   var cfg = webSheetConfig();
   if (!cfg) return webDiagnostico();

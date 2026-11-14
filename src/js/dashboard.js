@@ -9110,6 +9110,7 @@ const Dashboard = {
   saveWebEvento(e, id) { return Web.guardarEvento(e, id); },
   cambiarEstadoWeb(tipo, id, estado) { return Web.cambiarEstado(tipo, id, estado); },
   archivarWeb(id) { return Web.archivar(id); },
+  eliminarWebAnimal(animalId, nombre) { return Web.eliminarWebAnimal(animalId, nombre); },
   previewWeb(tipo, id) { return Web.preview(tipo, id); },
   copiarPreviewWeb() { return Web.copiarPreview(); },
   onWebSlugChange(el, id, tipo) { return Web.validarSlugInput(el, id, tipo); },

@@ -207,6 +207,7 @@ const API = {
   async getWebAnimal(id) { return this._get('web-animales', { id }); },
   async saveWebAnimal(data) { return this._post('web-animales', data); },
   async setWebAnimalEstado(animalId, estado) { return this._post('web-animales-estado', { animal_id: animalId, estado_publicacion: estado }); },
+  async deleteWebAnimal(animalId) { return this._post('web-animales', { animal_id: animalId, accion: 'eliminar' }); },
   async previewWebAnimal(id) { return this._get('web-animales-preview', { id }); },
   async getWebEventos(params = {}) { return this._get('web-eventos', params); },
   async getWebEvento(id) { return this._get('web-eventos', { id }); },

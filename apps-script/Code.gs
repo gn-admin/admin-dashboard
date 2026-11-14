@@ -325,6 +325,7 @@ function handlePost(endpoint, user, e) {
 
     // ==================== GESTOR WEB (admin) ====================
     case 'web-animales':
+      if (body && body.accion === 'eliminar') return jsonResponse(webEliminarAnimal(body));
       return jsonResponse(webUpsertAnimal(body, user));
     case 'web-animales-estado':
       return jsonResponse(webEstadoAnimal(body, user));

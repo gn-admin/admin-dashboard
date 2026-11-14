@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v229';
+﻿const CACHE_NAME = 'gn-encuestas-v230';
 const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
