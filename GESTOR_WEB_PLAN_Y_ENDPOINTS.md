@@ -394,6 +394,15 @@ Reglas:
 - **Canónica única:** la ficha del visor emite `canonical`, `og:url` y `mainEntityOfPage` apuntando a `publicaciones/<slug>.html`, de modo que SPA y estática no compiten; el listado y los estados conservan la URL propia.
 - **Guarda de despliegue:** si el canal no responde, falla una ficha o el `sitemap.xml`/`robots.txt` no salen válidos, el script **termina con error y bloquea el deploy** (sin borrar lo anterior). `--soft` permite solo avisar en ejecuciones manuales.
 - **Páginas de retirada:** cada slug retirado (y sus slugs históricos) genera `publicaciones/<slug>.html` con `noindex,nofollow`, sin canonical ni JSON-LD y fuera del sitemap. Así el enlace no da 404 entre despliegues y el hosting real puede servir 410. Si una ficha publicada recupera el slug, la ficha manda sobre la lápida.
+
+**Cuánto puede tardar en aplicarse una retirada**
+
+- El workflow se ejecuta además **una vez al día** (`cron: '17 3 * * *'`, en UTC; ≈ 04:17 en invierno y 05:17 en verano, hora de Madrid), así que una retirada no necesita push para generar su página.
+- Retirada → página publicada: **como máximo ~24 h** (hasta la siguiente ejecución) **+ 5–10 min** de tests, prerender y deploy. GitHub puede retrasar unos minutos el arranque de los programados.
+- Si esa ejecución falla (test en rojo o canal caído) no despliega y se reintenta al día siguiente: con dos fallos seguidos el peor caso es **~48 h**.
+- Para aplicarlo al momento: Actions → «Deploy a GitHub Pages» → *Run workflow* (`workflow_dispatch`).
+- GitHub desactiva los programados tras 60 días sin actividad en el repositorio; un push o relanzarlo a mano los reactiva.
+- El hosting es estático: entre la retirada y ese despliegue la página antigua sigue sirviéndose. Lo que garantiza el cron es que después quede la página de retirada y no un 404.
 - Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, avisa y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--strict`).
 
 **Resultados (2026-11-14, ficha real de Laia)**
@@ -468,3 +477,4 @@ Reglas:
 | 2026-11-14 | 5 | Retirada con 410: estado `retirado`, lápida de slug, `gone` en canal, exclusión de feed/sitemap y pantalla en el visor | — | `tests/web-backend.test.js` · pendiente de desplegar `Code.gs` y `WebPublicaciones.gs` |
 | 2026-11-14 | 5 | Página estática de retirada (`noindex`, sin canonical ni JSON-LD, fuera del sitemap) desde `?endpoint=retiradas` | — | `tests/prerender.test.js` |
 | 2026-11-14 | 5 | Gestor: resumen con tarjeta «Retiradas» (fuera de borradores e incompletas) y listado que las muestra sin acciones de republicar | — | `tests/web-backend.test.js`, `tests/web.test.js` |
+| 2026-11-14 | 5 | Deploy programado diario (03:17 UTC) para aplicar retiradas sin push; concurrencia en cola para no cancelar un deploy en curso | — | `.github/workflows/deploy.yml`, §7.4 |

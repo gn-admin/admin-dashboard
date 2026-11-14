@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # Ejecución diaria para que una retirada genere su página estática (410/noindex)
+    # sin esperar a un push. GitHub usa UTC: 03:17 UTC ≈ 04:17/05:17 en Madrid.
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
@@ -12,7 +16,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # En cola, no cancelado: un programado no debe abortar el deploy de un push.
+  cancel-in-progress: false
 
 jobs:
   deploy:
