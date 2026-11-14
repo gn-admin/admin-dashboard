@@ -99,20 +99,51 @@ function anotar(nivel, mensaje) {
   else console.warn('[prerender] ' + mensaje);
 }
 
+/** Valida JSON-LD y canonical de una ficha indexable. */
+function validarFichaHtml(html, esperado) {
+  const errores = [];
+  const texto = String(html || '');
+  const canonEsperada = esperado && esperado.canonical ? String(esperado.canonical) : '';
+  const scripts = texto.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g) || [];
+  if (scripts.length !== 1) errores.push('se esperaba 1 bloque JSON-LD y hay ' + scripts.length);
+  else {
+    const jsonLd = scripts[0].replace(/^<script[^>]*>|<\/script>$/g, '');
+    try {
+      const data = JSON.parse(jsonLd);
+      if (!data || data['@context'] !== 'https://schema.org') errores.push('JSON-LD sin @context schema.org');
+      if (!data || !data['@type']) errores.push('JSON-LD sin @type');
+      if (canonEsperada) {
+        const id = data && data.mainEntityOfPage && data.mainEntityOfPage['@id'];
+        if (id !== canonEsperada) errores.push('JSON-LD mainEntityOfPage no coincide con canonical');
+      }
+    } catch (e) {
+      errores.push('JSON-LD no parseable: ' + e.message);
+    }
+  }
+  const canonicals = texto.match(/<link rel="canonical" href="[^"]*">/g) || [];
+  if (canonicals.length !== 1) errores.push('se esperaba 1 canonical y hay ' + canonicals.length);
+  if (canonEsperada && canonicals.length === 1) {
+    const href = canonicals[0].match(/href="([^"]*)"/);
+    if (!href || href[1] !== canonEsperada) errores.push('canonical no coincide con la URL esperada');
+  }
+  return errores;
+}
+
 function validarSalida(salida) {
   const errores = [];
-  const sitemap = String((salida && salida.sitemap) || '');
-  const robots = String((salida && salida.robots) || '');
-  const paginas = (salida && salida.paginas) || [];
-  const indexables = paginas.filter(p => !(p && p.retirada)).length;
-  const urls = (sitemap.match(/<url>/g) || []).length;
-  if (!/<urlset[\s>]/.test(sitemap)) errores.push('sitemap.xml sin <urlset>');
-  if (urls < 1) errores.push('sitemap.xml sin ninguna URL');
-  if (urls !== indexables + 1) {
-    errores.push('sitemap.xml no cuadra: ' + urls + ' URLs frente a ' + (indexables + 1) + ' páginas');
+  const sitemap = salida && salida.sitemap;
+  const robots = salida && salida.robots;
+  if (!sitemap || sitemap.indexOf('<urlset') === -1) errores.push('sitemap.xml sin <urlset>');
+  if (!sitemap || sitemap.indexOf('<url>') === -1) errores.push('sitemap.xml sin ninguna URL');
+  if (!robots || robots.indexOf('User-agent') === -1) errores.push('robots.txt sin User-agent');
+  if (!robots || robots.indexOf('Sitemap:') === -1) errores.push('robots.txt sin línea Sitemap:');
+  if (sitemap) {
+    const urls = (sitemap.match(/<url>/g) || []).length;
+    const esperadas = 1 + (salida.paginas || []).filter(p => !p.retirada && !p.redirect).length;
+    if (urls !== esperadas) {
+      errores.push('sitemap.xml no cuadra: ' + urls + ' URLs frente a ' + esperadas + ' páginas');
+    }
   }
-  if (!/^User-agent:\s*\*/m.test(robots)) errores.push('robots.txt sin User-agent');
-  if (!/^Sitemap:\s+\S+/m.test(robots)) errores.push('robots.txt sin línea Sitemap:');
   return errores;
 }
 
@@ -242,9 +273,54 @@ function paginaRetirada() {
 }
 
 /** Salida completa a disco: páginas, sitemap y robots. */
-function construirSalida(publicaciones, base, retiradas) {
+/**
+ * Página estática de redirección (301 en el canal): en Pages no se puede emitir
+ * 301 real por fichero, así que se genera una página de paso noindex con
+ * canonical al destino y redirección por meta refresh/JS. No va al sitemap.
+ */
+function paginaRedirect(destinoUrl) {
+  const destino = String(destinoUrl || '').replace(/"/g, '&quot;');
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="es">',
+    '<head>',
+    '  <meta charset="UTF-8">',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '  <title>Publicación movida – Grupo Nebak</title>',
+    '  <meta name="description" content="Esta publicación se ha movido a una nueva dirección.">',
+    '  <meta name="robots" content="noindex,follow">',
+    '  <link rel="canonical" href="' + destino + '">',
+    '  <meta http-equiv="refresh" content="0; url=' + destino + '">',
+    '  <link rel="stylesheet" href="../css/variables.css">',
+    '  <link rel="stylesheet" href="../css/publico.css">',
+    '  <link rel="icon" href="../assets/icon-192.png">',
+    '</head>',
+    '<body>',
+    '  <a href="#contenido" class="skip-link">Saltar al contenido</a>',
+    '  <header class="pub-header">',
+    '    <a href="../publico.html" class="pub-marca"><img src="../assets/icon-192.png" alt="" width="40" height="40"><span>Grupo Nebak</span></a>',
+    '    <nav aria-label="Principal"><a href="../publico.html">Publicaciones</a></nav>',
+    '  </header>',
+    '  <main id="contenido" class="pub-main">',
+    '    <section class="pub-error">',
+    '      <h1>Publicación movida</h1>',
+    '      <p>Esta publicación se encuentra ahora en otra dirección.</p>',
+    '      <a class="pub-btn" href="' + destino + '">Ir a la publicación actual</a>',
+    '    </section>',
+    '  </main>',
+    '  <footer class="pub-footer"><p>Grupo Nebak – Contenido público. <a href="../publico.html">Ver todas las publicaciones</a></p></footer>',
+    '  <script>location.replace(' + JSON.stringify(destinoUrl || '') + ');</script>',
+    '</body>',
+    '</html>',
+    ''
+  ].join('\n');
+}
+
+/** Salida completa a disco: páginas, sitemap y robots. */
+function construirSalida(publicaciones, base, retiradas, redirects) {
   const paginas = [];
   const urls = [{ loc: String(base).replace(/\/+$/, '') + '/publico.html' }];
+  const publicados = new Set();
   const lapidas = new Set((retiradas || [])
     .map(r => slugSeguro(r && (r.slug || r)))
     .filter(Boolean));
@@ -252,13 +328,21 @@ function construirSalida(publicaciones, base, retiradas) {
     if (!pub || pub.listed === false) return;
     const slug = slugSeguro(pub.slug);
     if (!slug) return;
-    // Una ficha publicada manda sobre una lápida antigua del mismo slug.
     lapidas.delete(slug);
+    publicados.add(slug);
     paginas.push({ slug: slug, html: paginaEstatica(pub, base) });
     urls.push({ loc: urlEstatica(base, slug), lastmod: pub.updatedAt || pub.publishedAt });
   });
   lapidas.forEach(slug => {
     paginas.push({ slug: slug, retirada: true, html: paginaRetirada() });
+  });
+  (redirects || []).forEach(r => {
+    const from = slugSeguro(r && (r.slug || r.from || r.fromSlug));
+    const toSlug = slugSeguro(r && (r.currentSlug || r.toSlug));
+    if (!from || publicados.has(from) || lapidas.has(from)) return;
+    const destino = (r && r.to) || (toSlug ? urlEstatica(base, toSlug) : '');
+    if (!destino) return;
+    paginas.push({ slug: from, redirect: true, html: paginaRedirect(destino) });
   });
   return { paginas: paginas, sitemap: sitemapXml(urls), robots: robotsTxt(base) };
 }
@@ -333,12 +417,14 @@ async function main(argv = process.argv.slice(2)) {
   const fallos = [];
   let publicaciones = [];
   let retiradas = [];
+  let redirects = [];
 
   try {
     if (args.fixture) {
       const datos = JSON.parse(fs.readFileSync(path.resolve(args.fixture), 'utf8'));
       publicaciones = Array.isArray(datos) ? datos : (datos.publicaciones || []);
       retiradas = Array.isArray(datos) ? [] : (datos.retiradas || []);
+      redirects = Array.isArray(datos) ? [] : (datos.redirects || []);
     } else {
       if (!api) throw new Error('Falta API_URL en src/js/config.js (ejecuta npm run build)');
       publicaciones = await recolectar(api, fallos);
@@ -349,6 +435,12 @@ async function main(argv = process.argv.slice(2)) {
           '). No se pueden generar las páginas de retirada.';
         if (!args.soft) throw new Error(mensaje + ' Se detiene el despliegue.');
         anotar('warning', mensaje + ' Se continúa por --soft.');
+      }
+      try {
+        const r = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=redirects');
+        redirects = (r && r.data) || [];
+      } catch (e) {
+        anotar('warning', 'No se pudieron leer las redirecciones (' + e.message + '). Se continúa sin páginas de redirección.');
       }
     }
   } catch (err) {
@@ -365,7 +457,7 @@ async function main(argv = process.argv.slice(2)) {
     anotar('warning', mensaje);
   }
 
-  const salida = construirSalida(publicaciones, base, retiradas);
+  const salida = construirSalida(publicaciones, base, retiradas, redirects);
   const errores = validarSalida(salida);
   if (errores.length) {
     const mensaje = 'Salida incompleta: ' + errores.join('; ');
@@ -378,8 +470,9 @@ async function main(argv = process.argv.slice(2)) {
 
   if (args.dry) {
     const retiradasN = salida.paginas.filter(p => p.retirada).length;
-    console.log('[prerender] dry-run: ' + (salida.paginas.length - retiradasN) + ' fichas y ' +
-      retiradasN + ' retiradas para ' + base);
+    const redirN = salida.paginas.filter(p => p.redirect).length;
+    console.log('[prerender] dry-run: ' + (salida.paginas.length - retiradasN - redirN) + ' fichas, ' +
+      retiradasN + ' retiradas y ' + redirN + ' redirecciones para ' + base);
     return salida;
   }
 
@@ -390,15 +483,16 @@ async function main(argv = process.argv.slice(2)) {
   fs.writeFileSync(path.join(out, 'sitemap.xml'), salida.sitemap, 'utf8');
   fs.writeFileSync(path.join(out, 'robots.txt'), salida.robots, 'utf8');
   const totalRetiradas = salida.paginas.filter(p => p.retirada).length;
-  console.log('[prerender] ' + (salida.paginas.length - totalRetiradas) + ' fichas + ' +
-    totalRetiradas + ' retiradas + sitemap.xml + robots.txt en ' + out);
+  const totalRedir = salida.paginas.filter(p => p.redirect).length;
+  console.log('[prerender] ' + (salida.paginas.length - totalRetiradas - totalRedir) + ' fichas + ' +
+    totalRetiradas + ' retiradas + ' + totalRedir + ' redirecciones + sitemap.xml + robots.txt en ' + out);
   return salida;
 }
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, validarSalida, anotacion, anotar,
-  paginaEstatica, paginaRetirada, construirSalida, main
+  sitemapXml, robotsTxt, validarSalida, validarFichaHtml, anotacion, anotar,
+  paginaEstatica, paginaRetirada, paginaRedirect, construirSalida, main
 };
 
 if (require.main === module) {

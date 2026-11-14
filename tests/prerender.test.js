@@ -211,3 +211,88 @@ test('htmlDetalle se puede usar sin DOM (lo reutiliza el prerender)', () => {
   assert.match(html, /pub-back/);
   assert.match(html, /pub-facts-grid/);
 });
+
+test('validarFichaHtml exige canonical único y un JSON-LD coherente', () => {
+  const html = prerender.paginaEstatica(muestra, BASE);
+  const canonical = prerender.urlEstatica(BASE, muestra.slug);
+  assert.deepEqual(prerender.validarFichaHtml(html, { canonical: canonical }), []);
+
+  const sinLd = html.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/, '');
+  assert.match(prerender.validarFichaHtml(sinLd, { canonical: canonical }).join(' '), /1 bloque JSON-LD/);
+
+  const dosCanon = html.replace('</head>', '  <link rel="canonical" href="' + canonical + '">\n</head>');
+  assert.match(prerender.validarFichaHtml(dosCanon, { canonical: canonical }).join(' '), /1 canonical/);
+
+  const canonMal = html.replace(/("mainEntityOfPage":\{"@type":"WebPage","@id":")[^"]+"/, '$1https://otro.test/x"');
+  assert.match(prerender.validarFichaHtml(canonMal, { canonical: canonical }).join(' '), /mainEntityOfPage/);
+});
+
+test('fixture ficha normal: JSON-LD y canonical únicos y coherentes', async () => {
+  const { out } = await generar('ficha-normal.json');
+  try {
+    const html = fs.readFileSync(path.join(out, 'publicaciones', 'laia.html'), 'utf8');
+    const canonical = prerender.urlEstatica(BASE, 'laia');
+    assert.deepEqual(prerender.validarFichaHtml(html, { canonical: canonical }), []);
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('fixture ficha oculta/no listada: no se genera ni entra en sitemap', async () => {
+  const { out } = await generar('oculta.json');
+  try {
+    assert.ok(fs.existsSync(path.join(out, 'publicaciones', 'visible.html')));
+    assert.equal(fs.existsSync(path.join(out, 'publicaciones', 'oculta.html')), false);
+    const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
+    assert.match(sitemap, /publicaciones\/visible\.html/);
+    assert.doesNotMatch(sitemap, /oculta\.html/);
+    assert.equal((sitemap.match(/<url>/g) || []).length, 2); // listado + visible
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('construirSalida omite fichas no listadas (ocultas)', () => {
+  const salida = prerender.construirSalida([
+    muestra,
+    { slug: 'oculta-2', listed: false, title: 'Oculta' }
+  ], BASE);
+  assert.equal(salida.paginas.filter(p => p.slug === 'oculta-2').length, 0);
+  assert.doesNotMatch(salida.sitemap, /oculta-2/);
+  assert.deepEqual(prerender.validarSalida(salida), []);
+});
+
+test('fixture redirect 301: genera página de paso noindex y no va al sitemap', async () => {
+  const { out } = await generar('redirect-301.json');
+  try {
+    const destino = prerender.urlEstatica(BASE, 'luna-nueva');
+    assert.ok(fs.existsSync(path.join(out, 'publicaciones', 'luna-nueva.html')));
+    const redir = fs.readFileSync(path.join(out, 'publicaciones', 'luna-vieja.html'), 'utf8');
+    assert.match(redir, /<meta name="robots" content="noindex,follow">/);
+    assert.match(redir, /rel="canonical" href="https:\/\/gn-admin\.github\.io\/admin-dashboard\/publicaciones\/luna-nueva\.html"/);
+    assert.match(redir, /http-equiv="refresh"/);
+    assert.match(redir, /location\.replace/);
+    assert.match(redir, /href="https:\/\/gn-admin\.github\.io\/admin-dashboard\/publicaciones\/luna-nueva\.html"/);
+    const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
+    assert.match(sitemap, /luna-nueva\.html/);
+    assert.doesNotMatch(sitemap, /luna-vieja\.html/);
+    assert.equal((sitemap.match(/<url>/g) || []).length, 2); // listado + destino
+  } finally {
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('construirSalida genera redirecciones 301 estáticas fuera del sitemap', () => {
+  const destino = prerender.urlEstatica(BASE, 'laia-2026');
+  const salida = prerender.construirSalida([muestra], BASE, [], [
+    { slug: 'laia-antigua', currentSlug: 'laia-2026', status: 301 }
+  ]);
+  assert.equal(salida.paginas.length, 2);
+  const redir = salida.paginas.find(p => p.slug === 'laia-antigua');
+  assert.ok(redir && redir.redirect);
+  assert.match(redir.html, /<meta name="robots" content="noindex,follow">/);
+  assert.match(redir.html, new RegExp('rel="canonical" href="' + destino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"'));
+  assert.doesNotMatch(redir.html, /application\/ld\+json/);
+  assert.doesNotMatch(salida.sitemap, /laia-antigua/);
+  assert.deepEqual(prerender.validarSalida(salida), []);
+});

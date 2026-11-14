@@ -1,0 +1,20 @@
+{
+  "publicaciones": [
+    {
+      "slug": "luna-nueva",
+      "type": "animal",
+      "category": "Gatos en adopción",
+      "status": "en_adopcion",
+      "title": "Luna",
+      "excerpt": "Luna con slug actualizado.",
+      "contentHtml": "<p>Luna busca hogar.</p>",
+      "seo": { "metaTitle": "Luna", "metaDescription": "Luna con slug actualizado.", "robots": "index,follow", "canonical": "" },
+      "publishedAt": "2026-10-02T10:00:00Z",
+      "updatedAt": "2026-10-03T10:00:00Z"
+    }
+  ],
+  "retiradas": [],
+  "redirects": [
+    { "slug": "luna-vieja", "currentSlug": "luna-nueva", "status": 301, "type": "animal" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "publicaciones": [
+    {
+      "slug": "visible",
+      "type": "animal",
+      "category": "Perros en adopción",
+      "status": "en_adopcion",
+      "title": "Visible",
+      "excerpt": "Ficha visible.",
+      "contentHtml": "<p>Contenido visible.</p>",
+      "seo": { "metaTitle": "Visible", "metaDescription": "Ficha visible.", "robots": "index,follow", "canonical": "" },
+      "publishedAt": "2026-10-02T10:00:00Z",
+      "updatedAt": "2026-10-03T10:00:00Z"
+    },
+    {
+      "slug": "oculta",
+      "type": "animal",
+      "category": "Perros en adopción",
+      "status": "en_adopcion",
+      "title": "Oculta",
+      "excerpt": "No debe publicarse.",
+      "contentHtml": "<p>No debe salir.</p>",
+      "listed": false,
+      "seo": { "metaTitle": "Oculta", "metaDescription": "No debe publicarse.", "robots": "noindex,follow", "canonical": "" },
+      "publishedAt": "2026-10-02T10:00:00Z",
+      "updatedAt": "2026-10-03T10:00:00Z"
+    }
+  ],
+  "retiradas": [],
+  "redirects": []
+}
