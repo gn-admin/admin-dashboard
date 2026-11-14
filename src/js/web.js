@@ -182,7 +182,6 @@ const Web = {
       <div id="web-listado" class="web-lista">${this._tabla()}</div>
       <p class="web-nota">Los campos SEO son los metadatos que la web pública usará al renderizar cada ficha (title, description, canonical, robots, OG). La previsualización muestra exactamente el payload que entregará el canal público.</p>
     </div>
-    <div id="web-picker" class="web-picker" hidden></div>
     <div class="page-detail-container"></div>`;
   },
 
@@ -329,11 +328,15 @@ const Web = {
   // ==================== NUEVA PUBLICACIÓN (selector) ====================
 
   nuevaPublicacion() {
-    const host = document.getElementById('web-picker');
-    if (!host) return;
     // El panel de la página se anima con transform: eso rompería position:fixed.
-    // El selector vive en <body> para cubrir la pantalla completa.
-    if (host.parentElement !== document.body) document.body.appendChild(host);
+    // El selector vive en <body> (uno solo) para cubrir la pantalla completa.
+    let host = document.getElementById('web-picker');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'web-picker';
+      host.className = 'web-picker';
+      document.body.appendChild(host);
+    }
     this._pickerQ = '';
     host.innerHTML = this._pickerHtml();
     host.hidden = false;
