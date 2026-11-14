@@ -25,6 +25,7 @@
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
 | Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 454 en total (incluye cabeceras en hoja vacía, canonical condicional y pestaña única) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
+| Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
 
 **Pasos manuales pendientes (fuera de git):**
 
@@ -214,7 +215,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 > Aplica a las fichas/publicaciones renderizadas en `custom-page/nueva-version`, no al gestor/admin. El gestor provee los campos/metadatos; la web los consume y los aplica.
 
 - [x] **El gestor provee:** `seo.metaTitle`, `seo.metaDescription`, `seo.ogImage`, `seo.canonical`, `seo.robots`, `url` por tipo, `indexable`, `publishedAt`/`updatedAt`.
-- [ ] **Fichas dinámicas:** `post.html?slug=` solo cliente es insuficiente para indexación/OG; estrategia recomendada **prerender/build por slug** (o SSG/export) usando el endpoint como fuente. → se cierra en el visor (§7.1) y luego se porta a `custom-page`.
+- [~] **Fichas dinámicas:** `post.html?slug=` solo cliente es insuficiente para indexación/OG; estrategia recomendada **prerender/build por slug** (o SSG/export) usando el endpoint como fuente. El visor ya cubre metas/OG/JSON-LD (§7.1); el prerender se resuelve en el build de la web.
 - [~] **URLs canónicas:** `seo.canonical` aplicado en el visor; el canonical, la imagen OG y los robots se derivan solos (dominio + ruta, portada e `indexable`). Rutas limpias y redirect 301 desde `post.html?slug=` pendientes en la web real.
 - [x] **Por página/detalle:** `<title>`, meta description, canonical, robots, OG/Twitter y JSON-LD, aplicados desde la publicación en `src/js/publico.js`.
 - [x] **`web-sitemap`:** endpoint listo (published + indexable + `lastmod`).
@@ -254,14 +255,14 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - [x] Caché interna, paginación, consistencia con `preview`; error lógico para no disponibles.
 - [x] Validado con el visor público de este repo (`src/publico.html`): listado con filtros/paginación, detalle, 404 y SEO. La validación dentro de `nueva-version` queda en Fase 4.
 
-### Fase 4 — Integración en la web y SEO — **aceptación en el visor (`publico`)**, port posterior a `custom-page`
+### Fase 4 — Integración en la web y SEO — **cerrada en este proyecto** (visor + Pages); el port es tarea de la web
 **Objetivo:** fijar y verificar **aquí** el comportamiento definitivo que la web debe replicar.
 **Criterio de aceptación:** el **100% de las comprobaciones se hace sobre `src/publico.html` + `src/js/publico.js`**. `custom-page/nueva-version` se actualiza **después**, replicando lo ya validado (mismo contrato, mismas metas, mismos estados).
 - [x] Consumo del canal sin JSON estático, con filtros/búsqueda/paginación y estados vacío/error.
 - [x] Metas/OG/canonical/robots y JSON-LD (`Article`/`Event`/`BlogPosting`) aplicados desde la publicación, validados en el visor (§7.1).
-- [~] **Port a `custom-page/nueva-version`** (otro repositorio): sustituir `blog-posts.json`/`HistoriasAPI` por el canal y replicar metas, JSON-LD, redirects y estados.
-- [~] Prerender/build por slug y `sitemap.xml`/`robots.txt` físicos: se resuelven en el hosting al integrar; el **mapa 301** ya está en `GET /v1/redirects`.
-- [~] Rendimiento/accesibilidad: medido en el visor (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles); falta auditoría formal en la web final.
+- [x] **Traspaso del port a `custom-page/nueva-version` — fuera del alcance de este proyecto.** Aquí se entrega el contrato, el visor de referencia y la guía §7.2; la sustitución de `blog-posts.json`/`HistoriasAPI`, las metas, el JSON-LD, los 301 y los estados se ejecutan **desde el repositorio de la web**. No se marca como pendiente de este plan.
+- [~] **Prerender/build por slug y `sitemap.xml`/`robots.txt` físicos → tarea del proyecto web:** se resuelven en su build/hosting; aquí solo se entrega el **mapa 301** (`GET /v1/redirects`) y el endpoint `sitemap`.
+- [~] **Auditoría formal de rendimiento/accesibilidad → tarea del proyecto web:** aquí está medido lo básico (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles).
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
@@ -287,7 +288,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 ### 7.2 Guía de port a `custom-page/nueva-version`
 
-> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. No se toca el otro repositorio desde aquí.
+> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. **El port no es una tarea de este proyecto:** se ejecuta desde `custom-page/nueva-version`, que recibe el contrato, esta guía y los criterios de §7.1 como aceptación. Aquí no se modifica el otro repositorio.
 >
 > **Estilos ya alineados.** `src/css/publico.css` reproduce el tema de `custom-page/nueva-version` (`css/main.css`): tokens `--pub-*` equivalentes a `--brand*`/`--ink*`, Inter + Montserrat, hero de ficha a dos columnas, «Datos destacados» con iconos por etiqueta, cuerpo en tarjeta y listado con tarjetas de 24 px. Para portar basta reutilizar `main.css` tal cual y conservar el marcado (`pub-ficha-hero`, `pub-facts-grid`, `pub-fact`, `pub-card`, `pub-body`).
 
@@ -393,14 +394,14 @@ Reglas:
 2. **Fase 1** → base (datos + gestor + payload). `[x]`
 3. **Fase 2** y preparación de **Fase 3** en paralelo con contrato estable. `[x]`
 4. **Fase 3** → canal público. `[x]`
-5. **Fase 4** → integración web + SEO. `[~]` aceptada en el visor y en Pages; port a la web pendiente
+5. **Fase 4** → integración web + SEO. `[x]` cerrada aquí (visor + Pages); el port se ejecuta en la web (§7.2)
 6. **Fase 5** → estabilización. `[~]` parcial
 
 ## 9. Riesgos y mitigaciones (funcionales)
 | Riesgo | Mitigación | Estado |
 |---|---|---|
 | Desalineación gestor ↔ web | Contrato único `Publicacion` normalizado y compatibilidad `/api`–`/v1` documentada. | [x] |
-| Fichas dinámicas no indexables | Prerender/build por slug + metas/OG/JSON-LD + sitemap/canonical. | [ ] Fase 4 |
+| Fichas dinámicas no indexables | Prerender/build por slug + metas/OG/JSON-LD + sitemap/canonical. | [~] metas/OG/JSON-LD en el visor; prerender en la web |
 | Cambios de `slug` rompen enlaces | `slug` estable, historial y redirects 301; 404/410 para retirados. | [x] slug único + historial + 301 (`/v1/redirects`); 410 para retirados pendiente |
 | Límites/rendimiento GAS | Paginación, caché (`CacheService`) u opción de exportación JSON estática. | [x] caché + paginación |
 | Inconsistencia preview vs público | Reutilizar la misma composición de payload normalizado. | [x] probado |
@@ -424,3 +425,4 @@ Reglas:
 | 2026-11-14 | 4 | Revisión en Pages con el canal real: listado vacío, 404 con `noindex`, canonical propio, 360/1280 sin desbordes | — | §7.1 |
 | 2026-11-14 | 5 | `Code.gs` endurecido desplegado como nueva versión en Apps Script y canal verificado en vivo (`publicaciones`, `sitemap`, `redirects`, `taxonomias`, JSONP y 401 sin token) | — | Peticiones reales al `/exec` |
 | 2026-11-14 | 7.3 | Análisis y plan de la ficha de animal configurable (plantilla, bloques, iconos, galería, salud, CTA) sin implementar | — | §7.3 |
+| 2026-11-14 | 4 | Port a la web declarado **tarea del proyecto `custom-page/nueva-version`**: se entrega contrato + guía §7.2 + criterios §7.1 | — | §7.2 |
