@@ -281,6 +281,19 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
 - [~] **Pages en vivo:** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200**, carga `publico.css` y `js/publico.js`, el canal JSONP responde y se ve el estado vacío (0 publicaciones) sin errores de consola; canonical y `og:url` apuntan a la propia página. Falta la revisión de píxeles con contenido real publicado.
 
+### 7.2 Guía de port a `custom-page/nueva-version`
+
+> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/publico.html`. No se toca el otro repositorio desde aquí.
+
+1. **Consumo.** Sustituir `blog-posts.json` y `HistoriasAPI` por el canal: `GET {API_URL}?endpoint=publicaciones` (filtros `type`, `category`, `species`, `q`, `page`, `pageSize` ≤ 50) y `endpoint=publicacion&slug=…`. Desde el navegador usar **JSONP** (`&callback=`): Apps Script no da cabeceras CORS. Respetar el caché de 60 s y añadir `nocache=1` solo al depurar.
+2. **Metas.** `seo.metaTitle` → `<title>` y `og:title`; `seo.metaDescription` → `description` y `og:description`; `seo.ogImage` → `og:image`/`twitter:image`; `seo.robots` → `robots` (`noindex,nofollow` si `indexable === false`).
+3. **Canonical condicional.** Usar **solo** `seo.canonical || pub.canonical`. Si viene vacío (base GitHub Pages) **no emitir** `<link rel="canonical">` ni `og:url`; nunca derivarlo de `pub.url` (es una ruta relativa). En listado y páginas de estado, la URL propia de la página.
+4. **JSON-LD por tipo.** `animal` → `Article`; `evento` → `Event` (`startDate`, `endDate`, `location`, `organizer`, `offers` si hay inscripción); `historia` → `BlogPosting`. Un único `<script type="application/ld+json">`, y **ninguno** en 404/error.
+5. **Redirects 301.** Generar las reglas del hosting desde `GET /v1/redirects` (`from` → `to`, `status: 301`) en cada despliegue. En la ficha, si la respuesta trae `redirect.slug`, reescribir la URL sin recargar (`history.replaceState`).
+6. **Estados.** Distinguir *sin resultados* (filtros), *canal sin configurar* (`status:"warning"`), *error de red* (con reintento) y *no disponible* (`status:"error"`). Los dos últimos, `noindex,nofollow` y enlace al listado.
+7. **Antes de dar el port por bueno.** Repetir la lista de §7.1 en el dominio real: listado con filtros/paginación, fichas de los tres tipos, canonical ausente o correcto según base, JSON-LD correcto, 404, redirect de slug histórico, estados, y revisión visual a 360/1280 px.
+8. **Indexación real (opcional, siguiente paso).** Prerender por slug en build usando el canal como fuente y `sitemap.xml`/`robots.txt` físicos; el sitemap del backend solo emite URLs cuando hay dominio propio.
+
 ### Fase 5 — Ajustes, calidad y operación — parcial
 **Objetivo:** estabilizar y mantener el flujo gestor → web.
 - [x] Validaciones de completitud/publicación y consistencia preview↔público (con pruebas).
