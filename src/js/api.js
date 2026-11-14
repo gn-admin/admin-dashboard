@@ -179,6 +179,14 @@ const API = {
     }
     return this._post('upload-documento', { archivo_base64: base64, nombre, mime_type: mimeType, tipo: tipo || 'documento' });
   },
+  // Media de una publicación web: una carpeta de Drive por ficha.
+  async subirMediaWeb(publicacionId, tipo, base64, nombre, mimeType) {
+    const limite = tipo === 'video' ? 15 * 1024 * 1024 : (tipo === 'documento' ? 10 * 1024 * 1024 : 5 * 1024 * 1024);
+    if (base64 && base64.length > limite * 1.4) {
+      throw new Error('El archivo supera el máximo permitido (' + Math.round(limite / 1024 / 1024) + ' MB)');
+    }
+    return this._post('web-media-subir', { publicacion_id: publicacionId, tipo, archivo_base64: base64, nombre, mime_type: mimeType });
+  },
   async updateDocumento(id, data) { const r = await this._post('update-documento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteDocumento(id) { return this._post('delete-documento', { id }); },
 

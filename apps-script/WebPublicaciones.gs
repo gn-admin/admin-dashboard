@@ -913,6 +913,141 @@ function webResumen() {
   };
 }
 
+// ==================== MEDIA · UNA CARPETA POR FICHA ====================
+
+/** Tamaño aproximado del binario de un base64 (sin decodificarlo). */
+function webBytesAprox(base64) {
+  var limpio = String(base64 || '').replace(/\s+/g, '');
+  if (!limpio) return 0;
+  var pad = limpio.slice(-2) === '==' ? 2 : (limpio.slice(-1) === '=' ? 1 : 0);
+  return Math.floor((limpio.length * 3) / 4) - pad;
+}
+
+/**
+ * Raíz de media de la web (`CONFIG.DRIVE_WEB_FOLDER_ID`). Esa carpeta no se
+ * comparte: cada archivo se publica por separado (ANYONE_WITH_LINK).
+ */
+function webRaizMedia() {
+  var id = webTexto(typeof CONFIG !== 'undefined' ? CONFIG.DRIVE_WEB_FOLDER_ID : '');
+  if (!id) return null;
+  try { return DriveApp.getFolderById(id); } catch (err) { return null; }
+}
+
+/** Nombre estable de la carpeta de una ficha: `tipo-slug`. */
+function webNombreCarpeta(p) {
+  var tipo = webTexto(p && p.tipo) || 'publicacion';
+  var slug = webTexto(p && p.slug) || webTexto(p && p.id) || 'sin-slug';
+  return tipo + '-' + slug;
+}
+
+/**
+ * Carpeta de la ficha dentro de la raíz de media. Se busca por nombre y se
+ * crea si no existe, así la ficha siempre tiene la misma carpeta aunque se
+ * suba desde otra sesión o se recargue el gestor.
+ */
+function webCarpetaPublicacion(p) {
+  if (!p || !p.id) return { error: 'Falta la publicación' };
+  var raiz = webRaizMedia();
+  if (!raiz) return { error: 'DRIVE_WEB_FOLDER_ID no configurado en Config.gs' };
+  try {
+    var nombre = webNombreCarpeta(p);
+    var it = raiz.getFoldersByName(nombre);
+    var carpeta = it.hasNext() ? it.next() : raiz.createFolder(nombre);
+    return { folder: carpeta, folderId: carpeta.getId(), nombre: nombre };
+  } catch (err) {
+    return { error: 'No se pudo abrir la carpeta de la ficha: ' + err.message };
+  }
+}
+
+var WEB_MEDIA_TIPOS = {
+  portada: { prefijo: 'portada', mimes: ['image/'], maxBytes: 5 * 1024 * 1024 },
+  galeria: { prefijo: 'galeria', mimes: ['image/'], maxBytes: 5 * 1024 * 1024 },
+  video: { prefijo: 'video', mimes: ['video/'], maxBytes: 15 * 1024 * 1024 },
+  documento: { prefijo: 'documento', mimes: ['application/pdf', 'image/', 'video/'], maxBytes: 10 * 1024 * 1024 }
+};
+
+function webExtensionMedia(mime) {
+  var m = String(mime || '').toLowerCase();
+  if (m === 'application/pdf') return '.pdf';
+  if (m === 'image/png') return '.png';
+  if (m === 'image/webp') return '.webp';
+  if (m === 'image/gif') return '.gif';
+  if (m === 'image/jpeg' || m === 'image/jpg') return '.jpg';
+  if (m.indexOf('video/webm') === 0) return '.webm';
+  if (m.indexOf('video/') === 0) return '.mp4';
+  return '.bin';
+}
+
+/** Nombre ordenado y sin acentos: `<tipo>-<original>-<uuid corto><ext>`. */
+function webNombreArchivo(tipo, original, mime) {
+  var def = WEB_MEDIA_TIPOS[tipo] || WEB_MEDIA_TIPOS.documento;
+  var base = String(original || '').replace(/\.[^.]+$/, '')
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'archivo';
+  return def.prefijo + '-' + base + '-' + String(Utilities.getUuid()).slice(0, 8) + webExtensionMedia(mime);
+}
+
+/**
+ * Sube una imagen, vídeo o documento a la carpeta de la ficha.
+ * `tipo`: portada | galeria | video | documento.
+ */
+function webSubirMedia(body) {
+  body = body || {};
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var p = webPublicacionPorId(body.publicacion_id);
+  if (!p) return { status: 'error', error: 'Publicación no encontrada' };
+  var tipo = webTexto(body.tipo) || 'documento';
+  var def = WEB_MEDIA_TIPOS[tipo];
+  if (!def) return { status: 'error', error: 'Tipo de media no válido (portada, galeria, video o documento)' };
+
+  var base64 = String(body.archivo_base64 || '');
+  var coma = base64.indexOf(',');
+  if (base64.indexOf('data:') === 0 && coma !== -1) base64 = base64.substring(coma + 1);
+  base64 = base64.replace(/\s+/g, '');
+  if (!base64) return { status: 'error', error: 'Falta archivo_base64' };
+
+  if (webBytesAprox(base64) > def.maxBytes) {
+    return { status: 'error', error: 'Archivo demasiado grande (máx. ' + Math.round(def.maxBytes / 1024 / 1024) + ' MB)' };
+  }
+
+  var mime = String(body.mime_type || '').toLowerCase();
+  var permitido = def.mimes.some(function (prefijo) { return mime.indexOf(prefijo) === 0; });
+  if (!permitido) return { status: 'error', error: 'Tipo de archivo no permitido para «' + tipo + '»' };
+
+  var carpeta = webCarpetaPublicacion(p);
+  if (carpeta.error) return { status: 'error', error: carpeta.error };
+
+  try {
+    var nombre = webNombreArchivo(tipo, body.nombre, mime);
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), mime, nombre);
+    var file = carpeta.folder.createFile(blob);
+    // Imágenes y vídeos se comparten (los consume la web); los documentos no.
+    // Ni la raíz ni la carpeta de la ficha se comparten.
+    if (mime.indexOf('image/') === 0 || mime.indexOf('video/') === 0) {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+    return {
+      status: 'success',
+      data: {
+        fileId: file.getId(),
+        nombre: nombre,
+        tipo: tipo,
+        carpeta: carpeta.nombre,
+        carpeta_id: carpeta.folderId,
+        carpeta_url: carpeta.folder.getUrl(),
+        url: mime.indexOf('image/') === 0
+          ? 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1600'
+          : file.getUrl(),
+        download: 'https://drive.google.com/uc?id=' + file.getId() + '&export=download'
+      }
+    };
+  } catch (err) {
+    Logger.log('webSubirMedia error: ' + err.message);
+    return { status: 'error', error: 'Error subiendo a Drive: ' + err.message };
+  }
+}
+
 // ==================== CANAL PÚBLICO ====================
 
 function webPublicables() {

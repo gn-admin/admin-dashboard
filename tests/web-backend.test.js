@@ -20,6 +20,41 @@ function crearBackend() {
   // Pestañas existentes por spreadsheet (para probar la lectura estricta por nombre).
   const hojas = { SHEET_WEB: ['WebPublicaciones'], SHEET_ANIMALES: ['Animales'] };
   let seq = 0;
+  // Drive simulado: carpetas por nombre dentro de una raíz y ficheros creados.
+  const drive = { carpetas: [], archivos: [], seq: 0 };
+  function carpetaDrive(nombre, id, padre) {
+    const folder = {
+      getId: () => id,
+      getName: () => nombre,
+      getUrl: () => 'https://drive.test/folder/' + id,
+      getFoldersByName(n) {
+        const hits = drive.carpetas.filter(c => c.nombre === n && c.padre === id).map(c => c.folder);
+        let i = 0;
+        return { hasNext: () => i < hits.length, next: () => hits[i++] };
+      },
+      createFolder(n) {
+        const sub = carpetaDrive(n, 'carpeta-' + (++drive.seq), id);
+        drive.carpetas.push({ nombre: n, padre: id, folder: sub });
+        return sub;
+      },
+      createFile(blob) {
+        const fid = 'file-' + (++drive.seq);
+        const file = {
+          getId: () => fid,
+          getName: () => blob.name,
+          getUrl: () => 'https://drive.test/file/' + fid,
+          setSharing() {
+            const registro = drive.archivos.find(a => a.id === fid);
+            if (registro) registro.compartido = true;
+            return file;
+          }
+        };
+        drive.archivos.push({ id: fid, nombre: blob.name, mime: blob.mime, carpeta: id, compartido: false });
+        return file;
+      }
+    };
+    return folder;
+  }
   const ctx = {
     SpreadsheetApp: {
       openById(id) {
@@ -36,6 +71,7 @@ function crearBackend() {
     },
     CONFIG: {
       PUBLIC_WEB_BASE_URL: 'https://web.test',
+      DRIVE_WEB_FOLDER_ID: 'ROOT_MEDIA',
       CONTACT_EMAIL: 'hola@test.es',
       sheets: {
         webPublicaciones: { sheetId: 'SHEET_WEB', sheetName: 'WebPublicaciones' },
@@ -43,7 +79,21 @@ function crearBackend() {
       }
     },
     Logger: { log() {} },
-    Utilities: { getUuid: () => 'uuid-' + (++seq) },
+    Utilities: {
+      getUuid: () => 'uuid-' + (++seq),
+      newBlob: (bytes, mime, name) => ({ bytes, mime, name }),
+      base64Decode: () => []
+    },
+    DriveApp: {
+      Access: { ANYONE_WITH_LINK: 'anyone' },
+      Permission: { VIEW: 'view' },
+      getFolderById(id) {
+        if (id === 'ROOT_MEDIA') return carpetaDrive('media', 'ROOT_MEDIA', null);
+        const c = drive.carpetas.find(x => x.folder.getId() === id);
+        if (!c) throw new Error('Carpeta no encontrada');
+        return c.folder;
+      }
+    },
     readSheet(cfg) {
       const origen = cfg && cfg.sheetId === 'SHEET_ANIMALES' ? estado.animales : estado.publicaciones;
       return origen.map(f => Object.assign({}, f));
@@ -70,7 +120,7 @@ function crearBackend() {
   };
   vm.createContext(ctx);
   vm.runInContext(FUENTE, ctx, { filename: 'WebPublicaciones.gs' });
-  return { ctx, estado, hojas };
+  return { ctx, estado, hojas, drive };
 }
 
 function animal(extra) {
@@ -479,6 +529,91 @@ describe('gestor: eventos, historias y sitemap', () => {
     assert.deepEqual(plano(r.data.map(u => u.slug)), ['luna']);
     assert.equal(r.data[0].loc, 'https://web.test/animales/luna');
     assert.ok(r.data[0].lastmod);
+  });
+});
+
+describe('gestor web: media en una carpeta por ficha', () => {
+  function publicada(b, extra) {
+    const alta = b.ctx.webUpsertEvento(Object.assign({
+      tipo: 'historia', titulo: 'Luna', slug: 'luna', categoria: 'Historias',
+      contenido_html: '<p>Luna llegó al refugio en invierno y hoy vive con una familia que la adoptó; esta es su historia completa.</p>', extracto: 'Luna',
+      media: { coverImage: { src: 'https://x/luna.jpg', alt: 'Luna' } },
+      estado_publicacion: 'publicado'
+    }, extra || {}), { email: 'x@y.es' });
+    assert.equal(alta.status, 'success', JSON.stringify(alta));
+    return alta.data.id;
+  }
+
+  it('crea la carpeta tipo-slug una vez y la reutiliza', () => {
+    const b = crearBackend();
+    const id = publicada(b);
+
+    const portada = b.ctx.webSubirMedia({
+      publicacion_id: id, tipo: 'portada', archivo_base64: 'QUJD',
+      nombre: 'Foto Principal.JPG', mime_type: 'image/jpeg'
+    });
+    assert.equal(portada.status, 'success');
+    assert.equal(portada.data.carpeta, 'historia-luna');
+    assert.match(portada.data.url, /^https:\/\/drive\.google\.com\/thumbnail\?id=file-/);
+    assert.match(portada.data.url, /sz=w1600/);
+    assert.match(portada.data.nombre, /^portada-foto-principal-.*\.jpg$/);
+    assert.equal(b.drive.archivos[0].compartido, true);
+
+    const galeria = b.ctx.webSubirMedia({
+      publicacion_id: id, tipo: 'galeria', archivo_base64: 'QUJD',
+      nombre: 'Otra foto.png', mime_type: 'image/png'
+    });
+    assert.equal(galeria.data.carpeta_id, portada.data.carpeta_id);
+    assert.equal(b.drive.carpetas.filter(c => c.nombre === 'historia-luna').length, 1);
+    assert.equal(b.drive.archivos.length, 2);
+    assert.equal(b.drive.archivos[1].carpeta, portada.data.carpeta_id);
+  });
+
+  it('los documentos van a la misma carpeta y no usan thumbnail', () => {
+    const b = crearBackend();
+    const id = publicada(b);
+    const doc = b.ctx.webSubirMedia({
+      publicacion_id: id, tipo: 'documento', archivo_base64: 'QUJD',
+      nombre: 'Contrato adopción.pdf', mime_type: 'application/pdf'
+    });
+    assert.equal(doc.status, 'success');
+    assert.match(doc.data.nombre, /^documento-contrato-adopcion-.*\.pdf$/);
+    assert.match(doc.data.url, /^https:\/\/drive\.test\/file\//);
+    assert.match(doc.data.download, /export=download/);
+    // Los documentos no se publican: el fichero queda privado.
+    assert.equal(b.drive.archivos[0].compartido, false);
+  });
+
+  it('rechaza tipos, tamaños y publicaciones inexistentes', () => {
+    const b = crearBackend();
+    const id = publicada(b);
+
+    const pdfPortada = b.ctx.webSubirMedia({ publicacion_id: id, tipo: 'portada', archivo_base64: 'QUJD', nombre: 'x.pdf', mime_type: 'application/pdf' });
+    assert.equal(pdfPortada.status, 'error');
+    assert.match(pdfPortada.error, /no permitido/);
+
+    const videoEnGaleria = b.ctx.webSubirMedia({ publicacion_id: id, tipo: 'galeria', archivo_base64: 'QUJD', nombre: 'x.mp4', mime_type: 'video/mp4' });
+    assert.equal(videoEnGaleria.status, 'error');
+
+    const grande = b.ctx.webSubirMedia({ publicacion_id: id, tipo: 'portada', archivo_base64: 'A'.repeat(7 * 1024 * 1024), nombre: 'x.jpg', mime_type: 'image/jpeg' });
+    assert.equal(grande.status, 'error');
+    assert.match(grande.error, /demasiado grande/);
+
+    const sinPub = b.ctx.webSubirMedia({ publicacion_id: 'nope', tipo: 'portada', archivo_base64: 'QUJD', nombre: 'x.jpg', mime_type: 'image/jpeg' });
+    assert.equal(sinPub.status, 'error');
+
+    assert.equal(b.drive.carpetas.length, 0);
+    assert.equal(b.drive.archivos.length, 0);
+  });
+
+  it('sin DRIVE_WEB_FOLDER_ID avisa y no sube nada', () => {
+    const b = crearBackend();
+    const id = publicada(b);
+    b.ctx.CONFIG.DRIVE_WEB_FOLDER_ID = '';
+    const r = b.ctx.webSubirMedia({ publicacion_id: id, tipo: 'portada', archivo_base64: 'QUJD', nombre: 'x.jpg', mime_type: 'image/jpeg' });
+    assert.equal(r.status, 'error');
+    assert.match(r.error, /DRIVE_WEB_FOLDER_ID/);
+    assert.equal(b.drive.archivos.length, 0);
   });
 });
 

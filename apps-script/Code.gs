@@ -333,6 +333,9 @@ function handlePost(endpoint, user, e) {
       return jsonResponse(webUpsertEvento(body, user));
     case 'web-eventos-estado':
       return jsonResponse(webEstadoEvento(body, user));
+    case 'web-media-subir': {
+      var _rm = jsonResponse(webSubirMedia(body)); _audit(endpoint, user, body, _rm); return _rm;
+    }
     default:
       return jsonResponse({ error: 'Endpoint no encontrado' }, 404);
   }

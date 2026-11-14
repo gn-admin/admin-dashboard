@@ -9103,6 +9103,7 @@ const Dashboard = {
 
   // ==================== GESTOR WEB (delegacion a Web) ====================
   abrirAnimalWeb(animalId) { return Web.abrirAnimal(animalId); },
+  subirMediaWeb(el, tipo, prefijo, publicacionId) { return Web.subirMediaWeb(el, tipo, prefijo, publicacionId); },
   abrirEventoWeb(id) { return Web.abrirEvento(id); },
   abrirPublicacionWebAnimal(animalId) { return Web.abrirParaAnimal(animalId); },
   saveWebAnimal(e, animalId) { return Web.guardarAnimal(e, animalId); },

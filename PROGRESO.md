@@ -15,7 +15,8 @@ PWA de administración para protectora (Grupo Nebak): encuestas de Google Forms 
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
 - `npm run prerender` — genera fichas estáticas, `sitemap.xml` y `robots.txt` desde el canal público (el deploy lo ejecuta tras los tests; avisos como anotaciones del run). Fixtures en `tests/fixtures/prerender/`.
-- `npm test` — `node --test tests/*.test.js` (474 tests en verde, 11 ficheros). Corren en CI y bloquean el despliegue.
+- `npm test` — `node --test tests/*.test.js` (480 tests en verde, 11 ficheros). Corren en CI y bloquean el despliegue.
+- Media del gestor web: una carpeta de Drive por ficha (`tipo-slug`) bajo `DRIVE_WEB_FOLDER_ID`; se sube desde el formulario de la publicación.
 
 ## Arquitectura
 

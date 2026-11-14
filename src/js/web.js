@@ -77,6 +77,15 @@ const Web = {
       .map(p => ({ title: p[0] || '', url: p[1], provider: /youtu/.test(p[1]) ? 'youtube' : (/vimeo/.test(p[1]) ? 'vimeo' : '') }));
   },
 
+  /* "nombre|url" por línea -> documents[] (solo gestor; no se publican). */
+  parseDocumentos(texto) {
+    return String(texto || '')
+      .split(/\r?\n/)
+      .map(l => l.split('|').map(x => String(x || '').trim()))
+      .filter(p => p.length >= 2 && p[1])
+      .map(p => ({ name: p[0] || 'Documento', url: p[1] }));
+  },
+
   /* Lista separada por comas. */
   parseLista(texto) {
     return String(texto || '')
@@ -439,6 +448,9 @@ const Web = {
     const gallery = Array.isArray(media.gallery) ? media.gallery : [];
     const icons = Array.isArray(media.icons) ? media.icons : [];
     const videos = Array.isArray(media.videos) ? media.videos : [];
+    const documents = Array.isArray(media.documents) ? media.documents : [];
+    const docsTexto = documents.map(x => (x.name || '') + '|' + (x.url || '')).join('\n');
+    const carpetaFicha = (d.tipo || 'animal') + '-' + (d.slug || 'sin-slug');
     const cta = d.cta || {};
     const compat = animal.compatibility || {};
     const adop = animal.adoption || {};
@@ -482,6 +494,16 @@ const Web = {
           <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
           <div class="form-group"><label>Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
           <div class="form-group"><label>Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label>Subir portada</label><input type="file" id="web-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label>Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Subir vídeo</label><input type="file" id="web-file-video" class="form-input" accept="video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="video" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label>Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+          </div>
+          <div class="form-group"><label>Documentos de la ficha (nombre|url por línea)</label><textarea id="web-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+          <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos (los usa la web), no la carpeta; los documentos quedan privados. La portada, la galería y los vídeos se enlazan solos.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
         </div>
       </details>
 
@@ -564,7 +586,8 @@ const Web = {
         coverImage: { src: txt('web-cover'), alt },
         gallery: this.parseGaleria(v('web-galeria') ? v('web-galeria').value : '', alt),
         videos: this.parseVideos(v('web-videos') ? v('web-videos').value : ''),
-        icons: this.parseIconos(v('web-iconos') ? v('web-iconos').value : '')
+        icons: this.parseIconos(v('web-iconos') ? v('web-iconos').value : ''),
+        documents: this.parseDocumentos(v('web-docs') ? v('web-docs').value : '')
       },
       cta: txt('web-cta-label') && txt('web-cta-url') ? { label: txt('web-cta-label'), url: txt('web-cta-url') } : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.
@@ -584,6 +607,64 @@ const Web = {
         health: { specialNeeds: checked('web-special-needs') }
       }
     };
+  },
+
+  _leerArchivoBase64(file) {
+    return new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(String(lector.result || ''));
+      lector.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      lector.readAsDataURL(file);
+    });
+  },
+
+  _campoMedia(tipo, prefijo) {
+    const campos = { portada: prefijo + '-cover', galeria: prefijo + '-galeria', video: prefijo + '-videos', documento: prefijo + '-docs' };
+    return campos[tipo] || '';
+  },
+
+  /** Añade el resultado de una subida al campo de texto correspondiente. */
+  _anadirMedia(campo, tipo, d, nombreOriginal, prefijo) {
+    if (!campo) return;
+    if (tipo === 'portada') {
+      campo.value = d.url || '';
+      const alt = document.getElementById(prefijo + '-cover-alt');
+      if (alt && !String(alt.value || '').trim()) alt.value = String(nombreOriginal || '').replace(/\.[^.]+$/, '');
+      return;
+    }
+    if (tipo === 'galeria') {
+      campo.value = [campo.value, d.url].filter(Boolean).join('\n');
+      return;
+    }
+    if (tipo === 'video') {
+      const titulo = String(nombreOriginal || d.nombre || 'Vídeo').replace(/\.[^.]+$/, '');
+      campo.value = [campo.value, titulo + '|' + (d.url || '')].filter(Boolean).join('\n');
+      return;
+    }
+    campo.value = [campo.value, (d.nombre || nombreOriginal || 'Documento') + '|' + (d.url || '')].filter(Boolean).join('\n');
+  },
+
+  /** Sube los archivos elegidos a la carpeta de la ficha y rellena el campo. */
+  async subirMediaWeb(el, tipo, prefijo, publicacionId) {
+    const files = Array.from((el && el.files) || []);
+    if (!files.length) return;
+    const campo = document.getElementById(this._campoMedia(tipo, prefijo));
+    if (el) el.value = '';
+    if (!publicacionId) { this._snack('Guarda la publicación antes de subir archivos', 'warning'); return; }
+    if (!campo) { this._snack('No se encontró el campo de destino', 'error'); return; }
+    this._snack('Subiendo ' + files.length + ' archivo(s)…');
+    try {
+      for (const file of files) {
+        const base64 = await this._leerArchivoBase64(file);
+        const res = await API.subirMediaWeb(publicacionId, tipo, base64, file.name, file.type || 'application/octet-stream');
+        const d = (res && res.data) || {};
+        if (!d.url) throw new Error((res && res.error) || 'El backend no devolvió la URL');
+        this._anadirMedia(campo, tipo, d, file.name, prefijo);
+      }
+      this._snack('Archivo(s) subidos a la carpeta de la ficha');
+    } catch (err) {
+      this._snackErr(err, 'No se pudo subir: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
   },
 
   async guardarAnimal(e, animalId) {
@@ -625,6 +706,9 @@ const Web = {
     const ev = d.evento || d.event || {};
     const cover = media.coverImage || {};
     const gallery = Array.isArray(media.gallery) ? media.gallery : [];
+    const documents = Array.isArray(media.documents) ? media.documents : [];
+    const docsTexto = documents.map(x => (x.name || '') + '|' + (x.url || '')).join('\n');
+    const carpetaFicha = (d.tipo || 'evento') + '-' + (d.slug || 'sin-slug');
     const loc = ev.location || {};
     const org = ev.organizer || {};
     const reg = ev.registration || {};
@@ -658,6 +742,15 @@ const Web = {
         <div class="form-group"><label>Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
       </div>
       <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Subir portada</label><input type="file" id="we-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+        <div class="form-group"><label>Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+      </div>
+      <div class="form-group"><label>Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+      <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
 
       <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
         <div class="detail-collapse-body">
@@ -732,7 +825,8 @@ const Web = {
       featured: checked('we-featured'),
       media: {
         coverImage: { src: txt('we-cover'), alt },
-        gallery: this.parseGaleria(v('we-galeria') ? v('we-galeria').value : '', alt)
+        gallery: this.parseGaleria(v('we-galeria') ? v('we-galeria').value : '', alt),
+        documents: this.parseDocumentos(v('we-docs') ? v('we-docs').value : '')
       },
       cta: txt('we-cta-label') && txt('we-cta-url') ? { label: txt('we-cta-label'), url: txt('we-cta-url') } : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.

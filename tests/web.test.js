@@ -213,6 +213,47 @@ describe('Web.estadoLabel / estadoCls', () => {
   });
 });
 
+describe('Web.parseDocumentos', () => {
+  it('lee nombre|url, descarta líneas sin URL y pone nombre por defecto', () => {
+    const docs = Web.parseDocumentos('Contrato|https://x/a.pdf\n\n|https://x/sin-nombre.pdf\nSolo nombre\nActa | https://x/b.pdf');
+    assert.deepEqual(docs, [
+      { name: 'Contrato', url: 'https://x/a.pdf' },
+      { name: 'Documento', url: 'https://x/sin-nombre.pdf' },
+      { name: 'Acta', url: 'https://x/b.pdf' }
+    ]);
+  });
+});
+
+describe('Web._anadirMedia', () => {
+  it('rellena portada, galería, vídeo y documentos', () => {
+    const previo = global.document;
+    const alt = { value: '' };
+    global.document = { getElementById: id => (id === 'web-cover-alt' ? alt : null) };
+    try {
+      const ctx = Object.assign({}, Web);
+      const portada = { value: '' };
+      ctx._anadirMedia(portada, 'portada', { url: 'https://x/p.jpg' }, 'foto.jpg', 'web');
+      assert.equal(portada.value, 'https://x/p.jpg');
+      assert.equal(alt.value, 'foto');
+
+      const galeria = { value: 'https://x/1.jpg' };
+      ctx._anadirMedia(galeria, 'galeria', { url: 'https://x/2.jpg' }, 'dos.jpg', 'web');
+      assert.equal(galeria.value, 'https://x/1.jpg\nhttps://x/2.jpg');
+
+      const video = { value: '' };
+      ctx._anadirMedia(video, 'video', { url: 'https://x/v.mp4', nombre: 'video.mp4' }, 'Mi vídeo.mp4', 'web');
+      assert.equal(video.value, 'Mi vídeo|https://x/v.mp4');
+
+      const docs = { value: '' };
+      ctx._anadirMedia(docs, 'documento', { url: 'https://x/d.pdf', nombre: 'documento-d.pdf' }, 'd.pdf', 'web');
+      assert.equal(docs.value, 'documento-d.pdf|https://x/d.pdf');
+    } finally {
+      if (previo === undefined) delete global.document;
+      else global.document = previo;
+    }
+  });
+});
+
 describe('Web: retiradas en el gestor', () => {
   it('el resumen tiene tarjeta propia y no las suma a borradores', () => {
     const ctx = Object.assign({}, Web, { resumen: { totales: { publicados: 1, borradores: 0, ocultos: 0, retirados: 3, sin_publicar: 0, incompletas: 0, sin_seo: 0 } } });

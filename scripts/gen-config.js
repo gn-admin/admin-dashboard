@@ -127,6 +127,8 @@ const backendConfig = `var CONFIG = {
   DRIVE_FOTOS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FOTOS_FOLDER_ID', '')}',
   DRIVE_DOCS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_DOCS_FOLDER_ID', '')}',
   DRIVE_FACTURAS_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_FACTURAS_FOLDER_ID', '')}',
+  // Raíz de media del gestor web: una subcarpeta por ficha. No se comparte.
+  DRIVE_WEB_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_WEB_FOLDER_ID', '')}',
   CONTACT_EMAIL: '${env('CONTACTO_EMAIL', '')}',
   PUBLIC_WEB_BASE_URL: '${env('PUBLIC_WEB_BASE_URL', 'https://gn-admin.github.io/admin-dashboard')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario', COORDINADOR: 'coordinador', VOLUNTARIO: 'voluntario', TESORERIA: 'tesoreria', CONSULTA: 'consulta' },

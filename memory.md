@@ -39,10 +39,19 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 - Historial de slugs (`slug_historial`) con 301 desde `?endpoint=redirects`; un slug histórico no se reutiliza.
 - Resumen con totales por tipo y por estado, diagnósticos de hoja y aviso de cabeceras.
 
+### Media por ficha (Drive)
+
+- Una **carpeta por publicación** en Drive: `<tipo>-<slug>` (p. ej. `animal-laia`) dentro de la raíz `DRIVE_WEB_FOLDER_ID`; se busca por nombre y se reutiliza.
+- Endpoint `POST web-media-subir` con `publicacion_id`, `tipo` (`portada`, `galeria`, `video`, `documento`), `archivo_base64`, `nombre` y `mime_type`. Devuelve `fileId`, `carpeta`, `carpeta_url`, `url` (thumbnail para imágenes) y `download`.
+- Límites: imágenes 5 MB, vídeo 15 MB, documentos 10 MB. Nombre de archivo ordenado: `<tipo>-<original>-<uuid>.<ext>`.
+- Imágenes y vídeos se comparten (los consume la web); **los documentos quedan privados**. Ni la raíz ni la carpeta de la ficha se comparten.
+- Formularios: animal (portada, galería, vídeo, documento) y evento/historia (portada, galería, documento). Los documentos se guardan en `media.documents` y no se publican.
+- Requiere `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env` y regenerar `Config.gs`.
+
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v226`.
-- `npm test`: **474/474**.
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v227`.
+- `npm test`: **480/480**.
 
 ## Decisiones cerradas
 
@@ -54,10 +63,11 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 ## Pendiente manual (fuera de git)
 
-1. **Desplegar `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** como nueva versión en Apps Script. Hasta entonces no hay `gone` (410) ni `?endpoint=retiradas`, y el run mostrará el `::warning::` de retiradas.
-2. Dominio propio (`gruponebak.net`) y Search Console: `sitemap.xml`/`robots.txt` en la raíz, envío del sitemap y canonical `dominio + ruta` sin `.html`.
-3. Port del SEO al proyecto real (páginas por slug, 410 real en el hosting, 301 desde `slug_historial`).
-4. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
+1. **Desplegar `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** como nueva versión en Apps Script. Hasta entonces no hay `gone` (410), ni `?endpoint=retiradas`, ni `web-media-subir`.
+2. **Añadir `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID`** al `.env` (carpeta raíz de media, sin compartir), regenerar `Config.gs` y pegarlo también en Apps Script. Sin esa variable la subida avisa y no guarda nada.
+3. Dominio propio (`gruponebak.net`) y Search Console: `sitemap.xml`/`robots.txt` en la raíz, envío del sitemap y canonical `dominio + ruta` sin `.html`.
+4. Port del SEO al proyecto real (páginas por slug, 410 real en el hosting, 301 desde `slug_historial`).
+5. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
 
 ## Siguientes pasos propuestos (no implementados)
 
@@ -74,6 +84,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 | Visor | `src/publico.html`, `src/js/publico.js`, `src/css/publico.css` |
 | Prerender | `scripts/prerender-publico.js`, `tests/prerender.test.js`, `tests/fixtures/prerender/` |
 | Gestor | `src/js/web.js`, `src/js/api.js` |
+| Media | `apps-script/WebPublicaciones.gs` (`webSubirMedia`), carpeta por ficha en Drive |
 | Backend | `apps-script/WebPublicaciones.gs`, `apps-script/Code.gs` (endpoints públicos) |
 | CI | `.github/workflows/deploy.yml` |
 | Docs | `AGENTS.md`, `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`, `PROGRESO.md` |
@@ -81,7 +92,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 474 tests
+npm test                                   # 480 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
