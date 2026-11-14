@@ -1,10 +1,12 @@
-# Plan por fases: Web pública + Gestión (gestor) y endpoints públicos
+# Plan por fases: Web pública + Gestor y endpoints (publicaciones, SEO)
 
-> **Objetivo:** implementar de forma incremental y segura la gestión de contenido público en el admin (gestor) y el canal público de solo lectura para la web, con foco en SEO y curación de datos (especialmente fichas de animales).  
+> **Objetivo:** implementar de forma incremental y segura la gestión de contenido público en el admin (gestor) y el canal público de solo lectura para la web (`custom-page` / `nueva-version`), con foco en fichas de animales, eventos, SEO y curación de datos.  
 > **Modo:** análisis/plan (sin implementar).  
 > **Documento base:** `ANALISIS-WEB-PUBLICACIONES-SEO-ENDPOINTS.md`.  
-> **Dependencia externa:** cambios en Apps Script (`.gs`), hojas/Sheets, configuración de despliegue/CORS y la web pública. Seguridad alineada con `PLAN_SEGURIDAD.md` e `INSTRUCCIONES_CONFIGURACION_EXTERNA.md`.  
-> **Fuentes internas no encontradas:** no se localizaron `docs/custom-page/*` (“estructura endpoints publicaciones” y el otro md) en el workspace; al disponer de ellos, ajustar contratos, nombres de acciones/campos y prioridades.
+> **Fuentes externas alineadas (leídas):**
+> - `../custom-page/docs/estructura-endpoint-publicaciones.md` — contrato público `GET /api/publicaciones` (filtros `type,category,status,species,q,page,pageSize,sort`), detalle por `:slug`, esquema `Publicacion` (`icons`, `gallery`, `videos[]/video`, `animal`, `event`, `contentHtml`, `coverImage`, `cta`, `publication/nebak-post-v1`).
+> - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario/consumo `nueva-version` (`HistoriasAPI`, `post.html?slug`, listados adopción), propuesta GAS/Sheets `/v1/*` (contenido, config, taxonomías, `forms/submit`), SEO (prerender/build por slug, metas/OG/JSON-LD, sitemap/robots, redirects 301), formularios/reCAPTCHA y cookies/políticas.
+> **Dependencias externas:** cambios en Apps Script (`.gs`), hojas/Sheets, despliegue/CORS, estrategia de render/SEO de la web pública y (para formularios) reCAPTCHA/correos. Seguridad alineada con `PLAN_SEGURIDAD.md` e `INSTRUCCIONES_CONFIGURACION_EXTERNA.md`.
 
 ---
 
@@ -12,192 +14,202 @@
 
 | Fase | Enfoque | Resultado principal | Depende de |
 |---|---|---|---|
-| **0** | Definición y preparación | Decisiones cerradas, modelo de datos y contratos acordados | — |
-| **1** | Modelo de datos y backend gestor (base) | Hojas/entidades y endpoints de gestión (CRUD/configuración publicación/SEO) operativos y protegidos | Fase 0 |
-| **2** | UI gestor en admin | Sección “Web/Contenido público” + acciones contextuales para publicar/curar/SEO | Fase 1 |
-| **3** | Canal público (endpoints/feed) | Endpoints públicos de solo lectura con lista blanca, filtros y SEO payload | Fase 1 (y datos curados) |
-| **4** | Web pública (consumo y SEO técnico) | Sitio público renderizando listados/detalles, metadatos, schema, sitemap/robots | Fase 3 |
-| **5** | Endurecimiento, calidad y operación | Validaciones, caché, redirecciones, monitorización, pruebas y ajustes | Fases 2–4 |
+| **0** | Definición y contratos | Modelo, lista blanca, contratos gestor+público y estrategia SEO/entrega cerrados y alineados a `custom-page/docs` | — |
+| **1** | Modelo de datos y backend gestor | Hojas/capa de publicación, endpoints de gestión (CRUD/config/preview/slug/estado) protegidos, payload público normalizado | Fase 0 |
+| **2** | UI gestor en admin | Sección “Web/Contenido público” + edición contextual, curación/SEO/previsualización por permisos | Fase 1 |
+| **3** | Canal público (contenido) | Endpoints/feed públicos de solo lectura (`/api/publicaciones` y/o `/v1/*`) con lista blanca, filtros y SEO payload | Fase 1 (datos curados) |
+| **4** | Web pública, SEO técnico y formularios | Consumo del contrato, rutas canónicas, prerender/build por slug, metas/OG/JSON-LD, sitemap/robots/redirects, `forms/submit` y cookies | Fase 3 (y 0) |
+| **5** | Endurecimiento y operación | Calidad, caché/rendimiento, seguridad/privacidad, observabilidad, QA por rol y documentación | Fases 2–4 |
 
-> Se puede solapar parcialmente **2** y **3** tras estabilizar contratos de Fase 1, pero no exponer público (3/4) sin lista blanca y curación mínimas.
+> Se puede solapar **2** y **3** tras estabilizar contratos y payload normalizado de Fase 1, pero no exponer Fase 3/4 sin lista blanca, curación mínima y control de publicación.
 
 ---
 
-## Fase 0 — Definición, decisiones y contratos (análisis/preparación)
+## Fase 0 — Definición, decisiones y contratos (alineación)
 
-**Objetivo:** cerrar ambigüedades para evitar rehacer modelo y endpoints.
+**Objetivo:** cerrar ambigüedades de modelo, contratos y SEO para evitar rehacer backend/UI.
 
 ### Tareas
-1. **Alinear con fuentes internas:** revisar `docs/custom-page` (“estructura endpoints publicaciones” y md relacionado) cuando estén disponibles y ajustar nomenclatura/contratos.
-2. **Decisiones de modelo:**
-   - **Animales:** ¿campos de publicación en hoja `Animales` o entidad separada (`web_animales`/`publicaciones_animales` referenciando `animal_id`)? (recomendado: separada para aislar lo público).
-   - **Eventos:** crear hoja/entidad dedicada (ej. `EventosWeb`/`Publicaciones`) con estado borrador/publicado.
-   - **Estados publicables:** mapeo de estados internos de animal → `estado_publico` permitido en web (ej. disponible/en acogida; adoptado como escaparate sí/no).
-   - **Medios:** cómo se seleccionan `imagen_principal`/`galeria_publica` (URLs/IDs existentes de Drive/galería) y qué es público.
-3. **Definir lista blanca por tipo:** campos exactos permitidos en respuestas públicas (`animal`, `evento`) y campos excluidos.
-4. **Definir contrato de endpoints (gestor y público):** nombres de `endpoint/action`, parámetros, formato de respuesta/error, paginación, filtros y ordenación (borrador en `ANALISIS-WEB-PUBLICACIONES-SEO-ENDPOINTS.md`).
-5. **SEO y URL:** estructura (`/animales/{slug}`, `/eventos/{slug}`), reglas de slug, canonical, estrategia de redirecciones 301, sitemap/robots.
-6. **Seguridad y permisos:** roles que pueden gestionar web en admin; CORS/dominio(s) de la web pública; confirmación de que el canal público no usa token admin.
-7. **Estrategia de entrega:** endpoint dinámico GAS vs exportación JSON estática (o híbrido con caché) según volumen y límites.
+1. **Alineación de contratos (con `custom-page/docs`):**
+   - Adoptar como base pública el esquema `Publicacion` y rutas `GET /api/publicaciones` + `GET /api/publicaciones/:slug` (filtros/paginación/respuesta) de `estructura-endpoint-publicaciones.md`.
+   - Definir compatibilidad/alias con `/v1/*` (`/v1/publicaciones`, `/v1/animales`, `/v1/eventos`, `/v1/config`, `/v1/taxonomias`, `/v1/sitemap`/export) según `analisis-endpoint-seo-formularios-cookies-nueva-version.md`.
+   - Fijar taxonomía: `type` (`animal|evento` y regla para `historia/blog`), `category`, `status`, `species`, y mapeos a categorías/estados actuales de `nueva-version`.
+2. **Modelo de datos y fuente de verdad:**
+   - **Animales:** capa de publicación separada recomendada (`web_animales`/`web_publicaciones` referenciando `animal_id`) para aislar lo público de la ficha interna.
+   - **Eventos/historias publicables:** entidad/hoja dedicada (no `actividad` interna) con `estado_publicacion`, fechas/lugar, media y SEO.
+   - Estados internos publicables → `estado_publico` (p. ej. adoptado en escaparate sí/no) y regla de `indexable/listed/featured`.
+   - Origen y selección de media pública (`coverImage`, `gallery`, `videos`), `icons` y CTA pública.
+3. **Lista blanca y campos sensibles:**
+   - Definir campos exactos permitidos por tipo (`animal`, `evento`, y extensiones) y exclusiones (adoptantes/contratos/documentos/gastos/datos médicos sensibles/dirección exacta/notas/IDs internos).
+4. **Contratos del gestor (admin):** acciones, parámetros, respuestas y validaciones para `web-animales`, `web-eventos`, `web-animales-preview`, `web-slug-check`, `web-resumen` (y autorización por rol).
+5. **SEO y URLs (web pública):** estrategia canónica por slug (rutas limpias objetivo y convivencia con `post.html?slug=`), `slug` único/normalizado, redirects 301, `sitemap.xml`/`robots.txt`, metas/OG/canonical/robots/JSON-LD, y decisión de entrega (prerender/build por slug vs dinámico/híbrido/export JSON).
+6. **Seguridad, CORS y permisos:** canal público sin token admin y con CORS limitado a dominio(s) públicos; roles con permiso de gestión web; confirmación de autorización por endpoint en `.gs`.
+7. **Formularios y políticas (alcance y dependencias):** contrato `POST /v1/forms/submit` (tipos, reCAPTCHA server-side, hoja `solicitudes_form`/correo) y requisitos de cookies/consentimiento/políticas para la web pública.
 
 ### Entregables
-- Matriz de decisiones y modelo de datos (campos por entidad/hoja).
-- Especificación de contratos (gestor y público) y lista blanca.
-- Checklist de seguridad/privacidad para publicación.
+- Matriz de decisiones y modelo de datos (hojas/cabeceras/campos por tipo) + mapeos de estados/taxonomías.
+- Especificación de contratos público/gestor, lista blanca y reglas de validación/publicación.
+- Diseño SEO/URL (rutas, sitemap, redirects, estrategia prerender/export) y checklist de seguridad/privacidad/CORS.
 
 ### Criterio de salida
-- Contratos y modelo aprobados; sin ambigüedades críticas para Fase 1.
+- Contratos y modelo aprobados y alineados con `custom-page/docs`; sin ambigüedades críticas para Fase 1.
 
 ---
 
 ## Fase 1 — Modelo de datos y backend gestor (Apps Script/Sheets)
 
-**Objetivo:** disponer de almacenamiento y APIs de gestión seguras para configurar publicación y SEO.
+**Objetivo:** disponer de almacenamiento y APIs de gestión seguras que produzcan el payload público normalizado.
 
 ### Tareas
-1. **Hojas/entidades y `CONFIG` en `.gs`:**
-   - Crear/ajustar hojas para configuración pública (ej. `web_animales`, `web_eventos`) con cabeceras definidas (ids, `slug`, flags, campos públicos/SEO, fechas, `orden`, etc.). Fila 1 = cabeceras.
-   - Registrar en `CONFIG.sheets` y validar IDs/permisos.
-2. **Lógica de dominio (backend):**
-   - Generación/validación de `slug` (único por tipo, normalizado), unicidad y actualización controlada.
-   - Validaciones para publicar: campos mínimos, estado interno permitido (animales), coherencia de fechas (eventos).
-   - Composición de **payload público normalizado** (lista blanca) reutilizable por preview y por feed público.
-3. **Endpoints gestor (autenticados y autorizados):**
-   - `web-animales`: list/get/upsert/cambiar estado (y preview de payload público).
-   - `web-eventos`: list/get/create/update/delete (o archivar) + estado/SEO.
-   - Utilidades: validación de slug, resumen/métricas de publicación (si aplica).
-4. **Seguridad backend:**
-   - Aplicar autorización por rol/módulo en cada acción (denegar por defecto), alineada al hito 1.1.
-   - No exponer datos internos innecesarios en respuestas del gestor; sanitizar entradas.
-5. **Pruebas de backend:**
-   - CRUD/configuración, unicidad de slug, reglas de publicación, y que el payload público no incluya campos prohibidos.
+1. **Hojas/entidades y `CONFIG` (`.gs`):**
+   - Crear/ajustar hojas de publicación web (p. ej. `web_animales`, `web_eventos`/`web_publicaciones`) con cabeceras: identificadores/origen, `slug`, `estado_publicacion/publicado_web`, `indexable`, `listed/featured/orden`, campos públicos (`title/excerpt/contentHtml` o equivalentes curados, `category/status/type`, `cover`, `gallery_json`, `videos_json`, `icons_json`, CTA), bloque SEO/OG, fechas (`publishedAt/updatedAt`) y metadatos de control. Fila 1 = cabeceras.
+   - Registrar en `CONFIG.sheets` y validar permisos/IDs.
+2. **Lógica de dominio:**
+   - Normalización/validación de `slug` (único por tipo), unicidad y control de cambios (base para redirects).
+   - Validaciones de publicación: campos mínimos, estado interno publicable (animales), coherencia de fechas/lugar (eventos), y reglas de `indexable`.
+   - Composición de **payload `Publicacion` normalizado** (lista blanca, con `icons/gallery/videos`, `animal/event`, y bloque `seo` si aplica) reutilizable por `preview` y por el canal público.
+3. **Endpoints gestor (autenticados y autorizados, denegación por defecto):**
+   - `GET/POST ?endpoint=web-animales` (list/get/upsert), `web-animales-estado`, `web-animales-preview`.
+   - `GET/POST ?endpoint=web-eventos` (list/get/create/update/archivar/estado).
+   - Utilidades: `web-slug-check`, `web-resumen`.
+4. **Seguridad y calidad backend:**
+   - Autorización por rol/módulo en cada acción (hito 1.1); no devolver datos internos innecesarios; sanitizar/limitar entradas (slugs, textos, URLs/JSON).
+   - Registrar en auditoría acciones de publicación y cambios SEO relevantes (según capacidad).
+5. **Pruebas:** CRUD, unicidad de slug, reglas de publicación/estado, y verificación de que `preview`/payload público no incluye campos prohibidos.
 
 ### Entregables
-- Hojas/entidades operativas y mapeadas en `.gs`.
-- Endpoints gestor funcionando con control de acceso.
-- Casos de prueba/ejemplos de request-response (internos).
+- Hojas/entidades mapeadas y operativas.
+- Endpoints gestor con control de acceso y payload normalizado validado.
+- Ejemplos request/response (gestor y preview) alineados al contrato.
 
 ### Criterio de salida
-- Se puede crear/editar/publicar/ocultar configuración y SEO vía API gestor; payload público (preview) cumple lista blanca.
+- Se puede curar/publicar/ocultar contenido y obtener un `preview` público conforme a la lista blanca y al esquema `Publicacion`.
 
 ---
 
 ## Fase 2 — UI gestor en el admin (sección Web + contexto)
 
-**Objetivo:** permitir gestionar el contenido público desde el panel sin ir entidad por entidad para el control global.
+**Objetivo:** gestionar contenido público y SEO desde el panel de forma global y contextual.
 
 ### Tareas
 1. **Sección “Web / Contenido público”:**
-   - Vista global: listados de `animales` y `eventos` con estado (borrador/publicado/oculto), indicadores (sin slug/SEO/imagen, no indexable), filtros y búsqueda.
-   - Acciones: publicar/ocultar, editar configuración pública y SEO, previsualización (basada en `preview` del backend).
-2. **Gestión de animales (curación):**
-   - Selección/edición de campos públicos (descripción pública, extracto, estado público, imagen/galería pública) y SEO (`slug`, `seo_title`, `seo_description`, OG, `indexable`).
-   - Validaciones en UI (campos requeridos para publicar) y avisos SEO (longitudes recomendadas).
-3. **Gestión de eventos:**
-   - Formulario CRUD (datos, fechas/lugar público, imagen, estado) + campos SEO.
-4. **Integración contextual (híbrida):**
-   - En la ficha de animal: acceso rápido a “Publicación web” (estado, publicar/ocultar, enlace a edición completa en sección Web).
-5. **Permisos y UX:**
-   - Mostrar/ocultar acciones según rol; respetar `aplicarPermisosUI` y estados de carga/error.
-6. **SW/caché y pruebas:** actualizar `CACHE_NAME` ante cambios frontend; tests existentes en verde.
+   - Listados de animales y eventos/historias publicables con estado (borrador/publicado/oculto), `indexable`, indicadores de completitud (sin slug/SEO/imagen/descripción), filtros y búsqueda.
+   - Acciones: publicar/ocultar, editar configuración pública y SEO, y **previsualización** usando `web-*-preview` (validación visual del payload público).
+2. **Curación de animales (capa pública):**
+   - Edición de campos públicos permitidos (título/extracto/descripción pública, `estado_publico`, `category/status`, selección de `coverImage/gallery/videos`, `icons`, CTA) y SEO (`slug`, `seo_title/description`, OG/Twitter, canonical, robots/indexable), con avisos de longitud/calidad.
+   - Nunca editar/exponer campos internos sensibles en esta capa.
+3. **Gestión de eventos/historias publicables:** formulario CRUD (datos, fechas/lugar, media, estado) + SEO y campos del bloque `event`.
+4. **Integración contextual (híbrida):** acceso rápido desde la ficha de animal a “Publicación web” (estado, publicar/ocultar, enlace a edición completa).
+5. **Permisos y UX:** visibilidad/acciones según rol (`aplicarPermisosUI`), estados de carga/error/vacío y validaciones previas a publicar.
+6. **Calidad frontend:** rutas relativas, actualización de `CACHE_NAME` en `src/sw.js` ante cambios relevantes, y `npm test` en verde.
 
 ### Entregables
-- Sección Web operativa y edición contextual básica.
-- Flujo de curación y publicación usable.
+- Sección Web operativa y flujo de curación/publicación usable.
+- Edición contextual básica y previsualización de payload público.
 
 ### Criterio de salida
-- Un usuario autorizado puede preparar y publicar/ocultar animales y eventos con metadatos SEO desde el admin.
+- Un usuario autorizado puede preparar, previsualizar y publicar/ocultar animales y eventos con metadatos SEO desde el admin.
 
 ---
 
-## Fase 3 — Canal público (endpoints/feed de solo lectura)
+## Fase 3 — Canal público de solo lectura (contenido curado)
 
-**Objetivo:** exponer solo contenido público curado para la web externa, sin API/token admin.
+**Objetivo:** exponer el contenido publicado para la web mediante un canal separado y seguro.
 
 ### Tareas
-1. **Implementar endpoints públicos (GAS, separados):**
-   - `public-animales` (listado con filtros/paginación/orden) y detalle por `slug`.
-   - `public-eventos` (listado, idealmente por rango de fechas) y detalle por `slug`.
-   - (Opcional) `public-sitemap` / `public-site-meta`.
+1. **Endpoints públicos en GAS (separados del admin):**
+   - `GET /api/publicaciones` (filtros `type,category,status,species,q,page,pageSize,sort`, respuesta con `endpoint/generatedAt/filters/pagination/data`) y `GET /api/publicaciones/:slug` según `estructura-endpoint-publicaciones.md`.
+   - Alias/capa `/v1/*` según alcance: `/v1/publicaciones` (y detalle), `/v1/animales`, `/v1/eventos`, `/v1/config`, `/v1/taxonomias` y, si aplica, `/v1/sitemap`/export de URLs+`lastmod`.
 2. **Lista blanca y reglas:**
-   - Incluir solo `publicado` y estados internos permitidos; construir respuesta campo a campo; 404 para no publicado/inexistente.
-   - Incluir payload SEO (`title`, `description`, `canonical`, `robots`, OG/Twitter) y `schema` (p. ej. `Event`).
-3. **Seguridad y entrega:**
-   - Sin token de administración; CORS restringido al dominio de la web pública.
-   - `Cache-Control`/paginación y límites razonables; no exponer errores internos.
-4. **Estrategia de datos:** dinámico en GAS o exportación JSON estática programada (según Fase 0), con invalidación/actualización definida.
-5. **Pruebas:** verificar ausencia de campos sensibles, comportamiento de borradores/no publicados y consistencia con preview del gestor.
+   - Solo registros publicados/publicables e `indexable` según corresponda; estados internos permitidos para animales.
+   - Construir respuesta campo a campo (payload normalizado de Fase 1); incluir `icons/gallery/videos`, `animal/event`, `contentHtml`, CTA y metadatos/SEO necesarios; **404** para no publicado/inexistente.
+3. **No funcionales y seguridad:**
+   - Sin token admin; CORS restringido a dominio(s) de la web pública; errores genéricos sin detalles internos.
+   - `Cache-Control` y/o ETag/`Last-Modified`, paginación acotada y (si se decide) cacheo en GAS/exportación JSON estática con contrato estable.
+4. **Validación:** comparar respuestas con `web-*-preview` y verificar ausencia total de campos sensibles en muestreos.
 
 ### Entregables
-- Endpoints/feed públicos documentados y operativos.
-- Evidencia de lista blanca y CORS correcto.
+- Canal público documentado y operativo (contrato alineado a `custom-page/docs`).
+- Evidencia de lista blanca, CORS y comportamiento ante no publicados.
 
 ### Criterio de salida
-- La web pública puede obtener listados/detalles/SEO de contenido publicado sin acceder a datos internos.
+- `nueva-version` puede consumir listados/detalles (y config/taxonomías si aplica) de contenido publicado sin acceder a datos internos.
 
 ---
 
-## Fase 4 — Web pública: consumo, renderizado y SEO técnico
+## Fase 4 — Web pública: consumo, SEO técnico, formularios y cookies
 
-**Objetivo:** publicar el sitio público consumiendo el canal de Fase 3 con buenas prácticas SEO.
+**Objetivo:** hacer visible e indexable el contenido público y completar el circuito de interacción del sitio.
 
 ### Tareas
-1. **Estructura y rutas:** `/{tipo}/{slug}` (animales, eventos) + páginas de listado con filtros/búsqueda y paginación.
-2. **Renderizado por página:** `<title>`, meta description, canonical, robots, Open Graph/Twitter Cards y JSON-LD según tipo/contenido.
-3. **SEO técnico:** `sitemap.xml`, `robots.txt`, redirecciones 301 ante cambios de `slug`, manejo 404.
-4. **Rendimiento y calidad:** imágenes optimizadas y con `alt`, HTML semántico, responsive, accesibilidad básica.
-5. **Integración de datos:** consumo del feed/endpoints públicos, manejo de caché/revalidación y estados vacíos/errores.
+1. **Consumo del contrato en `custom-page/nueva-version`:**
+   - Sustituir `../data/blog-posts.json` por el endpoint público (`HistoriasAPI`/adaptadores) manteniendo compatibilidad con el render (`post.html`, listados adopción/historias, secciones a dinamizar).
+   - Implementar filtros/paginación/búsqueda (`type,category,status,species,q,sort`) y estados vacíos/error.
+2. **Rutas y SEO técnico (crítico para fichas dinámicas):**
+   - Rutas canónicas por tipo/slug (objetivo limpio) y mapeo/redirect 301 desde `post.html?slug=` y rutas antiguas.
+   - Estrategia de **prerender/build por slug** (o SSG/export) para que detalle/ficha emita HTML con contenido y metadatos; uso del endpoint como fuente en build y/o runtime controlado.
+   - Por página: `<title>`, meta description, canonical, robots (`index/noindex`), Open Graph/Twitter y JSON-LD (`Article/BlogPosting` o adecuado, `Event`, `BreadcrumbList`, `Organization/WebSite`).
+   - `sitemap.xml` y `robots.txt` desde contenido publicado/indexable (`lastmod`), manejo 404/410, y tratamiento de parámetros no indexables (p. ej. `?from=`).
+3. **Rendimiento y accesibilidad:** imágenes optimizadas con `alt`/URLs estables, HTML semántico, responsive y LCP razonable.
+4. **Formularios (`/v1/forms/submit` o equivalente, canal separado):**
+   - Reemplazar envío simulado (`NebakForms`) por POST real con `form_type`, `concepto`, contexto (slug/url), validación y feedback UX.
+   - Backend: verificación reCAPTCHA server-side, validaciones/antiabuso, registro opcional (hoja) y envío de correo por plantilla.
+5. **Cookies y políticas:**
+   - Consentimiento previo real para no esenciales y carga condicional de terceros (Maps/YouTube/Analytics/reCAPTCHA según decisión).
+   - Actualizar políticas de cookies/privacidad a los tratamientos reales (endpoints, Sheets/Drive, correos, terceros).
 
 ### Entregables
-- Web pública navegable con listados/detalles y metadatos SEO.
-- Sitemap/robots y redirecciones operativas.
+- Web pública consumiendo el canal y renderizando listados/detalles con metadatos SEO.
+- Sitemap/robots y redirecciones operativas; formularios funcionales y cookies/políticas alineadas.
 
 ### Criterio de salida
-- Contenido publicado visible y correctamente indexable (según configuración), sin exposición de datos internos.
+- Contenido publicado indexable (según configuración) y compartible con metadatos correctos, sin exposición de datos internos; formularios operativos bajo las políticas definidas.
 
 ---
 
 ## Fase 5 — Endurecimiento, calidad y operación
 
-**Objetivo:** estabilizar, asegurar y facilitar el mantenimiento continuo.
+**Objetivo:** estabilizar, asegurar y facilitar el mantenimiento continuo del flujo gestor → público.
 
 ### Tareas
-1. **Calidad de contenido:** validaciones reforzadas (slugs, campos mínimos, imágenes), detección de “publicado pero incompleto”, revisión de duplicados/canonical.
-2. **Seguridad/privacidad:** auditoría de respuestas públicas (muestreo), revisión de permisos de gestión web y registro en auditoría de cambios de publicación/SEO.
-3. **Rendimiento y resiliencia:** caché (cliente/CDN/`Cache-Control` o export estática), manejo de límites de GAS, tiempos de actualización.
-4. **Observabilidad y pruebas:** checklist por rol, pruebas de endpoints públicos/gestor, verificación en Search Console (sitemap, indexación) cuando aplique.
-5. **Documentación:** actualizar contratos, configuración (CORS, dominios, `CONFIG`), y procedimiento de publicación/redirecciones.
+1. **Calidad de contenido:** validaciones reforzadas (slugs, mínimos para publicar, media), detección de “publicado incompleto/sin SEO”, y gestión de cambios de slug con redirects.
+2. **Seguridad/privacidad:** auditoría de respuestas públicas (muestreo de lista blanca), revisión de permisos/roles de gestión web, registro de publicación/SEO, y revisión de retención/minimización en formularios.
+3. **Rendimiento y resiliencia:** caché (`Cache-Control`/ETag/`CacheService` o export estática), control de límites de GAS, tiempos de actualización y consistencia preview↔público.
+4. **Observabilidad y pruebas:** checklist por rol, pruebas de endpoints gestor/público y de render/SEO (metas/schema/canonical), verificación de sitemap/indexación en Search Console cuando aplique.
+5. **Documentación:** contratos finales (público/gestor), `CONFIG`/hojas, CORS/dominios, procedimiento de publicación/redirecciones y actualización de dependencias de `custom-page`.
 
 ### Entregables
-- Checklist de QA/seguridad pasado.
-- Documentación operativa actualizada.
+- Checklist de QA/seguridad pasado y documentación operativa actualizada.
+- Registro de incidencias y decisiones de mantenimiento.
 
 ### Criterio de salida
-- Flujo gestor→público estable, seguro, medible y mantenible.
+- Flujo estable, seguro, medible y mantenible de extremo a extremo.
 
 ---
 
-## Orden recomendado de ejecución (resumen)
+## Orden recomendado de ejecución
 
-1. **Fase 0** (decisiones/contratos, alinear con `docs/custom-page` si aparece).  
-2. **Fase 1** (hojas + backend gestor + payload/lista blanca).  
-3. **Fase 2** (UI gestor) y preparación de **Fase 3** en paralelo una vez estable el contrato.  
-4. **Fase 3** (canal público) con validación estricta de lista blanca.  
-5. **Fase 4** (web pública + SEO técnico).  
-6. **Fase 5** (endurecimiento y operación).
+1. **Fase 0** — decisiones, modelo, lista blanca y contratos alineados a `custom-page/docs`.  
+2. **Fase 1** — hojas + backend gestor + payload normalizado/lista blanca (base de todo).  
+3. **Fase 2** (UI gestor) y preparación de **Fase 3** en paralelo una vez estable el contrato/payload.  
+4. **Fase 3** — canal público con validación estricta de lista blanca y compatibilidad `/api`–`/v1`.  
+5. **Fase 4** — consumo en web pública, SEO técnico (prerender/redirects/sitemap) y formularios/cookies.  
+6. **Fase 5** — endurecimiento y operación.
 
 ## Riesgos y mitigaciones
 
 | Riesgo | Mitigación |
 |---|---|
-| Fuga de datos internos en feed público | Lista blanca en servidor, preview público, revisión de respuestas y pruebas automatizadas/manuales. |
-| Desalineación gestor ↔ público | Contrato único, payload normalizado compartido (preview = base del público). |
-| Cambios de slug rompen SEO | Redirecciones 301 y registro de slugs anteriores. |
-| Límites/rendimiento de GAS | Paginación, caché, y opción de exportación estática si crece el tráfico. |
-| Falta de permisos en backend | Autorización por rol en cada endpoint (hito 1.1) y pruebas por rol. |
+| Fuga de datos internos en feed público | Lista blanca en servidor, `preview` = base del público, muestreo/pruebas de respuestas. |
+| Desalineación gestor ↔ público ↔ web | Contrato único `Publicacion` normalizado y compatibilidad de rutas/campos documentada. |
+| Fichas dinámicas no indexables | Prerender/build por slug con metas/OG/JSON-LD, sitemap y canonicals. |
+| Cambios de slug rompen SEO | `slug` estable, historial y redirecciones 301; `noindex`/404-410 para retirados. |
+| Límites/rendimiento de GAS | Paginación, caché (`CacheService`/HTTP) y opción de exportación JSON estática. |
+| Falta de autorización en backend | Autorización por rol en cada endpoint gestor y pruebas por rol (hito 1.1). |
+| Formularios/spam o datos personales | `forms/submit` separado, reCAPTCHA server-side, validación/antiabuso y minimización. |
 
 ## Registro de avance (a completar durante implementación)
 
 | Fecha | Fase/Tarea | Cambio | Responsable | Evidencia/Notas |
 |---|---|---|---|---|
-| — | 0 | Plan creado (análisis) | — | `ANALISIS-WEB-PUBLICACIONES-SEO-ENDPOINTS.md`, este documento |
+| 2026-11-14 | 0 | Plan y análisis alineados con `../custom-page/docs` (contratos publicaciones, `/v1/*`, SEO/prerender, formularios/cookies) | — | `ANALISIS-WEB-PUBLICACIONES-SEO-ENDPOINTS.md`, este documento |

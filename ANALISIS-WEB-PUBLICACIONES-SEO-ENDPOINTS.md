@@ -1,166 +1,192 @@
 # Análisis: Web pública, publicaciones, SEO y endpoints (gestor + público)
 
 > **Alcance:** análisis y definición funcional/técnica para planificar (sin implementar).  
-> **Contexto:** el panel de administración (este repo) gestiona animales, acogidas, adopciones, etc. y debe alimentar una **web pública separada** con fichas públicas de animales y eventos propios, con buen SEO.  
-> **Fuentes internas solicitadas:** no se localizaron en este workspace los archivos indicados (`docs/custom-page/` con “estructura endpoints publicaciones” y el otro md). Se buscó en el repositorio y en `.internal-docs` sin resultados. Este documento se basa en la arquitectura conocida del proyecto, el análisis de estructura/SEO tipo Wix (CMS/publicaciones dinámicas) y buenas prácticas. Si compartes esos md, se puede alinear el plan/contratos con ellos.
+> **Contexto:** el panel de administración (este repo, **gestor**) gestiona animales, acogidas, adopciones, etc. y debe alimentar una **web pública separada** (`custom-page` / `nueva-version`) con fichas públicas de animales, eventos e historias, con buen SEO.  
+> **Fuentes de referencia (leídas y alineadas):**
+> - `../custom-page/docs/estructura-endpoint-publicaciones.md` — contrato de publicaciones para la web pública: `GET /api/publicaciones` (filtros, paginación), `GET /api/publicaciones/:slug`, esquema `Publicacion` con `icons`, `gallery`, `videos[]/video`, bloques `animal`/`event`, mapeo `publication` (`nebak-post-v1`).
+> - `../custom-page/docs/analisis-endpoint-seo-formularios-cookies-nueva-version.md` — inventario `nueva-version`, consumo actual (`../data/blog-posts.json`, `HistoriasAPI`, listados `[data-adoption-list]`), propuesta GAS/Sheets, endpoints `/v1/*` (contenido, taxonomías, config, formularios), SEO (prerender/build por slug, sitemap, redirects, metas/OG/JSON-LD), formularios/reCAPTCHA y cookies/políticas.
+>
+> Este documento unifica la información necesaria para diseñar los **endpoints del gestor** y los **endpoints públicos**, manteniendo separación de seguridad. Donde conviven convenciones (`/api/publicaciones` vs `/v1/publicaciones`), se propone compatibilidad (ver §4.4).
 
 ---
 
 ## 1. Objetivos y principios
 
-- **Separación de superficies:** la web pública es un sitio/app distinto del admin. El admin no expone su API/token ni datos internos.
-- **Capa pública curada (lista blanca):** la web consume solo contenido marcado como publicable y solo campos permitidos. Nunca se publica la ficha interna completa (especialmente animales).
-- **Gestión central + contextual:** una sección dedicada en el admin para “Web/Contenido público” (visión global, publicación, SEO) complementada con acciones rápidas desde la ficha de cada entidad.
-- **SEO primero:** URLs estables, metadatos por elemento, indexación controlada, datos estructurados, sitemap/robots y buen rendimiento.
-- **Backend como fuente de verdad:** validación, autorización y filtrado de campos/estados en el servidor (Apps Script), no solo en UI.
+- **Separación de superficies:** web pública y admin son despliegues/apps distintos. El admin no expone API/token ni datos internos.
+- **Capa pública curada (lista blanca):** solo contenido `published`/publicable y solo campos permitidos. Nunca la ficha interna completa (especialmente animales).
+- **Un contrato de publicación estable:** la web (`nueva-version`) consume un esquema único compatible con el render actual (`publication`, `icons`, `gallery`, `videos[]`, `animal`/`event`, `contentHtml`, `cta`).
+- **Gestión híbrida en el gestor:** sección dedicada “Web/Contenido público” (visión global, SEO, publicación) + acciones rápidas desde la ficha de la entidad.
+- **SEO real para fichas dinámicas:** las fichas/eventos cargados desde endpoint requieren HTML indexable por URL/slug (prerender/build o estrategia equivalente), metas/OG/canonical/JSON-LD, sitemap y redirects (ver §6).
+- **Backend como fuente de verdad:** validación, autorización por rol en cada endpoint gestor, filtrado de campos/estados y composición del payload público en servidor (GAS).
 
 ---
 
-## 2. Modelo de contenido (replicar patrón publicaciones/CMS)
+## 2. Inventario y consumo en `nueva-version` (alineado con custom-page)
 
-### 2.1 Tipos de contenido público
-| Tipo | Origen interno | Página | Notas |
-|---|---|---|---|
-| `animal` | Ficha de animal (`animales`) | Listado + detalle | Vista pública curada (no ficha interna). |
-| `evento` | Contenido propio (nueva entidad/hoja o fuente dedicada) | Listado + detalle | Borrador/publicado, fechas/lugar público, schema `Event`. |
-| `pagina` (opcional) | Contenido propio | Detalle | Textos estáticos (quiénes somos, contacto, cómo ayudar). |
-
-### 2.2 Estados y flags (editorial/publicación)
-- `estado_publicacion`: `borrador` | `publicado` | `oculto` | (opcional `programado`).
-- `publicado_web` (bool/derivado): visible en feed público.
-- `indexable` (bool): permitir indexación (`index/noindex`).
-- `fecha_publicacion`, `fecha_actualizacion`.
-- `orden` / `destacado` (para listados/portada).
-
-### 2.3 Campos comunes de publicación (SEO y presentación)
-| Campo | Descripción | Uso |
+| Zona/componente | Fuente/consumo actual | Necesidad de endpoint |
 |---|---|---|
-| `id_publico` / `slug` | Identificador único legible en URL (`/animales/luna`) | Ruta canónica, estable |
-| `titulo` / `nombre_publico` | Título visible y base de `<title>` | UI + SEO |
-| `extracto` | Resumen corto | Listados, fallback meta description, OG |
-| `contenido_publico` / `descripcion_publica` | Cuerpo/descripción pública | Detalle |
-| `imagen_principal` | URL/ID de imagen cover | Detalle, listados, OG/Twitter |
-| `galeria_publica` | Lista de medios seleccionados | Detalle (solo públicos) |
-| `seo_title` | Title tag (si vacío, derivar de plantilla) | `<title>` |
-| `seo_description` | Meta description | `<meta name="description">` |
-| `canonical_url` / derivada | URL canónica | `<link rel="canonical">` |
-| `og_title`, `og_description`, `og_image` | Open Graph (fallback a SEO/título/imagen) | Compartir en redes |
-| `twitter_card`, `twitter_title`, `twitter_description`, `twitter_image` | Twitter Cards | Compartir |
-| `robots` / `indexable` | `index,follow` o `noindex` | Control de indexación |
-| `schema_type` + datos | JSON-LD según tipo (`Event`, etc.) | Rich results |
-| `categorias` / `etiquetas` / taxonomías | Clasificación pública | Listados, filtros, SEO contextual |
+| `nueva-version/js/blog-api.js` (`HistoriasAPI`) | `../data/blog-posts.json` (`getAllPosts`, `getPostBySlug`, `getSiteConfig`) | `/publicaciones` (listado) y `/publicaciones/:slug` (detalle) o equivalentes `/v1` |
+| `historias.html` (`blog-render-index.js`) | Posts filtrados (excluye adopción/acogida/SC según lógica actual) | Listado por `type/category/status/listed` con reglas claras |
+| `post.html` (`blog-render.js`) | Detalle por `?slug` (modo ficha/historia, `publication.icons/gallery/videos`, CTA contextual) | Detalle completo por `slug` con `contentHtml`, media, `animal`/`event`, `seo`, `cta` |
+| Listados adopción (`main.js`, `[data-adoption-list]`) | `blog-posts.json` filtrado por `category` (Gatos/Perros en adopción) | `type=animal` + `category`/`status/species` |
+| Secciones hoy estáticas a dinamizar (prioridad) | `acogidas.html`, `casos-externos.html`, `adoptados.html`, destacados home | Consultas filtradas al endpoint público/gestor |
+| Chat asistente (`main.js`) | Búsqueda sobre posts cargados | Búsqueda `q` o dataset cacheado |
+| Formularios (`NebakForms`, `data-static-form`) | Envío simulado | `POST /v1/forms/submit` (endpoint separado, ver §5.4) |
 
-### 2.4 Ficha pública de `animal` (lista blanca — qué SÍ / qué NO)
-
-**SÍ (ejemplo publicable, según política):** `id_publico/slug`, `nombre`, `especie`, `raza`, `sexo`, `edad` o `fecha_nacimiento` (si se decide), `tamano`, `descripcion_publica`/historia, `caracter`/compatibilidades públicas, `estado_publico` (en adopción, en acogida, adoptado en escaparate — solo estados permitidos), `ubicacion_general` (no dirección), `imagen_principal`, `galeria_publica`, `fecha_publicacion`, `fecha_actualizacion`, `destacado/orden`, etiquetas públicas.
-
-**NO (nunca en feed público):** datos de adoptantes/solicitantes/acogidas, contratos, documentos, gastos/donaciones, apadrinamientos internos, datos médicos/veterinarios sensibles, dirección exacta, notas internas, historial/auditoría, identificadores internos que permitan correlación con datos privados, cualquier campo no incluido en la lista blanca.
-
-> **Regla:** el endpoint público construye la respuesta solo desde la lista blanca y solo para registros `publicado_web` y en estados permitidos.
-
-### 2.5 Eventos (`evento`)
-- Campos propios: `titulo`, `slug`, `descripcion`, `fecha_inicio`, `fecha_fin` (opcional), `hora`, `lugar_publico`, `direccion_publica` (si procede, general), `imagen`, `enlace_inscripcion`/contacto público, `estado_publicacion`, `indexable`, campos SEO/OG.
-- Fuente recomendada: hoja/entidad dedicada “Eventos web” o “Publicaciones” (no reutilizar `actividad` interna).
-- Schema: `Event` (JSON-LD) con fechas, ubicación y estado.
+**Implicación:** el endpoint debe entregar el esquema que ya espera el render (`coverImage/image`, `contentHtml`, `publication`/campos equivalentes `icons,gallery,videos`, `type/category/status`, `cta`, y contexto `animal/event`).
 
 ---
 
-## 3. Arquitectura de endpoints (gestor/admin vs público)
+## 3. Modelo de contenido y esquema de publicación
 
-> **Importante:** mantener el API de administración protegido (token/identidad + autorización por rol en cada endpoint, hito 1.1 del plan de seguridad). El canal público es **separado**, de **solo lectura**, con **lista blanca** y sin token admin.
+### 3.1 Tipos y categorías (según `estructura-endpoint-publicaciones.md`)
+- **`type`:** `animal` | `evento` (y en la evolución puede convivir `historia/blog` según taxonomía unificada; definir regla en Fase 0).
+- **`category` (ejemplos observados/previstos):** `Acogida`, `Acogidas`, `Gatos en adopción`, `Perros en adopción`, `Adoptados`, `Caso externo`, `Eventos` (y posibles `SC`, etc.).
+- **`status` (recomendado):** animales `en_adopcion`, `en_acogida`, `adoptado`, `reservado`, `urgente`, `cerrado`; eventos `activo`, `programado`, `finalizado`, `cancelado`.
 
-### 3.1 Endpoints para el gestor (admin, autenticados y autorizados)
+### 3.2 Esquema común `Publicacion` (contrato público)
 
-Objetivo: gestionar contenido público, metadatos SEO y publicación desde el panel (sección web + acciones contextuales).
+Campos alineados con `estructura-endpoint-publicaciones.md`:
+- **Obligatorios/recomendados:** `id`, `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt` (ISO/recomendado), `coverImage:{src,alt}`, `contentHtml`.
+- **Estructura de presentación (requerida para fichas/publicaciones normalizadas):** `icons[]` (`{icon,label,value}`), `gallery[]` (`{src,alt,caption?,order?}`), `videos[]` (`{title?,provider,url,thumbnail?,durationSec?,note?}`) y compatibilidad `video` único.
+- **Opcionales:** `updatedAt`, `author`, `tags[]`, `cta:{label,url}`.
+- **Condicionales:** `animal` cuando `type="animal"`, `event` cuando `type="evento"`.
+- **Extensiones recomendadas (compatibilidad/migración y gestor):** `listed`, `featured`, `flags` precalculadas (urgente/cachorro/adulto/especial), `image/imageAlt/dateFormatted/readTime` legacy si facilitan migración, y bloque `seo` (`metaTitle`, `metaDescription`, `ogImage`, `canonical`, `robots`, `og/twitter`).
 
-#### A. Configuración/publicación de animales (capa pública sobre `animales`)
-> Opción de diseño: (1) campos de publicación guardados en la propia entidad/hoja de animales, o (2) entidad separada `publicaciones_animales`/`web_animales` que referencia `animal_id`. La opción (2) aísla mejor lo público de lo interno; elegir según modelo GAS/hojas.
+### 3.3 Bloque `animal` (ficha pública curada)
+Estructura base: `names[]`, `species`, `breed`, `sex[]`, `age{value,unit,label}`, `size`, `color?`, `health{vaccinated,dewormed,neutered,microchipped,specialNeeds}`, `temperament[]`, `compatibility{dogs,cats,kids}`, `adoption{mode,feeEur,includes,requirements}`, `foster{temporary,reason,durationLabel,expensesPolicy}`, `location{city,province,shelter?}`, `contact{email,phone}`.
 
-| Acción (ejemplo) | Método | Descripción | Entrada (ejemplo) | Salida (ejemplo) |
-|---|---|---|---|---|
-| `web-animales` (list) | GET | Listar animales con estado de publicación web (para sección “Web”) | `?endpoint=web-animales&estado_publicacion=&q=&page=&limit=` | `{ items:[{ animal_id, nombre, estado_interno, publicado_web, indexable, slug, seo_ok, imagen_principal, fecha_actualizacion_publica }], total }` |
-| `web-animales` (get) | GET | Obtener configuración pública de un animal | `?endpoint=web-animales&id=<animal_id>` | `{ data:{ animal_id, publicado_web, estado_publicacion, indexable, slug, titulo_publico, descripcion_publica, extracto, imagen_principal, galeria_publica, seo_title, seo_description, og_*, estado_publico, orden, destacado, validaciones } }` |
-| `web-animales` (upsert) | POST | Crear/actualizar configuración pública y SEO | body: `{ animal_id, publicado_web, indexable, slug, ...campos_publicos_permitidos }` | `{ data:{...} }` |
-| `web-animales` (unpublish/estado) | POST | Publicar/ocultar/despublicar | `{ animal_id, estado_publicacion }` | `{ data:{...} }` |
-| `web-animales-preview` | GET | Vista previa del payload público (lista blanca) | `?endpoint=web-animales-preview&id=<animal_id>` | `{ data:{ ...payload_publico_normalizado } }` |
+**Lista blanca (SÍ, según política):** datos necesarios para la ficha pública (identidad del animal, descripción pública, estado público, ubicación general, medios públicos seleccionados, contacto público previsto).  
+**Excluir siempre (NO):** adoptantes/solicitantes, acogidas internas, contratos, documentos, gastos/donaciones, apadrinamientos internos, datos médicos sensibles no aptos para publicar, dirección exacta, notas internas, historial/auditoría, IDs internos correlables con datos privados.  
+**Regla:** el payload público se construye campo a campo en servidor; nunca se expone la ficha interna del gestor.
 
-**Validaciones gestor:** slug único por tipo, campos obligatorios para publicar (ej. nombre, descripción pública, imagen/estado público), coherencia con estados internos permitidos, longitud recomendada SEO (avisos, no bloqueos duros salvo reglas definidas).
+### 3.4 Bloque `event`
+`kind`, `startDate/endDate` (ISO), `timezone`, `location{name,address,city,onlineUrl}`, `organizer{name,contactEmail,phone}`, `audience[]`, `agenda[]`, `registration{required,url,label}`, `milestone{label,value,date}`. Estados recomendados: `activo`, `programado`, `finalizado`, `cancelado`.
 
-#### B. Eventos web (entidad propia)
-| Acción (ejemplo) | Método | Descripción | Entrada | Salida |
-|---|---|---|---|---|
-| `web-eventos` (list) | GET | Listar eventos (borrador/publicado/oculto) | filtros, paginación | `{ items, total }` |
-| `web-eventos` (get) | GET | Detalle/edición | `id/slug` | `{ data }` |
-| `web-eventos` (create) | POST | Crear evento | body evento | `{ data }` |
-| `web-eventos` (update) | POST | Actualizar evento/SEO/estado | `{ id, ... }` | `{ data }` |
-| `web-eventos` (delete) | POST | Eliminar (o archivar) | `{ id }` | `{ ok:true }` |
-
-#### C. Utilidades gestor (opcionales)
-- `web-slug-check`: validar disponibilidad/formato de slug.
-- `web-publicaciones-resumen`: métricas (publicados, borradores, sin SEO, sin imagen) para la sección web.
-- Auditoría de cambios de publicación (reutilizar/registrar en `auditoria`).
-
-**Autorización:** restringir gestión web a roles con permiso (p. ej. `admin`/`coordinador` o rol específico); `consulta` sin escritura.
-
-### 3.2 Endpoints públicos (solo lectura, separados del admin)
-
-Objetivo: alimentar la web pública con datos ya filtrados y curados. **Sin token de administración**, sin datos internos, con CORS limitado al dominio público.
-
-| Acción (ejemplo) | Método | Descripción | Parámetros | Respuesta (lista blanca) |
-|---|---|---|---|---|
-| `public-animales` | GET | Listado público de animales | `estado_publico`, `especie`, `q`, `destacado`, `page`, `limit`, `sort` | `{ items:[{ slug, nombre, especie, raza, edad, tamano, extracto, imagen_principal, estado_publico, ubicacion_general, fecha_publicacion, url }], meta:{ total, page, limit } }` |
-| `public-animales/:slug` (o `slug`) | GET | Detalle público de un animal | `slug` o `id_publico` | `{ data:{ slug, nombre, ..., descripcion_publica, galeria_publica, seo:{ title, description, canonical, robots, og, twitter }, schema, fecha_publicacion, fecha_actualizacion } }` o 404 si no publicado/no permitido |
-| `public-eventos` | GET | Listado público de eventos | `desde`, `hasta`, `q`, `page`, `limit` | `{ items:[...campos públicos...], meta }` |
-| `public-eventos/:slug` | GET | Detalle público de evento | `slug` | `{ data:{ ...campos públicos..., seo, schema(Event) } }` |
-| `public-sitemap` (opcional) | GET | Datos para generar sitemap | — | `{ urls:[{ loc, lastmod, changefreq, priority, type }] }` |
-| `public-site-meta` (opcional) | GET | Config global pública | — | `{ siteName, defaultSeo, organization? }` |
-
-**Reglas del canal público:**
-- Solo `estado_publicacion = publicado` (y `indexable`/flags según aplique).
-- Solo estados internos permitidos para animales.
-- Respuesta construida campo a campo (lista blanca), nunca `SELECT *`/objeto interno completo.
-- 404 para no publicado/no existente (no filtrar existencia de borradores internos).
-- Cacheo/`Cache-Control` y paginación; rate limiting razonable si es dinámico.
-- CORS solo para el/los dominios de la web pública.
-
-### 3.3 Contrato de error/respuesta (recomendado)
-- Éxito: `{ status: "ok", data/items, meta? }` (alinear con convenciones actuales si aplica).
-- Error: `{ status: "error", code, message }` sin detalles internos sensibles.
-- Público: mensajes genéricos; no exponer estructura interna ni razones de autorización.
+### 3.5 Mapeo interno (gestor) → publicación pública
+- **Origen:** `animales` (y entidades relacionadas en el gestor), más fuente dedicada para eventos/historias publicables.
+- **Capa de publicación web:** configuración editorial por elemento (campos en entidad o tabla/hoja separada `web_publicaciones`/`web_animales`/`web_eventos`): `slug`, `estado_publicacion` (`borrador/publicado/oculto`), `publicado_web`, `indexable`, `titulo_publico/extracto/descripcion_publica`, selección de `cover/galeria/videos`, `icons`, `seo_*`, `og_*`, `orden/destacado`, `fecha_publicacion/actualizacion`.
+- **Normalización:** `publication` (`nebak-post-v1`) o campos equivalentes directos en `Publicacion`, según lo que consuma `nueva-version` (mantener compatibilidad).
 
 ---
 
-## 4. SEO técnico (a implementar en la web pública)
+## 4. Endpoints públicos (web, solo lectura)
 
-- Rutas: `/{tipo}/{slug}` (ej. `/animales/{slug}`, `/eventos/{slug}`) + listados con filtros en query.
-- `<title>`, `<meta name="description">`, `<link rel="canonical">`, `meta robots` por página.
-- Open Graph y Twitter Cards por página/detalle (con fallback).
-- JSON-LD por tipo (`Event`, breadcrumbs, y metadatos de organización/sitio si aplica) con datos coherentes y reales.
-- `sitemap.xml` y `robots.txt` generados desde contenido publicado/indexable.
-- Redirecciones 301 al cambiar `slug`.
-- Imágenes con `alt`, optimizadas; HTML semántico; buen rendimiento móvil.
-- Evitar contenido duplicado (paginación/filtros con canonical o `noindex` según estrategia).
+> Canal **separado** del API de administración: sin token admin, sin datos internos, CORS restringido al dominio público, respuestas construidas por lista blanca.
+
+### 4.1 Listado de publicaciones
+- **Contrato de referencia (`estructura-endpoint-publicaciones.md`):** `GET /api/publicaciones`
+- **Query params:** `type` (`animal|evento`), `category`, `status`, `species` (`gato|perro|otros`), `q`, `page`, `pageSize`, `sort` (ej. `-publishedAt`, `publishedAt`).
+- **Respuesta:**
+```json
+{
+  "endpoint": "GET /api/publicaciones",
+  "generatedAt": "ISO-8601",
+  "filters": { "type": [], "category": [], "status": [], "species": [], "q": "string" },
+  "pagination": { "page": 1, "pageSize": 12, "total": 0, "totalPages": 0 },
+  "data": [ /* Publicacion[] (lista blanca) */ ]
+}
+```
+- **Reglas:** solo `publicado_web`/`published` y estados permitidos; paginación acotada; proyección ligera opcional (`fields=card`) para listados.
+
+### 4.2 Detalle de publicación
+- **`GET /api/publicaciones/:slug`** (o `:id` según compatibilidad). Devuelve la publicación completa (incluye `icons`, `gallery`, `videos[]/video`, `contentHtml`, `animal`/`event`, `seo`/schema si aplica).
+- **404** para no publicado, no permitido o inexistente (no revelar borradores).
+
+### 4.3 Endpoints/alias recomendados (compatibilidad y claridad)
+Para simplificar consumo de `nueva-version` y evolución (alineado con el análisis integral):
+- `GET /v1/publicaciones` y `GET /v1/publicaciones/:slug` como contrato versionado equivalente/canónico.
+- Alias: `GET /v1/animales` (= `type=animal`), `GET /v1/eventos` (= `type=evento`), `GET /v1/blog|historias` según taxonomía definida.
+- `GET /v1/config` (datos públicos de sitio/contacto/SEO por defecto) y `GET /v1/taxonomias` (filtros disponibles).
+- (Opcional) `GET /v1/sitemap` o export de URLs/`lastmod` para generación de sitemap.
+
+**Compatibilidad:** exponer `/api/publicaciones` (y detalle por `slug`) como alias estable para la web actual, o adaptar el cliente a `/v1`; mantener un único handler/mapeo interno.
+
+### 4.4 Requisitos no funcionales del canal público
+- **CORS:** solo dominios de la web pública.
+- **Caché:** `Cache-Control` y/o ETag/`Last-Modified` (por `updatedAt`/versión), cacheo en GAS (`CacheService`) cuando aplique.
+- **Errores:** JSON consistente, sin detalles internos.
+- **Rendimiento:** paginación, lecturas agrupadas, opción de exportación JSON estática si crece tráfico (contrato estable).
 
 ---
 
-## 5. Seguridad y cumplimiento
+## 5. Endpoints del gestor (admin, autenticados y autorizados)
 
-- Autorización por rol en **todos** los endpoints del gestor (`.gs`), denegación por defecto.
-- Canal público sin token admin, sin datos sensibles, con lista blanca estricta.
-- Validar/sanitizar entradas (slugs, textos, URLs de imagen) y limitar tamaños.
-- Auditoría de acciones de publicación y cambios SEO relevantes.
-- RGPD/privacidad: no publicar datos personales ni información identificativa; ubicación general, no exacta.
+> Requieren token/identidad y **autorización por rol en cada acción** (denegar por defecto). Separados del canal público.
+
+### 5.1 Gestión de publicación web de animales
+Objetivo: curar y configurar lo que se publica (sin exponer ficha interna).
+
+| Endpoint/acción (propuesto) | Método | Función | Datos clave |
+|---|---|---|---|
+| `GET ?endpoint=web-animales` | GET | Listar animales con estado/configuración web | filtros (`estado_publicacion`, `q`, `publicado`, paginación), flags de completitud (slug/SEO/imagen) |
+| `GET ?endpoint=web-animales&id={animal_id}` | GET | Obtener configuración pública/SEO del animal | campos editoriales, `slug`, flags, `estado_publico`, media seleccionada, SEO/OG, validaciones |
+| `POST web-animales` (upsert) | POST | Crear/actualizar configuración pública | `animal_id`, `estado_publicacion/publicado_web`, `indexable`, `slug`, campos públicos/SEO, selección media, `orden/destacado` |
+| `POST web-animales-estado` | POST | Publicar/ocultar/despublicar | `animal_id`, `estado_publicacion` |
+| `GET ?endpoint=web-animales-preview&id={animal_id}` | GET | Previsualizar payload público (lista blanca) | mismo objeto que entregaría el endpoint público (para validar filtrado) |
+| `GET ?endpoint=web-slug-check&tipo=animal&slug=...` | GET | Validar unicidad/formato de slug | `{ disponible, normalizado, conflicto? }` |
+
+**Reglas:** solo permitir publicar si el estado interno es publicable (según política) y si se cumplen mínimos (nombre, descripción pública, imagen/estado público). `slug` único por tipo.
+
+### 5.2 Gestión de eventos/historias publicables
+| Endpoint/acción (propuesto) | Método | Función |
+|---|---|---|
+| `GET/POST web-eventos` | GET/POST | Listar/obtener/crear/actualizar/eliminar(archivar) eventos con datos públicos y SEO |
+| `GET web-eventos&id=...` | GET | Detalle para edición |
+| `POST web-eventos-estado` | POST | Cambiar estado publicación/indexación |
+
+Campos según §3.4 y contrato `event`; soporte `icons/gallery/videos` si aplica.
+
+### 5.3 Utilidades de gestor
+- `GET ?endpoint=web-resumen`: contadores (publicados, borradores, sin SEO/slug/imagen) para la sección Web.
+- Registro en **auditoría** de publicar/despublicar y cambios SEO relevantes.
+- **Permisos:** p. ej. edición web para `admin`/`coordinador` (o rol dedicado); `consulta` solo lectura según política.
+
+### 5.4 Formularios web pública (endpoint separado, no público de datos)
+Alineado con el análisis de `nueva-version` (no mezclar con publicaciones):
+- `POST /v1/forms/submit` (o acción dedicada): recibe `form_type`, `concepto`, `fields`, `page_url`, `privacy_accepted`, `recaptcha{token,action}`.
+- GAS: verifica reCAPTCHA server-side, valida (honeypot/rate/whitelist por tipo), opcionalmente registra en hoja `solicitudes_form`, envía correo por plantilla (incluye `animal_slug/url` cuando aplique) y responde `{ok,id}`/error.
+- Tipos: `contacto-general`, `adopcion-animal`, `consulta-animal`, `acogida`, `voluntariado`, `socio`, `donaciones`.
 
 ---
 
-## 6. Dependencias y decisiones abiertas (a cerrar antes de implementar)
+## 6. SEO técnico (web pública) — requisitos para la migración
 
-- Fuente de verdad para configuración pública de animales: campos en hoja `Animales` vs entidad separada `web_animales/publicaciones`.
-- Dónde se gestionan **eventos** (hoja nueva `Eventos`/`Publicaciones web`).
-- Estados internos de animal que se consideran publicables y mapeo a `estado_publico`.
-- Selección de imágenes públicas (referencia a galería/documentos existentes vs URLs dedicadas).
-- Estrategia de entrega pública: endpoint dinámico en GAS vs exportación JSON estática programada (o híbrido con caché).
-- Dominio(s) de la web pública para CORS y canonical.
-- Roles con permiso para gestionar la web en el admin.
+- **Fichas dinámicas y SEO:** `post.html?slug=` renderizado solo en cliente es insuficiente para indexación/snippets/OG. Estrategia recomendada: **prerender/build por slug** (o SSG/export) generando HTML por publicación con contenido y metadatos; endpoint como fuente en build y/o runtime controlado.
+- **URLs canónicas:** rutas limpias por tipo (`/ficha/{slug}/`, `/animales-en-adopcion/{slug}/`, `/eventos/{slug}/` o según arquitectura final) y mapeo/redirect 301 desde `post.html?slug=` y rutas antiguas.
+- **Por página/detalle:** `<title>`, `meta description`, canonical, robots (`index/noindex`), Open Graph/Twitter, JSON-LD (`Article/BlogPosting` o adecuado, `Event`, `BreadcrumbList`, `Organization/WebSite` donde aplique).
+- **`sitemap.xml` y `robots.txt`:** generados con URLs publicadas/indexables y `lastmod` desde `updatedAt/publishedAt`.
+- **Parámetros:** `?from=` no indexable (canonical al slug). 404/410 o redirección para contenido retirado.
+- **Imágenes:** URLs estables, `alt`, optimización y buen LCP.
 
-> **Nota:** alinear contratos finales con los md de `docs/custom-page` cuando estén disponibles.
+---
+
+## 7. Seguridad, privacidad y cumplimiento
+
+- **Gestor:** autenticación + autorización por rol en cada endpoint `.gs`; `sin_acceso`/no autorizado denegado (alineado al plan de seguridad).
+- **Público:** sin token admin, lista blanca estricta, sin datos personales/sensibles, CORS limitado, errores genéricos.
+- **Cookies/privacidad (web pública):** consentimiento previo real para no esenciales, bloqueo condicional de terceros (Maps/YouTube/Analytics/reCAPTCHA según implementación) y políticas adaptadas a protectora (ver análisis integral en `custom-page/docs`).
+- **Datos:** ubicación general (no exacta) en público; retención/minimización en formularios y auditoría de publicaciones.
+
+---
+
+## 8. Decisiones abiertas (cerrar en Fase 0)
+
+- **Modelo de datos:** campos de publicación en `Animales` vs entidad/hoja separada (`web_animales`/`web_publicaciones`) — recomendado separada.
+- **Fuente de eventos/historias publicables:** hoja/entidad dedicada (no `actividad` interna).
+- **Mapeo estados internos → `estado_publico`** y reglas (adoptado en escaparate sí/no).
+- **Selección de media pública:** origen (galería/documentos/URLs) y permisos.
+- **Convención de API pública:** `/api/publicaciones` (compatibilidad actual) vs `/v1/*` (versionado) o ambos (alias).
+- **Entrega:** endpoint dinámico GAS vs exportación JSON estática programada (o híbrido).
+- **Dominio(s) web pública** para CORS/canonical y roles con permiso de gestión web.
+- **Alineación fina** con `docs/custom-page` ante cambios futuros en sus contratos.
+
+---
+
+## 9. Resumen de entregables para implementación
+
+- **Backend gestor (`.gs`/Sheets):** modelo de publicación/SEO, endpoints CRUD/config/preview/slug-check, autorización, normalización de payload público.
+- **Backend público (`.gs`/feed):** `/api/publicaciones` y/o `/v1/*` de solo lectura con lista blanca, filtros, detalle por slug, config/taxonomías/sitemap según alcance.
+- **Admin (este repo):** sección Web + edición contextual, validaciones, previsualización y permisos.
+- **Web pública (`custom-page`):** consumo del contrato, render/SEO técnico (prerender, metas/schema, sitemap/redirects) y formularios/cookies según plan integral.
+- **Documentación operativa:** contratos, `CONFIG`, CORS, procedimiento de publicación y actualización de datos.
