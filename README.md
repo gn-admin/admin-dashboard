@@ -30,7 +30,9 @@ Los valores reales (URL del backend, claves de Firebase, IDs de hojas/formulario
 gn-encuestas/
 ├── .github/workflows/     # Despliegue automático a GitHub Pages
 ├── scripts/
-│   └── gen-config.js      # Genera config a partir de .env / variables de CI
+│   ├── gen-config.js      # Genera config a partir de .env / variables de CI
+│   └── prerender-publico.js # Fichas estáticas, sitemap.xml y robots.txt del visor
+
 ├── src/                   # Frontend PWA
 │   ├── index.html
 │   ├── manifest.webmanifest
@@ -59,3 +61,5 @@ gn-encuestas/
 3. Subir el repo a GitHub y activar **Pages → Source: GitHub Actions** (rama `main`).
 4. Añadir las variables frontend en Settings → Secrets and variables → Actions.
 5. Recordar actualizar `ALLOWED_ORIGINS` con la URL real y re-desplegar el backend si procede.
+
+El workflow ejecuta `npm test` y `npm run prerender` antes de publicar: si alguno falla, el despliegue se detiene (un 200 sin sitemap rompería la indexación).

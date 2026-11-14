@@ -388,7 +388,7 @@ Reglas:
 > `publico` es la simulación de la web: cada requisito SEO se implementa y se comprueba **aquí** antes de documentarlo para el proyecto real.
 
 **Qué se ha implementado**
-- `scripts/prerender-publico.js`: lee el canal (`publicaciones` paginado + `publicacion&slug=`), y escribe una **página estática por ficha** en `src/publicaciones/<slug>.html` con `<title>`, description, robots, canonical absoluto, OG/Twitter, JSON-LD y el HTML de la ficha **ya renderizado (sin JavaScript)**.
+- `scripts/prerender-publico.js`: lee el canal (`publicaciones` paginado + `publicacion&slug=` + `retiradas`) y escribe una **página estática por ficha** en `src/publicaciones/<slug>.html` con `<title>`, description, robots, canonical absoluto, OG/Twitter, JSON-LD y el HTML de la ficha **ya renderizado (sin JavaScript)**.
 - `sitemap.xml` con el listado y cada ficha publicada/listada (`lastmod` desde `updatedAt`/`publishedAt`), y `robots.txt` que permite lo público y bloquea el resto del panel.
 - `Publico.htmlDetalle(p)`: el HTML de la ficha se extrajo del render para reutilizarlo desde Node (una sola composición para SPA y estático).
 - **Canónica única:** la ficha del visor emite `canonical`, `og:url` y `mainEntityOfPage` apuntando a `publicaciones/<slug>.html`, de modo que SPA y estática no compiten; el listado y los estados conservan la URL propia.
@@ -403,7 +403,7 @@ Reglas:
 - Para aplicarlo al momento: Actions → «Deploy a GitHub Pages» → *Run workflow* (`workflow_dispatch`).
 - GitHub desactiva los programados tras 60 días sin actividad en el repositorio; un push o relanzarlo a mano los reactiva.
 - El hosting es estático: entre la retirada y ese despliegue la página antigua sigue sirviéndose. Lo que garantiza el cron es que después quede la página de retirada y no un 404.
-- Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, avisa y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--strict`).
+- Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, **bloquea el deploy** y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--soft`).
 
 **Resultados (2026-11-14, ficha real de Laia)**
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
@@ -417,7 +417,7 @@ Reglas:
 1. Generar en su build una página por `slug` usando el canal como fuente (SSG o script equivalente).
 2. Metas desde `seo.*`; canonical `dominio + ruta` (con dominio propio, sin `.html`); OG/Twitter con `ogImage`; JSON-LD por tipo y `mainEntityOfPage`.
 3. `sitemap.xml` en la raíz con `lastmod` y `robots.txt` con `Sitemap:`; excluir borradores, ocultos y `listed: false`.
-4. 404 real del hosting para slugs inexistentes y redirecciones 301 desde `GET /v1/redirects` (mapa ya disponible).
+4. 404 real del hosting para slugs inexistentes, 410 para retirados (o página `noindex` si el hosting no permite códigos por ruta) y redirecciones 301 desde `GET /v1/redirects` (mapa ya disponible).
 5. Comprobar: HTML con contenido sin JS, `canonical` propio, JSON-LD válido, sitemap sin borradores y robots correcto.
 
 ### Fase 5 — Ajustes, calidad y operación — parcial

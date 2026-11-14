@@ -18,7 +18,7 @@
 
 ## 2. Estado real actual (verificado)
 
-**Pruebas:** 357/357 OK.  
+**Pruebas:** 470/470 OK.  
 **Base técnica:** `src/js/dashboard.js` ~8567 líneas (monolito), `src/css/styles.css` ~7024 líneas, `src/js/utils.js` 99 líneas, dependencias runtime externas (Google Fonts/Inter, Firebase/gstatic, qrcodejs bajo demanda), sin bundler/minificación.
 
 | Fase | Estado real | Entregado y verificado | Pendiente para completar la fase |
@@ -67,7 +67,7 @@
 
 ## 4. Checklist de calidad UI/UX (por iteración)
 
-- [ ] Tests `357/357` en verde.
+- [ ] Tests `470/470` en verde.
 - [ ] `CACHE_NAME` incrementado si hay cambios frontend.
 - [ ] Sin regresión de permisos por rol/fase/estado (menús, rutas, acciones y datos).
 - [ ] Jerarquía visual clara (títulos, secciones, acciones primarias vs secundarias).
