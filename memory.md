@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta, con SEO prerenderizado, canónica única, retiradas con 410 lógico y despliegue diario. Los `.gs` del backend ya están desplegados en Apps Script (según confirmación); queda verificar en producción el comportamiento de retiradas/`gone` y llevar el SEO al proyecto real.
+El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). Hay cambios de `.gs` en repo pendientes de redesplegar: **restaurar retirada (C1)** y **eliminar borrador de publicación web de animal** (solo `WebPublicaciones`). Suite: **495/495**.
 
 ## Entregado
 
@@ -20,8 +20,8 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 - Genera `src/publicaciones/<slug>.html` (title, description, robots, canonical absoluto, OG/Twitter, JSON-LD y HTML renderizado sin JS), `src/sitemap.xml` y `src/robots.txt`.
 - **Guarda de despliegue**: bloquea con `exit 1` si no puede leer el canal, si falla una ficha o si sitemap/robots no son válidos; no borra la salida anterior. `--soft` solo avisa (uso manual).
-- **Avisos en Actions**: `::warning::` para lo no bloqueante (p. ej. no poder leer retiradas) y `::error::` para el fallo que detiene el deploy, con `%`/saltos escapados.
-- **Fixtures versionadas** en `tests/fixtures/prerender/`: `ficha-normal.json`, `retirada.json`, `sin-portada.json`. Los tests ejecutan el generador completo en un directorio temporal y validan el HTML, el sitemap y el robots sin depender del canal real.
+- **Avisos en Actions** y guarda: falla el deploy si no puede leer `retiradas` (salvo `--soft`, A3) o si sitemap/robots no son válidos; no borra la salida anterior.
+- **Fixtures versionadas** en `tests/fixtures/prerender/`: `ficha-normal.json`, `retirada.json`, `sin-portada.json`, `oculta.json`, `redirect-301.json`. Genera también páginas de **redirección 301** estáticas (noindex, canonical/refresh al destino, fuera de sitemap) y valida **JSON-LD/canonical únicos** (`validarFichaHtml`). C2 avanzado (`d4daabf`).
 - Integrado en `.github/workflows/deploy.yml` después de `npm test`; además **ejecución diaria** (`cron: '17 3 * * *'`, UTC) para aplicar retiradas sin push. Concurrencia en cola para no cancelar un deploy en curso.
 
 ### Retiradas y 410
@@ -38,6 +38,8 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 - Alta/edición de publicaciones de animales, eventos e historias; completitud, SEO, media, CTA, preview y slug check.
 - Historial de slugs (`slug_historial`) con 301 desde `?endpoint=redirects`; un slug histórico no se reutiliza.
 - Resumen con totales por tipo y por estado, diagnósticos de hoja y aviso de cabeceras.
+- **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, verificado con Playwright, `v230`), **pendiente de redesplegar `.gs`**.
+- **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`), **pendiente de redesplegar `.gs`** y validar en vivo.
 
 ### Media por ficha (Drive)
 
@@ -53,7 +55,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 ### Despliegue
 
 - GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v228`.
-- `npm test`: **489/489**.
+- `npm test`: **495/495**.
 
 ## Decisiones cerradas
 
@@ -65,18 +67,20 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 ## Pendiente manual / verificación (fuera de git)
 
-1. **Verificar en producción (tras despliegue de `.gs`)**: `?endpoint=publicaciones`, `?endpoint=publicacion&slug=...`, `?endpoint=retiradas` y respuesta `gone` (410 lógico) para retiradas; comprobar también `web-media-subir` si aplica. Los `.gs` ya están desplegados (confirmado); falta validar el comportamiento en vivo.
+1. **Redesplegar `.gs` actuales** (`Code.gs`, `WebPublicaciones.gs`) y validar en producción: **restaurar retirada (C1)** y **eliminar borrador de publicación web de animal** (solo `WebPublicaciones`, ficha intacta). Tras restaurar, comprobar que desaparece de `retiradas/gone` y que la lápida se elimina en el siguiente prerender/deploy.
 2. **Raíz de media**: configurada en `.env` y `Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
-3. Dominio propio (`gruponebak.net`) y Search Console: `sitemap.xml`/`robots.txt` en la raíz, envío del sitemap y canonical `dominio + ruta` sin `.html`.
-4. Port del SEO al proyecto real (páginas por slug, 410 real en el hosting, 301 desde `slug_historial`).
-5. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
+3. **A4 aplazado**: dominio propio y Search Console (sobre `github.io` es opcional enviar sitemap mientras tanto). Port del SEO al proyecto real (`C:\Users\JonEg\Documents\proyectos\main`).
+4. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
 
-## Siguientes pasos propuestos (no implementados)
+**A2/A2.2 verificado:** endpoints públicos y prerender/SEO correctos en `github.io`; caso retirada `prueba-retirada-playwright` comprobado (`retiradas`, `gone`, slug reservado) y lápida estática publicada fuera de sitemap tras deploy.
 
-1. **Verificación A2 pendiente:** probar en vivo un caso real de retirada/`gone` (retirar en gestor → `retiradas` y detalle `gone`, slug bloqueado, lápida/sitemap tras prerender). A3 ya aplicado en repo (el fallo al leer `retiradas` bloquea el deploy salvo `--soft`).
-2. Salida de una retirada desde el panel (“Restaurar”) y auditoría de quién retira.
-3. Dominio propio + Search Console (lo único que queda de indexación).
-4. Fixtures adicionales (301, ficha oculta) y validación de JSON-LD/canonical único sobre el HTML generado.
+## Siguientes pasos propuestos
+
+1. **Redesplegar `.gs` y validar C1 + borrado de borrador animal** en vivo (y efecto en retiradas/`gone`/lápida tras deploy).
+2. **Track B**: port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).
+3. **Track D** (prioridad seguridad): D1 autorización por endpoint/perfil en GAS, D2–D7 (higiene Roles, auditoría, token, MFA, pruebas por rol, canal público). Se puede preparar en repo sin desplegar; validar requiere despliegue.
+4. **Track E**: homogeneizar módulos, limpiar CSS/modularizar `dashboard.js`, a11y/responsive y QA por rol (en repo).
+5. **A4 (aplazado)**: dominio propio + Search Console cuando aplique. C3 (ficha configurable) y C4 (forms) solo tras decisión.
 
 ## Mapa rápido
 
@@ -99,6 +103,6 @@ npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
 ```
 
-## Historial de commits (2026-11-14)
+## Historial de commits recientes (2026-11-14)
 
-`714f053` tema del visor · `51d9cf8` SEO/prerender · `9337478`, `017e907`, `be456c8`, `dc9b339` ajustes y docs · `cce984e` canónica única + guarda + 410 · `14a34f4` páginas de retirada y gestor · `e5cb640` deploy diario · `768fdac` recuentos y docs · `06ce8fa` anotaciones de Actions y fixtures.
+`714f053`…`06ce8fa` visor/SEO/prerender/retiradas/docs — `870735f` A3 (fallo retiradas bloquea deploy) — `7fbeca0` UI móvil publicaciones (`v229`) — `9435a6d` eliminar borrador publicación web de animal (solo `WebPublicaciones`, `v230`, pendiente `.gs`) — `d4daabf` C2 prerender (redirect 301/oculta/JSON-LD-canonical, 495 tests) — `39fb362` C1 restaurar retirada (evento/historia, `v231`, pendiente `.gs`).
