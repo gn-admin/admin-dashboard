@@ -3,7 +3,7 @@
 > **Objetivo:** revisar el estado real de todos los planes del proyecto y definir una estrategia óptima y priorizada para ejecutar lo que queda pendiente.
 > **Fecha de revisión:** 2026-11-14
 > **Fuentes revisadas:** `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`, `memory.md`, `PLAN_SEGURIDAD.md`, `PLAN_ANALISIS_Y_EJECUCION.md`, `AGENTS.md`, `PROGRESO.md`, `.internal-docs/GESTOR_WEB_OPERATIVA.md` y consolidados de `.internal-docs/`.
-> **Alcance:** este plan maestro coordina trabajo en **este repositorio**, **backend externo (Apps Script/Sheets)**, **Firebase/GitHub/operación** y **proyecto web externo** (`custom-page/nueva-version`), sin mezclar su ejecución.
+> **Alcance:** este plan maestro coordina trabajo en **este repositorio**, **backend externo (Apps Script/Sheets)**, **Firebase/GitHub/operación** y **proyecto web externo** (`proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`), sin mezclar su ejecución.
 
 ---
 
@@ -18,7 +18,7 @@
 | F1 Backend gestor (GAS) | ✅ Implementado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | **Desplegar nueva versión de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** para activar en vivo `retirado`, `gone` (410 lógico) y `?endpoint=retiradas` (la l�pida ya existe en código/tests; en `/exec` puede no estar activa) |
 | F2 UI Gestor web (admin) | ✅ Implementado | Sección “Web/Contenido público”, alta guiada, curación animal/evento/historia, preview, slug-check, resumen, integración en ficha, permisos UI, estilos, `web.js`/`api.js`/rutas/SW | Revisión visual final en Pages/uso real tras despliegues; mejoras evolutivas menores si surgen |
 | F3 Canal público | ✅ Implementado | `/api/publicaciones`, detalle por slug, alias `/v1/*`, `config/taxonomias/sitemap/redirects/retiradas`, filtros/paginación/búsqueda, cache interna, 404/301/410 lógico, JSONP | Validar en producción tras desplegar `.gs` (especialmente `gone`/`retiradas`) |
-| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (489 verdes) | **Port a `custom-page/nueva-version`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
+| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (489 verdes) | **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
 | F5 Ajustes/calidad/operación | 🟡 Parcial | Completitud, consistencia preview↔público, cache/paginación, diagnóstico hoja/pestaña, historial de slug+301, retirada/410+l�pida, páginas de retirada, recuentos, docs operativa interna | Dominio propio + Search Console + sitemap en raíz; indexación/auditoría real; convertir aviso de retiradas en error si falla tras desplegar; **restaurar/salida de retirada** desde panel y auditoría de quién retira (propuesto); fixtures adicionales (301, oculta) y validación JSON-LD/canónica única |
 | §7.3 Ficha configurable / media | 🟡 Parcial (media hecha, configuración pendiente) | Media por ficha en Drive (`animales|eventos|historias/<slug>`), `web-media-subir`, normalización enlaces, galería `url|alt|pie`, documentos privados, límites/tipos; análisis y contrato aditivo v1.1 planificado | **No implementado:** ficha configurable (`ficha_json`/plantilla/bloques/iconos/tags/CTA kind/salud curada/campos animal extra), decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos compartido, saneado HTML, orden bloques, tags retrocompatibles) |
 
@@ -65,7 +65,7 @@
 
 1. **Desbloquear valor en producción primero:** cerrar pendientes manuales/de despliegue que activan funcionalidad ya implementada (especialmente `gone`/`retiradas` del gestor web).
 2. **Maximizar trabajo en este repo (controlado y testeable):** priorizar ítems con `npm test`/prerender verificables antes de depender de terceros.
-3. **Separar por dependencias:** no mezclar repo, GAS/Sheets, Firebase y `custom-page`; ejecutar en paralelo solo tracks independientes.
+3. **Separar por dependencias:** no mezclar repo, GAS/Sheets, Firebase y `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`; ejecutar en paralelo solo tracks independientes.
 4. **Seguridad backend antes que ampliación de superficie:** para exposición real, la autorización por endpoint (1.1) y verificación operativa pesan más que nuevas features.
 5. **Evitar alcance difuso:** tratar `7.3 ficha configurable` y `forms/submit` como líneas explícitas con decisiones previas, no como “extras” de otras fases.
 6. **Definición de hecho por hito:** código + pruebas + despliegue/configuración externa + verificación en entorno real.
@@ -89,7 +89,7 @@
 **Criterio de cierre Track A:** A2 verificado, A3 aplicado, y A4 planificado/ejecutado cuando haya dominio. (A1 desplegado según confirmación.)
 
 ### Track B — Web externa: consumo e indexación real (paralelo tras A2, otro repositorio)
-**Objetivo:** que `custom-page/nueva-version` muestre el contenido con el contrato y SEO de publicaciones.
+**Objetivo:** que `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` muestre el contenido con el contrato y SEO de publicaciones.
 **Dependencias:** canal público verificado en vivo (A2) y, idealmente, dominio (A4).
 
 | ID | Acción | Dónde | Resultado esperado |
@@ -162,7 +162,7 @@
 | **Este repo** | A3, C1–C3 (según decisión), C2, iteraciones Track E, ajustes doc (Track F) |
 | **Apps Script/Sheets (externo)** | Soporte C1/C3/C4, D1–D4, D7, verificación 5.1 (A1 desplegado; pendiente verificación A2) |
 | **Firebase/GitHub/operación** | D5, parte D4/D6, A4 (DNS/SC), rotaciones/revisiones |
-| **Proyecto web `custom-page` (externo)** | Track B completo (consumo, SEO de publicaciones, prerender/sitemap/robots/301/410) |
+| **Proyecto web `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (externo)** | Track B completo (consumo, SEO de publicaciones, prerender/sitemap/robots/301/410) |
 
 ## 6. Criterio global de “terminado”
 - **Gestor web:** canal y retiradas operativos en producción (A1–A2), documentación/CI alineadas, y (cuando aplique) dominio/indexación y port web completados.

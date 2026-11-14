@@ -11,7 +11,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 ### Visor público (`src/publico.html`, `src/js/publico.js`, `src/css/publico.css`)
 
-- Tema portado de `custom-page/nueva-version`: hero a dos columnas, datos destacados con iconos, tarjetas de 24 px, Inter/Montserrat (CSP con Google Fonts). Verificado a 360/768/1280.
+- Tema portado de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`: hero a dos columnas, datos destacados con iconos, tarjetas de 24 px, Inter/Montserrat (CSP con Google Fonts). Verificado a 360/768/1280.
 - Listado, ficha y estados vacío/error/retirada; composición de la ficha extraída a `Publico.htmlDetalle(p)` para reutilizarla desde Node.
 - **Canónica única**: la ficha del SPA emite `canonical`, `og:url` y `mainEntityOfPage` hacia `publicaciones/<slug>.html`; el listado y las páginas de estado conservan su URL. SPA y estática ya no compiten.
 - La pantalla de retirada muestra «Publicación retirada» con `noindex,nofollow`, sin JSON-LD.
@@ -60,7 +60,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 - La ficha canónica es la página **estática**; el SPA apunta a ella.
 - El 410 se modela como `status:'gone'` porque el canal (JSONP) no puede devolver códigos HTTP; la lápida conserva el slug.
 - El prerender **bloquea** el deploy antes que publicar sin sitemap/robots.
-- El port a `custom-page/nueva-version` **no pertenece a este repositorio**: se entrega documentado (§7.2 y §7.4 del plan).
+- El port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` **no pertenece a este repositorio**: se entrega documentado (§7.2 y §7.4 del plan).
 - No implementar la ficha configurable (§7.3) sin aprobación.
 
 ## Pendiente manual / verificación (fuera de git)

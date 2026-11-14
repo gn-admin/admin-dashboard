@@ -25,7 +25,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Contenido público**: la canónica de una ficha es su página estática `publicaciones/<slug>.html`, no la URL del SPA. Los estados `borrador` y `oculto` no salen del canal; `retirado` responde `gone` (410 lógico) y deja una lápida que conserva el slug.
 - **Prerender**: `npm run prerender` genera fichas, `sitemap.xml` y `robots.txt`; el deploy lo ejecuta tras los tests y bloquea si falla. Sus avisos salen como anotaciones (`::warning::`/`::error::`) en el run.
 - **Media del gestor**: una carpeta de Drive por ficha dentro de `DRIVE_WEB_FOLDER_ID` → `animales|eventos|historias/<slug>`; se sube con `web-media-subir`. Los enlaces de carpeta se rechazan y los de fichero de Drive se normalizan a thumbnail/vista. Imágenes y vídeos se comparten para la web, los documentos quedan privados. Los enlaces de carpeta no se publican.
-- **No tocar `custom-page/` desde este repositorio**: el port del SEO se documenta como entrega externa (§7.2 y §7.4 del plan).
+- **No tocar el proyecto web externo (`C:\Users\JonEg\Documents\proyectos\main`) desde este repositorio**: el port del SEO se documenta como entrega externa (§7.2 y §7.4 del plan).
 - **Sin secretos**: nada de tokens, IDs de hojas ni claves en el código, fixtures o documentación versionada (el repo es público).
 
 ## Arquitectura

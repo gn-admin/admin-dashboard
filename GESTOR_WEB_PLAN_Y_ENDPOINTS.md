@@ -1,6 +1,6 @@
 # Gestor web (admin) — Plan por fases y endpoints para la web
 
-> **Objetivo:** crear un apartado **Gestor web** en el admin para preparar, curar y publicar contenido, y exponer los **endpoints necesarios** para que el proyecto web (`custom-page` / `nueva-version`) pueda consultar y visualizar fichas de animales, eventos e historias.
+> **Objetivo:** crear un apartado **Gestor web** en el admin para preparar, curar y publicar contenido, y exponer los **endpoints necesarios** para que el proyecto web (`proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` / `nueva-version`) pueda consultar y visualizar fichas de animales, eventos e historias.
 > **Alcance:** análisis, plan e **implementación**. Los puntos ya ejecutados llevan `- [x]`; los pendientes, `- [ ]` con su motivo.
 > **Nota importante (SEO):** los campos/metadatos de SEO se gestionan aquí como parte de las **publicaciones** para que la **otra web** los use al renderizarlas (metas, OG, canonical, indexación, sitemap, etc.); no se refieren al SEO del gestor/admin.
 > **Base de planificación:** este documento ya incorpora la información analizada sobre el proyecto web (contratos, consumo esperado y requisitos de publicación/SEO) y debe tratarse como fuente autosuficiente para la implementación. No depende de documentación externa adicional.
@@ -26,7 +26,7 @@
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
 | Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 489 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
-| Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
+| Port a la web (consumo del canal, metas, 301) | `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` | `→` tarea del proyecto web; guía en §7.2 |
 
 **Pasos manuales pendientes (fuera de git):**
 
@@ -168,7 +168,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ## 5. Endpoints para la web (canal público de contenido)
 
-> Contrato que consumirá `custom-page/nueva-version`. **No requieren token**: solo devuelven contenido publicado y listado.
+> Contrato que consumirá `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`. **No requieren token**: solo devuelven contenido publicado y listado.
 
 ### 5.1 Listado de publicaciones — implementado
 - **`GET /api/publicaciones`** → en Apps Script: `?endpoint=publicaciones` (o `api/publicaciones`, `v1/publicaciones`).
@@ -216,7 +216,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ## 6. SEO de las publicaciones en la web pública (requisitos para la otra web)
 
-> Aplica a las fichas/publicaciones renderizadas en `custom-page/nueva-version`, no al gestor/admin. El gestor provee los campos/metadatos; la web los consume y los aplica.
+> Aplica a las fichas/publicaciones renderizadas en `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`, no al gestor/admin. El gestor provee los campos/metadatos; la web los consume y los aplica.
 
 - [x] **El gestor provee:** `seo.metaTitle`, `seo.metaDescription`, `seo.ogImage`, `seo.canonical`, `seo.robots`, `url` por tipo, `indexable`, `publishedAt`/`updatedAt`.
 - [~] **Fichas dinámicas:** `post.html?slug=` solo cliente es insuficiente para indexación/OG; estrategia recomendada **prerender/build por slug** (o SSG/export) usando el endpoint como fuente. El visor ya cubre metas/OG/JSON-LD (§7.1); el prerender se resuelve en el build de la web.
@@ -261,10 +261,10 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ### Fase 4 — Integración en la web y SEO — **cerrada en este proyecto** (visor + Pages); el port es tarea de la web
 **Objetivo:** fijar y verificar **aquí** el comportamiento definitivo que la web debe replicar.
-**Criterio de aceptación:** el **100% de las comprobaciones se hace sobre `src/publico.html` + `src/js/publico.js`**. `custom-page/nueva-version` se actualiza **después**, replicando lo ya validado (mismo contrato, mismas metas, mismos estados).
+**Criterio de aceptación:** el **100% de las comprobaciones se hace sobre `src/publico.html` + `src/js/publico.js`**. `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` se actualiza **después**, replicando lo ya validado (mismo contrato, mismas metas, mismos estados).
 - [x] Consumo del canal sin JSON estático, con filtros/búsqueda/paginación y estados vacío/error.
 - [x] Metas/OG/canonical/robots y JSON-LD (`Article`/`Event`/`BlogPosting`) aplicados desde la publicación, validados en el visor (§7.1).
-- [x] **Traspaso del port a `custom-page/nueva-version` — fuera del alcance de este proyecto.** Aquí se entrega el contrato, el visor de referencia y la guía §7.2; la sustitución de `blog-posts.json`/`HistoriasAPI`, las metas, el JSON-LD, los 301 y los estados se ejecutan **desde el repositorio de la web**. No se marca como pendiente de este plan.
+- [x] **Traspaso del port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` — fuera del alcance de este proyecto.** Aquí se entrega el contrato, el visor de referencia y la guía §7.2; la sustitución de `blog-posts.json`/`HistoriasAPI`, las metas, el JSON-LD, los 301 y los estados se ejecutan **desde el repositorio de la web**. No se marca como pendiente de este plan.
 - [x] **Prerender por slug y `sitemap.xml`/`robots.txt` físicos aplicados en la simulación** (`scripts/prerender-publico.js`, §7.4): una página estática por ficha con metas/JSON-LD, sitemap con `lastmod` y robots con `Sitemap:`. En la web se replica en su build; aquí queda además el **mapa 301** (`GET /v1/redirects`).
 - [~] **Auditoría formal de rendimiento/accesibilidad → tarea del proyecto web:** aquí está medido lo básico (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles).
 
@@ -292,11 +292,11 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Ficha real publicada (Laia):** el listado la muestra y la ficha se compone con datos reales; el prerender genera `publicaciones/laia.html` con metas, canonical y JSON-LD (§7.4).
 - [x] **Prerender SEO:** una página estática por ficha sin JavaScript, `sitemap.xml` y `robots.txt` generados desde el canal y verificados a 360/1280 (§7.4).
 
-### 7.2 Guía de port a `custom-page/nueva-version`
+### 7.2 Guía de port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`
 
-> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. **El port no es una tarea de este proyecto:** se ejecuta desde `custom-page/nueva-version`, que recibe el contrato, esta guía y los criterios de §7.1 como aceptación. Aquí no se modifica el otro repositorio.
+> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. **El port no es una tarea de este proyecto:** se ejecuta desde `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`, que recibe el contrato, esta guía y los criterios de §7.1 como aceptación. Aquí no se modifica el otro repositorio.
 >
-> **Estilos ya alineados.** `src/css/publico.css` reproduce el tema de `custom-page/nueva-version` (`css/main.css`): tokens `--pub-*` equivalentes a `--brand*`/`--ink*`, Inter + Montserrat, hero de ficha a dos columnas, «Datos destacados» con iconos por etiqueta, cuerpo en tarjeta y listado con tarjetas de 24 px. Para portar basta reutilizar `main.css` tal cual y conservar el marcado (`pub-ficha-hero`, `pub-facts-grid`, `pub-fact`, `pub-card`, `pub-body`).
+> **Estilos ya alineados.** `src/css/publico.css` reproduce el tema de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`css/main.css`): tokens `--pub-*` equivalentes a `--brand*`/`--ink*`, Inter + Montserrat, hero de ficha a dos columnas, «Datos destacados» con iconos por etiqueta, cuerpo en tarjeta y listado con tarjetas de 24 px. Para portar basta reutilizar `main.css` tal cual y conservar el marcado (`pub-ficha-hero`, `pub-facts-grid`, `pub-fact`, `pub-card`, `pub-body`).
 
 1. **Consumo.** Sustituir `blog-posts.json` y `HistoriasAPI` por el canal: `GET {API_URL}?endpoint=publicaciones` (filtros `type`, `category`, `species`, `q`, `page`, `pageSize` ≤ 50) y `endpoint=publicacion&slug=…`. Desde el navegador usar **JSONP** (`&callback=`): Apps Script no da cabeceras CORS. Respetar el caché de 60 s y añadir `nocache=1` solo al depurar.
 2. **Metas.** `seo.metaTitle` → `<title>` y `og:title`; `seo.metaDescription` → `description` y `og:description`; `seo.ogImage` → `og:image`/`twitter:image`; `seo.robots` → `robots` (`noindex,nofollow` si `indexable === false`).
@@ -309,7 +309,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 ### 7.3 Ficha de animal configurable desde la publicación — media implementada, resto pendiente
 
-**Pregunta de partida.** La ficha de `custom-page/nueva-version` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
+**Pregunta de partida.** La ficha de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
 
 **Criterio de esta pasada.** Solo análisis y plan: **no se implementa nada**. El contrato que se propone es **aditivo**: si una publicación no trae la configuración nueva, endpoint y visor se comportan exactamente como hoy.
 
@@ -389,7 +389,7 @@ Reglas:
 2. **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.
 3. **Gestor (`src/js/web.js`):** nueva sección «Presentación de la ficha» (plantilla, toggles de bloques, `mostrarLectura`), selectores de icono con catálogo, galería `url\|alt\|pie`, salud con tres estados, CTA con intención y `tags`.
 4. **Visor (`publico.js` + `publico.css`):** render condicionado por `ficha.bloques`, plantilla `historia`, CTA por `kind` y salud explícita. Mantener el fallback actual cuando no venga `ficha`.
-5. **Port a `custom-page/nueva-version`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story` y ocultar bloques; `publication.icons` con clave de catálogo.
+5. **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story` y ocultar bloques; `publication.icons` con clave de catálogo.
 6. **Aceptación:** payload sin `ficha` idéntico byte a byte al actual (test de regresión); ficha con `bloques` desactivados no pinta esos bloques; publicación antigua sigue renderizando igual; 360/1280 sin desbordes.
 
 **Fuera de alcance:** exponer la ficha interna del animal, editor WYSIWYG, CSS/tema por publicación y multiplantilla más allá de `ficha`/`historia`.
@@ -478,11 +478,11 @@ Reglas:
 | 2026-11-14 | 5 | Procedimiento operativo de publicación y redirects | — | `.internal-docs/GESTOR_WEB_OPERATIVA.md` |
 | 2026-11-14 | 5 | Distinguir hoja sin configurar/pestaña inexistente de “sin publicaciones”; sin fallback a la primera pestaña | — | `tests/web-backend.test.js` |
 | 2026-11-14 | 5 | SEO simplificado: solo meta title (auto desde el título) y meta description; canonical/OG/robots derivados. Base por defecto = GitHub Pages | — | `tests/web-backend.test.js`, `tests/web.test.js` |
-| 2026-11-14 | 4 | Visor con el tema de `custom-page/nueva-version`: tokens, Inter/Montserrat, hero a dos columnas, datos destacados con iconos y tarjetas de 24 px | — | `src/css/publico.css`, `tests` 454 en verde, `sw` v223 |
+| 2026-11-14 | 4 | Visor con el tema de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`: tokens, Inter/Montserrat, hero a dos columnas, datos destacados con iconos y tarjetas de 24 px | — | `src/css/publico.css`, `tests` 454 en verde, `sw` v223 |
 | 2026-11-14 | 4 | Revisión en Pages con el canal real: listado vacío, 404 con `noindex`, canonical propio, 360/1280 sin desbordes | — | §7.1 |
 | 2026-11-14 | 5 | `Code.gs` endurecido desplegado como nueva versión en Apps Script y canal verificado en vivo (`publicaciones`, `sitemap`, `redirects`, `taxonomias`, JSONP y 401 sin token) | — | Peticiones reales al `/exec` |
 | 2026-11-14 | 7.3 | Análisis y plan de la ficha de animal configurable (plantilla, bloques, iconos, galería, salud, CTA) sin implementar | — | §7.3 |
-| 2026-11-14 | 4 | Port a la web declarado **tarea del proyecto `custom-page/nueva-version`**: se entrega contrato + guía §7.2 + criterios §7.1 | — | §7.2 |
+| 2026-11-14 | 4 | Port a la web declarado **tarea del proyecto `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`**: se entrega contrato + guía §7.2 + criterios §7.1 | — | §7.2 |
 | 2026-11-14 | 4 | Prerender SEO en la simulación: página estática por ficha, `sitemap.xml` y `robots.txt` desde el canal, integrados en el despliegue | — | `scripts/prerender-publico.js`, `tests/prerender.test.js`, §7.4 |
 | 2026-11-14 | 4 | Verificación con ficha real (Laia): estática con canonical/JSON-LD sin JS, 360/1280 sin desbordes; SPA sin regresiones | — | §7.4 |
 | 2026-11-14 | 4 | Canónica única: la ficha del SPA apunta a su página estática en canonical, `og:url` y JSON-LD | — | `tests/publico.test.js`, §7.4 |
