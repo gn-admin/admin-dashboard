@@ -50,7 +50,7 @@
 - [x] **Selección de pestaña:** se exige el nombre configurado (`sheetName`). Si no existe pero el documento tiene **una única pestaña** (`Hoja 1`), se acepta: no hay ambigüedad. Con **dos o más pestañas** y sin coincidencia, el canal responde `sheet_not_found` y el gestor no escribe nada; nunca se adivina con la primera.
 - [x] **Cabeceras:** si la hoja está vacía, `appendToSheet` escribe las 26 columnas de §3.6 antes de la fila. Cubierto por `tests/sheets.test.js` (hoja vacía, primera publicación y segunda reutilizando cabecera).
 - [x] **Canonical condicional:** con base `*.github.io` el backend devuelve `canonical: ""` y sitemap vacío con `notice` (las rutas `/animales/<slug>` aún no existen en Pages); con dominio propio vuelve a `dominio + ruta`. El visor omite `<link rel="canonical">` y `og:url` cuando viene vacío (la ruta relativa `url` del payload nunca se usa como canonical).
-- [ ] **Propuesto (no implementado): endurecer `getSheet()`.** Hoy cae a la primera pestaña aunque la configurada no exista. Propuesta: mantener el fallback solo con una pestaña y lanzar error con ≥2 pestañas sin coincidencia (registrando los nombres en `Logger`), para que un `sheetName` mal puesto no escriba en la hoja equivocada en silencio. Afecta a todos los módulos, así que requiere sus propios tests.
+- [x] **`getSheet()` endurecido (2026-11-14).** Mantiene el fallback a la primera pestaña solo cuando el documento tiene **una** pestaña; con dos o más y sin coincidencia registra las pestañas en `Logger` y lanza error, para no leer ni escribir en la hoja equivocada. Cubierto en `tests/sheets.test.js` (nombre exacto, pestaña única, ambigüedad y “sin `sheetName`”). **Pendiente de pegar y desplegar** en Apps Script: ese cambio no viaja en git.
 
 ---
 
@@ -279,7 +279,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Estados de canal:** “Canal público sin activar” vs “No se pudieron cargar las publicaciones”, con botón **Reintentar**; ambos `noindex,nofollow` (corregido en esta pasada: antes se indexaban).
 - [x] **Accesibilidad básica:** `role="search"` en la barra, `label for` en todos los campos, `alt` de portada, placeholder “Sin imagen”, `role="status"` al cargar, `aria-label` en el paginador.
 - [x] **Responsive:** 360 px → 1 columna sin desbordamiento horizontal; 1280 px → 3 columnas.
-- [ ] **Revisión visual en Pages** (colores/espaciados reales): bloqueada por el despliegue del frontend.
+- [~] **Pages en vivo:** `https://gn-admin.github.io/admin-dashboard/publico.html` responde **200**, carga `publico.css` y `js/publico.js`, el canal JSONP responde y se ve el estado vacío (0 publicaciones) sin errores de consola; canonical y `og:url` apuntan a la propia página. Falta la revisión de píxeles con contenido real publicado.
 
 ### Fase 5 — Ajustes, calidad y operación — parcial
 **Objetivo:** estabilizar y mantener el flujo gestor → web.
