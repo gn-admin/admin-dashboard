@@ -7,8 +7,8 @@
   <meta name="robots" content="noindex, nofollow">
   <!-- Seguridad: no enviar Referer a sitios externos (evita filtrar ?token= en la URL) -->
   <meta name="referrer" content="no-referrer">
-  <!-- Seguridad: CSP en modo reporte (solo informa, no bloquea nada). -->
-  <meta http-equiv="Content-Security-Policy-Report-Only" content="
+  <!-- Seguridad: CSP activa (con limitaciones de GitHub Pages; no sustituye cabeceras HTTP). -->
+  <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://www.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
