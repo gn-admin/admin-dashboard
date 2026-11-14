@@ -64,7 +64,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 ## Pendiente manual (fuera de git)
 
 1. **Desplegar `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** como nueva versión en Apps Script. Hasta entonces no hay `gone` (410), ni `?endpoint=retiradas`, ni `web-media-subir`.
-2. **Añadir `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID`** al `.env` (carpeta raíz de media, sin compartir), regenerar `Config.gs` y pegarlo también en Apps Script. Sin esa variable la subida avisa y no guarda nada.
+2. **Raíz de media configurada** en `.env` y `Config.gs` (carpeta «Fichas Animales»; ID en `.internal-docs`, no versionado). Falta pegar `Config.gs` en Apps Script junto a los dos `.gs`.
 3. Dominio propio (`gruponebak.net`) y Search Console: `sitemap.xml`/`robots.txt` en la raíz, envío del sitemap y canonical `dominio + ruta` sin `.html`.
 4. Port del SEO al proyecto real (páginas por slug, 410 real en el hosting, 301 desde `slug_historial`).
 5. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
