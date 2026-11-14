@@ -14,7 +14,7 @@
  */
 
 var WEB_TIPOS = ['animal', 'evento', 'historia'];
-var WEB_ESTADOS = ['borrador', 'publicado', 'oculto'];
+var WEB_ESTADOS = ['borrador', 'publicado', 'oculto', 'retirado'];
 var WEB_PAGE_SIZE_DEF = 12;
 var WEB_PAGE_SIZE_MAX = 50;      // canal publico
 var WEB_ADMIN_PAGE_SIZE_MAX = 500; // listado del gestor (admin)
@@ -671,7 +671,11 @@ function webListarEventos(params) {
   var estadoFiltro = webTexto(params.estado_publicacion);
   var tipoFiltro = webTexto(params.tipo);
 
-  var filas = webFilasWeb().filter(function (p) { return p.tipo === 'evento' || p.tipo === 'historia'; });
+  var filas = webFilasWeb().filter(function (p) {
+    if (p.tipo !== 'evento' && p.tipo !== 'historia') return false;
+    // Las retiradas quedan como lapida (410): no se listan salvo que se pidan.
+    return estadoFiltro === 'retirado' ? p.estado_publicacion === 'retirado' : p.estado_publicacion !== 'retirado';
+  });
   if (tipoFiltro) filas = filas.filter(function (p) { return p.tipo === tipoFiltro; });
   if (estadoFiltro) filas = filas.filter(function (p) { return p.estado_publicacion === estadoFiltro; });
   if (q) {
@@ -814,9 +818,15 @@ function webArchivarEvento(body, user) {
   var previa = webPublicacionPorId(id);
   if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
   if (previa.tipo === 'animal') return { status: 'error', error: 'Los animales no se archivan desde aquí' };
-  if (!deleteSheetRow(webSheetConfig(), id)) return { status: 'error', error: 'No se encontró la publicación a archivar' };
-  try { registrarAuditoria('archivar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
-  return { status: 'success', success: true };
+  if (previa.estado_publicacion === 'retirado') {
+    return { status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } };
+  }
+  // No se borra la fila: el slug queda como lapida para responder 410 (gone)
+  // y para que no se pueda reutilizar en otra publicacion.
+  var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
+  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
+  try { registrarAuditoria('retirar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
+  return { status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } };
 }
 
 // ==================== UTILIDADES DEL GESTOR ====================
@@ -1015,6 +1025,27 @@ function webPublicacionPublica(slug) {
           permanent: true
         },
         data: webConstruirPublicacion(pubs[j], pubs[j].tipo === 'animal' ? mapa[String(pubs[j].origen_id)] : null)
+      };
+    }
+  }
+  // Lapida: el slug existio y se retiro. Se responde `gone` (410 logico) en
+  // lugar de un 404, para que la web y los buscadores lo traten como retirado.
+  var todas = webFilasWeb();
+  for (var r = 0; r < todas.length; r++) {
+    if (todas[r].estado_publicacion !== 'retirado') continue;
+    var coincide = todas[r].slug === s;
+    if (!coincide) {
+      var histRetirada = todas[r].slug_historial || [];
+      for (var hr = 0; hr < histRetirada.length; hr++) {
+        if (histRetirada[hr].slug === s) { coincide = true; break; }
+      }
+    }
+    if (coincide) {
+      return {
+        status: 'gone',
+        code: 'gone',
+        error: 'Esta publicación se ha retirado',
+        data: { slug: todas[r].slug, tipo: todas[r].tipo, retirado_en: todas[r].actualizado_en || '' }
       };
     }
   }

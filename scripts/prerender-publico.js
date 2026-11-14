@@ -7,10 +7,10 @@
  * existen sin ejecutar JavaScript, que es lo que necesita un buscador.
  *
  * Uso:
- *   node scripts/prerender-publico.js                  # canal real
+ *   node scripts/prerender-publico.js                  # canal real (bloquea si falla)
  *   node scripts/prerender-publico.js --fixture f.json # sin red (pruebas)
  *   node scripts/prerender-publico.js --dry            # solo resumen
- *   node scripts/prerender-publico.js --strict         # falla si el canal falla
+ *   node scripts/prerender-publico.js --soft           # avisa y sigue (manual)
  *
  * Base pública: `PUBLIC_WEB_BASE_URL` o, en CI, el Pages del repositorio.
  */
@@ -81,6 +81,22 @@ function sitemapXml(urls) {
   return '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
     cuerpo + '\n</urlset>\n';
+}
+
+function validarSalida(salida) {
+  const errores = [];
+  const sitemap = String((salida && salida.sitemap) || '');
+  const robots = String((salida && salida.robots) || '');
+  const paginas = (salida && salida.paginas) || [];
+  const urls = (sitemap.match(/<url>/g) || []).length;
+  if (!/<urlset[\s>]/.test(sitemap)) errores.push('sitemap.xml sin <urlset>');
+  if (urls < 1) errores.push('sitemap.xml sin ninguna URL');
+  if (urls !== paginas.length + 1) {
+    errores.push('sitemap.xml no cuadra: ' + urls + ' URLs frente a ' + (paginas.length + 1) + ' páginas');
+  }
+  if (!/^User-agent:\s*\*/m.test(robots)) errores.push('robots.txt sin User-agent');
+  if (!/^Sitemap:\s+\S+/m.test(robots)) errores.push('robots.txt sin línea Sitemap:');
+  return errores;
 }
 
 function robotsTxt(base) {
@@ -184,7 +200,7 @@ async function json(url) {
   return res.json();
 }
 
-async function recolectar(api) {
+async function recolectar(api, fallos) {
   const lista = [];
   let page = 1;
   let totalPages = 1;
@@ -207,17 +223,18 @@ async function recolectar(api) {
         'endpoint=publicacion&slug=' + encodeURIComponent(item.slug));
       if (res && res.status === 'success' && res.data) detalle.push(res.data);
     } catch (e) {
-      console.warn('[prerender] Se omite "' + item.slug + '": ' + e.message);
+      if (fallos) fallos.push(item.slug + ': ' + e.message);
+      else console.warn('[prerender] Se omite "' + item.slug + '": ' + e.message);
     }
   }
   return detalle;
 }
 
 function leerArgs(argv) {
-  const args = { strict: false, dry: false, fixture: '', api: '', base: '', out: '' };
+  const args = { soft: false, dry: false, fixture: '', api: '', base: '', out: '' };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === '--strict') args.strict = true;
+    if (a === '--soft' || a === '--allow-empty') args.soft = true;
     else if (a === '--dry') args.dry = true;
     else if (a === '--fixture') { args.fixture = argv[i + 1] || ''; i += 1; }
     else if (a === '--api') { args.api = argv[i + 1] || ''; i += 1; }
@@ -232,8 +249,8 @@ async function main(argv = process.argv.slice(2)) {
   const base = String(args.base || basePublica()).replace(/\/+$/, '');
   const out = path.resolve(args.out || SALIDA);
   const api = args.api || apiUrlDeConfig();
+  const fallos = [];
   let publicaciones = [];
-  let fallo = '';
 
   try {
     if (args.fixture) {
@@ -241,22 +258,35 @@ async function main(argv = process.argv.slice(2)) {
       publicaciones = Array.isArray(datos) ? datos : (datos.publicaciones || []);
     } else {
       if (!api) throw new Error('Falta API_URL en src/js/config.js (ejecuta npm run build)');
-      publicaciones = await recolectar(api);
+      publicaciones = await recolectar(api, fallos);
     }
   } catch (err) {
-    fallo = err.message;
-    console.warn('[prerender] Aviso: ' + fallo);
-    if (args.strict) throw err;
+    const mensaje = 'No se pudo leer el canal: ' + err.message +
+      '. Sin datos no hay sitemap ni robots que publicar.';
+    if (!args.soft) throw new Error(mensaje + ' Se detiene el despliegue.');
+    console.warn('[prerender] Aviso: ' + mensaje + ' Se continúa por --soft.');
+    return { paginas: [], sitemap: '', robots: '' };
+  }
+
+  if (fallos.length) {
+    const mensaje = 'No se pudieron generar ' + fallos.length + ' ficha(s): ' + fallos.join(' · ');
+    if (!args.soft) throw new Error(mensaje + '. Se detiene el despliegue para no dejar páginas sin generar.');
+    console.warn('[prerender] Aviso: ' + mensaje);
   }
 
   const salida = construirSalida(publicaciones, base);
-  if (args.dry) {
-    console.log('[prerender] dry-run: ' + salida.paginas.length + ' fichas para ' + base);
+  const errores = validarSalida(salida);
+  if (errores.length) {
+    const mensaje = 'Salida incompleta: ' + errores.join('; ');
+    if (!args.soft) {
+      throw new Error(mensaje + '. Se detiene el despliegue para no publicar sin sitemap ni robots.');
+    }
+    console.warn('[prerender] Aviso: ' + mensaje);
     return salida;
   }
-  if (fallo) {
-    // Sin datos fiables no se borra lo ya generado en un despliegue anterior.
-    console.warn('[prerender] No se escribe nada para no degradar el sitio.');
+
+  if (args.dry) {
+    console.log('[prerender] dry-run: ' + salida.paginas.length + ' fichas para ' + base);
     return salida;
   }
 
@@ -272,7 +302,7 @@ async function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, paginaEstatica, construirSalida, main
+  sitemapXml, robotsTxt, validarSalida, paginaEstatica, construirSalida, main
 };
 
 if (require.main === module) {

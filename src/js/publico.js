@@ -98,6 +98,17 @@ const Publico = {
     };
   },
 
+  /**
+   * URL de la página estática que genera el prerender. Es la canónica de la
+   * ficha: evita que el visor (hash) y la estática compitan por el contenido.
+   */
+  urlEstatica(slug) {
+    const s = String(slug || '').trim();
+    if (!s || typeof location === 'undefined') return '';
+    const dir = location.pathname.replace(/[^/]*$/, '');
+    return location.origin + dir + 'publicaciones/' + encodeURIComponent(s) + '.html';
+  },
+
   jsonLd(pub) {
     if (!pub) return null;
     const url = this.urlSegura((pub.seo && pub.seo.canonical) || pub.canonical || pub.url) || '';
@@ -267,6 +278,11 @@ const Publico = {
         this.estadoError(res.error || 'Canal público sin configurar.');
         return;
       }
+      // Publicación retirada (410): la fila se conserva como lápida.
+      if (res && res.status === 'gone') {
+        this.renderRetirada(res.error);
+        return;
+      }
       if (!res || res.status === 'error' || !res.data) {
         this.renderNoDisponible((res && res.error) || 'Esta publicación no está disponible.');
         return;
@@ -307,6 +323,18 @@ const Publico = {
     cont.innerHTML = `<div class="pub-error">
       <h1>Publicación no disponible</h1>
       <p>${this.esc(msg || 'Puede que se haya retirado o que el enlace no sea correcto.')}</p>
+      <a class="pub-btn" href="#/">Ver todas las publicaciones</a>
+    </div>`;
+  },
+
+  /** 410 lógico: la publicación existió y se retiró; no vuelve a publicarse. */
+  renderRetirada(msg) {
+    const cont = this._contenedor();
+    if (!cont) return;
+    this.aplicarSeo(null, 'noindex,nofollow');
+    cont.innerHTML = `<div class="pub-error">
+      <h1>Publicación retirada</h1>
+      <p>${this.esc(msg || 'Esta ficha ya no está disponible.')}</p>
       <a class="pub-btn" href="#/">Ver todas las publicaciones</a>
     </div>`;
   },
@@ -572,11 +600,15 @@ const Publico = {
 
   aplicarSeo(pub, robotsForzado) {
     const meta = this.metaDe(pub);
-    // En una ficha sin canonical (p. ej. base de GitHub Pages) no se emite;
-    // en el listado sí vale la propia página.
+    // Una ficha tiene una única canónica: su página estática del prerender.
+    // Así el visor (hash) y la estática no compiten por el mismo contenido.
+    // El listado y los estados usan la propia página.
+    const esFicha = !!(pub && pub.slug);
     const canonica = meta.canonical
       ? (this.urlSegura(meta.canonical) || '')
-      : ((pub || typeof location === 'undefined') ? '' : location.origin + location.pathname);
+      : (esFicha
+        ? this.urlEstatica(pub.slug)
+        : ((pub || typeof location === 'undefined') ? '' : location.origin + location.pathname));
     document.title = meta.title;
     this._meta('name', 'description', meta.description);
     this._meta('name', 'robots', robotsForzado || meta.robots);
@@ -594,7 +626,7 @@ const Publico = {
       if (canonica) link.setAttribute('href', canonica);
       else link.remove();
     }
-    this._jsonLd(pub);
+    this._jsonLd(pub, canonica);
   },
 
   _meta(atributo, clave, valor) {
@@ -607,11 +639,13 @@ const Publico = {
     el.setAttribute('content', valor == null ? '' : String(valor));
   },
 
-  _jsonLd(pub) {
+  _jsonLd(pub, canonica) {
     const previo = document.getElementById('pub-jsonld');
     if (previo) previo.remove();
     const data = this.jsonLd(pub);
     if (!data) return;
+    // El `@id` debe ser la misma URL canónica que declara el documento.
+    if (canonica) data.mainEntityOfPage = { '@type': 'WebPage', '@id': canonica };
     const script = document.createElement('script');
     script.type = 'application/ld+json';
     script.id = 'pub-jsonld';

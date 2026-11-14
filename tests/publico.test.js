@@ -97,6 +97,20 @@ describe('Publico.metaDe: SEO de la publicación', () => {
   });
 });
 
+describe('Publico.urlEstatica', () => {
+  it('apunta a la página estática del prerender (canónica única)', () => {
+    const previo = global.location;
+    global.location = { origin: 'https://gn-admin.github.io', pathname: '/admin-dashboard/publico.html' };
+    try {
+      assert.equal(Publico.urlEstatica('laia'), 'https://gn-admin.github.io/admin-dashboard/publicaciones/laia.html');
+      assert.equal(Publico.urlEstatica(''), '');
+      assert.equal(Publico.urlEstatica(null), '');
+    } finally {
+      global.location = previo;
+    }
+  });
+});
+
 describe('Publico.jsonLd', () => {
   it('animal -> Article con about y fechas', () => {
     const ld = Publico.jsonLd({

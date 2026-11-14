@@ -429,7 +429,24 @@ describe('gestor: eventos, historias y sitemap', () => {
 
     const archivo = b.ctx.webArchivarEvento({ id }, { email: 'x@y.es' });
     assert.equal(archivo.status, 'success');
-    assert.equal(b.ctx.webPublicacionPorId(id), null);
+    assert.equal(archivo.data.estado_publicacion, 'retirado');
+
+    // La fila no se borra: queda como lápida con el slug bloqueado.
+    const retirada = b.ctx.webPublicacionPorId(id);
+    assert.ok(retirada);
+    assert.equal(retirada.estado_publicacion, 'retirado');
+    assert.equal(retirada.listed, false);
+    assert.equal(retirada.indexable, false);
+    assert.equal(b.ctx.webSlugOcupado('historia', 'historia-de-luna'), true);
+
+    // 410 lógico en el canal y fuera del feed, del gestor y del sitemap.
+    const detalle = b.ctx.webPublicacionPublica('historia-de-luna');
+    assert.equal(detalle.status, 'gone');
+    assert.equal(detalle.code, 'gone');
+    assert.equal(detalle.data.slug, 'historia-de-luna');
+    assert.equal(b.ctx.webListarPublicas({}).data.length, 0);
+    assert.deepEqual(plano(b.ctx.webSitemap().data), []);
+    assert.equal(b.ctx.webListarEventos({}).data.length, 0);
   });
 
   it('el sitemap solo incluye publicadas e indexables', () => {

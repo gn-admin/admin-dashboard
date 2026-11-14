@@ -93,12 +93,12 @@ const Web = {
   },
 
   estadoLabel(estado) {
-    const m = { publicado: 'Publicado', borrador: 'Borrador', oculto: 'Oculto', sin_publicar: 'Sin publicar' };
+    const m = { publicado: 'Publicado', borrador: 'Borrador', oculto: 'Oculto', retirado: 'Retirado', sin_publicar: 'Sin publicar' };
     return m[estado] || 'Sin publicar';
   },
 
   estadoCls(estado) {
-    const m = { publicado: 'aprobada', borrador: 'pendiente', oculto: 'descartada' };
+    const m = { publicado: 'aprobada', borrador: 'pendiente', oculto: 'descartada', retirado: 'descartada' };
     return m[estado] || '';
   },
 
@@ -262,7 +262,7 @@ const Web = {
         ${e.estado_publicacion === 'publicado'
           ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
-        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Archivar ${this._esc(e.titulo || 'publicación')}" title="Archivar">${Icons.trash}</button>
+        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>
       </td>
     </tr>`;
   },
@@ -797,12 +797,12 @@ const Web = {
 
   async archivar(id) {
     if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
-      const ok = await Dashboard._confirm('Archivar esta publicación? Dejará de estar disponible en la web.', 'Archivar', 'Archivar');
+      const ok = await Dashboard._confirm('¿Retirar esta publicación? Dejará de estar disponible en la web y su enlace responderá como retirado (410); el slug no se podrá reutilizar.', 'Retirar', 'Retirar');
       if (!ok) return;
     }
     try {
       await API.deleteWebEvento(id);
-      this._snack('Publicación archivada');
+      this._snack('Publicación retirada (410)');
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo archivar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));

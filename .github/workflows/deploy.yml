@@ -48,7 +48,8 @@ jobs:
         run: npm test
 
       # Prerender SEO del visor: una página estática por ficha, sitemap y robots.
-      # Si el canal no responde, avisa y no borra lo generado (no bloquea el deploy).
+      # Bloquea el despliegue si no puede generar sitemap/robots válidos o si
+      # falta alguna ficha (un 200 sin sitemap rompería la indexación).
       - name: Prerender público
         env:
           PUBLIC_WEB_BASE_URL: ${{ vars.PUBLIC_WEB_BASE_URL }}

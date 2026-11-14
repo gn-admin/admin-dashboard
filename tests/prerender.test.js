@@ -102,6 +102,20 @@ test('construirSalida omite lo no listado y normaliza los slugs', () => {
   assert.match(salida.sitemap, /publicaciones\/laia-2026\.html/);
 });
 
+test('validarSalida exige sitemap y robots utilizables', () => {
+  const ok = prerender.construirSalida([muestra], BASE);
+  assert.deepEqual(prerender.validarSalida(ok), []);
+
+  const vacia = prerender.validarSalida({ paginas: [], sitemap: '', robots: '' }).join(' ');
+  assert.match(vacia, /sitemap\.xml sin <urlset>/);
+  assert.match(vacia, /sitemap\.xml sin ninguna URL/);
+  assert.match(vacia, /robots\.txt sin User-agent/);
+  assert.match(vacia, /robots\.txt sin línea Sitemap:/);
+
+  const descuadre = prerender.validarSalida({ paginas: [], sitemap: ok.sitemap, robots: ok.robots }).join(' ');
+  assert.match(descuadre, /sitemap\.xml no cuadra: 2 URLs frente a 1 páginas/);
+});
+
 test('htmlDetalle se puede usar sin DOM (lo reutiliza el prerender)', () => {
   const html = Publico.htmlDetalle(muestra);
   assert.match(html, /<article class="pub-detalle">/);
