@@ -88,11 +88,12 @@ function validarSalida(salida) {
   const sitemap = String((salida && salida.sitemap) || '');
   const robots = String((salida && salida.robots) || '');
   const paginas = (salida && salida.paginas) || [];
+  const indexables = paginas.filter(p => !(p && p.retirada)).length;
   const urls = (sitemap.match(/<url>/g) || []).length;
   if (!/<urlset[\s>]/.test(sitemap)) errores.push('sitemap.xml sin <urlset>');
   if (urls < 1) errores.push('sitemap.xml sin ninguna URL');
-  if (urls !== paginas.length + 1) {
-    errores.push('sitemap.xml no cuadra: ' + urls + ' URLs frente a ' + (paginas.length + 1) + ' páginas');
+  if (urls !== indexables + 1) {
+    errores.push('sitemap.xml no cuadra: ' + urls + ' URLs frente a ' + (indexables + 1) + ' páginas');
   }
   if (!/^User-agent:\s*\*/m.test(robots)) errores.push('robots.txt sin User-agent');
   if (!/^Sitemap:\s+\S+/m.test(robots)) errores.push('robots.txt sin línea Sitemap:');
@@ -180,16 +181,68 @@ function paginaEstatica(pub, base) {
   ].join('\n');
 }
 
+/**
+ * Página estática de retirada: el hosting de Pages no permite devolver 410 por
+ * ruta, así que se deja una página `noindex` en la canónica antigua en lugar
+ * de un 404. La web real sí podrá responder 410 con esta misma ruta.
+ */
+function paginaRetirada() {
+  const titulo = 'Publicación retirada · Grupo Nebak';
+  const descripcion = 'Esta publicación ya no está disponible.';
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="es">',
+    '<head>',
+    '  <meta charset="UTF-8">',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '  <meta name="theme-color" content="#0F5F31">',
+    '  <meta name="referrer" content="no-referrer">',
+    '  <title>' + Publico.esc(titulo) + '</title>',
+    '  <meta name="description" content="' + Publico.esc(descripcion) + '">',
+    '  <meta name="robots" content="noindex,nofollow">',
+    '  <link rel="icon" href="../assets/icons/logo-nebak.jpg">',
+    '  <link rel="stylesheet" href="../css/publico.css">',
+    '</head>',
+    '<body>',
+    '  <header class="pub-header">',
+    '    <a class="pub-brand" href="../publico.html">',
+    '      <img src="../assets/icons/logo-nebak.jpg" alt="Grupo Nebak" width="44" height="44">',
+    '      <span><strong>Grupo Nebak</strong><small>Publicaciones</small></span>',
+    '    </a>',
+    '    <a class="pub-link-panel" href="../publico.html">Todas las publicaciones</a>',
+    '  </header>',
+    '  <main id="pub-contenido" class="pub-main">',
+    '    <section class="pub-error">',
+    '      <h1>Publicación retirada</h1>',
+    '      <p>Esta publicación ya no está disponible. Su enlace se ha retirado de forma permanente.</p>',
+    '      <a class="pub-btn" href="../publico.html">Ver todas las publicaciones</a>',
+    '    </section>',
+    '  </main>',
+    '  <footer class="pub-footer"><p>Grupo Nebak · Contenido público. <a href="../publico.html">Ver todas las publicaciones</a></p></footer>',
+    '</body>',
+    '</html>',
+    ''
+  ].join('\n');
+}
+
 /** Salida completa a disco: páginas, sitemap y robots. */
-function construirSalida(publicaciones, base) {
+function construirSalida(publicaciones, base, retiradas) {
   const paginas = [];
   const urls = [{ loc: String(base).replace(/\/+$/, '') + '/publico.html' }];
+  const lapidas = new Set((retiradas || [])
+    .map(r => slugSeguro(r && (r.slug || r)))
+    .filter(Boolean));
   (publicaciones || []).forEach(pub => {
     if (!pub || pub.listed === false) return;
     const slug = slugSeguro(pub.slug);
     if (!slug) return;
+    // Una ficha publicada manda sobre una lápida antigua del mismo slug.
+    lapidas.delete(slug);
     paginas.push({ slug: slug, html: paginaEstatica(pub, base) });
     urls.push({ loc: urlEstatica(base, slug), lastmod: pub.updatedAt || pub.publishedAt });
+  });
+  lapidas.forEach(slug => {
+    paginas.push({ slug: slug, retirada: true, html: paginaRetirada() });
   });
   return { paginas: paginas, sitemap: sitemapXml(urls), robots: robotsTxt(base) };
 }
@@ -198,6 +251,18 @@ async function json(url) {
   const res = await fetch(url, { headers: { accept: 'application/json' } });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
+}
+
+async function recolectarRetiradas(api) {
+  const res = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=retiradas');
+  if (!res || res.status !== 'success') {
+    throw new Error((res && (res.error || res.detail)) || 'El canal no devolvió retiradas');
+  }
+  return (res.data || []).map(r => ({
+    slug: r && r.slug,
+    tipo: r && r.tipo,
+    retiradoEn: r && (r.retiradoEn || r.retirado_en)
+  }));
 }
 
 async function recolectar(api, fallos) {
@@ -251,14 +316,22 @@ async function main(argv = process.argv.slice(2)) {
   const api = args.api || apiUrlDeConfig();
   const fallos = [];
   let publicaciones = [];
+  let retiradas = [];
 
   try {
     if (args.fixture) {
       const datos = JSON.parse(fs.readFileSync(path.resolve(args.fixture), 'utf8'));
       publicaciones = Array.isArray(datos) ? datos : (datos.publicaciones || []);
+      retiradas = Array.isArray(datos) ? [] : (datos.retiradas || []);
     } else {
       if (!api) throw new Error('Falta API_URL en src/js/config.js (ejecuta npm run build)');
       publicaciones = await recolectar(api, fallos);
+      try {
+        retiradas = await recolectarRetiradas(api);
+      } catch (e) {
+        console.warn('[prerender] Aviso: no se pudieron leer las retiradas (' + e.message +
+          '). ¿Falta desplegar WebPublicaciones.gs? Se continúa sin páginas de retirada.');
+      }
     }
   } catch (err) {
     const mensaje = 'No se pudo leer el canal: ' + err.message +
@@ -274,7 +347,7 @@ async function main(argv = process.argv.slice(2)) {
     console.warn('[prerender] Aviso: ' + mensaje);
   }
 
-  const salida = construirSalida(publicaciones, base);
+  const salida = construirSalida(publicaciones, base, retiradas);
   const errores = validarSalida(salida);
   if (errores.length) {
     const mensaje = 'Salida incompleta: ' + errores.join('; ');
@@ -286,7 +359,9 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   if (args.dry) {
-    console.log('[prerender] dry-run: ' + salida.paginas.length + ' fichas para ' + base);
+    const retiradasN = salida.paginas.filter(p => p.retirada).length;
+    console.log('[prerender] dry-run: ' + (salida.paginas.length - retiradasN) + ' fichas y ' +
+      retiradasN + ' retiradas para ' + base);
     return salida;
   }
 
@@ -296,13 +371,15 @@ async function main(argv = process.argv.slice(2)) {
   salida.paginas.forEach(p => fs.writeFileSync(path.join(dir, p.slug + '.html'), p.html, 'utf8'));
   fs.writeFileSync(path.join(out, 'sitemap.xml'), salida.sitemap, 'utf8');
   fs.writeFileSync(path.join(out, 'robots.txt'), salida.robots, 'utf8');
-  console.log('[prerender] ' + salida.paginas.length + ' fichas estáticas + sitemap.xml + robots.txt en ' + out);
+  const totalRetiradas = salida.paginas.filter(p => p.retirada).length;
+  console.log('[prerender] ' + (salida.paginas.length - totalRetiradas) + ' fichas + ' +
+    totalRetiradas + ' retiradas + sitemap.xml + robots.txt en ' + out);
   return salida;
 }
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, validarSalida, paginaEstatica, construirSalida, main
+  sitemapXml, robotsTxt, validarSalida, paginaEstatica, paginaRetirada, construirSalida, main
 };
 
 if (require.main === module) {

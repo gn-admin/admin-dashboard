@@ -671,10 +671,10 @@ function webListarEventos(params) {
   var estadoFiltro = webTexto(params.estado_publicacion);
   var tipoFiltro = webTexto(params.tipo);
 
+  // Las retiradas se listan como lapida (410) para poder verlas y depurarlas;
+  // el filtro de estado decide si se quieren solo ellas.
   var filas = webFilasWeb().filter(function (p) {
-    if (p.tipo !== 'evento' && p.tipo !== 'historia') return false;
-    // Las retiradas quedan como lapida (410): no se listan salvo que se pidan.
-    return estadoFiltro === 'retirado' ? p.estado_publicacion === 'retirado' : p.estado_publicacion !== 'retirado';
+    return p.tipo === 'evento' || p.tipo === 'historia';
   });
   if (tipoFiltro) filas = filas.filter(function (p) { return p.tipo === tipoFiltro; });
   if (estadoFiltro) filas = filas.filter(function (p) { return p.estado_publicacion === estadoFiltro; });
@@ -863,7 +863,7 @@ function webResumen() {
   if (!cfg) return webDiagnostico();
   var filas = webFilasWeb();
   var mapa = webMapaAnimales();
-  var resumen = { animal: { total: 0, publicados: 0, borradores: 0, ocultos: 0, sin_publicar: 0 }, evento: { total: 0, publicados: 0, borradores: 0, ocultos: 0 }, historia: { total: 0, publicados: 0, borradores: 0, ocultos: 0 } };
+  var resumen = { animal: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0, sin_publicar: 0 }, evento: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 }, historia: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 } };
 
   Object.keys(mapa).forEach(function (id) {
     var pub = null;
@@ -872,6 +872,7 @@ function webResumen() {
     if (!pub) resumen.animal.sin_publicar++;
     else if (pub.estado_publicacion === 'publicado') resumen.animal.publicados++;
     else if (pub.estado_publicacion === 'oculto') resumen.animal.ocultos++;
+    else if (pub.estado_publicacion === 'retirado') resumen.animal.retirados++;
     else resumen.animal.borradores++;
   });
   filas.forEach(function (p) {
@@ -880,12 +881,15 @@ function webResumen() {
     r.total++;
     if (p.estado_publicacion === 'publicado') r.publicados++;
     else if (p.estado_publicacion === 'oculto') r.ocultos++;
+    else if (p.estado_publicacion === 'retirado') r.retirados++;
     else r.borradores++;
   });
 
   var incompletas = 0;
   var sinSeo = 0;
   filas.forEach(function (p) {
+    // Una retirada no se puede completar: no debe engordar los pendientes.
+    if (p.estado_publicacion === 'retirado') return;
     var origen = p.tipo === 'animal' ? mapa[String(p.origen_id)] : null;
     if (!webValidarPublicacion(p, origen).ok) incompletas++;
     if (!webTexto((p.seo || {}).metaDescription) && !p.extracto) sinSeo++;
@@ -899,6 +903,7 @@ function webResumen() {
         publicados: resumen.animal.publicados + resumen.evento.publicados + resumen.historia.publicados,
         borradores: resumen.animal.borradores + resumen.evento.borradores + resumen.historia.borradores,
         ocultos: resumen.animal.ocultos + resumen.evento.ocultos + resumen.historia.ocultos,
+        retirados: resumen.animal.retirados + resumen.evento.retirados + resumen.historia.retirados,
         sin_publicar: resumen.animal.sin_publicar,
         incompletas: incompletas,
         sin_seo: sinSeo
@@ -914,6 +919,27 @@ function webPublicables() {
   return webFilasWeb().filter(function (p) {
     return p.estado_publicacion === 'publicado' && p.listed !== false;
   });
+}
+
+/**
+ * Slugs retirados (lapida) con sus slugs historicos. La web los usa para
+ * publicar una pagina estatica de retirada (410 logico) en lugar de un 404.
+ */
+function webRetiradas() {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  var out = [];
+  var vistos = {};
+  webFilasWeb().forEach(function (p) {
+    if (p.estado_publicacion !== 'retirado') return;
+    var slugs = [p.slug].concat((p.slug_historial || []).map(function (h) { return h.slug; }));
+    slugs.forEach(function (s) {
+      if (!s || vistos[s]) return;
+      vistos[s] = true;
+      out.push({ slug: s, tipo: p.tipo, retiradoEn: p.actualizado_en || p.publicado_en || '' });
+    });
+  });
+  return { status: 'success', data: out };
 }
 
 function webListarPublicas(params) {

@@ -167,7 +167,7 @@ const Web = {
         <div class="filter-row">
           <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
             <option value="">Todos los estados</option>
-            ${['publicado', 'borrador', 'oculto'].map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
+            ${['publicado', 'borrador', 'oculto', 'retirado'].map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
           </select>
           <div class="web-acciones">
             ${this.tab === 'animal'
@@ -198,7 +198,8 @@ const Web = {
     return `<div class="stats-grid web-stats" style="margin-bottom:16px">
       ${card('Publicados', t.publicados, Icons.checkCircle, 'Visibles en la web')}
       ${card('Borradores', t.borradores, Icons.fileText, 'Sin publicar todavía')}
-      ${card('Ocultos', t.ocultos, Icons.eye, 'Retirados de la web')}
+      ${card('Ocultos', t.ocultos, Icons.eye, 'Fuera de la web temporalmente')}
+      ${card('Retiradas', t.retirados, Icons.trash, 'Enlace retirado (410)')}
       ${card('Sin configurar', t.sin_publicar, Icons.alertTriangle, 'Animales sin ficha web')}
       ${card('Incompletos', t.incompletas, Icons.alertTriangle, (Number(t.sin_seo) || 0) + ' sin SEO/descripción')}
     </div>`;
@@ -256,13 +257,15 @@ const Web = {
       <td data-label="Slug">${e.slug ? `<code>${this._esc(e.slug)}</code>` : '<span class="web-sub">sin slug</span>'}</td>
       <td data-label="Completitud">${this._chips(faltan)}</td>
       <td data-label="Acciones" class="table-actions">
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
+        ${e.estado_publicacion === 'retirado'
+          ? '<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>'
+          : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
         ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>` : ''}
         ${e.estado_publicacion === 'publicado'
           ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
-        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>
+        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>`}
       </td>
     </tr>`;
   },

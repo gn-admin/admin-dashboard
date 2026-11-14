@@ -380,7 +380,8 @@ function _webNormalizarEndpoint(raw, e) {
 function _esEndpointPublico(endpoint) {
   var publicos = {
     'publicaciones': 1, 'publicacion': 1, 'animales-publicos': 1, 'eventos-publicos': 1,
-    'historias-publicas': 1, 'config-publica': 1, 'taxonomias': 1, 'sitemap': 1, 'redirects': 1
+    'historias-publicas': 1, 'config-publica': 1, 'taxonomias': 1, 'sitemap': 1, 'redirects': 1,
+    'retiradas': 1
   };
   return publicos[endpoint] === 1;
 }
@@ -422,6 +423,9 @@ function handleGetPublico(endpoint, e) {
       break;
     case 'redirects':
       res = _webConCache('pub_redirects', function () { return webRedirects(); }, p.nocache === '1');
+      break;
+    case 'retiradas':
+      res = _webConCache('pub_retiradas', function () { return webRetiradas(); }, p.nocache === '1');
       break;
     default:
       res = { status: 'error', error: 'Endpoint público no encontrado' };

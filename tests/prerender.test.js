@@ -116,6 +116,27 @@ test('validarSalida exige sitemap y robots utilizables', () => {
   assert.match(descuadre, /sitemap\.xml no cuadra: 2 URLs frente a 1 páginas/);
 });
 
+test('una retirada genera página noindex fuera del sitemap', () => {
+  const salida = prerender.construirSalida([muestra], BASE, [{ slug: 'historia-retirada' }]);
+  assert.equal(salida.paginas.length, 2);
+  const retirada = salida.paginas.find(p => p.slug === 'historia-retirada');
+  assert.ok(retirada && retirada.retirada);
+  assert.match(retirada.html, /<meta name="robots" content="noindex,nofollow">/);
+  assert.match(retirada.html, /Publicación retirada/);
+  assert.doesNotMatch(retirada.html, /rel="canonical"/);
+  assert.doesNotMatch(retirada.html, /application\/ld\+json/);
+  assert.doesNotMatch(salida.sitemap, /historia-retirada/);
+  assert.equal((salida.sitemap.match(/<url>/g) || []).length, 2);
+  assert.deepEqual(prerender.validarSalida(salida), []);
+});
+
+test('una ficha publicada manda sobre una lápida del mismo slug', () => {
+  const salida = prerender.construirSalida([muestra], BASE, [{ slug: muestra.slug }]);
+  assert.equal(salida.paginas.filter(p => p.slug === 'laia-2026').length, 1);
+  assert.match(salida.paginas[0].html, /rel="canonical"/);
+  assert.deepEqual(prerender.validarSalida(salida), []);
+});
+
 test('htmlDetalle se puede usar sin DOM (lo reutiliza el prerender)', () => {
   const html = Publico.htmlDetalle(muestra);
   assert.match(html, /<article class="pub-detalle">/);

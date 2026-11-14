@@ -24,7 +24,7 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 466 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO y 410 de retiradas) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 470 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
 | Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
 
@@ -36,7 +36,7 @@
 - [x] Origen de la web pública permitido: `https://gn-admin.github.io` cubre `/admin-dashboard/` (la comprobación reduce a esquema+host y también lee `Referer`, necesario para JSONP). Al pasar a dominio propio, añadir `https://gruponebak.net` a `CONFIG.ALLOWED_ORIGINS`.
 - [x] Canal público accesible sin token confirmado en el despliegue (`?endpoint=publicaciones` responde sin sesión); los endpoints del gestor siguen devolviendo 401 sin token.
 - [x] Desplegar GitHub Pages: `publico.html` viaja en `src/` y responde **200** en `https://gn-admin.github.io/admin-dashboard/publico.html` (verificado con `sw` `v225` y el tema del visor).
-- [ ] Pegar y desplegar `apps-script/WebPublicaciones.gs` como **nueva versión** para activar el estado `retirado` y la respuesta `gone` (410). Hasta ese paso el `/exec` sigue borrando la fila al archivar.
+- [ ] Pegar y desplegar `apps-script/Code.gs` **y** `apps-script/WebPublicaciones.gs` como **nueva versión** para activar el estado `retirado`, la respuesta `gone` (410) y `?endpoint=retiradas`. Hasta ese paso el `/exec` sigue borrando la fila al archivar y el prerender avisa de que no puede leer retiradas.
 
 ### Decisiones cerradas en Fase 0
 
@@ -198,6 +198,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - [x] Alias por tipo: `GET /v1/animales`, `GET /v1/eventos`, `GET /v1/blog|historias`.
 - [x] Soporte: `GET /v1/config`, `GET /v1/taxonomias`, `GET /v1/sitemap` (URLs + `lastmod`; también `sitemap.xml`).
 - [x] `GET /v1/redirects` (o `?endpoint=redirects`): mapa 301 `{from,to,status,type,slug,currentSlug,changedAt}` para generar redirecciones en el hosting.
+- [x] `?endpoint=retiradas` (público): slugs retirados y sus slugs históricos (`{slug,tipo,retiradoEn}`), para que la web publique una página de retirada `noindex` en la canónica antigua en vez de un 404.
 - [x] **Estrategia:** un único handler/payload normalizado con alias `/api/publicaciones` ↔ `/v1/*`.
 
 ### 5.4 Requisitos no funcionales — parcial
@@ -269,11 +270,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 466 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-14, 470 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **466 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO y el 410 de retiradas).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **470 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -392,13 +393,14 @@ Reglas:
 - `Publico.htmlDetalle(p)`: el HTML de la ficha se extrajo del render para reutilizarlo desde Node (una sola composición para SPA y estático).
 - **Canónica única:** la ficha del visor emite `canonical`, `og:url` y `mainEntityOfPage` apuntando a `publicaciones/<slug>.html`, de modo que SPA y estática no compiten; el listado y los estados conservan la URL propia.
 - **Guarda de despliegue:** si el canal no responde, falla una ficha o el `sitemap.xml`/`robots.txt` no salen válidos, el script **termina con error y bloquea el deploy** (sin borrar lo anterior). `--soft` permite solo avisar en ejecuciones manuales.
+- **Páginas de retirada:** cada slug retirado (y sus slugs históricos) genera `publicaciones/<slug>.html` con `noindex,nofollow`, sin canonical ni JSON-LD y fuera del sitemap. Así el enlace no da 404 entre despliegues y el hosting real puede servir 410. Si una ficha publicada recupera el slug, la ficha manda sobre la lápida.
 - Integrado en el despliegue (`.github/workflows/deploy.yml`) después de los tests; si el canal falla, avisa y **no borra** lo generado. `npm run prerender` para ejecutarlo a mano (`--fixture`, `--dry`, `--strict`).
 
 **Resultados (2026-11-14, ficha real de Laia)**
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **466/466** (12 nuevas: prerender, canónica única y 410).
+- `npm test`: **470/470** (16 nuevas: prerender, canónica única, 410, páginas de retirada y gestor).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
@@ -463,4 +465,6 @@ Reglas:
 | 2026-11-14 | 4 | Verificación con ficha real (Laia): estática con canonical/JSON-LD sin JS, 360/1280 sin desbordes; SPA sin regresiones | — | §7.4 |
 | 2026-11-14 | 4 | Canónica única: la ficha del SPA apunta a su página estática en canonical, `og:url` y JSON-LD | — | `tests/publico.test.js`, §7.4 |
 | 2026-11-14 | 4 | Guarda de despliegue del prerender: falla si no hay canal, ficha o sitemap/robots válidos | — | `scripts/prerender-publico.js`, `tests/prerender.test.js` |
-| 2026-11-14 | 5 | Retirada con 410: estado `retirado`, lápida de slug, `gone` en canal, exclusión de feed/sitemap y pantalla en el visor | — | `tests/web-backend.test.js` · pendiente de desplegar `WebPublicaciones.gs` |
+| 2026-11-14 | 5 | Retirada con 410: estado `retirado`, lápida de slug, `gone` en canal, exclusión de feed/sitemap y pantalla en el visor | — | `tests/web-backend.test.js` · pendiente de desplegar `Code.gs` y `WebPublicaciones.gs` |
+| 2026-11-14 | 5 | Página estática de retirada (`noindex`, sin canonical ni JSON-LD, fuera del sitemap) desde `?endpoint=retiradas` | — | `tests/prerender.test.js` |
+| 2026-11-14 | 5 | Gestor: resumen con tarjeta «Retiradas» (fuera de borradores e incompletas) y listado que las muestra sin acciones de republicar | — | `tests/web-backend.test.js`, `tests/web.test.js` |

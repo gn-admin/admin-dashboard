@@ -213,6 +213,35 @@ describe('Web.estadoLabel / estadoCls', () => {
   });
 });
 
+describe('Web: retiradas en el gestor', () => {
+  it('el resumen tiene tarjeta propia y no las suma a borradores', () => {
+    const ctx = Object.assign({}, Web, { resumen: { totales: { publicados: 1, borradores: 0, ocultos: 0, retirados: 3, sin_publicar: 0, incompletas: 0, sin_seo: 0 } } });
+    const previo = global.Icons;
+    global.Icons = { checkCircle: 'i', fileText: 'i', eye: 'i', trash: 'i', alertTriangle: 'i' };
+    let html = '';
+    try {
+      html = ctx._statsHtml();
+    } finally {
+      if (previo === undefined) delete global.Icons;
+      else global.Icons = previo;
+    }
+    assert.match(html, /Retiradas/);
+    assert.match(html, /Enlace retirado \(410\)/);
+  });
+
+  it('la fila retirada se ve pero no ofrece republicar ni volver a retirar', () => {
+    const ctx = Object.assign({}, Web);
+    const html = ctx._filaEvento({
+      id: 'web_1', tipo: 'historia', titulo: 'Historia retirada', slug: 'historia-retirada',
+      categoria: '', estado_publicacion: 'retirado', completitud: { faltan: [] }
+    });
+    assert.match(html, /Retirado/);
+    assert.match(html, /slug sigue reservado/);
+    assert.doesNotMatch(html, /data-action="cambiarEstadoWeb"/);
+    assert.doesNotMatch(html, /data-action="archivarWeb"/);
+  });
+});
+
 describe('Web: helpers de escape', () => {
   it('escapa HTML cuando no hay Dashboard cargado', () => {
     assert.equal(Web._esc('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');

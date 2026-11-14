@@ -439,14 +439,32 @@ describe('gestor: eventos, historias y sitemap', () => {
     assert.equal(retirada.indexable, false);
     assert.equal(b.ctx.webSlugOcupado('historia', 'historia-de-luna'), true);
 
-    // 410 lógico en el canal y fuera del feed, del gestor y del sitemap.
+    // 410 lógico en el canal y fuera del feed y del sitemap.
     const detalle = b.ctx.webPublicacionPublica('historia-de-luna');
     assert.equal(detalle.status, 'gone');
     assert.equal(detalle.code, 'gone');
     assert.equal(detalle.data.slug, 'historia-de-luna');
     assert.equal(b.ctx.webListarPublicas({}).data.length, 0);
     assert.deepEqual(plano(b.ctx.webSitemap().data), []);
-    assert.equal(b.ctx.webListarEventos({}).data.length, 0);
+
+    // El gestor no las esconde ni las cuenta como borradores.
+    const listado = b.ctx.webListarEventos({}).data;
+    assert.equal(listado.length, 1);
+    assert.equal(listado[0].estado_publicacion, 'retirado');
+    assert.equal(b.ctx.webListarEventos({ estado_publicacion: 'retirado' }).data.length, 1);
+    assert.equal(b.ctx.webListarEventos({ estado_publicacion: 'publicado' }).data.length, 0);
+    const resumen = b.ctx.webResumen().data.totales;
+    assert.equal(resumen.retirados, 1);
+    assert.equal(resumen.borradores, 0);
+    assert.equal(resumen.publicados, 0);
+    assert.equal(resumen.incompletas, 0);
+
+    // Endpoint público que alimenta las páginas estáticas de retirada.
+    const retiradas = b.ctx.webRetiradas();
+    assert.equal(retiradas.status, 'success');
+    assert.equal(retiradas.data.length, 1);
+    assert.equal(retiradas.data[0].slug, 'historia-de-luna');
+    assert.equal(retiradas.data[0].tipo, 'historia');
   });
 
   it('el sitemap solo incluye publicadas e indexables', () => {
