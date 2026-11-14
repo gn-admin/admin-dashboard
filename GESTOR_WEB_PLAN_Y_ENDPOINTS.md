@@ -285,7 +285,9 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 ### 7.2 Guía de port a `custom-page/nueva-version`
 
-> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/publico.html`. No se toca el otro repositorio desde aquí.
+> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. No se toca el otro repositorio desde aquí.
+>
+> **Estilos ya alineados.** `src/css/publico.css` reproduce el tema de `custom-page/nueva-version` (`css/main.css`): tokens `--pub-*` equivalentes a `--brand*`/`--ink*`, Inter + Montserrat, hero de ficha a dos columnas, «Datos destacados» con iconos por etiqueta, cuerpo en tarjeta y listado con tarjetas de 24 px. Para portar basta reutilizar `main.css` tal cual y conservar el marcado (`pub-ficha-hero`, `pub-facts-grid`, `pub-fact`, `pub-card`, `pub-body`).
 
 1. **Consumo.** Sustituir `blog-posts.json` y `HistoriasAPI` por el canal: `GET {API_URL}?endpoint=publicaciones` (filtros `type`, `category`, `species`, `q`, `page`, `pageSize` ≤ 50) y `endpoint=publicacion&slug=…`. Desde el navegador usar **JSONP** (`&callback=`): Apps Script no da cabeceras CORS. Respetar el caché de 60 s y añadir `nocache=1` solo al depurar.
 2. **Metas.** `seo.metaTitle` → `<title>` y `og:title`; `seo.metaDescription` → `description` y `og:description`; `seo.ogImage` → `og:image`/`twitter:image`; `seo.robots` → `robots` (`noindex,nofollow` si `indexable === false`).

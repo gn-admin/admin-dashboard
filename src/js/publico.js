@@ -326,7 +326,11 @@ const Publico = {
       : `<div class="pub-error"><h1>${hayFiltros ? 'Sin resultados' : 'Todavía no hay publicaciones'}</h1><p>${hayFiltros ? 'No hay contenido que coincida con estos filtros. Prueba a limpiarlos.' : 'Cuando se publique contenido desde el panel aparecerá aquí.'}</p></div>`;
 
     cont.innerHTML = `
-      <h1 class="pub-titulo">Publicaciones</h1>
+      <section class="pub-hero-lista">
+        <p class="pub-eyebrow">Grupo Nebak</p>
+        <h1 class="pub-titulo">Publicaciones</h1>
+        <p class="pub-lead">Animales en adopción, acogidas, eventos e historias de Grupo Nebak.</p>
+      </section>
       <form class="pub-toolbar" data-pub-search role="search">
         <div class="pub-field" style="flex:2 1 240px">
           <label for="pub-q">Buscar</label>
@@ -378,13 +382,15 @@ const Publico = {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const animal = p.animal ? [p.animal.species, p.animal.age && p.animal.age.label].filter(Boolean).join(' · ') : '';
+    const meta = [this.fecha(p.publishedAt), animal].filter(Boolean).join(' · ');
     return `<a class="pub-card" href="#/publicacion/${encodeURIComponent(p.slug || '')}">
       <div class="pub-card-media${img ? '' : ' pub-card-media--vacia'}">${img ? `<img src="${this.esc(img)}" alt="${this.esc(alt)}" loading="lazy">` : '<span>Sin imagen</span>'}</div>
       <div class="pub-card-body">
         ${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
+        ${meta ? `<p class="pub-card-meta">${this.esc(meta)}</p>` : ''}
         <h2>${this.esc(p.title)}</h2>
-        ${p.excerpt ? `<p>${this.esc(p.excerpt)}</p>` : ''}
-        <div class="pub-card-meta">${this.esc(this.fecha(p.publishedAt))}${animal ? ' · ' + this.esc(animal) : ''}</div>
+        ${p.excerpt ? `<p class="pub-card-excerpt">${this.esc(p.excerpt)}</p>` : ''}
+        <span class="pub-card-link">Ver ficha →</span>
       </div>
     </a>`;
   },
@@ -398,11 +404,16 @@ const Publico = {
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const estado = p.status ? `<span class="pub-tag pub-tag--estado">${this.esc(this.estadoTexto(p.status))}</span>` : '';
     const cta = (p.cta && this.urlSegura(p.cta.url))
-      ? `<div class="pub-cta"><a class="pub-btn" href="${this.esc(this.urlSegura(p.cta.url))}" rel="noopener">${this.esc(p.cta.label || 'Ver más')}</a></div>`
+      ? `<a class="pub-btn" href="${this.esc(this.urlSegura(p.cta.url))}" rel="noopener">${this.esc(p.cta.label || 'Ver más')}</a>`
       : '';
     const etiquetas = (p.tags || []).filter(Boolean).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('');
-    const iconos = (p.icons || []).filter(i => i && (i.label || i.value)).map(i => `
-      <dt>${this.esc(i.label || i.icon)}</dt><dd>${this.esc(i.value)}</dd>`).join('');
+    const hechos = (p.icons || []).filter(i => i && (i.label || i.value)).map(i => {
+      const meta = this._icono(i.label || '', i.icon || '', p);
+      return `<article class="pub-fact ${meta.tone}">
+        <div class="pub-fact-icon" aria-hidden="true">${meta.svg}</div>
+        <div class="pub-fact-copy"><h3>${this.esc(i.label || i.icon || '')}</h3><p>${this.esc(i.value || '')}</p></div>
+      </article>`;
+    }).join('');
     const galeria = (p.gallery || [])
       .map((g, i) => ({
         src: this.urlSegura(g && g.src),
@@ -416,34 +427,68 @@ const Publico = {
         <span aria-hidden="true">${this.esc((v.provider || 'vídeo').toUpperCase())} ↗</span>
       </a>`).join('');
 
+    const acciones = cta
+      ? `<div class="pub-acciones">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
+      : '';
+    const metaLinea = [
+      estado,
+      p.publishedAt ? `<span>${this.esc(this.fecha(p.publishedAt))}</span>` : '',
+      p.readTime ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : '',
+      p.author ? `<span>${this.esc(p.author)}</span>` : ''
+    ].filter(Boolean).join('');
+
     cont.innerHTML = `
       <a class="pub-back" href="#/">← Todas las publicaciones</a>
       <article class="pub-detalle">
-        ${img ? `<div class="pub-hero"><img src="${this.esc(img)}" alt="${this.esc(alt)}" fetchpriority="high"></div>` : ''}
-        <div class="pub-detalle-cuerpo">
-          <div class="pub-etiquetas">
-            ${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
-            ${estado}
+        <header class="pub-ficha-hero">
+          <div class="pub-ficha-copy">
+            <p class="pub-eyebrow">${this.esc(p.category || 'Ficha')}</p>
+            <h1>${this.esc(p.title)}</h1>
+            ${p.excerpt ? `<p class="pub-lead">${this.esc(p.excerpt)}</p>` : ''}
+            ${metaLinea ? `<div class="pub-meta">${metaLinea}</div>` : ''}
+            ${acciones}
           </div>
-          <h1>${this.esc(p.title)}</h1>
-          ${p.excerpt ? `<p class="pub-lead">${this.esc(p.excerpt)}</p>` : ''}
-          <div class="pub-meta">
-            ${p.publishedAt ? `<span>${this.esc(this.fecha(p.publishedAt))}</span>` : ''}
-            ${p.readTime ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : ''}
-            ${p.author ? `<span>${this.esc(p.author)}</span>` : ''}
-          </div>
-          ${etiquetas ? `<div class="pub-chips">${etiquetas}</div>` : ''}
-          ${iconos ? `<dl class="pub-dl">${iconos}</dl>` : ''}
-          <div class="pub-html">${p.contentHtml || ''}</div>
-          ${galeria ? `<div class="pub-galeria">${galeria}</div>` : ''}
-          ${videos ? `<div class="pub-videos">${videos}</div>` : ''}
-          ${p.animal ? this._bloqueAnimal(p.animal) : ''}
-          ${p.event ? this._bloqueEvento(p.event) : ''}
-          ${cta}
-        </div>
+          ${img ? `<div class="pub-ficha-media"><img src="${this.esc(img)}" alt="${this.esc(alt)}" fetchpriority="high"></div>` : ''}
+        </header>
+        ${hechos ? `<section class="pub-section" aria-label="Datos destacados"><div class="pub-section-head"><h2>Datos destacados</h2></div><div class="pub-facts-grid">${hechos}</div></section>` : ''}
+        ${etiquetas ? `<div class="pub-etiquetas">${etiquetas}</div>` : ''}
+        <section class="pub-section">
+          <div class="pub-section-head"><h2>Sobre este caso</h2></div>
+          <div class="pub-body pub-html">${p.contentHtml || ''}</div>
+        </section>
+        ${galeria ? `<section class="pub-section" aria-label="Galería de imágenes"><div class="pub-section-head"><h2>Galería</h2></div><div class="pub-galeria">${galeria}</div></section>` : ''}
+        ${videos ? `<section class="pub-section" aria-label="Vídeos"><div class="pub-section-head"><h2>Vídeo</h2></div><div class="pub-videos">${videos}</div></section>` : ''}
+        ${p.animal ? this._bloqueAnimal(p.animal) : ''}
+        ${p.event ? this._bloqueEvento(p.event) : ''}
+        ${cta ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>` : ''}
       </article>`;
 
     this.aplicarSeo(p);
+  },
+
+  // Icono y tono de cada dato destacado, calcado de la ficha de nueva-version.
+  _icono(label, icon, pub) {
+    const l = String([label, icon, pub && pub.title, pub && pub.category].join(' '))
+      .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const svg = contenido => `<svg viewBox="0 0 24 24" aria-hidden="true">${contenido}</svg>`;
+    const paw = svg('<ellipse class="fill-soft" cx="12" cy="15.2" rx="4.8" ry="3.8"/><circle cx="7.6" cy="9.2" r="1.7"/><circle cx="12" cy="7.8" r="1.8"/><circle cx="16.4" cy="9.2" r="1.7"/><path d="M7.2 15.1c0-2.8 2.2-4.6 4.8-4.6s4.8 1.8 4.8 4.6c0 2.3-2.1 4.1-4.8 4.1s-4.8-1.8-4.8-4.1Z"/><path d="M10.2 15.1c.5-.7 1.1-1 1.8-1s1.3.3 1.8 1"/>');
+    const home = svg('<path class="fill-soft" d="M7.5 11.2 12 7.8l4.5 3.4V18h-9z"/><path d="M4.2 11.6 12 5.5l7.8 6.1"/><path d="M7.2 10.8V18.5h9.6v-7.7"/><path d="M12 12.2c.8-1 2.2-1 3 0 .8 1 .5 2.2-.5 3.1L12 17.5l-2.5-2.2c-1-.9-1.3-2.1-.5-3.1.8-1 2.2-1 3 0Z"/>');
+    const pin = svg('<path class="fill-soft" d="M12 20s6-5.1 6-10.1A6 6 0 0 0 6 9.9C6 14.9 12 20 12 20Z"/><circle cx="12" cy="10" r="2.4"/>');
+    const clock = svg('<circle class="fill-soft" cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="7.5"/><path d="M12 7.4v5l3.2 1.9"/>');
+    const heart = svg('<path class="fill-soft" d="M12 18.4 6.4 13a4 4 0 0 1 5.6-5.7l.9.9.9-.9A4 4 0 0 1 19.4 13Z"/><path d="M12 18.4 6.4 13a4 4 0 0 1 5.6-5.7l.9.9.9-.9A4 4 0 0 1 19.4 13Z"/>');
+    const doc = svg('<path class="fill-soft" d="M7.5 4h6.2l2.8 2.8V20H7.5z"/><path d="M7 3.8h6.8L17 7v13.2H7z"/><path d="M13.8 3.8v3.6H17"/><path d="M9.5 11h5M9.5 14h5M9.5 17h3.4"/>');
+    const alert = svg('<path class="fill-soft" d="M12 4.2 3.8 18.8h16.4z"/><path d="M12 4.2 3.8 18.8h16.4z"/><path d="M12 9v4.8"/><circle cx="12" cy="16.6" r=".9"/>');
+    const people = svg('<circle class="fill-soft" cx="9" cy="8.6" r="2.6"/><circle cx="9" cy="8.6" r="2.6"/><path d="M4.6 18.4a4.5 4.5 0 0 1 8.8 0"/><path d="M14.2 11.2a2.2 2.2 0 1 0 0-4.4"/><path d="M14.8 18.4c.2-1.8 1.5-3.1 3.3-3.4"/>');
+    const mail = svg('<rect class="fill-soft" x="4.2" y="6.6" width="15.6" height="10.8" rx="2.4"/><rect x="3.5" y="6" width="17" height="12" rx="2.5"/><path d="m5 7.5 7 5 7-5"/>');
+    if (/urgente|prioridad|alert/.test(l)) return { svg: alert, tone: 'tone-peach' };
+    if (/zona|ubic|lugar|irun|gipuz/.test(l)) return { svg: pin, tone: 'tone-sky' };
+    if (/duracion|tiempo|plazo|fecha|edad/.test(l)) return { svg: clock, tone: 'tone-sun' };
+    if (/hogar|casa|acog|familia|estado|final feliz|adoptad/.test(l)) return { svg: home, tone: 'tone-mint' };
+    if (/contact|correo|email|telefono/.test(l)) return { svg: mail, tone: 'tone-sky' };
+    if (/vinculo|junt|conjunt|herman|duo|trio|grupo|person/.test(l)) return { svg: people, tone: 'tone-green' };
+    if (/proceso|seguim|apoyo|cuidado|requisit/.test(l)) return { svg: doc, tone: 'tone-leaf' };
+    if (/especie|gato|perro|animal/.test(l)) return { svg: paw, tone: 'tone-green' };
+    return { svg: heart, tone: 'tone-mint' };
   },
 
   _bloqueAnimal(a) {

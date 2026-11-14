@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0A431E">
+  <meta name="theme-color" content="#0F5F31">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://script.google.com https://script.googleusercontent.com;
-    style-src 'self' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' data: https:;
-    font-src 'self' data:;
+    font-src 'self' data: https://fonts.gstatic.com;
     connect-src 'self' https://script.google.com https://script.googleusercontent.com;
     frame-src 'none';
     base-uri 'self';
@@ -27,6 +27,9 @@
   <meta property="og:description" content="Animales en adopción, acogidas, eventos e historias de Grupo Nebak.">
   <meta property="og:image" content="">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
   <link rel="icon" href="assets/icons/logo-nebak.jpg">
   <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
   <link rel="stylesheet" href="css/publico.css">
