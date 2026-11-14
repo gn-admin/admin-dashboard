@@ -82,11 +82,11 @@
 |---|---|---|---|---|---|
 | A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"` y `?endpoint=retiradas`; canal coherente | **Hecho (confirmado por el usuario).** Falta verificación en vivo: `?endpoint=publicaciones/publicacion/retiradas/redirects/taxonomias/sitemap` OK; ficha retirada devuelve `gone`; slug bloqueado |
 | A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | Alta→feed→ficha→ocultar/retirar; `gone`/`retiradas` en vivo; prerender diario genera lápida/sitemap correcto |
-| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | Ejecutar tras confirmar A2; ejecución workflow anota/falla según caso; `npm test`/prerender verdes |
+| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Implementado en repo** (`scripts/prerender-publico.js`: falla si no puede leer `retiradas`, salvo `--soft`). Pruebas prerender 17/17 y suite 489/489 verdes; efectivo en el próximo deploy. |
 | A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | Propiedad verificada, sitemap aceptado, URLs canónicas correctas |
 | A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | Actualizar `memory.md`/operativa; validar consistencia preview↔público y casos 301/410 |
 
-**Criterio de cierre Track A:** A2 verificado, A3 aplicado, y A4 planificado/ejecutado cuando haya dominio. (A1 desplegado según confirmación.)
+**Criterio de cierre Track A:** A2 verificado (caso `gone`/retirada en vivo pendiente de prueba con un dato real), A3 aplicado en repo, y A4 planificado/ejecutado cuando haya dominio. (A1 desplegado según confirmación.)
 
 ### Track B — Web externa: consumo e indexación real (paralelo tras A2, otro repositorio)
 **Objetivo:** que `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` muestre el contenido con el contrato y SEO de publicaciones.

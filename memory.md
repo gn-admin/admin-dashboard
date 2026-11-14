@@ -73,7 +73,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 ## Siguientes pasos propuestos (no implementados)
 
-1. Tras verificar el despliegue de `.gs`, convertir el aviso de retiradas en error si vuelve a fallar (que una lápida rota no pase desapercibida).
+1. **Verificación A2 pendiente:** probar en vivo un caso real de retirada/`gone` (retirar en gestor → `retiradas` y detalle `gone`, slug bloqueado, lápida/sitemap tras prerender). A3 ya aplicado en repo (el fallo al leer `retiradas` bloquea el deploy salvo `--soft`).
 2. Salida de una retirada desde el panel (“Restaurar”) y auditoría de quién retira.
 3. Dominio propio + Search Console (lo único que queda de indexación).
 4. Fixtures adicionales (301, ficha oculta) y validación de JSON-LD/canonical único sobre el HTML generado.

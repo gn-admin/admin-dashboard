@@ -345,8 +345,10 @@ async function main(argv = process.argv.slice(2)) {
       try {
         retiradas = await recolectarRetiradas(api);
       } catch (e) {
-        anotar('warning', 'No se pudieron leer las retiradas (' + e.message +
-          '). ¿Falta desplegar WebPublicaciones.gs? Se continúa sin páginas de retirada.');
+        const mensaje = 'No se pudieron leer las retiradas (' + e.message +
+          '). No se pueden generar las páginas de retirada.';
+        if (!args.soft) throw new Error(mensaje + ' Se detiene el despliegue.');
+        anotar('warning', mensaje + ' Se continúa por --soft.');
       }
     }
   } catch (err) {
