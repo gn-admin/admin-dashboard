@@ -312,6 +312,8 @@ a:hover { color: var(--pub-primary-dark); }
   border-radius: 18px; padding: .6rem;
 }
 .pub-galeria img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 12px; }
+.pub-galeria figure { margin: 0; display: grid; gap: .35rem; }
+.pub-galeria figcaption { font-size: .78rem; line-height: 1.35; color: var(--pub-muted); }
 
 .pub-videos { display: grid; gap: .5rem; }
 .pub-videos a {

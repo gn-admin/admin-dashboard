@@ -17,6 +17,7 @@ const Web = {
   error: '',
   _filtros: { q: '', estado: '' },
   _ultimoPreview: null,
+  _mediaIgnorados: 0,
 
   // ==================== LÓGICA PURA ====================
 
@@ -51,12 +52,57 @@ const Web = {
   },
 
   /* Convierte texto multilínea en galería `{src,alt,order}`. */
+  /**
+   * Normaliza un enlace de media pegado en el gestor. Los enlaces de carpeta de
+   * Drive se rechazan (no son una imagen y expondrían el listado); un fichero
+   * de Drive pasa a thumbnail (imagen) o a vista del fichero (vídeo/documento).
+   */
+  normalizarMediaUrl(valor, tipo) {
+    const s = String(valor == null ? '' : valor).trim();
+    if (!s) return '';
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) return s; // ruta relativa (assets/…)
+    if (!/^https?:\/\//i.test(s)) return '';       // data:, javascript:, …
+    if (/drive\.google\.com\/(?:drive\/(?:u\/\d+\/)?folders|folderview)/i.test(s)) return '';
+    const id = (s.match(/\/d\/([A-Za-z0-9_-]{10,})/) || s.match(/[?&]id=([A-Za-z0-9_-]{10,})/) || [])[1] || '';
+    if (id) {
+      if (tipo === 'video' || tipo === 'documento') return 'https://drive.google.com/file/d/' + id + '/view';
+      return 'https://drive.google.com/thumbnail?id=' + id + '&sz=w' + (tipo === 'portada' ? 1200 : 1600);
+    }
+    return s;
+  },
+
+  /** Galería como texto editable: `url|alt|pie` por línea (retrocompatible). */
+  mediaTextoGaleria(lista) {
+    return (lista || [])
+      .map(g => [g && g.src, g && g.alt, g && g.caption].map(x => String(x || '').trim()))
+      .filter(p => p[0])
+      .map(p => {
+        while (p.length > 1 && !p[p.length - 1]) p.pop();
+        return p.join('|');
+      })
+      .join('\n');
+  },
+
+  /** Ruta de la carpeta de la ficha dentro de la raíz de media. */
+  _carpetaFicha(tipo, slug) {
+    const carpeta = { animal: 'animales', evento: 'eventos', historia: 'historias' }[tipo] || 'publicaciones';
+    return carpeta + '/' + (slug || 'sin-slug');
+  },
+
+  /* "url|alt|pie" por línea -> gallery[] (alt y pie opcionales). */
   parseGaleria(texto, altBase) {
     return String(texto || '')
       .split(/\r?\n/)
       .map(l => l.trim())
       .filter(Boolean)
-      .map((src, i) => ({ src, alt: (altBase ? altBase + ' ' : 'Imagen ') + (i + 1), order: i }));
+      .map((linea, i) => {
+        const partes = linea.split('|').map(x => String(x || '').trim());
+        const src = partes[0] || '';
+        const alt = partes[1] || '';
+        const caption = partes.slice(2).join(' | ').trim();
+        return { src, alt: alt || (altBase ? altBase + ' ' : 'Imagen ') + (i + 1), caption, order: i };
+      })
+      .filter(g => g.src);
   },
 
   /* "icono|etiqueta|valor" por línea -> icons[] */
@@ -450,7 +496,7 @@ const Web = {
     const videos = Array.isArray(media.videos) ? media.videos : [];
     const documents = Array.isArray(media.documents) ? media.documents : [];
     const docsTexto = documents.map(x => (x.name || '') + '|' + (x.url || '')).join('\n');
-    const carpetaFicha = (d.tipo || 'animal') + '-' + (d.slug || 'sin-slug');
+    const carpetaFicha = this._carpetaFicha(d.tipo || 'animal', d.slug);
     const cta = d.cta || {};
     const compat = animal.compatibility || {};
     const adop = animal.adoption || {};
@@ -491,7 +537,7 @@ const Web = {
             <div class="form-group"><label>Portada (URL)</label><input type="text" id="web-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
             <div class="form-group"><label>Texto alternativo</label><input type="text" id="web-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
           </div>
-          <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
+          <div class="form-group"><label>Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
           <div class="form-group"><label>Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
           <div class="form-group"><label>Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
           <div class="form-row">
@@ -503,7 +549,7 @@ const Web = {
             <div class="form-group"><label>Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
           </div>
           <div class="form-group"><label>Documentos de la ficha (nombre|url por línea)</label><textarea id="web-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
-          <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos (los usa la web), no la carpeta; los documentos quedan privados. La portada, la galería y los vídeos se enlazan solos.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
+          <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos (los usa la web), no la carpeta; los documentos quedan privados. La portada, la galería y los vídeos se enlazan solos. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
         </div>
       </details>
 
@@ -570,6 +616,18 @@ const Web = {
     const txt = id => (v(id) ? String(v(id).value || '').trim() : '');
     const checked = id => !!(v(id) && v(id).checked);
     const alt = txt('web-cover-alt') || txt('web-titulo');
+    this._mediaIgnorados = 0;
+    const norm = (valor, tipo) => {
+      const url = this.normalizarMediaUrl(valor, tipo);
+      if (!url && String(valor || '').trim()) this._mediaIgnorados += 1;
+      return url;
+    };
+    const galeria = this.parseGaleria(v('web-galeria') ? v('web-galeria').value : '', alt)
+      .map(g => Object.assign({}, g, { src: norm(g.src, 'galeria') })).filter(g => g.src);
+    const videos = this.parseVideos(v('web-videos') ? v('web-videos').value : '')
+      .map(vid => Object.assign({}, vid, { url: norm(vid.url, 'video') })).filter(vid => vid.url);
+    const documentos = this.parseDocumentos(v('web-docs') ? v('web-docs').value : '')
+      .map(doc => Object.assign({}, doc, { url: norm(doc.url, 'documento') })).filter(doc => doc.url);
     return {
       estado_publicacion: txt('web-estado') || 'borrador',
       slug: this.normalizarSlug(txt('web-slug') || txt('web-titulo')),
@@ -583,11 +641,11 @@ const Web = {
       featured: checked('web-featured'),
       orden: Number(txt('web-orden')) || 0,
       media: {
-        coverImage: { src: txt('web-cover'), alt },
-        gallery: this.parseGaleria(v('web-galeria') ? v('web-galeria').value : '', alt),
-        videos: this.parseVideos(v('web-videos') ? v('web-videos').value : ''),
+        coverImage: { src: norm(txt('web-cover'), 'portada'), alt },
+        gallery: galeria,
+        videos: videos,
         icons: this.parseIconos(v('web-iconos') ? v('web-iconos').value : ''),
-        documents: this.parseDocumentos(v('web-docs') ? v('web-docs').value : '')
+        documents: documentos
       },
       cta: txt('web-cta-label') && txt('web-cta-url') ? { label: txt('web-cta-label'), url: txt('web-cta-url') } : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.
@@ -672,12 +730,15 @@ const Web = {
     const fin = (typeof Dashboard !== 'undefined' && Dashboard._guardando) ? Dashboard._guardando(e && e.target) : () => {};
     if (!fin) return;
     const datos = this._leerFormAnimal();
+    const ignorados = this._mediaIgnorados;
     if (!datos.titulo) { this._snack('Falta el título público', 'warning'); fin(); return; }
     try {
       await API.saveWebAnimal({ animal_id: animalId, ...datos });
       fin();
       if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
-      this._snack('Publicación guardada');
+      this._snack(ignorados
+        ? 'Publicación guardada; se ignoraron ' + ignorados + ' enlace(s) de carpeta de Drive'
+        : 'Publicación guardada', ignorados ? 'warning' : undefined);
       await this.recargar();
     } catch (err) {
       fin();
@@ -708,7 +769,7 @@ const Web = {
     const gallery = Array.isArray(media.gallery) ? media.gallery : [];
     const documents = Array.isArray(media.documents) ? media.documents : [];
     const docsTexto = documents.map(x => (x.name || '') + '|' + (x.url || '')).join('\n');
-    const carpetaFicha = (d.tipo || 'evento') + '-' + (d.slug || 'sin-slug');
+    const carpetaFicha = this._carpetaFicha(d.tipo || 'evento', d.slug);
     const loc = ev.location || {};
     const org = ev.organizer || {};
     const reg = ev.registration || {};
@@ -741,7 +802,7 @@ const Web = {
         <div class="form-group"><label>Portada (URL)</label><input type="text" id="we-cover" class="form-input" value="${this._esc(cover.src || '')}"></div>
         <div class="form-group"><label>Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
       </div>
-      <div class="form-group"><label>Galería (una URL por línea)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(gallery.map(g => g.src).join('\n'))}</textarea></div>
+      <div class="form-group"><label>Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
       <div class="form-row">
         <div class="form-group"><label>Subir portada</label><input type="file" id="we-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
         <div class="form-group"><label>Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
@@ -750,7 +811,7 @@ const Web = {
         <div class="form-group"><label>Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
       </div>
       <div class="form-group"><label>Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
-      <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
+      <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
 
       <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
         <div class="detail-collapse-body">
@@ -811,6 +872,16 @@ const Web = {
     const checked = id => !!(v(id) && v(id).checked);
     const alt = txt('we-cover-alt') || txt('we-titulo');
     const tipo = txt('we-tipo') === 'historia' ? 'historia' : 'evento';
+    this._mediaIgnorados = 0;
+    const norm = (valor, t) => {
+      const url = this.normalizarMediaUrl(valor, t);
+      if (!url && String(valor || '').trim()) this._mediaIgnorados += 1;
+      return url;
+    };
+    const galeria = this.parseGaleria(v('we-galeria') ? v('we-galeria').value : '', alt)
+      .map(g => Object.assign({}, g, { src: norm(g.src, 'galeria') })).filter(g => g.src);
+    const documentos = this.parseDocumentos(v('we-docs') ? v('we-docs').value : '')
+      .map(doc => Object.assign({}, doc, { url: norm(doc.url, 'documento') })).filter(doc => doc.url);
     return {
       tipo,
       estado_publicacion: txt('we-estado') || 'borrador',
@@ -824,9 +895,9 @@ const Web = {
       listed: checked('we-listed'),
       featured: checked('we-featured'),
       media: {
-        coverImage: { src: txt('we-cover'), alt },
-        gallery: this.parseGaleria(v('we-galeria') ? v('we-galeria').value : '', alt),
-        documents: this.parseDocumentos(v('we-docs') ? v('we-docs').value : '')
+        coverImage: { src: norm(txt('we-cover'), 'portada'), alt },
+        gallery: galeria,
+        documents: documentos
       },
       cta: txt('we-cta-label') && txt('we-cta-url') ? { label: txt('we-cta-label'), url: txt('we-cta-url') } : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.
@@ -852,12 +923,15 @@ const Web = {
     const fin = (typeof Dashboard !== 'undefined' && Dashboard._guardando) ? Dashboard._guardando(e && e.target) : () => {};
     if (!fin) return;
     const datos = this._leerFormEvento();
+    const ignorados = this._mediaIgnorados;
     if (!datos.titulo) { this._snack('Falta el título', 'warning'); fin(); return; }
     try {
       await API.saveWebEvento({ id: id || undefined, ...datos });
       fin();
       if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
-      this._snack('Publicación guardada');
+      this._snack(ignorados
+        ? 'Publicación guardada; se ignoraron ' + ignorados + ' enlace(s) de carpeta de Drive'
+        : 'Publicación guardada', ignorados ? 'warning' : undefined);
       await this.recargar();
     } catch (err) {
       fin();

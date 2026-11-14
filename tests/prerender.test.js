@@ -129,6 +129,8 @@ test('fixture ficha normal: HTML completo sin JavaScript', async () => {
     assert.match(html, /<meta property="og:image"/);
     assert.match(html, /application\/ld\+json/);
     assert.match(html, /Border collie de 4 años/);
+    assert.match(html, /alt="Laia jugando en el parque"/);
+    assert.match(html, /<figcaption>Laia en el parque<\/figcaption>/);
     assert.doesNotMatch(html, /<script src=/);
     const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
     assert.equal((sitemap.match(/<url>/g) || []).length, 2);

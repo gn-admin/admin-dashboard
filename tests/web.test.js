@@ -172,8 +172,8 @@ describe('Web.parseGaleria / parseIconos / parseVideos / parseLista', () => {
   it('galería: una URL por línea con orden y alt', () => {
     const g = Web.parseGaleria('https://a.jpg\n\n https://b.jpg ', 'Luna');
     assert.equal(g.length, 2);
-    assert.deepEqual(g[0], { src: 'https://a.jpg', alt: 'Luna 1', order: 0 });
-    assert.deepEqual(g[1], { src: 'https://b.jpg', alt: 'Luna 2', order: 1 });
+    assert.deepEqual(g[0], { src: 'https://a.jpg', alt: 'Luna 1', caption: '', order: 0 });
+    assert.deepEqual(g[1], { src: 'https://b.jpg', alt: 'Luna 2', caption: '', order: 1 });
   });
 
   it('iconos: icono|etiqueta|valor y descarta líneas incompletas', () => {
@@ -210,6 +210,68 @@ describe('Web.estadoLabel / estadoCls', () => {
     assert.equal(Web.estadoCls('borrador'), 'pendiente');
     assert.equal(Web.estadoCls('oculto'), 'descartada');
     assert.equal(Web.estadoCls('sin_publicar'), '');
+  });
+});
+
+describe('Web.normalizarMediaUrl', () => {
+  const fichero = 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrS/view?usp=sharing';
+
+  it('convierte un fichero de Drive en thumbnail (portada w1200, galería w1600)', () => {
+    assert.equal(Web.normalizarMediaUrl(fichero, 'portada'),
+      'https://drive.google.com/thumbnail?id=1AbCdEfGhIjKlMnOpQrS&sz=w1200');
+    assert.equal(Web.normalizarMediaUrl(fichero, 'galeria'),
+      'https://drive.google.com/thumbnail?id=1AbCdEfGhIjKlMnOpQrS&sz=w1600');
+  });
+
+  it('vídeo y documento se quedan como vista del fichero', () => {
+    assert.equal(Web.normalizarMediaUrl('https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrS', 'video'),
+      'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrS/view');
+    assert.equal(Web.normalizarMediaUrl(fichero, 'documento'),
+      'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrS/view');
+  });
+
+  it('rechaza enlaces de carpeta y esquemas peligrosos', () => {
+    assert.equal(Web.normalizarMediaUrl('https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrS?usp=sharing', 'galeria'), '');
+    assert.equal(Web.normalizarMediaUrl('javascript:alert(1)', 'galeria'), '');
+    assert.equal(Web.normalizarMediaUrl('data:image/png;base64,AAA', 'galeria'), '');
+  });
+
+  it('respeta URLs normales y rutas relativas', () => {
+    assert.equal(Web.normalizarMediaUrl(' https://x/y.jpg ', 'galeria'), 'https://x/y.jpg');
+    assert.equal(Web.normalizarMediaUrl('assets/fotos/x.jpg', 'galeria'), 'assets/fotos/x.jpg');
+  });
+});
+
+describe('Web.parseGaleria', () => {
+  it('acepta url, url|alt y url|alt|pie', () => {
+    const g = Web.parseGaleria('https://x/1.jpg\nhttps://x/2.jpg|Laia jugando\nhttps://x/3.jpg|Laia|En el parque', 'Laia');
+    assert.equal(g.length, 3);
+    assert.equal(g[0].src, 'https://x/1.jpg');
+    assert.equal(g[0].alt, 'Laia 1');
+    assert.equal(g[0].caption, '');
+    assert.equal(g[1].alt, 'Laia jugando');
+    assert.equal(g[2].alt, 'Laia');
+    assert.equal(g[2].caption, 'En el parque');
+  });
+
+  it('conserva los pipes dentro del pie y descarta líneas sin URL', () => {
+    const g = Web.parseGaleria(' |Solo alt\nhttps://x/1.jpg|Alt|Antes | después', '');
+    assert.equal(g.length, 1);
+    assert.equal(g[0].caption, 'Antes | después');
+  });
+});
+
+describe('Web.mediaTextoGaleria / _carpetaFicha', () => {
+  it('serializa solo los campos presentes', () => {
+    assert.equal(Web.mediaTextoGaleria([
+      { src: 'a' }, { src: 'b', alt: 'Alt' }, { src: 'c', alt: 'Alt', caption: 'Pie' }
+    ]), 'a\nb|Alt\nc|Alt|Pie');
+  });
+
+  it('agrupa la carpeta por tipo', () => {
+    assert.equal(Web._carpetaFicha('animal', 'laia'), 'animales/laia');
+    assert.equal(Web._carpetaFicha('historia', 'luna'), 'historias/luna');
+    assert.equal(Web._carpetaFicha('otro', ''), 'publicaciones/sin-slug');
   });
 });
 

@@ -933,11 +933,20 @@ function webRaizMedia() {
   try { return DriveApp.getFolderById(id); } catch (err) { return null; }
 }
 
-/** Nombre estable de la carpeta de una ficha: `tipo-slug`. */
-function webNombreCarpeta(p) {
-  var tipo = webTexto(p && p.tipo) || 'publicacion';
-  var slug = webTexto(p && p.slug) || webTexto(p && p.id) || 'sin-slug';
-  return tipo + '-' + slug;
+var WEB_CARPETAS_TIPO = { animal: 'animales', evento: 'eventos', historia: 'historias' };
+
+/** Carpeta de tipo dentro de la raíz (animales, eventos, historias). */
+function webCarpetaTipo(raiz, tipo) {
+  var nombre = WEB_CARPETAS_TIPO[tipo] || 'publicaciones';
+  var it = raiz.getFoldersByName(nombre);
+  return it.hasNext() ? it.next() : raiz.createFolder(nombre);
+}
+
+/** Ruta visible de la carpeta de una ficha: `<tipo>/<slug>`. */
+function webRutaCarpeta(p) {
+  var tipo = webTexto(p && p.tipo);
+  var carpeta = WEB_CARPETAS_TIPO[tipo] || 'publicaciones';
+  return carpeta + '/' + (webTexto(p && p.slug) || webTexto(p && p.id) || 'sin-slug');
 }
 
 /**
@@ -950,10 +959,11 @@ function webCarpetaPublicacion(p) {
   var raiz = webRaizMedia();
   if (!raiz) return { error: 'DRIVE_WEB_FOLDER_ID no configurado en Config.gs' };
   try {
-    var nombre = webNombreCarpeta(p);
-    var it = raiz.getFoldersByName(nombre);
-    var carpeta = it.hasNext() ? it.next() : raiz.createFolder(nombre);
-    return { folder: carpeta, folderId: carpeta.getId(), nombre: nombre };
+    var carpetaTipo = webCarpetaTipo(raiz, webTexto(p.tipo));
+    var slug = webTexto(p.slug) || webTexto(p.id) || 'sin-slug';
+    var it = carpetaTipo.getFoldersByName(slug);
+    var carpeta = it.hasNext() ? it.next() : carpetaTipo.createFolder(slug);
+    return { folder: carpeta, folderId: carpeta.getId(), nombre: webRutaCarpeta(p) };
   } catch (err) {
     return { error: 'No se pudo abrir la carpeta de la ficha: ' + err.message };
   }

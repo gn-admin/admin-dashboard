@@ -24,7 +24,7 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 480 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 489 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
 | Port a la web (consumo del canal, metas, 301) | `custom-page/nueva-version` | `→` tarea del proyecto web; guía en §7.2 |
 
@@ -270,11 +270,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 480 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-14, 489 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **480 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **489 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -321,7 +321,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 | Datos destacados | rejilla de tarjetas `feature-card` con icono + etiqueta + valor | `icons[]` `{icon,label,value}` | Sí, como texto libre `icono\|etiqueta\|valor` |
 | Etiquetas | chips bajo los datos | `tags[]` | **No**: el formulario de animal no edita `tags` |
 | Sobre este caso | HTML libre | `contentHtml` | Sí |
-| Galería | carrusel de imágenes 16/10 con pie | `gallery[]` `{src,alt,caption}` | Solo `src` |
+| Galería | carrusel de imágenes 16/10 con pie | `gallery[]` `{src,alt,caption}` | Sí: `url|alt|pie` por línea (retrocompatible) |
 | Vídeo | iframe 16/9 + nota | `videos[]` `{url,title,note}` | Solo `título\|url`; el visor **enlaza**, no incrusta |
 | Ficha del animal | tabla de datos, salud y temperamento | `animal.{names,species,breed,sex,age,size,color,health,temperament,compatibility,adoption,foster,location,contact}` | Parcial (ver C.5) |
 | CTA final | repite CTA + botón «volver» | `cta` | Igual que la cabecera |
@@ -366,7 +366,9 @@ Reglas:
 
 #### C bis. Media por ficha — implementado
 
-- **Una carpeta por publicación** en Drive: `<tipo>-<slug>` (p. ej. `animal-laia`) dentro de `CONFIG.DRIVE_WEB_FOLDER_ID`. Se busca por nombre y se crea si no existe, así la ficha reutiliza siempre la misma.
+- **Una carpeta por publicación** en Drive, separada por tipo: `animales/<slug>`, `eventos/<slug>`, `historias/<slug>` dentro de `CONFIG.DRIVE_WEB_FOLDER_ID`. Se busca por nombre y se crea si no existe, así la ficha reutiliza siempre la misma.
+- **Enlaces normalizados al pegar:** un fichero de Drive (`/d/ID`, `open?id=`, `uc?id=`, `thumbnail?id=`) se convierte en `thumbnail?id=ID&sz=w1200|w1600` (imágenes) o en `/file/d/ID/view` (vídeo/documento). Los enlaces de **carpeta** (`/drive/folders/`) se rechazan y se avisa al guardar; nunca se guarda una URL de carpeta.
+- **Galería con alt y pie:** `url|alt|pie` por línea; una URL sola sigue valiendo y el alt se genera con el título de la ficha. El visor pinta `<figure>` + `<figcaption>` cuando hay pie.
 - **Endpoint** `POST web-media-subir` (admin/coordinación, como el resto de `web-*`): `{publicacion_id, tipo, archivo_base64, nombre, mime_type}` → `{fileId, nombre, carpeta, carpeta_id, carpeta_url, url, download}`.
 - **Tipos y límites:** `portada` y `galeria` (imagen, 5 MB), `video` (15 MB), `documento` (PDF/imagen/vídeo, 10 MB). Nombre ordenado: `<tipo>-<original>-<uuid>.<ext>`.
 - **Permisos:** se comparten imágenes y vídeos (`ANYONE_WITH_LINK`) porque los consume la web; **los documentos quedan privados**. Ni la carpeta raíz ni la de la ficha se comparten.
@@ -420,7 +422,7 @@ Reglas:
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **480/480** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha y gestor).
+- `npm test`: **489/489** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie y normalización de Drive).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
@@ -490,3 +492,4 @@ Reglas:
 | 2026-11-14 | 5 | Gestor: resumen con tarjeta «Retiradas» (fuera de borradores e incompletas) y listado que las muestra sin acciones de republicar | — | `tests/web-backend.test.js`, `tests/web.test.js` |
 | 2026-11-14 | 5 | Deploy programado diario (03:17 UTC) para aplicar retiradas sin push; concurrencia en cola para no cancelar un deploy en curso | — | `.github/workflows/deploy.yml`, §7.4 |
 | 2026-11-14 | 3 | Media por ficha: carpeta `tipo-slug` en Drive, endpoint `web-media-subir` y subidas desde los formularios; documentos privados | — | `tests/web-backend.test.js`, `tests/web.test.js`, §7.3 C bis |
+| 2026-11-14 | 3 | Galería `url|alt|pie` con `<figure>`/`<figcaption>`, normalización de enlaces de Drive (carpetas rechazadas) y media separada por tipo (`animales|eventos|historias/<slug>`) | — | `tests/web.test.js`, `tests/prerender.test.js`, `tests/web-backend.test.js` |

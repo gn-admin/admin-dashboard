@@ -41,17 +41,19 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 
 ### Media por ficha (Drive)
 
-- Una **carpeta por publicación** en Drive: `<tipo>-<slug>` (p. ej. `animal-laia`) dentro de la raíz `DRIVE_WEB_FOLDER_ID`; se busca por nombre y se reutiliza.
+- Una **carpeta por publicación** en Drive, separada por tipo: `animales/<slug>`, `eventos/<slug>`, `historias/<slug>` dentro de la raíz `DRIVE_WEB_FOLDER_ID`; se busca por nombre y se reutiliza.
 - Endpoint `POST web-media-subir` con `publicacion_id`, `tipo` (`portada`, `galeria`, `video`, `documento`), `archivo_base64`, `nombre` y `mime_type`. Devuelve `fileId`, `carpeta`, `carpeta_url`, `url` (thumbnail para imágenes) y `download`.
 - Límites: imágenes 5 MB, vídeo 15 MB, documentos 10 MB. Nombre de archivo ordenado: `<tipo>-<original>-<uuid>.<ext>`.
 - Imágenes y vídeos se comparten (los consume la web); **los documentos quedan privados**. Ni la raíz ni la carpeta de la ficha se comparten.
 - Formularios: animal (portada, galería, vídeo, documento) y evento/historia (portada, galería, documento). Los documentos se guardan en `media.documents` y no se publican.
+- **Galería:** `url|alt|pie` por línea, retrocompatible (una URL sola sigue valiendo); el visor pinta `<figure>`/`<figcaption>`.
+- **Enlaces de Drive normalizados al pegar:** fichero → `thumbnail?id=…&sz=w1200|w1600` (imagen) o `/file/d/…/view` (vídeo/documento); enlace de carpeta → rechazado con aviso al guardar.
 - Requiere `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env` y regenerar `Config.gs`.
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v227`.
-- `npm test`: **480/480**.
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v228`.
+- `npm test`: **489/489**.
 
 ## Decisiones cerradas
 
@@ -92,7 +94,7 @@ El flujo gestor → canal público → visor funciona de punta a punta, con SEO 
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 480 tests
+npm test                                   # 489 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

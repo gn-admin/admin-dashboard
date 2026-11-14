@@ -10,7 +10,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 
 - `npm run dev` — genera config (`.env` → `src/js/config.js`) y sirve en `http://localhost:8080`.
 - `npm run build` — regenera la config manualmente (`node scripts/gen-config.js`).
-- `npm test` (`node --test tests/*.test.js`) — unitarios de lógica pura del front, sin dependencias (480 tests, 11 ficheros). Se corren en CI y un test en rojo bloquea el despliegue.
+- `npm test` (`node --test tests/*.test.js`) — unitarios de lógica pura del front, sin dependencias (489 tests, 11 ficheros). Se corren en CI y un test en rojo bloquea el despliegue.
 - `npm run prerender` — genera las páginas estáticas de `src/publicaciones/`, `sitemap.xml` y `robots.txt` desde el canal público. El deploy lo ejecuta tras los tests y **bloquea** si no puede generarlos (`--fixture`, `--dry`, `--soft` para uso manual). Fixtures versionadas en `tests/fixtures/prerender/` (ficha normal, retirada y sin portada) para validar el HTML sin canal real. Los avisos salen como anotaciones del run (`::warning::`/`::error::`).
 
 ## Reglas importantes
@@ -24,7 +24,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - **Rutas relativas obligatorias** en el frontend: GitHub Pages sirve bajo `/admin-dashboard/`.
 - **Contenido público**: la canónica de una ficha es su página estática `publicaciones/<slug>.html`, no la URL del SPA. Los estados `borrador` y `oculto` no salen del canal; `retirado` responde `gone` (410 lógico) y deja una lápida que conserva el slug.
 - **Prerender**: `npm run prerender` genera fichas, `sitemap.xml` y `robots.txt`; el deploy lo ejecuta tras los tests y bloquea si falla. Sus avisos salen como anotaciones (`::warning::`/`::error::`) en el run.
-- **Media del gestor**: una carpeta de Drive por ficha (`<tipo>-<slug>`) bajo `DRIVE_WEB_FOLDER_ID`; se sube con `web-media-subir`. Imágenes y vídeos se comparten para la web, los documentos quedan privados. Los enlaces de carpeta no se publican.
+- **Media del gestor**: una carpeta de Drive por ficha dentro de `DRIVE_WEB_FOLDER_ID` → `animales|eventos|historias/<slug>`; se sube con `web-media-subir`. Los enlaces de carpeta se rechazan y los de fichero de Drive se normalizan a thumbnail/vista. Imágenes y vídeos se comparten para la web, los documentos quedan privados. Los enlaces de carpeta no se publican.
 - **No tocar `custom-page/` desde este repositorio**: el port del SEO se documenta como entrega externa (§7.2 y §7.4 del plan).
 - **Sin secretos**: nada de tokens, IDs de hojas ni claves en el código, fixtures o documentación versionada (el repo es público).
 

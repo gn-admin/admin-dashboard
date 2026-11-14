@@ -553,7 +553,8 @@ describe('gestor web: media en una carpeta por ficha', () => {
       nombre: 'Foto Principal.JPG', mime_type: 'image/jpeg'
     });
     assert.equal(portada.status, 'success');
-    assert.equal(portada.data.carpeta, 'historia-luna');
+    assert.equal(portada.data.carpeta, 'historias/luna');
+    assert.ok(b.drive.carpetas.some(c => c.nombre === 'historias' && c.padre === 'ROOT_MEDIA'));
     assert.match(portada.data.url, /^https:\/\/drive\.google\.com\/thumbnail\?id=file-/);
     assert.match(portada.data.url, /sz=w1600/);
     assert.match(portada.data.nombre, /^portada-foto-principal-.*\.jpg$/);
@@ -564,9 +565,30 @@ describe('gestor web: media en una carpeta por ficha', () => {
       nombre: 'Otra foto.png', mime_type: 'image/png'
     });
     assert.equal(galeria.data.carpeta_id, portada.data.carpeta_id);
-    assert.equal(b.drive.carpetas.filter(c => c.nombre === 'historia-luna').length, 1);
+    assert.equal(b.drive.carpetas.filter(c => c.nombre === 'luna').length, 1);
+    assert.equal(b.drive.carpetas.length, 2);
     assert.equal(b.drive.archivos.length, 2);
     assert.equal(b.drive.archivos[1].carpeta, portada.data.carpeta_id);
+  });
+
+  it('separa la media por tipo de publicación', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    const animal = b.ctx.webSubirMedia({
+      publicacion_id: 'web_1', tipo: 'portada', archivo_base64: 'QUJD',
+      nombre: 'luna.jpg', mime_type: 'image/jpeg'
+    });
+    assert.equal(animal.status, 'success');
+    assert.equal(animal.data.carpeta, 'animales/luna');
+    const historia = publicada(b);
+    const otra = b.ctx.webSubirMedia({
+      publicacion_id: historia, tipo: 'portada', archivo_base64: 'QUJD',
+      nombre: 'luna.jpg', mime_type: 'image/jpeg'
+    });
+    assert.equal(otra.data.carpeta, 'historias/luna');
+    assert.notEqual(otra.data.carpeta_id, animal.data.carpeta_id);
+    assert.ok(b.drive.carpetas.some(c => c.nombre === 'animales' && c.padre === 'ROOT_MEDIA'));
+    assert.ok(b.drive.carpetas.some(c => c.nombre === 'historias' && c.padre === 'ROOT_MEDIA'));
   });
 
   it('los documentos van a la misma carpeta y no usan thumbnail', () => {

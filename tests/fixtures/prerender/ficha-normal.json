@@ -9,6 +9,9 @@
       "excerpt": "Border collie de 4 años, busca familia sin niños pequeños.",
       "contentHtml": "<p>Laia es una border collie sociable y activa. Busca una familia sin niños pequeños.</p>",
       "coverImage": { "src": "assets/fotos/laia.jpg", "alt": "Laia, border collie" },
+      "gallery": [
+        { "src": "assets/fotos/laia-2.jpg", "alt": "Laia jugando en el parque", "caption": "Laia en el parque" }
+      ],
       "icons": [
         { "icon": "edad", "label": "Edad", "value": "4 años" },
         { "icon": "tamano", "label": "Tamaño", "value": "Mediano" }

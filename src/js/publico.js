@@ -454,10 +454,11 @@ const Publico = {
     const galeria = (p.gallery || [])
       .map((g, i) => ({
         src: this.urlSegura(g && g.src),
-        alt: (g && (g.alt || g.caption)) || ((p.title ? p.title + ' ' : 'Imagen ') + (i + 1))
+        alt: (g && (g.alt || g.caption)) || ((p.title ? p.title + ' ' : 'Imagen ') + (i + 1)),
+        pie: (g && g.caption) || ''
       }))
       .filter(g => g.src)
-      .map(g => `<img src="${this.esc(g.src)}" alt="${this.esc(g.alt)}" loading="lazy">`).join('');
+      .map(g => `<figure class="pub-figura"><img src="${this.esc(g.src)}" alt="${this.esc(g.alt)}" loading="lazy">${g.pie ? `<figcaption>${this.esc(g.pie)}</figcaption>` : ''}</figure>`).join('');
     const videos = (p.videos || []).filter(v => v && this.urlSegura(v.url)).map(v => `
       <a href="${this.esc(this.urlSegura(v.url))}" target="_blank" rel="noopener noreferrer">
         <span>${this.esc(v.title || 'Ver vídeo')}</span>
