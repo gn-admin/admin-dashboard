@@ -4,13 +4,18 @@
  * reglas de publicityación, slug único, preview == feed y canal público.
  * Sin red ni Google Apps Script real.
  */
-const { describe, it, beforeEach } = require('node:test');
+const test = require('node:test');
+const { it, beforeEach } = test;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const FUENTE = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'WebPublicaciones.gs'), 'utf8');
+// El backend (apps-script/) no vive en git: en CI estas pruebas se saltan.
+const RUTA_FUENTE = path.join(__dirname, '..', 'apps-script', 'WebPublicaciones.gs');
+const HAY_FUENTE = fs.existsSync(RUTA_FUENTE);
+const FUENTE = HAY_FUENTE ? fs.readFileSync(RUTA_FUENTE, 'utf8') : '';
+const describe = HAY_FUENTE ? test.describe : test.describe.skip;
 // Los objetos creados dentro del sandbox `vm` tienen otro prototipo:
 // se normalizan a JSON antes de comparar con deepEqual estricto.
 const plano = v => JSON.parse(JSON.stringify(v));

@@ -4,15 +4,21 @@
  * Se carga el Code.gs real (appendToSheet/readSheet) sobre un SpreadsheetApp
  * simulado, para cubrir el caso de una pestaña recién creada, sin cabeceras.
  */
-const { describe, it } = require('node:test');
+const test = require('node:test');
+const { it } = test;
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+// El backend (apps-script/) no vive en git: en CI estas pruebas se saltan.
 const RAIZ = path.join(__dirname, '..');
-const CODE_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Code.gs'), 'utf8');
-const WEB_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'WebPublicaciones.gs'), 'utf8');
+const RUTA_CODE = path.join(RAIZ, 'apps-script', 'Code.gs');
+const RUTA_WEB = path.join(RAIZ, 'apps-script', 'WebPublicaciones.gs');
+const HAY_FUENTES = fs.existsSync(RUTA_CODE) && fs.existsSync(RUTA_WEB);
+const CODE_GS = HAY_FUENTES ? fs.readFileSync(RUTA_CODE, 'utf8') : '';
+const WEB_GS = HAY_FUENTES ? fs.readFileSync(RUTA_WEB, 'utf8') : '';
+const describe = HAY_FUENTES ? test.describe : test.describe.skip;
 
 function crearHoja(nombre) {
   const hoja = {
@@ -132,5 +138,63 @@ describe('cabeceras en hoja vacía', () => {
     assert.deepEqual([...hojaWeb.filas[0]], [...cabecera]);
     assert.equal(hojaWeb.filas.length, 3);
     assert.equal(hojaWeb.filas[2][cabecera.indexOf('slug')], 'nube');
+  });
+});
+
+function crearCtxPestanas(nombres) {
+  const hojas = nombres.map((nombre) => {
+    const h = {
+      nombre,
+      filas: [],
+      getName: () => nombre,
+      getLastRow: () => h.filas.length,
+      getDataRange: () => ({ getValues: () => h.filas.map((f) => f.slice()) }),
+      appendRow: (fila) => { h.filas.push(fila.slice()); }
+    };
+    return h;
+  });
+  const doc = {
+    getSheetByName: (n) => hojas.find((h) => h.nombre === n) || null,
+    getSheets: () => hojas
+  };
+  const ctx = {
+    CONFIG: { sheets: { prueba: { sheetId: 'SHEET_X', sheetName: 'Animales' } } },
+    SpreadsheetApp: { openById: () => doc },
+    Logger: { log: () => {} },
+    Utilities: { getUuid: () => 'uuid-1' }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(CODE_GS, ctx);
+  return { ctx, hojas, cfg: ctx.CONFIG.sheets.prueba };
+}
+
+describe('getSheet: nombre configurado y ambigüedad', () => {
+  it('usa la pestaña que coincide con el nombre configurado', () => {
+    const { ctx, cfg } = crearCtxPestanas(['Hoja 1', 'Animales']);
+    assert.equal(ctx.getSheet(cfg).getName(), 'Animales');
+  });
+
+  it('con una sola pestaña acepta el nombre por defecto de Sheets', () => {
+    const { ctx, cfg } = crearCtxPestanas(['Hoja 1']);
+    assert.equal(ctx.getSheet(cfg).getName(), 'Hoja 1');
+  });
+
+  it('con varias pestañas y sin coincidencia lanza un error explicativo', () => {
+    const { ctx, cfg } = crearCtxPestanas(['Hoja 1', 'OtraHoja']);
+    assert.throws(() => ctx.getSheet(cfg), /No existe la pestaña "Animales" y el documento tiene 2 pestañas/);
+  });
+
+  it('con varias pestañas no lee ni escribe en la primera', () => {
+    const { ctx, hojas, cfg } = crearCtxPestanas(['Hoja 1', 'OtraHoja']);
+    assert.throws(() => ctx.readSheet(cfg), /No existe la pestaña/);
+    assert.throws(() => ctx.appendToSheet(cfg, { id: 'x', titulo: 'Luna' }), /No existe la pestaña/);
+    assert.equal(hojas[0].filas.length, 0);
+    assert.equal(hojas[1].filas.length, 0);
+  });
+
+  it('sin sheetName mantiene el comportamiento de siempre (primera pestaña)', () => {
+    const { ctx, cfg } = crearCtxPestanas(['Hoja 1', 'Animales']);
+    delete cfg.sheetName;
+    assert.equal(ctx.getSheet(cfg).getName(), 'Hoja 1');
   });
 });
