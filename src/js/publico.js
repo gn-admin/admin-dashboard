@@ -433,6 +433,14 @@ const Publico = {
   },
 
   _normalizarFichaCfg(ficha) {
+    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    if (FC && typeof FC.normalizarFicha === 'function') {
+      const n = FC.normalizarFicha(ficha);
+      if (!n) return null;
+      const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+      const bloques = Object.assign({}, def, n.bloques || {});
+      return { plantilla: n.plantilla || 'ficha', bloques, mostrarLectura: n.mostrarLectura !== false };
+    }
     let f = ficha;
     if (typeof f === 'string') { try { f = JSON.parse(f); } catch (e) { return null; } }
     if (!f || typeof f !== 'object' || Array.isArray(f)) return null;

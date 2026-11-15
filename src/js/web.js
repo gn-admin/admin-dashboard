@@ -509,9 +509,11 @@ const Web = {
     const contacto = animal.contact || {};
     const health = animal.health || {};
     this._webFichaForm = d.ficha || d.ficha_json || null;
-    const fichaTxt = this._webFichaForm && typeof this._webFichaForm === 'object'
-      ? JSON.stringify(this._webFichaForm, null, 2)
-      : (typeof this._webFichaForm === 'string' ? this._webFichaForm : '');
+    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    const fichaNorm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(this._webFichaForm) : this._webFichaForm;
+    const fichaTxt = fichaNorm && typeof fichaNorm === 'object'
+      ? JSON.stringify(fichaNorm, null, 2)
+      : (typeof fichaNorm === 'string' ? fichaNorm : '');
 
     const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
       <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. La ficha interna del animal no se expone: solo lo que rellenes aquí.</p>
@@ -691,7 +693,13 @@ const Web = {
     if (!raw) return undefined; // vacío: no enviar (preserva estado servidor)
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+      const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+      if (FC && typeof FC.normalizarFicha === 'function') {
+        const n = FC.normalizarFicha(parsed);
+        return n || undefined;
+      }
+      return parsed;
     } catch (e) { /* inválido: ignorar para no romper guardado */ }
     return undefined;
   },
@@ -805,9 +813,11 @@ const Web = {
     const cta = d.cta || {};
     const hoy = new Date().toISOString().slice(0, 10);
     this._webFichaForm = d.ficha || d.ficha_json || null;
-    const fichaTxt = this._webFichaForm && typeof this._webFichaForm === 'object'
-      ? JSON.stringify(this._webFichaForm, null, 2)
-      : (typeof this._webFichaForm === 'string' ? this._webFichaForm : '');
+    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    const fichaNorm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(this._webFichaForm) : this._webFichaForm;
+    const fichaTxt = fichaNorm && typeof fichaNorm === 'object'
+      ? JSON.stringify(fichaNorm, null, 2)
+      : (typeof fichaNorm === 'string' ? fichaNorm : '');
 
     const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
       <div class="form-row">

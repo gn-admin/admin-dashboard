@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v254';
+﻿const CACHE_NAME = 'gn-encuestas-v255';
 const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   './js/dashboard-blacklist.js',
   './js/dashboard-web.js',
   './js/web.js',
+  './js/ficha-config.js',
   './js/publico.js',
   './js/carnet-generator.js',
   './js/pdf-export.js',
