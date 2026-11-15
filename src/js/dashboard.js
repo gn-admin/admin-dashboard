@@ -263,7 +263,7 @@ const Dashboard = {
       console.error('Error cargando ' + page + ':', err);
       if (token !== this._pageToken) return;
       this._snackErr(err, 'No se pudo cargar esta pantalla');
-      el.innerHTML = `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="loadPage" data-arg0="${page}">Reintentar</button></div>`;
+      el.innerHTML = `<div class="empty-state empty-state-illustrated" role="alert"><div class="empty-state-icon">${Icons.alertTriangle}</div><h3>Error al cargar</h3><p>${this._esc(err.message || 'Error desconocido')}</p><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="loadPage" data-arg0="${page}">Reintentar</button></div>`;
       return;
     } finally {
       if (token === this._pageToken) el.removeAttribute('aria-busy');
@@ -3799,7 +3799,7 @@ const Dashboard = {
   _renderRedesHistorial() {
     const items = (this.publicaciones || []).slice().reverse();
     if (!items.length) return '<div style="text-align:center;padding:16px;color:var(--gray-400)">Sin publicaciones todavia</div>';
-    return `<table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Animal</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>${items.map(p => `<tr><td data-label="Imagen">${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="Imagen de ${this._esc(p.animal || 'publicación')}" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td data-label="Fecha">${this._fmtFecha(p.fecha)}</td><td data-label="Animal">${this._esc(p.animal || '')}</td><td data-label="Tipo">${p.tipo === 'acogida' ? 'Acogida' : 'Adopción'}</td><td data-label="Estado"><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver</a> <button type="button" class="btn btn-danger btn-sm" data-action="borrarPublicacion" data-arg0="${this._esc(p.id)}" aria-label="Eliminar publicación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th scope="col"><span class="sr-only">Imagen</span></th><th scope="col">Fecha</th><th scope="col">Animal</th><th scope="col">Tipo</th><th scope="col">Estado</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.map(p => `<tr><td data-label="Imagen">${p.media ? `<img loading="lazy" src="${this._esc(p.media)}" alt="Imagen de ${this._esc(p.animal || 'publicación')}" style="width:40px;height:40px;border-radius:8px;object-fit:cover">` : '<span style="color:var(--gray-300)">—</span>'}</td><td data-label="Fecha">${this._fmtFecha(p.fecha)}</td><td data-label="Animal">${this._esc(p.animal || '')}</td><td data-label="Tipo">${p.tipo === 'acogida' ? 'Acogida' : 'Adopción'}</td><td data-label="Estado"><span class="estado-badge en_proceso">${this._esc(p.estado)}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><a class="btn btn-outline-green btn-sm" href="${this._esc(p.permalink)}" target="_blank" rel="noopener noreferrer">Ver</a> <button type="button" class="btn btn-danger btn-sm" data-action="borrarPublicacion" data-arg0="${this._esc(p.id)}" aria-label="Eliminar publicación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('')}</tbody></table>`;
   },
 
   async borrarPublicacion(id) {
@@ -4284,7 +4284,7 @@ const Dashboard = {
               <div class="animal-card-name">${this._esc(a.nombre)}</div>
               <div class="animal-card-breed">${this._esc(a.raza)} &middot; ${this._esc(a.edad)} &middot; ${this._esc(a.sexo)}</div>
               <div class="animal-card-pills">${this._esPrioritario(a)?`<span class="urgente-badge" title="Necesita acogida o adopcion urgente" aria-label="Necesita acogida o adopcion urgente">Urgente</span>`:''}<span class="animal-card-status ${a.estado}">${this._animalEstadoLabel(a.estado)}</span></div>
-              ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" style="cursor:pointer" data-action="viewGrupo" data-arg0="${a.grupo_id}" data-stop-propagation="1" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
+              ${(!enBloque && a.grupo && a.grupo_id)?`<div class="animal-group-badge" role="button" tabindex="0" style="cursor:pointer" data-action="viewGrupo" data-arg0="${a.grupo_id}" data-stop-propagation="1" title="Ver grupo">${Icons.users} ${this._esc(a.grupo)} · ${this._grupoSize(a.grupo_id)}</div>`:''}
             </div>
           </div>`;
     const bloquesHtml = bloques.map(b => `
@@ -4606,7 +4606,7 @@ const Dashboard = {
     const nombre = (g && g.nombre) || ms[0].grupo || gid;
     const cabecera = this._grupoCollage(gid);
     const filas = ms.map(x => `
-      <div class="grupo-miembro" data-action="openAnimalFichaFromInfo" data-arg0="${x.id}" style="cursor:pointer">
+      <div class="grupo-miembro" role="button" tabindex="0" data-action="openAnimalFichaFromInfo" data-arg0="${x.id}" style="cursor:pointer">
         <span class="grupo-miembro-foto">${this._fotoSrc(x) ? `<img loading="lazy" src="${this._esc(this._fotoSrc(x, 'w80'))}" alt="">` : (x.especie === 'Perro' ? Icons.dog : (x.especie === 'Gato' ? Icons.cat : Icons.paw))}</span>
         <span class="grupo-miembro-nombre"><b>${this._esc(x.nombre)}</b><small>${this._esc(x.raza || '')}${x.edad ? ' · ' + this._esc(x.edad) : ''} · ${this._esc(x.sexo || '')}</small></span>
         <span class="animal-card-status ${x.estado}">${this._animalEstadoLabel(x.estado)}</span>
@@ -8083,8 +8083,8 @@ const Dashboard = {
       </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Tipo</th><th>Area</th><th>Horas/mes</th><th>Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td data-label="Nombre">${this._esc(s.nombre)}</td><td data-label="Email">${this._esc(s.email)}</td><td data-label="Tipo"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td data-label="Área">${this._esc(s.area)||'—'}</td><td data-label="Horas/mes">${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td data-label="Estado"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th scope="col">Nombre</th><th scope="col">Email</th><th scope="col">Tipo</th><th scope="col">Area</th><th scope="col">Horas/mes</th><th scope="col">Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr role="button" tabindex="0" data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td data-label="Nombre">${this._esc(s.nombre)}</td><td data-label="Email">${this._esc(s.email)}</td><td data-label="Tipo"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td data-label="Área">${this._esc(s.area)||'—'}</td><td data-label="Horas/mes">${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td data-label="Estado"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -8511,7 +8511,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
         <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Fecha</th><th>Donante</th><th>Importe</th><th></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Donante</th><th scope="col">Importe</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -8590,7 +8590,7 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
         <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
-        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th>Artículo</th><th>Stock</th><th></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td data-label="Artículo">${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td data-label="Stock"><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
+        <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Artículo</th><th scope="col">Stock</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td data-label="Artículo">${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td data-label="Stock"><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -8732,7 +8732,7 @@ const Dashboard = {
     if (!rows.length) {
       return `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro. Si acabas de desplegar el backend, vuelve a entrar para cargar el historial.</p></div>`;
     }
-    return `<table class="data-table"><thead><tr><th>Fecha</th><th>Usuario</th><th>Tipo</th><th>Detalle</th></tr></thead><tbody>${rows.map(r => `
+    return `<table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Usuario</th><th scope="col">Tipo</th><th scope="col">Detalle</th></tr></thead><tbody>${rows.map(r => `
       <tr>
         <td data-label="Fecha" style="white-space:nowrap">${this._esc(this._fmtLogFecha(r.fecha))}</td>
         <td data-label="Usuario">${this._esc(r.usuario || '—')}</td>
@@ -8825,12 +8825,12 @@ const Dashboard = {
         <div id="memoria-resumen"></div>
       </div></div>
       <div class="card"><div class="card-header"><h3>Reportes</h3></div><div class="card-body">
-        <div class="alert-item info" style="cursor:pointer" data-action="exportSurvey" data-arg0="pre-adopcion-perros">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
-        <div class="alert-item info" style="cursor:pointer" data-action="exportSurvey" data-arg0="pre-adopcion-gatos">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
-        <div class="alert-item info" style="cursor:pointer" data-action="exportSurvey" data-arg0="pre-acogida">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
+        <div class="alert-item info" style="cursor:pointer" role="button" tabindex="0" data-action="exportSurvey" data-arg0="pre-adopcion-perros">${Icons.download} <span>Exportar encuestas perros (PDF)</span></div>
+        <div class="alert-item info" style="cursor:pointer" role="button" tabindex="0" data-action="exportSurvey" data-arg0="pre-adopcion-gatos">${Icons.download} <span>Exportar encuestas gatos (PDF)</span></div>
+        <div class="alert-item info" style="cursor:pointer" role="button" tabindex="0" data-action="exportSurvey" data-arg0="pre-acogida">${Icons.download} <span>Exportar solicitudes acogida (PDF)</span></div>
       </div></div>
       <div class="card"><div class="card-header"><h3>Mantenimiento</h3></div><div class="card-body">
-        <div class="alert-item warning" style="cursor:pointer" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
+        <div class="alert-item warning" style="cursor:pointer" role="button" tabindex="0" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
         <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>

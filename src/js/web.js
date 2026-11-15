@@ -272,7 +272,7 @@ const Web = {
         return ((a.nombre || '') + ' ' + (a.titulo || '') + ' ' + (a.slug || '') + ' ' + (a.especie || '')).toLowerCase().includes(q);
       });
       if (!filas.length) return this._sinPublicaciones();
-      return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th>Animal</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
+      return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th scope="col">Animal</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
     }
     const filas = this.eventos.filter(e => {
       if (this._filtros.estado && e.estado_publicacion !== this._filtros.estado) return false;
@@ -280,7 +280,7 @@ const Web = {
       return ((e.titulo || '') + ' ' + (e.slug || '') + ' ' + (e.categoria || '')).toLowerCase().includes(q);
     });
     if (!filas.length) return this._vacio('No hay eventos ni historias', 'Crea el primero con el botón "Nuevo evento/historia".');
-    return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th>Título</th><th>Tipo</th><th>Estado web</th><th>Slug</th><th>Completitud</th><th></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
+    return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th scope="col">Título</th><th scope="col">Tipo</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
   },
 
   _filaAnimal(a) {

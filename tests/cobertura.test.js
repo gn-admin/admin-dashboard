@@ -584,7 +584,7 @@ describe('listas de detalle: blacklist y actividad', () => {
     const html = Dashboard._renderActividadTabla([
       { fecha: '2025-04-13 10:30:00', usuario: 'x@y.es', tipo: 'gasto', detalle: 'Alta <b>Luna</b>' }
     ]);
-    assert.match(html, /<th>Fecha<\/th>/);
+    assert.match(html, /<th scope="col">Fecha<\/th>/);
     assert.match(html, /Alta &lt;b&gt;Luna&lt;\/b&gt;/);
     assert.match(html, /estado-badge en_proceso/);
     assert.match(html, /Gasto/);
