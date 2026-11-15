@@ -4,7 +4,7 @@
 
 ## 0. Estado de verificación (2026-11-15)
 
-**Automatizado en repo:** `tests/roles-d1.test.js` carga el `apps-script/Code.gs` real y fija la matriz `_role`/`_canReadEndpoint`/`_canWriteEndpoint` (denegación por defecto, `sin_acceso` sin lecturas ni escrituras, perfil minimizado y alcance de cada rol). Suite completa: **508/508**.
+**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs) y `tests/roles-auth.test.js` (Roles.gs/Auth.gs) fijan la matriz de autorización, la denegación por defecto, el perfil minimizado y la resolución de roles (no listado, revocado, normalización de email y fallbacks seguros). Suite completa: **518/518**.
 
 **Verificado en vivo (con lote `.gs` desplegado):**
 - [x] `sin_acceso` **revocado** (`gn.test.revocado@example.test`, `activo:false`): login Firebase OK, `user-profile` mínimo `{"role":"sin_acceso","email", "status"}` (sin `uid`/`name`), UI de bloqueo/navegación oculta, lecturas operativas/`web-*` y escrituras denegadas por API directa.
@@ -15,7 +15,7 @@
 - [x] Canal público sin token OK (`config-publica`, `retiradas`, `sitemap`, `taxonomias`, `redirects`); detalle público coherente tras restauración (publicación en borrador no expuesta).
 
 **Pendiente (operativo/manual):**
-- [ ] `sin_acceso` **no listado**: cuenta Firebase autenticable no presente en `ROLES_USUARIOS`/`ADMIN_EMAILS` (misma ruta de denegación por defecto; falta cuenta de prueba).
+- [ ] *(Opcional, ya cubierto por tests)* `sin_acceso` **no listado** con una cuenta Firebase real no presente en `ROLES_USUARIOS`/`ADMIN_EMAILS`.
 - [ ] Verificar en la hoja de **auditoría** de producción que `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles quedan registradas (D3).
 - [ ] Confirmar que `ROLES_USUARIOS`/`ADMIN_EMAILS` desplegados cubren a todos los usuarios legítimos (D2).
 - [ ] Escrituras con datos reales en entorno controlado (si se requiere validación funcional completa de negocio, más allá de autorización).

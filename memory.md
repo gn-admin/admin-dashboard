@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` subido y desplegado** (D1, C1, auditoría de borrado); D1 validado en vivo (sin_acceso revocado, perfiles y matriz de lecturas/escrituras por rol por API directa, canal público). Suite: **508/508**.
+El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` subido y desplegado** (D1, C1, auditoría de borrado); D1 validado en vivo y con regresión automatizada de Code/Auth/Roles. Suite: **518/518**.
 
 ## Entregado
 
@@ -55,7 +55,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ### Despliegue
 
 - GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v233` (visor público: enlace de salto al contenido).
-- `npm test`: **508/508** (incluye `tests/roles-d1.test.js`: matriz de autorización D1 sobre el `Code.gs` real).
+- `npm test`: **518/518** (incluye `tests/roles-d1.test.js` y `tests/roles-auth.test.js`: matriz D1 y resolución de roles/denegación por defecto sobre los `.gs` reales).
 
 ## Decisiones cerradas
 
@@ -69,11 +69,10 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 **Hecho en vivo (2026-11-15, lote `.gs` desplegado):**
 - A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK (`config-publica`, `retiradas`, `sitemap`, `taxonomias`, `redirects`).
-- **D1/D6 (mayormente verificado):** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; matriz de lecturas y de escrituras/acciones por API directa coherente con la política (admin, coordinador, voluntario, tesorería, consulta, sin_acceso). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
+- **D1 cerrado en código y verificado en vivo (núcleo):** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; matriz de lecturas/escrituras por API directa coherente con la política; regresión automatizada de `Code.gs`/`Auth.gs`/`Roles.gs` (no listado/revocado/normalización/fallbacks seguros). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Queda solo la comprobación operativa con una cuenta Firebase **no listada** y confirmar roles legítimos desplegados.
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **`sin_acceso` no listado:** validar con una cuenta Firebase autenticable no presente en `ROLES_USUARIOS`/`ADMIN_EMAILS`.
-2. **D2 (higiene):** confirmar que los roles/correos desplegados cubren a todos los legítimos (mínimo privilegio).
+1. **D2 (higiene):** confirmar que los roles/correos desplegados cubren a todos los legítimos (mínimo privilegio). *(La resolución no listado/revocado está cubierta por tests automatizados y verificada en vivo para revocado; opcional: prueba con una cuenta Firebase no listada.)*
 3. **D3 (auditoría):** comprobar en la hoja de auditoría de producción el registro de `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles; verificar historial de fases operativo.
 4. **D4 (token):** rotación/revisión de `?token=` y exposición/logs (GitHub Secrets + config GAS); limitación estructural conocida.
 5. **D5 (Firebase):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
