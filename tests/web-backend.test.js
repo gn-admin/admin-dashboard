@@ -1044,5 +1044,7 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     const con = b.ctx.webDeployEstado();
     assert.equal(con.data.configurado, true);
     assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
+    // Marcador para detectar implementaciones antiguas desde el panel.
+    assert.equal(con.data.version, '2026-11-15.4');
   });
 });

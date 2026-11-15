@@ -1288,6 +1288,9 @@ function webCarpetaEnArbolMedia(carpeta, raizId, nivel) {
 // vive en las propiedades del script (`GITHUB_DEPLOY_TOKEN`), nunca en el repo.
 
 var WEB_DEPLOY_DEFECTOS = { repo: 'gn-admin/admin-dashboard', ref: 'main', workflow: 'deploy.yml' };
+// Marcador de versión del backend: `web-deploy-estado` lo devuelve para poder
+// distinguir si el panel habla con una implementación antigua.
+var WEB_DEPLOY_VERSION = '2026-11-15.4';
 var WEB_DEPLOY_DEDUPE_SEG = 60;
 
 function webDeployPropiedades() {
@@ -1312,7 +1315,7 @@ function webDeployConfig() {
 /** Estado de la configuración del deploy (nunca devuelve el token). */
 function webDeployEstado() {
   var cfg = webDeployConfig();
-  return { status: 'success', data: { configurado: !!cfg.token, repo: cfg.repo, ref: cfg.ref, workflow: cfg.workflow } };
+  return { status: 'success', data: { configurado: !!cfg.token, repo: cfg.repo, ref: cfg.ref, workflow: cfg.workflow, version: WEB_DEPLOY_VERSION } };
 }
 
 /**
