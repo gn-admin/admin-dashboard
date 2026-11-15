@@ -427,7 +427,7 @@ const Web = {
 
   _pickerHtml() {
     const total = this.animalesSinPublicacion(this.animales).length;
-    const cerrar = (typeof Icons !== 'undefined' && Icons.close) ? Icons.close : '✕';
+    const cerrar = (typeof Icons !== 'undefined' && Icons.x) ? Icons.x : '✕';
     return `<div class="web-picker-overlay" data-action="cerrarPickerWeb" aria-hidden="true"></div>
       <div class="web-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="web-picker-titulo">
         <div class="web-picker-head">

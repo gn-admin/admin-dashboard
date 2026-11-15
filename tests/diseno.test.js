@@ -102,7 +102,11 @@ describe('integridad estatica: clases, ids e iconos', () => {
   it('toda clase usada en JS/HTML de interfaz existe en el CSS', () => {
     const cssClases = new Set([...CSS.matchAll(/\.([A-Za-z][A-Za-z0-9_-]*)/g)].map(m => m[1]));
     const usadas = new Set();
-    for (const f of ['js/dashboard.js', 'js/app.js', 'index.html']) {
+    const uiFiles = [
+      'js/dashboard.js', 'js/dashboard-actividad.js', 'js/dashboard-finanzas.js',
+      'js/dashboard-blacklist.js', 'js/web.js', 'js/app.js', 'index.html'
+    ];
+    for (const f of uiFiles) {
       const s = leer(f);
       for (const m of s.matchAll(/class\s*=\s*"([^"]*)"/g)) {
         m[1].split(/\s+/).forEach(c => { if (c && okClase(c) && !c.includes('$')) usadas.add(c); });
@@ -118,7 +122,7 @@ describe('integridad estatica: clases, ids e iconos', () => {
   it('todo icono usado existe en Icons', () => {
     const iconos = require('../src/js/icons.js');
     const usados = new Set();
-    for (const f of ['js/dashboard.js', 'js/app.js', 'js/pdf-export.js', 'js/carnet-generator.js', 'index.html']) {
+    for (const f of ['js/dashboard.js', 'js/dashboard-actividad.js', 'js/dashboard-finanzas.js', 'js/dashboard-blacklist.js', 'js/web.js', 'js/app.js', 'js/pdf-export.js', 'js/carnet-generator.js', 'index.html']) {
       for (const m of leer(f).matchAll(/\bIcons\.([A-Za-z_][A-Za-z0-9_]*)/g)) usados.add(m[1]);
     }
     const sinDefinir = [...usados].filter(n => !(n in iconos));
@@ -128,8 +132,9 @@ describe('integridad estatica: clases, ids e iconos', () => {
   it('todo getElementById literar existe en el HTML o en los templates', () => {
     const html = leer('index.html');
     const htmlIds = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
-    const js = leer('js/dashboard.js') + leer('js/app.js');
+    const js = leer('js/dashboard.js') + leer('js/dashboard-actividad.js') + leer('js/dashboard-finanzas.js') + leer('js/dashboard-blacklist.js') + leer('js/web.js') + leer('js/app.js');
     const jsIds = new Set([...js.matchAll(/id="([a-zA-Z0-9-]+)"/g)].map(m => m[1]));
+    for (const m of js.matchAll(/\.id\s*=\s*['"]([a-zA-Z0-9-]+)['"]/g)) jsIds.add(m[1]);
     const buscados = new Set([...js.matchAll(/getElementById\('([a-z0-9-]+)'\)/gi)].map(m => m[1]));
     const ausentes = [...buscados].filter(i => !htmlIds.has(i) && !jsIds.has(i));
     assert.deepEqual(ausentes, [], 'Ids buscados que no existen: ' + ausentes.join(', '));
@@ -137,7 +142,11 @@ describe('integridad estatica: clases, ids e iconos', () => {
 
   it('el service worker precachea todos los JS de interfaz', () => {
     const sw = leer('sw.js');
-    const jsUi = ['js/config.js', 'js/icons.js', 'js/pwa.js', 'js/auth.js', 'js/api.js', 'js/dashboard.js', 'js/app.js'];
+    const jsUi = [
+      'js/config.js', 'js/icons.js', 'js/pwa.js', 'js/auth.js', 'js/api.js',
+      'js/dashboard.js', 'js/dashboard-actividad.js', 'js/dashboard-finanzas.js',
+      'js/dashboard-blacklist.js', 'js/web.js', 'js/app.js'
+    ];
     const fuera = jsUi.filter(f => !sw.includes(f));
     assert.deepEqual(fuera, [], 'JS sin precachear en sw.js: ' + fuera.join(', '));
   });

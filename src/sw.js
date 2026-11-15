@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v249';
+﻿const CACHE_NAME = 'gn-encuestas-v250';
 const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   './js/dashboard.js',
   './js/dashboard-actividad.js',
   './js/dashboard-finanzas.js',
+  './js/dashboard-blacklist.js',
   './js/web.js',
   './js/publico.js',
   './js/carnet-generator.js',

@@ -8293,3 +8293,5 @@ body.web-picker-abierto { overflow: hidden; }
 /* Hook de JS para la tabla de actividad por página. */
 .actividad-tabla { min-height: 0; }
 
+.web-lista { min-height: 0; }
+
