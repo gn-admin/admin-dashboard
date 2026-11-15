@@ -117,6 +117,85 @@ function webAhora() {
   try { return new Date().toISOString(); } catch (e) { return ''; }
 }
 
+// ==================== SANEADO DE HTML (C3) ====================
+// El gestor admite HTML en `contenido_html`. Se sanea con lista blanca al
+// construir el payload público (detalle, listados y prerender): lo guardado no
+// se toca (reversible) y lo publicado nunca lleva scripts, estilos, formularios
+// ni atributos de evento.
+var WEB_HTML_ETIQUETAS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'ul', 'ol', 'li', 'blockquote', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'figure', 'figcaption', 'img', 'hr', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub'];
+var WEB_HTML_VACIAS = ['br', 'hr', 'img'];
+var WEB_HTML_ATRIBUTOS = { a: ['href', 'title'], img: ['src', 'alt', 'width', 'height'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] };
+var WEB_HTML_PROHIBIDAS = 'script|style|iframe|object|embed|applet|svg|math|form|input|button|select|option|textarea|link|meta|base|noscript|template|frame|frameset';
+
+/** `true` si la URL se puede usar como `href`/`src` (relativa, http(s), mailto o tel). */
+function webUrlSegura(valor) {
+  var u = String(valor === undefined || valor === null ? '' : valor).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  if (!u) return '';
+  if (u.indexOf('&#') !== -1) return ''; // entidades numéricas: `&#106;avascript:`
+  var esquema = u.match(/^([a-z][a-z0-9+.\-]*):/i);
+  if (esquema) return /^(https?|mailto|tel)$/i.test(esquema[1]) ? u : '';
+  return u;
+}
+
+function webEscaparAtributo(valor) {
+  return String(valor === undefined || valor === null ? '' : valor)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Atributos permitidos de una etiqueta, ya filtrados y escapados. */
+function webHtmlAtributos(tag, resto) {
+  var permitidos = WEB_HTML_ATRIBUTOS[tag];
+  if (!permitidos) return '';
+  var salida = [];
+  var re = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+  var m;
+  while ((m = re.exec(resto)) !== null) {
+    var nombre = String(m[1]).toLowerCase();
+    if (permitidos.indexOf(nombre) === -1) continue;
+    var valor = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : m[4]);
+    if (valor === undefined) continue;
+    if (nombre === 'href' || nombre === 'src') {
+      valor = webUrlSegura(valor);
+      if (!valor) continue;
+    }
+    if (nombre === 'width' || nombre === 'height' || nombre === 'colspan' || nombre === 'rowspan') {
+      if (!/^\d{1,4}$/.test(String(valor).trim())) continue;
+    }
+    salida.push(nombre + '="' + webEscaparAtributo(valor) + '"');
+  }
+  return salida.length ? ' ' + salida.join(' ') : '';
+}
+
+/**
+ * Saneado de HTML con lista blanca: conserva solo etiquetas y atributos
+ * conocidos y descarta el resto (la etiqueta se quita, su texto se queda).
+ * Es idempotente: sanear dos veces da el mismo resultado.
+ */
+function webSanearHtml(html) {
+  var s = String(html === undefined || html === null ? '' : html);
+  if (!s) return '';
+
+  // 1. Bloques peligrosos con su contenido (script, style, iframe, svg...).
+  var bloque = new RegExp('<(' + WEB_HTML_PROHIBIDAS + ')\\b[^>]*>[\\s\\S]*?<\\/\\1\\s*>', 'gi');
+  var antes;
+  do { antes = s; s = s.replace(bloque, ''); } while (s !== antes);
+
+  // 2. Comentarios y etiquetas sueltas de la lista prohibida.
+  s = s.replace(/<!--[\s\S]*?-->/g, '');
+  s = s.replace(new RegExp('<\\/?(?:' + WEB_HTML_PROHIBIDAS + ')\\b[^>]*>', 'gi'), '');
+
+  // 3. Etiquetas permitidas (sin atributos de evento) y resto descartado.
+  s = s.replace(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>/g, function (todo, cierre, nombre, resto) {
+    var tag = String(nombre).toLowerCase();
+    if (WEB_HTML_ETIQUETAS.indexOf(tag) === -1) return '';
+    if (cierre) return WEB_HTML_VACIAS.indexOf(tag) === -1 ? '</' + tag + '>' : '';
+    return '<' + tag + webHtmlAtributos(tag, resto) + '>';
+  });
+
+  // 4. Un `<` que no abre etiqueta se escapa para que no arrastre el texto.
+  return s.replace(/<(?![a-zA-Z\/])/g, '&lt;');
+}
+
 function webUuid() {
   try { return Utilities.getUuid(); } catch (e) { return 'web_' + new Date().getTime(); }
 }
@@ -493,7 +572,7 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     publishedAt: p.publicado_en || '',
     updatedAt: p.actualizado_en || '',
     coverImage: { src: src, alt: alt },
-    contentHtml: p.contenido_html || '',
+    contentHtml: webSanearHtml(p.contenido_html || ''),
     author: p.autor || '',
     tags: Array.isArray(p.tags) ? p.tags : [],
     icons: icons,
@@ -718,10 +797,9 @@ function webUpsertAnimal(body) {
   } catch (err) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
-  var respuesta = { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
-  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) al ver el
+  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) con el
   // estado resultante: aquí no se llama a GitHub para no tener dos lógicas.
-  return respuesta;
+  return { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
 }
 
 function webEstadoAnimal(body, user) {
@@ -748,10 +826,9 @@ function webEstadoAnimal(body, user) {
   var ok = updateSheetRow(webSheetConfig(), previa.id, cambios);
   if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  var respuesta = { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
   // Ocultar, publicar o retirar cambia las páginas estáticas: el deploy lo
   // dispara el router al leer `estado_publicacion` de esta respuesta.
-  return respuesta;
+  return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
 }
 
 function webEliminarAnimal(body, user) {
@@ -915,10 +992,9 @@ function webUpsertEvento(body, user) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
   try { registrarAuditoria('publicacion_web', 'web_' + tipo, registro.id, user, { estado: registro.estado_publicacion, slug: registro.slug }); } catch (e) {}
-  var respuesta = { status: 'success', data: webFilaAPublicacion(registro) };
-  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) al ver el
+  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) con el
   // estado resultante: aquí no se llama a GitHub para no tener dos lógicas.
-  return respuesta;
+  return { status: 'success', data: webFilaAPublicacion(registro) };
 }
 
 function webEstadoEvento(body, user) {
@@ -943,8 +1019,7 @@ function webEstadoEvento(body, user) {
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  var respuesta = { status: 'success', data: { id: id, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
-  return respuesta;
+  return { status: 'success', data: { id: id, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
 }
 
 function webArchivarEvento(body, user) {
