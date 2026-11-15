@@ -39,7 +39,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 - Historial de slugs (`slug_historial`) con 301 desde `?endpoint=redirects`; un slug histórico no se reutiliza.
 - Resumen con totales por tipo y por estado, diagnósticos de hoja y aviso de cabeceras.
 - **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`) y verificado en producción (Playwright).
-- **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`). **Backend verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, desaparece de `retiradas`/`gone` en lectura fresca (`nocache=1`); el endpoint `retiradas` puede servir cache ~60 s. UI de restaurar pendiente de reflejarse en el front desplegado (Pages) y la lápida estática se eliminará en el siguiente prerender/deploy.
+- **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`) y **verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, slug conservado; tras deploy/prerender la lápida estática responde 404, no figura en sitemap ni en `retiradas`, y el front desplegado incluye la acción de restaurar (`API.restaurarWebEvento`). `retiradas` puede servir cache ~60 s sin `nocache=1`.
 
 ### Media por ficha (Drive)
 
@@ -67,7 +67,6 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ## Pendiente manual / verificación (fuera de git o de siguiente deploy)
 
-1. **C1 cierre operativo:** desplegar/actualizar front (Pages) para exponer UI de “Restaurar” y ejecutar prerender/deploy para eliminar la lápida estática de `prueba-retirada-playwright` (ya restaurada a borrador) y confirmar que no entra en sitemap ni en `retiradas`.
 2. **Alinear `.gs` local ↔ desplegado ↔ git:** `Code.gs`/`Auth.gs`/`Roles.gs`/`WebPublicaciones.gs` desplegados según usuario (C1, borrado borrador animal, D1). En local, `Auth.gs`/`Roles.gs` (gitignored) y `Code.gs` tienen cambios D1 no reflejados en git; evitar exponer secretos y dejar registro coherente del lote desplegado.
 3. **Raíz de media:** confirmada en `.env`/`Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
 3. **A4 aplazado**: dominio propio y Search Console (sobre `github.io` es opcional enviar sitemap mientras tanto). Port del SEO al proyecto real (`C:\Users\JonEg\Documents\proyectos\main`).
@@ -75,11 +74,10 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 **A2/A2.2 verificado:** endpoints públicos y prerender/SEO correctos en `github.io`; caso retirada `prueba-retirada-playwright` comprobado (`retiradas`, `gone`, slug reservado) y lápida estática publicada fuera de sitemap tras deploy.
 
-**Verificación 2026-11-15 (con .gs desplegados):** C1 restaurar evento en vivo OK (→ borrador, canal fresco sin `gone` y fuera de `retiradas`; cache ~60 s sin `nocache`). D1 parcial: `user-profile` admin devuelve datos completos; pendiente validar caso `sin_acceso` (no listado/revocado) y matriz por rol (ver [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)).
+**Verificación 2026-11-15 (con .gs desplegados):** C1 restaurar evento en vivo **OK** (→ borrador, canal fresco sin `gone`/fuera de `retiradas`, lápida estática eliminada tras deploy/prerender, front con restaurar desplegado). D1 **parcial**: `user-profile` correcto y matriz de lecturas verificada para `admin`, `coordinador`, `tesoreria`, `consulta` y `voluntario` (coherente con política; ver pruebas ejecutadas); pendiente caso `sin_acceso` (no listado/revocado), escrituras/denegaciones por API directa por rol y D2–D5/D7 (ver [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)).
 
 ## Siguientes pasos propuestos
 
-1. **C1 cierre operativo (repo/CI):** desplegar front con UI de restaurar y regenerar prerender para retirar lápida estática de `prueba-retirada-playwright`; validar en canal fresco/sitemap.
 2. **D1/D6 validación completa (operativo):** probar `sin_acceso` (no listado/revocado), confirmar restricciones por endpoint en UI y API directa, y ejecutar matriz por rol ([`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)). Verificar que `ROLES_USUARIOS`/`ADMIN_EMAILS` cubren a todos los legítimos.
 3. **Track D pendiente:** D2 higiene de roles/cuentas, D3 auditoría/historial operativo en hojas, D4 rotación/revisión token, D5 MFA (Firebase), D7 revisión formal del canal público.
 4. **Track B (externo):** port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).

@@ -86,7 +86,7 @@
 | A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | **Aplazado** (decisión): se usa `github.io`. Opcional: Search Console/sitemap sobre la URL actual hasta tener dominio propio. |
 | A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **Parcial.** `memory.md`/plan actualizados (2026-11-15) y checklist D6 añadido (`PRUEBAS_POR_ROL_D6.md`). Pendiente: desplegar front con UI C1, regenerar prerender (retirar lápida restaurada), y validar consistencia preview↔público/casos 301/410 en vivo. |
 
-**Criterio de cierre Track A:** A2/A3 verificados. C1 backend desplegado/verificado (canal fresco); resta desplegar UI C1 y limpiar lápida estática en siguiente prerender/deploy. **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y cierre operativo A5.
+**Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y revisión operativa residual de A5 (consistencia preview↔público/casos 301/410 en uso real).
 
 ### Track B — Web externa: consumo e indexación real (paralelo tras A2, otro repositorio)
 **Objetivo:** que `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` muestre el contenido con el contrato y SEO de publicaciones.
@@ -107,7 +107,7 @@
 
 | ID | Acción | Dónde | Prioridad | Resultado esperado | Notas |
 |---|---|---|---|---|---|
-| C1 | **Restaurar publicación retirada** desde panel + registro de quién retira/restaura | Repo + GAS | Alta | Salida controlada de `retirado` y trazabilidad | **Parcial.** Backend `.gs` desplegado y verificado en vivo (restauración → borrador, slug conservado; `retiradas`/`gone` correctos en lectura fresca, cache ~60 s). UI/botón en repo; pendiente reflejo en front desplegado y limpieza de lápida estática vía prerender/deploy. |
+| C1 | **Restaurar publicación retirada** desde panel + registro de quién retira/restaura | Repo + GAS | Alta | Salida controlada de `retirado` y trazabilidad | **OK.** Backend y front desplegados y verificados en vivo (restauración → borrador, slug conservado; sin `gone`/fuera de `retiradas` en fresco, lápida estática eliminada tras deploy/prerender, acción de restaurar disponible). Cache `retiradas` ~60 s. |
 | C2 | Hardening de pruebas/prerender (fixtures 301 y ficha oculta, validación JSON-LD/canónica única, caso `gone`) | Repo | Media | Regresiones cubiertas | **Avanzado en repo**: fixtures `redirect-301`/`oculta`, soporte de redirecciones estáticas, `validarFichaHtml` (JSON-LD/canonical únicos), 495 tests. `npm test` + `npm run prerender --fixture`. |
 | C3 | **§7.3 Ficha configurable (v1.1 aditivo)** — solo si se aprueba | Repo + GAS/Sheets | Media-baja (decisión requerida) | Plantilla/bloques, iconos, galería/alt-pie completo, salud curada, CTA kind, campos animal/tags, etc. | **Antes:** cerrar decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos, saneado HTML, orden bloques, tags). Mantener compatibilidad: sin `ficha` = comportamiento actual. Implementar por etapas (contrato/validación → backend → UI → visor → port web) |
 | C4 | `forms/submit` (opcional) | GAS + web | Baja / alcance aparte | Envío real de formularios | Canal separado; requiere reCAPTCHA server-side, validación/antiabuso, plantillas/correos y políticas |
@@ -148,7 +148,7 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora (cierre operativo inmediato):** desplegar front con UI C1 y ejecutar prerender/deploy para limpiar lápida de `prueba-retirada-playwright`; validar A5/C1 en vivo. A2 verificado.
+1. **Ahora:** validación D1/D6 completa (caso `sin_acceso` revocado/no listado y escrituras/denegaciones por API directa por rol) y cierre operativo residual de A5. A2/A3/C1 verificados en vivo.
 2. **En paralelo inmediato:** `D1, D2, D3, D4` (seguridad backend/operativa crítica) y preparación de `B1` (contrato ya estable). 
 3. **Corto plazo:** `A3` (CI, tras confirmar A2) + `C1` (restaurar retirada, tras A2) + `C2` (pruebas) + `D5/D6/D7` según viabilidad.
 4. **Medio plazo (con dominio disponible):** `A4 → B2/B3/B4` (SEO/indexación real en web externa).
