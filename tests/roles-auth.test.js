@@ -3,6 +3,8 @@
  *
  * Carga `apps-script/Roles.gs` y `apps-script/Auth.gs` reales para fijar el
  * contrato de no listado/revocado/normalización y el fallback de Auth.
+ * Esos dos ficheros NO se versionan (llevan la configuración real), así que en
+ * un checkout limpio (CI) la suite se omite en vez de romper el despliegue.
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,8 +13,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const RAIZ = path.join(__dirname, '..');
-const ROLES_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Roles.gs'), 'utf8');
-const AUTH_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Auth.gs'), 'utf8');
+const RUTA_ROLES = path.join(RAIZ, 'apps-script', 'Roles.gs');
+const RUTA_AUTH = path.join(RAIZ, 'apps-script', 'Auth.gs');
+const DISPONIBLE = fs.existsSync(RUTA_ROLES) && fs.existsSync(RUTA_AUTH);
+// `describe.skip` mantiene la suite visible como omitida en CI.
+const describir = DISPONIBLE ? describe : describe.skip;
+
+function fuente(ruta) { return fs.readFileSync(ruta, 'utf8'); }
 
 function contextoRoles(sobrescribir = {}) {
   const ctx = Object.assign({
@@ -20,11 +27,11 @@ function contextoRoles(sobrescribir = {}) {
     Logger: { log: () => {} },
   }, sobrescribir);
   vm.createContext(ctx);
-  vm.runInContext(ROLES_GS, ctx);
+  vm.runInContext(fuente(RUTA_ROLES), ctx);
   return ctx;
 }
 
-describe('Roles.gs: resolución segura de roles', () => {
+describir('Roles.gs: resolución segura de roles', () => {
   it('usuario no listado -> sin_acceso (denegación por defecto)', () => {
     const ctx = contextoRoles();
     assert.equal(ctx.resolverRolUsuario('uid', 'nadie@example.test'), 'sin_acceso');
@@ -62,15 +69,15 @@ describe('Roles.gs: resolución segura de roles', () => {
   });
 });
 
-describe('Auth.gs: getUserRole (denegación por defecto)', () => {
+describir('Auth.gs: getUserRole (denegación por defecto)', () => {
   it('usa resolverRolUsuario si existe y nunca devuelve vacío', () => {
     const ctx = {
       CONFIG: { ROLES: { ADMIN: 'admin' }, ADMIN_EMAILS: [] },
       Logger: { log: () => {} },
     };
     vm.createContext(ctx);
-    vm.runInContext(ROLES_GS, ctx);
-    vm.runInContext(AUTH_GS, ctx);
+    vm.runInContext(fuente(RUTA_ROLES), ctx);
+    vm.runInContext(fuente(RUTA_AUTH), ctx);
     assert.equal(ctx.getUserRole('uid', 'nadie@example.test'), 'sin_acceso');
     assert.equal(ctx.getUserRole('uid', 'gn.test.revocado@example.test'), 'sin_acceso');
     assert.equal(ctx.getUserRole('uid', 'gn.test.admin@example.test'), 'admin');
@@ -82,7 +89,7 @@ describe('Auth.gs: getUserRole (denegación por defecto)', () => {
       Logger: { log: () => {} },
     };
     vm.createContext(ctx);
-    vm.runInContext(AUTH_GS, ctx); // sin resolverRolUsuario
+    vm.runInContext(fuente(RUTA_AUTH), ctx); // sin resolverRolUsuario
     assert.equal(ctx.getUserRole('uid', 'nadie@example.test'), 'sin_acceso');
   });
 
@@ -92,7 +99,7 @@ describe('Auth.gs: getUserRole (denegación por defecto)', () => {
       Logger: { log: () => {} },
     };
     vm.createContext(ctx);
-    vm.runInContext(AUTH_GS, ctx);
+    vm.runInContext(fuente(RUTA_AUTH), ctx);
     assert.equal(ctx.getUserRole('uid', 'Admin@example.test'), 'admin');
     assert.equal(ctx.getUserRole('uid', 'otro@example.test'), 'sin_acceso');
   });
@@ -104,7 +111,7 @@ describe('Auth.gs: getUserRole (denegación por defecto)', () => {
       resolverRolUsuario: () => { throw new Error('boom'); },
     };
     vm.createContext(ctx);
-    vm.runInContext(AUTH_GS, ctx);
+    vm.runInContext(fuente(RUTA_AUTH), ctx);
     assert.equal(ctx.getUserRole('uid', 'x@example.test'), 'sin_acceso');
   });
 });
