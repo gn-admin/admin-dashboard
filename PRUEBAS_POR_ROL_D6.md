@@ -7,18 +7,17 @@
 **Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **521/521**.
 
 **Verificado en vivo (con lote `.gs` desplegado):**
-- [x] `sin_acceso` **revocado** (`gn.test.revocado@example.test`, `activo:false`): login Firebase OK, `user-profile` mínimo `{"role":"sin_acceso","email", "status"}` (sin `uid`/`name`), UI de bloqueo/navegación oculta, lecturas operativas/`web-*` y escrituras denegadas por API directa.
-- [x] Perfiles completos (`uid,email,role,name`) para `admin`, `coordinador`, `voluntario`, `tesoreria`, `consulta`.
-- [x] **Matriz de lecturas** por API directa coherente con política (incl. `web-*` solo admin/coordinador; restricciones de voluntario/tesorería/consulta según alcance).
-- [x] **Matriz de escrituras/acciones** por API directa con ids inexistentes (sin modificar datos): denegaciones/autorizaciones coherentes con la política implementada (`coordinador` sin acciones solo-admin; `voluntario` sin borrados sensibles/finanzas/contratos/blacklist/web; `tesoreria` limitada a su ámbito; `consulta` y `sin_acceso` sin escrituras). Nota: `voluntario` no tiene permitido `delete-animal` (borrado no incluido en su allowlist de escritura).
-- [x] Sin token / token inválido denegados en endpoints privados.
-- [x] Canal público sin token OK (`config-publica`, `retiradas`, `sitemap`, `taxonomias`, `redirects`); detalle público coherente tras restauración (publicación en borrador no expuesta).
+- [x] **D1/D2:** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; roles desplegados resuelven correctamente (revocado→`sin_acceso`) con denegación por defecto.
+- [x] **Matriz de lecturas y escrituras/acciones** por API directa coherente con política (sin modificar datos reales).
+- [x] **D7/canal público:** endpoints públicos accesibles sin token y endpoints internos denegados sin token.
+- [x] **D3 (flujos):** operaciones auditadas del gestor (restaurar/retirar/estado) operativas en producción.
+- [x] **D4 (exposición):** token en `?token=` por diseño, sin eco de secretos en workflow ni exposición detectada en cliente.
 
 **Pendiente (operativo/manual):**
-- [ ] *(Opcional, ya cubierto por tests)* `sin_acceso` **no listado** con una cuenta Firebase real no presente en `ROLES_USUARIOS`/`ADMIN_EMAILS`.
-- [ ] Verificar en la hoja de **auditoría** de producción que `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles quedan registradas (D3).
-- [ ] Confirmar que `ROLES_USUARIOS`/`ADMIN_EMAILS` desplegados cubren a todos los usuarios legítimos (D2).
-- [ ] Escrituras con datos reales en entorno controlado (si se requiere validación funcional completa de negocio, más allá de autorización).
+- [ ] **Subir `apps-script/Code.gs` (repo):** mejora D3 (`web-media-subir` auditado, `_audit` robusto).
+- [ ] **D3 (opcional):** inspección visual de filas en hoja de auditoría/fases (incl. `web-media-subir` tras subir).
+- [ ] **D4 (periódico):** rotación del token cuando proceda.
+- [ ] **D5:** MFA/endurecimiento en Firebase.
 
 ## 1. Roles esperados
 

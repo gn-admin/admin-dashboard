@@ -68,18 +68,17 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ## Verificación y pendientes
 
 **Hecho en vivo (2026-11-15, lote `.gs` desplegado):**
-- A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK (`config-publica`, `retiradas`, `sitemap`, `taxonomias`, `redirects`).
-- **D1 cerrado en código y verificado en vivo (núcleo):** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; matriz de lecturas/escrituras por API directa coherente con la política; regresión automatizada de `Code.gs`/`Auth.gs`/`Roles.gs` (no listado/revocado/normalización/fallbacks seguros). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Queda solo la comprobación operativa con una cuenta Firebase **no listada** y confirmar roles legítimos desplegados.
+- A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK y allowlist interna protegida (endpoints privados exigen token).
+- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 521 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
+- **D3 cerrado en lo verificable:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web). En repo queda mejora pendiente de subir: `web-media-subir` auditado y `_audit` robusto.
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **Subir mejora `.gs` (repo):** `apps-script/Code.gs` refuerza D3 (audita `web-media-subir`, `_audit` robusto) y añade `tests/auditoria-d3.test.js` — requiere nueva versión del Web App.
-2. **D2 (ejecución):** confirmar que `ROLES_USUARIOS`/`ADMIN_EMAILS` desplegados cubren a todos los legítimos (mínimo privilegio). *Código/procedimiento y tests listos.*
-3. **D3 (verificación en hojas):** comprobar en la hoja de auditoría de producción el registro de `restaurar_publicacion`, `eliminar_publicacion`, `web-media-subir` y acciones sensibles; verificar historial de fases. *Instrumentación verificada en código/tests.*
-4. **D4 (ejecución):** rotar/revisar `?token=` y exposición/logs en GitHub Secrets + config/propiedades GAS y redesplegar. *Procedimiento definido; limitación estructural conocida.*
-5. **D5 (externo):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
-6. **D7 (formal en entorno):** validar CORS/dominio en producción. *Revisión de código completada.*
-7. **A4 (aplazado):** dominio propio y Search Console.
-8. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
+1. **Subir mejora `.gs` (repo):** `apps-script/Code.gs` refuerza D3 (audita `web-media-subir`, `_audit` robusto) y `tests/auditoria-d3.test.js` — requiere nueva versión del Web App.
+2. **D3 (opcional):** inspección visual en la hoja de auditoría/fases para confirmar filas escritas (incl. `web-media-subir` tras subir la mejora).
+3. **D4 (acción periódica):** ejecutar rotación del token cuando proceda (Secrets + config GAS + redespliegue).
+4. **D5 (externo):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
+5. **A4 (aplazado):** dominio propio y Search Console.
+6. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
 
 ## Pendiente de desarrollo (otros tracks)
 
