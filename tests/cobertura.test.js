@@ -565,7 +565,7 @@ describe('listas de detalle: blacklist y actividad', () => {
   it('el filtro busca en nombre, email y motivo', () => {
     assert.equal((Dashboard._renderBlacklistCards('ana').match(/class="bl-card"/g) || []).length, 1);
     assert.equal((Dashboard._renderBlacklistCards('estafa').match(/class="bl-card"/g) || []).length, 1);
-    assert.match(Dashboard._renderBlacklistCards('zzz'), /No hay personas en la lista negra/);
+    assert.match(Dashboard._renderBlacklistCards('zzz'), /Sin resultados/);
   });
 
   it('escapa el motivo', () => {
