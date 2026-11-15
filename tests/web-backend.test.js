@@ -967,7 +967,8 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
     assert.equal(r.status, 'success');
     assert.equal(r.data.estado_publicacion, 'oculto');
-    assert.equal(r.data.backend, '2026-11-15.6');
+    // El estado solo dice lo que cambió: sin campos de diagnóstico.
+    assert.deepEqual(Object.keys(r.data).sort(), ['animal_id', 'estado_publicacion', 'id']);
     assert.equal(r.data.deploy, undefined);
     assert.equal(b.llamadas.length, 0);
   });

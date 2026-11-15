@@ -390,7 +390,7 @@ function handlePost(endpoint, user, e) {
       try { _src = String(webEstadoEvento); } catch (err) { _src = ''; }
       return jsonResponse({ status: 'success', data: {
         version: typeof WEB_DEPLOY_VERSION === 'undefined' ? null : WEB_DEPLOY_VERSION,
-        estado_evento: { con_backend: _src.indexOf('backend') !== -1, cola: _src.slice(-200) },
+        estado_evento_cola: _src.slice(-200),
         construir_con_saneado: String(webConstruirPublicacion).indexOf('webSanearHtml') !== -1
       } });
     }

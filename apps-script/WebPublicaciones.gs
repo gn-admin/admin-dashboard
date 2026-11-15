@@ -888,7 +888,7 @@ function webEstadoAnimal(body, user) {
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
   // Ocultar, publicar o retirar cambia las páginas estáticas: el deploy lo
   // dispara el router al leer `estado_publicacion` de esta respuesta.
-  return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
+  return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
 }
 
 function webEliminarAnimal(body, user) {
@@ -1079,7 +1079,7 @@ function webEstadoEvento(body, user) {
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  return { status: 'success', data: { id: id, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
+  return { status: 'success', data: { id: id, estado_publicacion: estado } };
 }
 
 function webArchivarEvento(body, user) {
