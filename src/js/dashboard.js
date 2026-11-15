@@ -2542,9 +2542,9 @@ const Dashboard = {
   showRecordatorioForm() {
     this.showFormModal('Nuevo recordatorio', `
       <form data-submit="saveRecordatorio">
-      <div class="form-group"><label>Título *</label><input type="text" id="rc-titulo" required placeholder="Ej: Vacuna anual Luna"></div>
-      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="rc-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
-      <div class="form-group"><label>Nota</label><input type="text" id="rc-nota" placeholder="Opcional"></div></div>
+      <div class="form-group"><label for="rc-titulo">Título *</label><input type="text" id="rc-titulo" required placeholder="Ej: Vacuna anual Luna"></div>
+      <div class="form-row"><div class="form-group"><label for="rc-fecha">Fecha *</label><input type="date" id="rc-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
+      <div class="form-group"><label for="rc-nota">Nota</label><input type="text" id="rc-nota" placeholder="Opcional"></div></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
   },
@@ -8118,6 +8118,10 @@ const Dashboard = {
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
+    if (this._currentSocioSearch) {
+      const inp = el.querySelector('.search-box input[data-input="onSociosSearchInput"]');
+      if (inp) this.filterSocios(inp);
+    }
   },
 
   filterSocios(input) {
@@ -8481,7 +8485,7 @@ const Dashboard = {
 
   _blacklistFormHTML(data, id) {
     const isEdit = id !== undefined;
-    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form data-submit="saveBlacklistItem" data-sarg0="${isEdit ? this._esc(String(id)) : ''}"><div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label>Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label>Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label>Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label>Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="clearBlacklistForm">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
+    return `<div class="form-card" style="margin-top:16px"><h3>${isEdit?'Editar':'Anadir a lista negra'}</h3><form data-submit="saveBlacklistItem" data-sarg0="${isEdit ? this._esc(String(id)) : ''}"><div class="form-row"><div class="form-group"><label for="bl-nombre">Nombre *</label><input type="text" id="bl-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label for="bl-apellidos">Apellidos *</label><input type="text" id="bl-apellidos" value="${this._esc(data?.apellidos||'')}" required></div></div><div class="form-row"><div class="form-group"><label for="bl-email">Email</label><input type="email" id="bl-email" value="${this._esc(data?.email||'')}"></div><div class="form-group"><label for="bl-telefono">Telefono</label><input type="text" id="bl-telefono" value="${this._esc(data?.telefono||'')}"></div></div><div class="form-group"><label for="bl-motivo">Motivo *</label><select id="bl-motivo" required><option value="">Seleccionar...</option>${['Incompatible con animales','Vivienda inadecuada','Historial de maltrato','Informacion falsa','Sin compromiso','Otros'].map(m=>`<option ${data?.motivo===m?'selected':''}>${m}</option>`).join('')}</select></div><div class="form-group"><label for="bl-notas">Notas</label><textarea id="bl-notas" rows="2">${this._esc(data?.notas||'')}</textarea></div><div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="clearBlacklistForm">Cancelar</button><button type="submit" class="btn btn-danger">${isEdit?'Actualizar':'Anadir'}</button></div></form></div>`;
   },
 
   async saveBlacklistItem(e, id) {
@@ -8569,10 +8573,10 @@ const Dashboard = {
   showDonacionForm() {
     this.showFormModal('Nueva donacion', `
       <form data-submit="saveDonacion">
-      <div class="form-row"><div class="form-group"><label>Donante *</label><input type="text" id="dn-donante" required placeholder="Nombre o Anonimo"></div>
-      <div class="form-group"><label>Importe (€) *</label><input type="text" id="dn-importe" required placeholder="Ej: 50" inputmode="decimal"></div></div>
-      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="dn-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
-      <div class="form-group"><label>Notas</label><input type="text" id="dn-notas" placeholder="Opcional"></div></div>
+      <div class="form-row"><div class="form-group"><label for="dn-donante">Donante *</label><input type="text" id="dn-donante" required placeholder="Nombre o Anonimo"></div>
+      <div class="form-group"><label for="dn-importe">Importe (€) *</label><input type="text" id="dn-importe" required placeholder="Ej: 50" inputmode="decimal"></div></div>
+      <div class="form-row"><div class="form-group"><label for="dn-fecha">Fecha *</label><input type="date" id="dn-fecha" required value="${new Date().toISOString().slice(0, 10)}"></div>
+      <div class="form-group"><label for="dn-notas">Notas</label><input type="text" id="dn-notas" placeholder="Opcional"></div></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
   },
@@ -8650,10 +8654,10 @@ const Dashboard = {
     const isEdit = !!data;
     this.showFormModal(isEdit ? 'Editar artículo' : 'Nuevo artículo', `
       <form data-submit="saveInventario" data-sarg0="${data ? this._esc(data.id) : ''}">
-      <div class="form-row"><div class="form-group"><label>Artículo *</label><input type="text" id="iv-nombre" required value="${this._esc(data?.nombre || '')}" placeholder="Ej: Pienso cachorro"></div>
-      <div class="form-group"><label>Unidad</label><input type="text" id="iv-unidad" value="${this._esc(data?.unidad || '')}" placeholder="Ej: sacos, latas"></div></div>
-      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="iv-cantidad" required step="any" value="${data?.cantidad ?? ''}" placeholder="Ej: 12"></div>
-      <div class="form-group"><label>Mínimo (aviso)</label><input type="number" id="iv-minimo" step="any" value="${data?.minimo ?? ''}" placeholder="Ej: 2"></div></div>
+      <div class="form-row"><div class="form-group"><label for="iv-nombre">Artículo *</label><input type="text" id="iv-nombre" required value="${this._esc(data?.nombre || '')}" placeholder="Ej: Pienso cachorro"></div>
+      <div class="form-group"><label for="iv-unidad">Unidad</label><input type="text" id="iv-unidad" value="${this._esc(data?.unidad || '')}" placeholder="Ej: sacos, latas"></div></div>
+      <div class="form-row"><div class="form-group"><label for="iv-cantidad">Cantidad *</label><input type="number" id="iv-cantidad" required step="any" value="${data?.cantidad ?? ''}" placeholder="Ej: 12"></div>
+      <div class="form-group"><label for="iv-minimo">Mínimo (aviso)</label><input type="number" id="iv-minimo" step="any" value="${data?.minimo ?? ''}" placeholder="Ej: 2"></div></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
       </form>`);
   },
