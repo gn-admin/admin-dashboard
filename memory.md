@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado y al día** (D1, C1, auditoría D3 completa). **Track E cerrado** (E1–E5, código/auditoría incremental). Suite: **535/535**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). Suite: **535/535**.
 
 ## Entregado
 
@@ -73,11 +73,14 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **D3 (opcional):** inspección visual en la hoja de auditoría/fases para confirmar filas escritas.
-2. **D4 (acción periódica):** ejecutar rotación del token cuando proceda (Secrets + config GAS + redespliegue).
-3. **D5 (externo):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
-4. **A4 (aplazado):** dominio propio y Search Console.
-5. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
+1. **D5 (reCAPTCHA, operativo):** configurar dominios/hostname/umbral en consola reCAPTCHA v3 y realizar prueba e2e del login en entorno desplegado (código y `.gs` ya actualizados).
+2. **D3 (opcional):** inspección visual en la hoja de auditoría/fases para confirmar filas escritas.
+3. **D4 (acción periódica):** ejecutar rotación del token cuando proceda (Secrets + config GAS + redespliegue).
+4. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
+
+**Mejoras futuras opcionales (no imprescindibles):** MFA para cuentas elevadas y App Check/endurecimiento adicional en Firebase.
+
+**Nota de alcance:** el dominio propio/indexación del sitio publicado corresponde al proyecto `main` (ver `TRANSFERIR_A_MAIN.md`). Este repositorio es para gestión (aunque esté accesible públicamente).
 
 ## Pendiente de desarrollo (otros tracks)
 

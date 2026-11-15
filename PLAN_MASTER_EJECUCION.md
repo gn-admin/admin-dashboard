@@ -22,7 +22,7 @@
 | F5 Ajustes/calidad/operación | 🟡 Parcial | Completitud, consistencia preview↔público, cache/paginación, diagnóstico hoja/pestaña, historial de slug+301, retirada/410+l�pida, páginas de retirada, recuentos, docs operativa interna | Dominio propio + Search Console + sitemap en raíz; indexación/auditoría real; convertir aviso de retiradas en error si falla tras desplegar; **restaurar/salida de retirada** desde panel y auditoría de quién retira (propuesto); fixtures adicionales (301, oculta) y validación JSON-LD/canónica única |
 | §7.3 Ficha configurable / media | 🟡 Parcial (media hecha, configuración pendiente) | Media por ficha en Drive (`animales|eventos|historias/<slug>`), `web-media-subir`, normalización enlaces, galería `url|alt|pie`, documentos privados, límites/tipos; análisis y contrato aditivo v1.1 planificado | **No implementado:** ficha configurable (`ficha_json`/plantilla/bloques/iconos/tags/CTA kind/salud curada/campos animal extra), decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos compartido, saneado HTML, orden bloques, tags retrocompatibles) |
 
-**Pendientes manuales clave (gestor web):** desplegar `Code.gs`+`WebPublicaciones.gs` (desbloquea `gone`/`retiradas`), verificar canal/flujo en producción, dominio propio y Search Console, portar SEO/consumo al proyecto web real.
+**Pendientes manuales clave (gestor web):** verificar canal/flujo en producción cuando corresponda, configurar/validar reCAPTCHA (D5) y cerrar decisiones/despliegues de C3/C4 si se aprueban. El dominio/indexación del sitio publicado corresponde al proyecto `main` (este repo es de gestión). (Ítems cerrados en código: C1, D1, instrumentación D3; `.gs` actualizados.)
 
 ### 1.2 Seguridad (`PLAN_SEGURIDAD.md`, consolidado)
 **Estado:** ~66% estimado alcanzado (en repo); objetivo 80–85%.
@@ -32,7 +32,7 @@
 | 1.1 Autorización por endpoint en GAS + `sin_acceso` para no reconocidos (normalizar email) | ✅ Hecho y verificado | Desplegado; denegación por defecto, perfil minimizado y matriz por rol verificados en vivo y cubiertos por tests automatizados (Code/Auth/Roles). |
 | 1.2 `sin_acceso` y bloqueo UI/cargas en frontend | ✅ Hecho y verificado | Pantalla de bloqueo, navegación oculta y restricción de cargas; efectivo con D1 desplegado (revocado verificado en vivo). |
 | 1.3 Higiene Roles/cuentas | ✅ Verificado (config efectiva) | Roles desplegados correctos (incl. revocado→`sin_acceso`), normalizados y cubiertos por tests; mantener alineados ante altas/bajas. |
-| 2.1 Firebase login endurecido (MFA admins, reCAPTCHA/App Check si aplica) | ⏳ Externo (Firebase) | No iniciado según plan (D5). |
+| 2.1 Endurecimiento login (reCAPTCHA v3 verificado en servidor) | ~ Parcial (repo/código completado) | Implementado y `.gs` actualizado; pendiente configurar dominios/hostname/umbral en consola reCAPTCHA y prueba e2e. **MFA/App Check: mejora futura opcional** (no imprescindible para este plan). |
 | 2.2 Token API (rotación, mínima exposición, sin logs con `?token=`) | ✅ Revisado (procedimiento y exposición) | Token en `?token=` por diseño, sin eco de secretos ni exposición detectada; rotación definida (acción operativa periódica). |
 | 3.1 Minimizar/limpiar caché cliente | 🟡 Avanzado en repo (~64–66%) | Limpieza logout/cambio, restricciones por permisos, `responses/notas` solo en memoria; ajustes finos SW/cobertura posibles. |
 | 3.2 Hardening frontend (CSP enforcement en meta, Permissions-Policy, errores/deps) | 🟡 Parcial en repo (~66%) | Hecho dentro de límites GitHub Pages; verificación producción recomendada. |
@@ -80,13 +80,13 @@
 
 | ID | Acción | Dónde | Tipo | Resultado esperado | Verificación |
 |---|---|---|---|---|---|
-| A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` (+ `Auth.gs`/`Roles.gs` para D1 coherente) | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"`, `?endpoint=retiradas`, C1 y D1 | **Hecho.** Lote desplegado y verificado: canal/C1 en vivo; D1 con `sin_acceso` revocado, perfiles y matriz de lecturas/escrituras por rol (API directa) coherentes con política. Repo/local alineado. |
+| A1 | `.gs` actualizados en Apps Script (incl. canal/roles/D1 coherentes cuando aplique) | GAS (externo) | Hecho | Activar cambios; pendiente solo verificación operativa puntual en producción si se requiere |
 | A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | **Hecho.** Canal/endpoints, SPA/estática/SEO, `retiradas` y detalle `gone` verificados; caso real `prueba-retirada-playwright` con lápida estática publicada (noindex, fuera de sitemap) en `github.io`. |
 | A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Hecho.** Implementado y efectivo (falla si no puede leer `retiradas`, salvo `--soft`); validado en flujo real. Suite 521/521. |
-| A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | **Aplazado** (decisión): se usa `github.io`. Opcional: Search Console/sitemap sobre la URL actual hasta tener dominio propio. |
+| A4 | Dominio propio y Search Console del sitio publicado | Proyecto `main`/hosting/DNS/SC (externo) | Externo (en `main`) | Corresponde al sitio público real (ver `TRANSFERIR_A_MAIN.md`); no es pendiente de este proyecto de gestión |
 | A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **OK.** C1 y lote `.gs` verificados en vivo, D6 documentado con matriz/checklist y repo alineado. Resta solo seguimiento operativo externo (auditoría en hojas/roles legítimos/D4–D5/D7 y caso no listado). |
 
-**Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y revisión operativa residual de A5 (consistencia preview↔público/casos 301/410 en uso real).
+**Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io` como entorno de gestión/simulación).
 
 ### Track B — Web externa (`main`): trasladado
 **Estado:** planificación y ejecución **trasladadas a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para ejecutar en `C:\Users\JonEg\Documents\proyectos\main` (consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y paridad). **No forma parte del alcance de ejecución de este repositorio.**
@@ -113,11 +113,11 @@
 | D2 | Higiene de Roles/cuentas (depurar, mínimo privilegio, correos correctos) y reflejo de cambios | Sheets/operativo | Alta | 1.3 | **Verificado (config efectiva).** Roles desplegados resuelven correctamente (admin/coordinador/voluntario/tesorería/consulta y revocado→`sin_acceso`), con normalización y denegación por defecto testeadas. Mantener `ROLES_USUARIOS`/`ADMIN_EMAILS` alineados ante altas/bajas. |
 | D3 | Verificar auditoría e historial de fases operativos en producción (cabeceras/IDs/endpoints/escritura) | GAS/Sheets | Alta | 5.1 | **Cerrado.** Instrumentación en código/tests (`tests/auditoria-d3.test.js`), desplegada y operativa en producción (incl. `web-media-subir` con permisos correctos). Inspección visual de filas en hoja: opcional. |
 | D4 | Gestión/rotación de token API y revisión de logs/exposición (`?token=`) | GAS/GitHub/operativo | Alta | 2.2 | **Revisado/cerrado (exposición y procedimiento).** Token en `?token=` por diseño (sin header auth por defecto), sin eco de secretos en workflow y sin exposición detectada en repo/cliente. Procedimiento de rotación definido (Secrets + config GAS + redespliegue); la rotación efectiva es una acción operativa a ejecutar cuando proceda. |
-| D5 | MFA para admins/elevados y endurecimiento login (reCAPTCHA/App Check según viabilidad) | Firebase | Media-alta | 2.1 | **Pendiente externo.** Configurar en consola Firebase (MFA para cuentas elevadas; reCAPTCHA/App Check si viable). |
+| D5 | Endurecimiento login con reCAPTCHA v3 (configuración y validación) | Consola reCAPTCHA / entorno desplegado | Media | 2.1 | **Pendiente operativo.** Código y `.gs` actualizados: verificar dominios/hostname/umbral y realizar prueba e2e. **MFA/App Check:** mejora futura opcional (no imprescindible). |
 | D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Cerrado en repo/verificable.** Automatizado (521 tests, Code/Auth/Roles), verificado en vivo por rol (incl. revocado, UI y matriz API directa), checklist y procedimiento documentados en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Residual operativo: auditoría en hojas (D3) y ejecución periódica/revisión de incidentes. |
 | D7 | Revisar canal público del gestor web frente a criterio 4.1 (lista blanca, CORS/dominio, sin datos internos) | GAS/config | Media | 4.1 | **Cerrado (código y producción).** Endpoints públicos allowlistados, solo GET, resueltos antes de auth y sin datos internos; verificado en vivo sin token (incl. rechazo de endpoints internos sin token). CORS/dominio condicionado al despliegue actual (JSONP). |
 
-**Criterio de cierre:** 1.1, 1.3, 2.2, 4.1, 5.1 y 5.2 verificados/cerrados en lo aplicable; **2.1 (MFA, D5) pendiente externo**. Objetivo ~80–85% alcanzado salvo D5.
+**Criterio de cierre (seguridad de este plan):** 1.1, 1.3, 2.2, 4.1, 5.1 y 5.2 verificados/cerrados en lo aplicable. **D5** queda cerrado para este plan cuando se verifiquen dominios/umbral y la prueba e2e de reCAPTCHA; MFA/App Check se registran como **mejoras futuras opcionales**.
 
 ### Track E — UI/UX modernización evolutiva (repo, en iteraciones cortas)
 **Objetivo:** completar la calidad percibida y mantenibilidad sin regresiones.
@@ -140,19 +140,21 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora:** **Track E cerrado** (E1–E5 completados en código/auditoría incremental, con QA manual operativa recomendada). **Track F** al día en esta iteración. Siguientes focos: operativos externos/de decisión (D5, A4, Track B, C3/C4) y mantenimiento evolutivo.
-2. **Operativo puntual:** inspección visual opcional de auditoría/fases en hojas, rotación periódica del token (D4), confirmación de `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
-3. **Externo / dependiente de decisión:** **D5** (MFA/endurecimiento login en Firebase), **A4** (dominio propio + Search Console), **C3** (ficha configurable v1.1) y **C4** (backend/alcance en este ecosistema si aplica). Lo planificado para `main` (Track B y formularios web C4) está trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md).
+1. **Ahora:** **Track E cerrado** y **`.gs` actualizados**. Siguientes focos: **D5** (configurar dominios/hostname/umbral en consola reCAPTCHA y prueba e2e) y **C3** (decisiones + implementación), además de mantenimiento evolutivo.
+2. **Operativo puntual:** inspección visual opcional de auditoría/fases en hojas, rotación periódica del token (D4) y confirmación de `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
+3. **Dependiente de decisión:** **C3** (ficha configurable v1.1) y soporte backend/C4 en este ecosistema si se aprueba. Lo planificado para `main` (Track B, formularios web C4 y dominio/indexación del sitio publicado) está en [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md). **MFA/App Check:** mejora futura opcional (no imprescindible para este plan).
 4. **Continuo:** mantener documentación y verificación alineadas con la realidad (tests, despliegues, SW).
 
 ## 5. Resumen de “qué falta” por responsabilidad
 
 | Responsabilidad | Pendientes principales |
 |---|---|
-| **Este repo** | Mantenimiento evolutivo (mejoras UX/a11y/perf adicionales y refactors oportunistas), soporte a C3/C4 si se aprueban, higiene documental continua |
+| **Este repo (gestión privada)** | Cerrar **D5** (config reCAPTCHA + e2e), avanzar **C3** si se aprueba, mantenimiento evolutivo y soporte a C4 backend si aplica |
 | **Apps Script/Sheets (operativo)** | Inspección opcional de auditoría/fases en hojas, rotación de token cuando proceda, confirmar `DRIVE_WEB_FOLDER_ID` desplegado; soporte a C3/C4 si se aprueban |
-| **Firebase/GitHub/operación** | **D5** (MFA/login), **A4** (DNS/Search Console), revisiones/rotaciones periódicas |
-| **Proyecto `main` (externo)** | Ejecutar lo trasladado en [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (Track B y formularios C4 en web), fuera de este repo. |
+| **Consola reCAPTCHA / operación** | Configurar dominios/hostname/umbral y validar login e2e (D5). Revisiones/rotaciones periódicas |
+| **Proyecto `main` (externo)** | Ejecutar lo trasladado en [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (Track B, formularios web C4 y dominio/indexación del sitio publicado), fuera de este repo. |
+
+**Mejoras futuras opcionales (no imprescindibles):** MFA para cuentas elevadas y App Check/endurecimiento adicional en Firebase.
 
 ## 6. Criterio global de “terminado”
 - **Gestor web:** canal y retiradas operativos en producción (A1–A2), documentación/CI alineadas, y (cuando aplique) dominio/indexación y port web completados.
