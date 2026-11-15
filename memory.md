@@ -1,11 +1,11 @@
 # memory.md — Qué se ha hecho
 
 > Registro de trabajo del gestor web y del visor público (`publico.html`, simulación de la web real de Grupo Nebak).
-> Última actualización: 2026-11-14. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
+> Última actualización: 2026-11-15. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). Hay cambios de `.gs` en repo pendientes de redesplegar: **restaurar retirada (C1)** y **eliminar borrador de publicación web de animal** (solo `WebPublicaciones`). Suite: **495/495**.
+El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). Según indicación del usuario, los `.gs` (C1 restaurar, borrado de borrador de publicación web de animal y D1 autorización/`sin_acceso`) están implementados/desplegados; en repo los cambios D1 locales de `apps-script/Auth.gs`/`apps-script/Roles.gs` están gitignored y `apps-script/Code.gs` tiene ajustes D1 no commiteados (alinear/registrar con lo desplegado). Suite: **495/495**.
 
 ## Entregado
 
@@ -38,8 +38,8 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 - Alta/edición de publicaciones de animales, eventos e historias; completitud, SEO, media, CTA, preview y slug check.
 - Historial de slugs (`slug_historial`) con 301 desde `?endpoint=redirects`; un slug histórico no se reutiliza.
 - Resumen con totales por tipo y por estado, diagnósticos de hoja y aviso de cabeceras.
-- **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, verificado con Playwright, `v230`), **pendiente de redesplegar `.gs`**.
-- **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`), **pendiente de redesplegar `.gs`** y validar en vivo.
+- **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`) y verificado en producción (Playwright).
+- **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`). **Backend verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, desaparece de `retiradas`/`gone` en lectura fresca (`nocache=1`); el endpoint `retiradas` puede servir cache ~60 s. UI de restaurar pendiente de reflejarse en el front desplegado (Pages) y la lápida estática se eliminará en el siguiente prerender/deploy.
 
 ### Media por ficha (Drive)
 
@@ -65,22 +65,26 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 - El port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` **no pertenece a este repositorio**: se entrega documentado (§7.2 y §7.4 del plan).
 - No implementar la ficha configurable (§7.3) sin aprobación.
 
-## Pendiente manual / verificación (fuera de git)
+## Pendiente manual / verificación (fuera de git o de siguiente deploy)
 
-1. **Redesplegar `.gs` actuales** (`Code.gs`, `WebPublicaciones.gs`) y validar en producción: **restaurar retirada (C1)** y **eliminar borrador de publicación web de animal** (solo `WebPublicaciones`, ficha intacta). Tras restaurar, comprobar que desaparece de `retiradas/gone` y que la lápida se elimina en el siguiente prerender/deploy.
-2. **Raíz de media**: configurada en `.env` y `Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
+1. **C1 cierre operativo:** desplegar/actualizar front (Pages) para exponer UI de “Restaurar” y ejecutar prerender/deploy para eliminar la lápida estática de `prueba-retirada-playwright` (ya restaurada a borrador) y confirmar que no entra en sitemap ni en `retiradas`.
+2. **Alinear `.gs` local ↔ desplegado ↔ git:** `Code.gs`/`Auth.gs`/`Roles.gs`/`WebPublicaciones.gs` desplegados según usuario (C1, borrado borrador animal, D1). En local, `Auth.gs`/`Roles.gs` (gitignored) y `Code.gs` tienen cambios D1 no reflejados en git; evitar exponer secretos y dejar registro coherente del lote desplegado.
+3. **Raíz de media:** confirmada en `.env`/`Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
 3. **A4 aplazado**: dominio propio y Search Console (sobre `github.io` es opcional enviar sitemap mientras tanto). Port del SEO al proyecto real (`C:\Users\JonEg\Documents\proyectos\main`).
 4. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
 
 **A2/A2.2 verificado:** endpoints públicos y prerender/SEO correctos en `github.io`; caso retirada `prueba-retirada-playwright` comprobado (`retiradas`, `gone`, slug reservado) y lápida estática publicada fuera de sitemap tras deploy.
 
+**Verificación 2026-11-15 (con .gs desplegados):** C1 restaurar evento en vivo OK (→ borrador, canal fresco sin `gone` y fuera de `retiradas`; cache ~60 s sin `nocache`). D1 parcial: `user-profile` admin devuelve datos completos; pendiente validar caso `sin_acceso` (no listado/revocado) y matriz por rol (ver [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)).
+
 ## Siguientes pasos propuestos
 
-1. **Redesplegar `.gs` y validar C1 + borrado de borrador animal** en vivo (y efecto en retiradas/`gone`/lápida tras deploy).
-2. **Track B**: port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).
-3. **Track D** (prioridad seguridad): D1 autorización por endpoint/perfil en GAS, D2–D7 (higiene Roles, auditoría, token, MFA, pruebas por rol, canal público). Se puede preparar en repo sin desplegar; validar requiere despliegue.
-4. **Track E**: homogeneizar módulos, limpiar CSS/modularizar `dashboard.js`, a11y/responsive y QA por rol (en repo).
-5. **A4 (aplazado)**: dominio propio + Search Console cuando aplique. C3 (ficha configurable) y C4 (forms) solo tras decisión.
+1. **C1 cierre operativo (repo/CI):** desplegar front con UI de restaurar y regenerar prerender para retirar lápida estática de `prueba-retirada-playwright`; validar en canal fresco/sitemap.
+2. **D1/D6 validación completa (operativo):** probar `sin_acceso` (no listado/revocado), confirmar restricciones por endpoint en UI y API directa, y ejecutar matriz por rol ([`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)). Verificar que `ROLES_USUARIOS`/`ADMIN_EMAILS` cubren a todos los legítimos.
+3. **Track D pendiente:** D2 higiene de roles/cuentas, D3 auditoría/historial operativo en hojas, D4 rotación/revisión token, D5 MFA (Firebase), D7 revisión formal del canal público.
+4. **Track B (externo):** port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).
+5. **Track E (repo):** homogeneizar módulos (E1), limpiar CSS/primitivas (E2), modularizar `dashboard.js` (E3), rendimiento (E4), a11y/responsive/QA por rol (E5).
+6. **A4 aplazado:** dominio propio + Search Console cuando aplique. C3/C4 solo tras decisión/alcance.
 
 ## Mapa rápido
 
