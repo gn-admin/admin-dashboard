@@ -187,6 +187,50 @@ describe('Publico.fecha', () => {
   });
 });
 
+describe('Publico.htmlDetalle: ficha configurable (C3)', () => {
+  const base = {
+    title: 'Luna busca familia',
+    excerpt: 'Perra sociable',
+    category: 'Perros en adopción',
+    contentHtml: '<p>Luna es una perra sociable.</p>',
+    publishedAt: '2026-11-01T10:00:00.000Z',
+    readTime: 4,
+    icons: [{ label: 'Edad', value: '2 años' }],
+    gallery: [{ src: 'https://x/1.jpg', alt: 'Luna', caption: 'En el parque' }],
+    videos: [{ title: 'Luna jugando', url: 'https://youtu.be/abc' }],
+    tags: ['perro'],
+    cta: { label: 'Quiero adoptar', url: 'https://x/adoptar', kind: 'adopcion' }
+  };
+
+  it('sin ficha mantiene el comportamiento actual', () => {
+    const html = Publico.htmlDetalle(base);
+    assert.match(html, /pub-detalle--ficha/);
+    assert.match(html, /Datos destacados/);
+    assert.match(html, /Galería/);
+    assert.match(html, /Vídeo/);
+    assert.match(html, /pub-chip/);
+    assert.match(html, /min de lectura/);
+    assert.match(html, /Quiero adoptar/);
+  });
+
+  it('respeta plantilla, bloques y tiempo de lectura', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, {
+      ficha: {
+        plantilla: 'historia',
+        bloques: { datos: false, galeria: false, videos: false, etiquetas: false, cta: false },
+        mostrarLectura: false
+      }
+    }));
+    assert.match(html, /pub-detalle--historia/);
+    assert.doesNotMatch(html, /Datos destacados/);
+    assert.doesNotMatch(html, /Galería/);
+    assert.doesNotMatch(html, /Vídeo/);
+    assert.doesNotMatch(html, /pub-chip/);
+    assert.doesNotMatch(html, /min de lectura/);
+    assert.match(html, /Luna es una perra sociable/);
+  });
+});
+
 describe('Publico.estadoTexto / esc', () => {
   it('traduce estados públicos', () => {
     assert.equal(Publico.estadoTexto('en_adopcion'), 'En adopción');

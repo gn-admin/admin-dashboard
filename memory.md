@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). Suite: **535/535**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (JSON avanzado), visor y pruebas. Suite: **540/540**.
 
 ## Entregado
 
@@ -41,6 +41,15 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`), verificado en producción (Playwright) y con auditoría `eliminar_publicacion` en el backend desplegado.
 - **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`) y **verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, slug conservado; tras deploy/prerender la lápida estática responde 404, no figura en sitemap ni en `retiradas`, y el front desplegado incluye la acción de restaurar (`API.restaurarWebEvento`). `retiradas` puede servir cache ~60 s sin `nocache=1`.
 
+### Ficha configurable (C3)
+
+- `ficha` es **aditivo**: `plantilla` (`ficha|historia`), `bloques` (datos, galeria, videos, fichaAnimal, etiquetas, cta), `mostrarLectura`, y opcionales `icons`/`gallery`/`videos`/`cta` (con `kind`).
+- Backend: columna `ficha_json` (se añade sola al final si la hoja ya existía), `webNormalizarFicha` cierra valores, acota listas/longitudes y rechaza fichas que no son objeto; máximo 45.000 caracteres.
+- Solo viaja en **detalle y preview**; los listados no la leen (regla de rendimiento). `cta.kind` (`adopcion|acogida|contacto|url`) se conserva en el payload.
+- Gestor: campo «Ficha configurable (JSON)» en la configuración avanzada de animal y evento/historia, normalizado antes de guardar.
+- Visor y prerender: misma composición (`htmlDetalle`) respeta plantilla, bloques y `mostrarLectura`; sin `ficha` el HTML no cambia.
+- Pruebas: `tests/ficha-config.test.js` (helpers), `tests/web-backend.test.js` (guardado/normalización, detalle sí y listado no) y `tests/publico.test.js` (bloques/plantilla).
+
 ### Media por ficha (Drive)
 
 - Una **carpeta por publicación** en Drive, separada por tipo: `animales/<slug>`, `eventos/<slug>`, `historias/<slug>` dentro de la raíz `DRIVE_WEB_FOLDER_ID`; se busca por nombre y se reutiliza.
@@ -55,7 +64,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ### Despliegue
 
 - GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v255` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; integraci�n C3: `ficha-config.js` cargado y usado para normalizar ficha en gestor/visor, precache actualizado).
-- `npm test`: **535/535** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
+- `npm test`: **540/540** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
 
 ## Decisiones cerradas
 
@@ -69,7 +78,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 **Hecho en vivo (2026-11-15, lote `.gs` desplegado):**
 - A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK y allowlist interna protegida (endpoints privados exigen token).
-- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 521 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
+- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 540 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
@@ -86,7 +95,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 - **Track B / formularios en `main`:** planificación trasladada a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (ejecución en el proyecto `main`, fuera de este repo).
 - **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
-- **Track C (pendiente, sujeto a aprobación/decisiones):** C1/C2 hechos. **C3** plan refinado (objetivo de `ficha_json`, almacenamiento compacto/híbrido, regla de rendimiento: no leer ficha por ítem en listados de 20+ y cargarla solo en detalle/prerender, viabilidad GitHub Pages+GAS) y **C4** con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso). Requiere cerrar decisiones y aprobación antes de implementar.
+- **Track C (pendiente, sujeto a aprobación/decisiones):** C1/C2 hechos. **C3 parcialmente implementado:** helpers (`ficha-config.js`), `ficha_json` en backend (detalle/preview, nunca listados) con normalización y límite, campo JSON avanzado en gestor, bloques/plantilla/lectura en visor y prerender, y pruebas de contrato. Queda UI estructurada (toggles, iconos, salud, tags), cerrar decisiones abiertas y el port a `main`. **C3** plan refinado (objetivo de `ficha_json`, almacenamiento compacto/híbrido, regla de rendimiento: no leer ficha por ítem en listados de 20+ y cargarla solo en detalle/prerender, viabilidad GitHub Pages+GAS) y **C4** con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso). Requiere cerrar decisiones y aprobación antes de implementar.
 
 ## Mapa rápido
 
@@ -104,7 +113,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 535 tests
+npm test                                   # 540 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

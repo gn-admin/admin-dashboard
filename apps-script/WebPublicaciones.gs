@@ -19,6 +19,12 @@ var WEB_PAGE_SIZE_DEF = 12;
 var WEB_PAGE_SIZE_MAX = 50;      // canal publico
 var WEB_ADMIN_PAGE_SIZE_MAX = 500; // listado del gestor (admin)
 
+// Ficha configurable (C3): valores cerrados y límite de celda de Sheets.
+var WEB_FICHA_PLANTILLAS = ['ficha', 'historia'];
+var WEB_FICHA_BLOQUES = ['datos', 'galeria', 'videos', 'fichaAnimal', 'etiquetas', 'cta'];
+var WEB_FICHA_CTA_KINDS = ['adopcion', 'acogida', 'contacto', 'url'];
+var WEB_FICHA_MAX_CHARS = 45000;
+
 // ==================== HELPERS BÁSICOS ====================
 
 function webSinAcentos(valor) {
@@ -240,6 +246,81 @@ function webHistorialDeCambio(previa, slugNuevo) {
   return hist.filter(function (h) { return h.slug && h.slug !== slugNuevo; });
 }
 
+/** Booleano estricto de la ficha: solo `true`/`false` (mismas reglas que el gestor). */
+function webFichaBool(valor, porDefecto) {
+  if (valor === true || valor === false) return valor;
+  if (valor === 'true') return true;
+  if (valor === 'false') return false;
+  return porDefecto;
+}
+
+/**
+ * Ficha configurable (C3): normaliza el objeto `ficha` con las mismas reglas
+ * que `src/js/ficha-config.js` (valores cerrados, listas y longitudes acotadas).
+ * Devuelve `null` cuando no hay ficha o el valor no es un objeto.
+ */
+function webNormalizarFicha(valor) {
+  var f = (valor && typeof valor === 'object' && !Array.isArray(valor)) ? valor : webParseJson(valor, null);
+  if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+
+  var plantilla = webTexto(f.plantilla).toLowerCase();
+  var bloquesIn = (f.bloques && typeof f.bloques === 'object' && !Array.isArray(f.bloques)) ? f.bloques : {};
+  var bloques = {};
+  WEB_FICHA_BLOQUES.forEach(function (k) { bloques[k] = webFichaBool(bloquesIn[k], true); });
+
+  var out = {
+    plantilla: WEB_FICHA_PLANTILLAS.indexOf(plantilla) !== -1 ? plantilla : 'ficha',
+    bloques: bloques,
+    mostrarLectura: webFichaBool(f.mostrarLectura, true)
+  };
+
+  if (Array.isArray(f.icons)) {
+    out.icons = f.icons.map(function (i) {
+      if (!i || typeof i !== 'object') return null;
+      var icon = webTexto(i.icon).slice(0, 40);
+      var label = webTexto(i.label).slice(0, 80);
+      var value = webTexto(i.value).slice(0, 120);
+      return (icon || label || value) ? { icon: icon, label: label, value: value } : null;
+    }).filter(function (x) { return !!x; }).slice(0, 30);
+  }
+  if (Array.isArray(f.gallery)) {
+    out.gallery = f.gallery.map(function (g, idx) {
+      if (!g) return null;
+      var src = webTexto(typeof g === 'string' ? g : (g.src || g.url)).slice(0, 500);
+      if (!src) return null;
+      var pedido = Number(g.order);
+      return {
+        src: src,
+        alt: webTexto(g.alt).slice(0, 160),
+        caption: webTexto(g.caption || g.pie).slice(0, 240),
+        order: (g.order !== undefined && g.order !== null && g.order !== '' && !isNaN(pedido)) ? pedido : idx
+      };
+    }).filter(function (x) { return !!x; }).slice(0, 30);
+  }
+  if (Array.isArray(f.videos)) {
+    out.videos = f.videos.map(function (v) {
+      if (!v || typeof v !== 'object') return null;
+      var url = webTexto(v.url).slice(0, 500);
+      if (!url) return null;
+      return {
+        title: webTexto(v.title || v.titulo).slice(0, 120),
+        url: url,
+        provider: webTexto(v.provider).slice(0, 40),
+        note: webTexto(v.note || v.nota).slice(0, 240)
+      };
+    }).filter(function (x) { return !!x; }).slice(0, 10);
+  }
+  if (f.cta && typeof f.cta === 'object' && !Array.isArray(f.cta)) {
+    var label = webTexto(f.cta.label || f.cta.texto).slice(0, 80);
+    var urlCta = webTexto(f.cta.url).slice(0, 500);
+    var kind = webTexto(f.cta.kind).toLowerCase();
+    if (WEB_FICHA_CTA_KINDS.indexOf(kind) === -1) kind = (urlCta || label) ? 'url' : '';
+    if (label || urlCta || kind) out.cta = { label: label, url: urlCta, kind: kind || 'url' };
+  }
+
+  return out;
+}
+
 function webMapaAnimales() {
   var mapa = {};
   var cfg = CONFIG.sheets && CONFIG.sheets.animales;
@@ -440,6 +521,8 @@ function webConstruirPublicacion(publicacion, origen, opts) {
 
   if (p.cta && webTexto(p.cta.label) && webTexto(p.cta.url)) {
     out.cta = { label: webTexto(p.cta.label), url: webTexto(p.cta.url) };
+    var kindCta = webTexto(p.cta.kind).toLowerCase();
+    if (WEB_FICHA_CTA_KINDS.indexOf(kindCta) !== -1) out.cta.kind = kindCta;
   }
   if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
   if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
@@ -576,6 +659,11 @@ function webUpsertAnimal(body) {
   var fichaVal = (body && (body.ficha !== undefined || body.ficha_json !== undefined))
     ? (body.ficha !== undefined ? body.ficha : body.ficha_json)
     : (previa ? previa.ficha : null);
+  var fichaNorm = webNormalizarFicha(fichaVal);
+  if (fichaVal && !fichaNorm) return { status: 'error', error: 'La ficha configurable debe ser un objeto JSON' };
+  if (fichaNorm && JSON.stringify(fichaNorm).length > WEB_FICHA_MAX_CHARS) {
+    return { status: 'error', error: 'La ficha configurable supera el máximo de ' + WEB_FICHA_MAX_CHARS + ' caracteres' };
+  }
   var registro = {
     id: (previa && previa.id) || ('web_' + webUuid()),
     tipo: 'animal',
@@ -599,7 +687,7 @@ function webUpsertAnimal(body) {
     cta_json: JSON.stringify(body.cta || null),
     animal_json: JSON.stringify(body.animal || {}),
     evento_json: '',
-    ficha_json: (fichaVal && typeof fichaVal === 'object') ? JSON.stringify(fichaVal) : '',
+    ficha_json: fichaNorm ? JSON.stringify(fichaNorm) : '',
     publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
     actualizado_en: webAhora(),
     creado_en: (previa && previa.creado_en) || webAhora()
@@ -763,6 +851,11 @@ function webUpsertEvento(body, user) {
   var fichaVal = (body && (body.ficha !== undefined || body.ficha_json !== undefined))
     ? (body.ficha !== undefined ? body.ficha : body.ficha_json)
     : (previa ? previa.ficha : null);
+  var fichaNorm = webNormalizarFicha(fichaVal);
+  if (fichaVal && !fichaNorm) return { status: 'error', error: 'La ficha configurable debe ser un objeto JSON' };
+  if (fichaNorm && JSON.stringify(fichaNorm).length > WEB_FICHA_MAX_CHARS) {
+    return { status: 'error', error: 'La ficha configurable supera el máximo de ' + WEB_FICHA_MAX_CHARS + ' caracteres' };
+  }
   var registro = {
     id: (previa && previa.id) || ('web_' + webUuid()),
     tipo: tipo,
@@ -786,7 +879,7 @@ function webUpsertEvento(body, user) {
     cta_json: JSON.stringify(body.cta || null),
     animal_json: '',
     evento_json: JSON.stringify(body.event || {}),
-    ficha_json: (fichaVal && typeof fichaVal === 'object') ? JSON.stringify(fichaVal) : '',
+    ficha_json: fichaNorm ? JSON.stringify(fichaNorm) : '',
     publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
     actualizado_en: webAhora(),
     creado_en: (previa && previa.creado_en) || webAhora()

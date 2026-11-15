@@ -24,8 +24,8 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 489 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
-| Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 540 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410 y ficha configurable) |
+| Ficha configurable desde la publicación | §7.3 | `- [~]` contrato aditivo implementado (backend validado, gestor JSON, visor/prerender y pruebas); falta UI estructurada y cerrar decisiones |
 | Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
 
 **Pasos manuales pendientes (fuera de git):**
@@ -127,10 +127,12 @@ Campos alineados con `estructura-endpoint-publicaciones.md`:
 id | tipo | origen_id | slug | estado_publicacion | indexable | listed | featured | orden
 titulo | extracto | contenido_html | categoria | estado_publico | especie | autor | tags_json
 media_json | seo_json | cta_json | animal_json | evento_json
-publicado_en | actualizado_en | creado_en | slug_historial
+publicado_en | actualizado_en | creado_en | slug_historial | ficha_json
 ```
 
-`media_json`, `seo_json`, `cta_json`, `animal_json`, `evento_json` y `tags_json` guardan JSON serializado.
+`media_json`, `seo_json`, `cta_json`, `animal_json`, `evento_json`, `tags_json` y `ficha_json` guardan JSON serializado.
+
+`ficha_json` (C3) es opcional y aditivo. En hojas ya creadas no hace falta migrar a mano: `appendToSheet`/`updateSheetRow` añaden las columnas nuevas al final; aun así, conviene revisar que aparezca tras el primer guardado. Contiene como máximo 45.000 caracteres y nunca se incluye en listados.
 
 ---
 
@@ -271,11 +273,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-14, 489 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-15, 540 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **489 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **540 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -297,13 +299,13 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 La guía de port, consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y criterios de ejecución para la web real se han **trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para su ejecución en `C:\Users\JonEg\Documents\proyectos\main` (fuera del alcance de este repositorio).
 
-### 7.3 Ficha de animal configurable desde la publicación — media implementada, resto pendiente
+### 7.3 Ficha de animal configurable desde la publicación — implementada por etapas (C3 en curso)
 
 **Pregunta de partida.** La ficha de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
 
 **Objetivo de `ficha_json`.** Campo opcional y aditivo para guardar la **configuración/contenido estructurado de la ficha** (bloques, plantilla, iconos, datos curados/CTA, etc.) y hacerla configurable desde el gestor sin ampliar el esquema fijo en cada cambio. Si no existe, se mantiene el render actual.
 
-**Criterio de esta pasada.** Solo análisis y plan: **no se implementa nada**. El contrato que se propone es **aditivo** y debe respetar compatibilidad y rendimiento (los listados no leen la ficha completa por ítem; se carga en detalle/prerender).
+**Estado (2026-11-15).** Contrato aditivo **implementado por etapas**: backend (`ficha_json` normalizado, solo detalle/preview), gestor (campo JSON avanzado), visor y prerender (plantilla, bloques, tiempo de lectura) y pruebas de regresión. Falta la UI estructurada (toggles, catálogo de iconos, salud curada, tags) y cerrar las decisiones de §D antes de completar el port a la web.
 
 #### A. Anatomía de la ficha de referencia
 
@@ -385,12 +387,12 @@ Reglas:
 
 #### F. Plan de implementación (sin empezar, sujeto a aprobación C3)
 
-1. **Contrato y validación** (`WebPublicaciones.gs`): `ficha_json` → objeto `ficha` en `webConstruirPublicacion`; valores cerrados; tests de ausencia (payload idéntico al actual).
-2. **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.
-3. **Gestor (`src/js/web.js`):** nueva sección «Presentación de la ficha» (plantilla, toggles de bloques, `mostrarLectura`), selectores de icono con catálogo, galería `url\|alt\|pie`, salud con tres estados, CTA con intención y `tags`.
-4. **Visor (`publico.js` + `publico.css`):** render condicionado por `ficha.bloques`, plantilla `historia`, CTA por `kind` y salud explícita. Mantener el fallback actual cuando no venga `ficha`.
+1. [x] **Contrato y validación** (`WebPublicaciones.gs`): `ficha_json` → objeto `ficha` en `webConstruirPublicacion`; valores cerrados; tests de ausencia (payload idéntico al actual).
+2. [x] **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.
+3. [~] **Gestor (`src/js/web.js`):** nueva sección «Presentación de la ficha» (plantilla, toggles de bloques, `mostrarLectura`), selectores de icono con catálogo, galería `url\|alt\|pie`, salud con tres estados, CTA con intención y `tags`.
+4. [x] **Visor (`publico.js` + `publico.css`):** render condicionado por `ficha.bloques`, plantilla `historia`, CTA por `kind` y salud explícita. Mantener el fallback actual cuando no venga `ficha`.
 5. **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story` y ocultar bloques; `publication.icons` con clave de catálogo.
-6. **Aceptación:** payload sin `ficha` idéntico byte a byte al actual (test de regresión); ficha con `bloques` desactivados no pinta esos bloques; publicación antigua sigue renderizando igual; 360/1280 sin desbordes.
+6. [~] **Aceptación:** payload sin `ficha` idéntico byte a byte al actual (test de regresión); ficha con `bloques` desactivados no pinta esos bloques; publicación antigua sigue renderizando igual; 360/1280 sin desbordes.
 
 **Fuera de alcance:** exponer la ficha interna del animal, editor WYSIWYG, CSS/tema por publicación y multiplantilla más allá de `ficha`/`historia`.
 
@@ -422,7 +424,7 @@ Reglas:
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **489/489** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie y normalización de Drive).
+- `npm test`: **540/540** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive y ficha configurable).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
@@ -493,3 +495,5 @@ Reglas:
 | 2026-11-14 | 5 | Deploy programado diario (03:17 UTC) para aplicar retiradas sin push; concurrencia en cola para no cancelar un deploy en curso | — | `.github/workflows/deploy.yml`, §7.4 |
 | 2026-11-14 | 3 | Media por ficha: carpeta `tipo-slug` en Drive, endpoint `web-media-subir` y subidas desde los formularios; documentos privados | — | `tests/web-backend.test.js`, `tests/web.test.js`, §7.3 C bis |
 | 2026-11-14 | 3 | Galería `url|alt|pie` con `<figure>`/`<figcaption>`, normalización de enlaces de Drive (carpetas rechazadas) y media separada por tipo (`animales|eventos|historias/<slug>`) | — | `tests/web.test.js`, `tests/prerender.test.js`, `tests/web-backend.test.js` |
+| 2026-11-15 | C3 | Contrato `ficha` aditivo: helpers de normalización, `ficha_json` en backend (detalle/preview, nunca listados), campo JSON en gestor y bloques/plantilla en visor/prerender | — | `tests/ficha-config.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js` |
+| 2026-11-15 | C3 | Endurecido en servidor: `webNormalizarFicha` (valores cerrados, listas/longitudes, máximo 45.000 caracteres), rechazo de fichas no objeto y `cta.kind` conservado en el payload | — | `tests/web-backend.test.js`, `tests/publico.test.js` |

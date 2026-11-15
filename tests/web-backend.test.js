@@ -328,6 +328,69 @@ describe('preview del gestor == canal público', () => {
   });
 });
 
+describe('ficha configurable (C3)', () => {
+  function alta(b, ficha, cta) {
+    return b.ctx.webUpsertAnimal({
+      animal_id: 'ani_1', titulo: 'Luna busca familia', slug: 'luna',
+      estado_publicacion: 'publicado', categoria: 'Perros en adopción',
+      estado_publico: 'en_adopcion',
+      contenido_html: '<p>Luna es una perra sociable y juguetona que busca una familia responsable.</p>',
+      seo: { metaDescription: 'Luna en adopción' },
+      ficha: ficha, cta: cta
+    });
+  }
+
+  it('guarda la ficha normalizada y solo viaja en detalle/preview', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const r = alta(b, {
+      plantilla: 'historia',
+      bloques: { galeria: false, datos: 'false' },
+      mostrarLectura: false,
+      cta: { label: 'Quiero adoptar', url: 'https://web.test/adoptar', kind: 'adopcion' }
+    }, { label: 'Quiero adoptar', url: 'https://web.test/adoptar', kind: 'adopcion' });
+    assert.equal(r.status, 'success');
+
+    const guardada = JSON.parse(b.estado.publicaciones[0].ficha_json);
+    assert.equal(guardada.plantilla, 'historia');
+    assert.equal(guardada.bloques.galeria, false);
+    assert.equal(guardada.bloques.datos, false);
+    assert.equal(guardada.bloques.videos, true);
+    assert.equal(guardada.mostrarLectura, false);
+    assert.equal(guardada.cta.kind, 'adopcion');
+
+    const lista = b.ctx.webListarPublicas({ pageSize: 50 });
+    assert.equal(lista.data[0].ficha, undefined, 'los listados no cargan la ficha');
+    const detalle = b.ctx.webPublicacionPublica('luna');
+    assert.equal(detalle.data.ficha.plantilla, 'historia');
+    assert.equal(detalle.data.cta.kind, 'adopcion');
+    assert.equal(b.ctx.webPreviewAnimal('ani_1').data.ficha.plantilla, 'historia');
+  });
+
+  it('cierra valores no válidos y rechaza fichas que no son objeto', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const r = alta(b, { plantilla: 'otra', bloques: { cta: 'no' }, cta: { label: 'Ver', url: 'https://x', kind: 'raro' } });
+    assert.equal(r.status, 'success');
+    const f = JSON.parse(b.estado.publicaciones[0].ficha_json);
+    assert.equal(f.plantilla, 'ficha');
+    assert.equal(f.bloques.cta, true);
+    assert.equal(f.cta.kind, 'url');
+
+    const malo = b.ctx.webUpsertAnimal({ animal_id: 'ani_1', ficha: ['no'] });
+    assert.equal(malo.status, 'error');
+  });
+
+  it('sin ficha el payload no cambia (compatibilidad)', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const r = alta(b, null);
+    assert.equal(r.status, 'success');
+    assert.equal(b.estado.publicaciones[0].ficha_json, '');
+    assert.equal(b.ctx.webPublicacionPublica('luna').data.ficha, undefined);
+  });
+});
+
 describe('canal público: listado', () => {
   let b;
   beforeEach(() => {

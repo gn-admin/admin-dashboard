@@ -4,7 +4,7 @@
 
 ## 0. Estado de verificación (2026-11-15)
 
-**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **521/521**.
+**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **540/540**.
 
 **Verificado en vivo (con lote `.gs` desplegado):**
 - [x] **D1/D2:** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; roles desplegados resuelven correctamente (revocado→`sin_acceso`) con denegación por defecto.
@@ -16,7 +16,7 @@
 **Pendiente (operativo/manual):**
 - [ ] **D3 (opcional):** inspección visual de filas en hoja de auditoría/fases.
 - [ ] **D4 (periódico):** rotación del token cuando proceda.
-- [ ] **D5:** MFA/endurecimiento en Firebase.
+- [ ] **D5:** configurar dominios/umbral en la consola reCAPTCHA v3 y ejecutar la prueba e2e de login (código y `.gs` ya actualizados). **MFA/App Check:** mejora futura opcional.
 
 ## 1. Roles esperados
 
