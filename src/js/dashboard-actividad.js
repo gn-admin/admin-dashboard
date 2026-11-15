@@ -3,7 +3,8 @@
     module.exports = factory();
   } else {
     const mod = factory();
-    if (root.Dashboard) Object.assign(root.Dashboard, mod);
+    const destino = (typeof Dashboard !== 'undefined') ? Dashboard : root.Dashboard;
+    if (destino) Object.assign(destino, mod);
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   return {

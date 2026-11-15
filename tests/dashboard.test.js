@@ -1613,3 +1613,14 @@ describe('notas con autor (linea temporal)', () => {
     assert.doesNotMatch(html, /notaEliminarUI/);
   });
 });
+
+describe('módulos delegados de Dashboard', () => {
+  it('se fusionan con Dashboard aunque no viva en window', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    ['dashboard-actividad', 'dashboard-finanzas', 'dashboard-blacklist', 'dashboard-web'].forEach(f => {
+      const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', f + '.js'), 'utf8');
+      assert.match(src, /typeof Dashboard !== 'undefined'/, f + ' debe resolver el Dashboard léxico');
+    });
+  });
+});
