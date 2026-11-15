@@ -211,6 +211,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ### 5.5 Formularios (opcional, canal separado del feed) — pendiente
 - [ ] `POST /v1/forms/submit` (`form_type`, `concepto`, `fields`, `page_url`, `privacy_accepted`, `recaptcha{token,action}`) con validación, registro opcional y envío de correo según plantillas. Fuera del alcance de esta iteración.
+- **Factibilidad (GitHub Pages + GAS, 2026-11-15):** viable para bajo volumen si se resuelve el transporte. GAS no expone CORS configurable: los `POST` JSON cross-origin pueden fallar por preflight (el proyecto ya evita preflight en lecturas con JSONP). Recomendación: **prototipar** envío compatible (form clásico `x-www-form-urlencoded`/`multipart`, p. ej. con iframe oculto y UX sin dependencia de leer respuesta cross-origin) antes de implementar. Verificación reCAPTCHA en servidor vía `UrlFetchApp` con clave secreta en Script Properties (site key pública en cliente); `MailApp`/Sheets sujetos a cuotas; rate-limit/antiabuso limitado (sin estado transaccional robusto). Requiere política de datos/privacidad y no almacenar secretos/PII en repo.
 
 ---
 
@@ -311,7 +312,9 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 **Pregunta de partida.** La ficha de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
 
-**Criterio de esta pasada.** Solo análisis y plan: **no se implementa nada**. El contrato que se propone es **aditivo**: si una publicación no trae la configuración nueva, endpoint y visor se comportan exactamente como hoy.
+**Objetivo de `ficha_json`.** Campo opcional y aditivo para guardar la **configuración/contenido estructurado de la ficha** (bloques, plantilla, iconos, datos curados/CTA, etc.) y hacerla configurable desde el gestor sin ampliar el esquema fijo en cada cambio. Si no existe, se mantiene el render actual.
+
+**Criterio de esta pasada.** Solo análisis y plan: **no se implementa nada**. El contrato que se propone es **aditivo** y debe respetar compatibilidad y rendimiento (los listados no leen la ficha completa por ítem; se carga en detalle/prerender).
 
 #### A. Anatomía de la ficha de referencia
 
@@ -361,8 +364,9 @@ La plantilla se elige por categoría (`isFichaPost`): `Adoptados` cae a formato 
 Reglas:
 - **Aditivo y opcional:** ausencia de `ficha` = comportamiento actual; el visor y la web ignoran claves desconocidas.
 - **Compatibilidad:** `icon` pasa a ser clave sugerida, no obligatoria; `label` manda para el texto y el icono cae al catálogo o al regex.
-- **Persistencia:** nueva columna `ficha_json` en `WebPublicaciones` (27 columnas). `appendToSheet` escribe cabeceras nuevas solo en hoja vacía; en hojas ya creadas hay que añadir la columna a mano (misma operación que `slug_historial`).
-- **Validación:** `plantilla` y `bloques` cerrados a valores conocidos; `cta.kind` cerrado; el resto, texto saneado. Publicar **no** exige la configuración nueva.
+- **Persistencia y tamaño:** propuesta base, columna `ficha_json` en `WebPublicaciones` (añadirla a mano en hojas ya creadas, como `slug_historial`). **Límite de celda en Sheets ~50.000 caracteres**: mantener el JSON compacto (IDs/referencias, sin duplicar contenido pesado que ya vive en otros campos/Drive). Alternativa/híbrido si crece: guardar la ficha completa en un fichero JSON en Drive (p. ej. en la carpeta de la publicación) y almacenar su `fileId`/ruta en la hoja como desbordamiento.
+- **Rendimiento de lectura (regla):** los listados/secciones (historias, gatos/perros en adopción, feeds con 20+ ítems) **no deben** leer `ficha_json` ni ficheros por ítem: se resuelven con campos de la fila ya usados en tarjetas (slug, título, portada, extracto, categoría/estado, destacados). La ficha completa se carga **solo en el detalle** y en el **prerender** de la ficha (donde el coste se paga en build). Con caché interna del canal (~60 s) esto evita penalizar los listados.
+- **Validación:** `plantilla` y `bloques` cerrados a valores conocidos; `cta.kind` cerrado; el resto, texto saneado (ver decisiones). Publicar **no** exige la configuración nueva.
 
 #### C bis. Media por ficha — implementado
 
@@ -377,13 +381,20 @@ Reglas:
 
 #### D. Decisiones abiertas antes de implementar
 
+- [ ] **Almacenamiento de la ficha (celda vs fichero).** Base: `ficha_json` compacto en celda (límite ~50k chars). Si hace falta, desbordamiento a fichero JSON en Drive + `fileId`/ruta en hoja. Regla: **nunca leer ficha por ítem en listados**; cargarla solo en detalle y en prerender.
 - [ ] **Vídeo incrustado o enlace.** La ficha real usa `<iframe>`; `src/publico.html` tiene hoy `frame-src 'none'` y `publico.js` enlaza. Incrustar exige abrir CSP a `youtube-nocookie.com`/`player.vimeo.com` y decidir consentimiento de cookies. Recomendación: mantener enlace hasta que la web final lo pida.
 - [ ] **Catálogo de iconos compartido.** Copiarlo en `publico.js` y en `blog-render.js` (hoy ya está duplicado el `svgFor`), o publicarlo como `GET ?endpoint=taxonomias`.
 - [ ] **HTML libre en `contentHtml` y `sections`.** El gestor admite HTML; falta decidir si se sanea en el backend (lista blanca) o se confía en el rol `admin`/`coordinador`.
 - [ ] **Orden de bloques configurable.** Se propone solo visibilidad; un orden libre complica el layout y el render de la web.
 - [ ] **Retrocompatibilidad de `tags` en animales.** Añadir el campo al formulario no rompe nada, pero hay publicaciones antiguas sin etiquetas.
 
-#### E. Plan de implementación (sin empezar)
+#### E. Factibilidad y notas de implementación (GitHub Pages + GAS, 2026-11-15)
+
+- **C3 viable:** aditivo en Sheets/Drive + GAS + Pages/prerender. Claves: JSON compacto (o híbrido con fichero de desbordamiento), saneado/validación en servidor, y **no leer ficha completa en listados** (solo en detalle/prerender; caché ~60 s) para no penalizar secciones con 20+ publicaciones.
+- **C4 viable con restricciones (alcance aparte):** verificación reCAPTCHA server-side vía `UrlFetchApp` (secreto en Script Properties) y persistencia/notificación con Sheets/`MailApp` dentro de cuotas; principal reto **CORS/preflight en POST** desde navegador a GAS. Requiere prototipo de transporte (p. ej. form `x-www-form-urlencoded`/iframe, UX sin lectura directa de respuesta) y política de antiabuso/datos.
+- **Repo público/Pages:** sin secretos en repo; site key pública aceptable, secretos solo en GitHub Secrets/Script Properties; Pages estático (redirects/410 ya resueltos con prerender/estado lógico).
+
+#### F. Plan de implementación (sin empezar, sujeto a aprobación C3)
 
 1. **Contrato y validación** (`WebPublicaciones.gs`): `ficha_json` → objeto `ficha` en `webConstruirPublicacion`; valores cerrados; tests de ausencia (payload idéntico al actual).
 2. **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.

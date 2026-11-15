@@ -83,7 +83,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 - **Track B (externo, `C:\Users\JonEg\Documents\proyectos\main`):** B1–B4 consumo del canal, metas/SEO, prerender/sitemap/robots/301/410 y paridad.
 - **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
-- **Solo si se aprueba:** C3 ficha configurable §7.3 v1.1 y C4 `forms/submit` (decisiones previas y alcance aparte).
+- **Track C (pendiente, sujeto a aprobación/decisiones):** C1/C2 hechos. **C3** plan refinado (objetivo de `ficha_json`, almacenamiento compacto/híbrido, regla de rendimiento: no leer ficha por ítem en listados de 20+ y cargarla solo en detalle/prerender, viabilidad GitHub Pages+GAS) y **C4** con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso). Requiere cerrar decisiones y aprobación antes de implementar.
 
 ## Mapa rápido
 
