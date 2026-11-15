@@ -4200,9 +4200,9 @@ const Dashboard = {
     if (!a) { this.showSnackbar('Animal no encontrado. Recarga la lista.', 'warning'); return; }
     this.showFormModal('Nuevo documento · ' + a.nombre, `
       <form data-submit="saveDocumento" data-sarg0="${a.id}">
-      <div class="form-row"><div class="form-group"><label>Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
-      <div class="form-group"><label>Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
-      <div class="form-group"><label>Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
+      <div class="form-row"><div class="form-group"><label for="dc-nombre">Nombre *</label><input type="text" id="dc-nombre" required placeholder="Ej: Cartilla 2026"></div>
+      <div class="form-group"><label for="dc-tipo">Tipo *</label><select id="dc-tipo" required><option value="Cartilla">Cartilla</option><option value="Vacunas">Vacunas</option><option value="Analitica">Analitica</option><option value="Otro">Otro</option></select></div></div>
+      <div class="form-group"><label for="dc-archivo">Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Subir y guardar</button></div>
       </form>`);
   },
@@ -4680,9 +4680,9 @@ const Dashboard = {
     const nombre = g.nombre || ms[0].grupo || '';
     const fotoActual = this._grupoFoto(gid) || '';
     this.showFormModal('Editar grupo', `<form data-submit="saveGrupo" data-sarg0="${gid}">
-      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label>Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="gr-foto-preview"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
-      <div class="form-group"><label>Descripcion</label><textarea id="gr-descripcion" rows="2" placeholder="De donde viene la camada, caracteristicas...">${this._esc(g.descripcion || '')}</textarea></div>
-      <div class="form-group"><label>Notas</label><textarea id="gr-notas" rows="3" placeholder="Seguimiento, tratamientos, acuerdos...">${this._esc(g.notas || '')}</textarea></div>
+      <div class="form-row"><div class="form-group"><label for="gr-nombre">Nombre del grupo *</label><input type="text" id="gr-nombre" value="${this._esc(nombre)}" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Cambiarlo renombra los ${ms.length} animales del grupo.</p></div><div class="form-group"><label for="gr-foto">Foto del grupo (opcional)</label><input type="file" id="gr-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="gr-foto-preview"><div id="gr-foto-preview">${fotoActual ? `<img src="${this._esc(fotoActual)}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div></div></div>
+      <div class="form-group"><label for="gr-descripcion">Descripcion</label><textarea id="gr-descripcion" rows="2" placeholder="De donde viene la camada, caracteristicas...">${this._esc(g.descripcion || '')}</textarea></div>
+      <div class="form-group"><label for="gr-notas">Notas</label><textarea id="gr-notas" rows="3" placeholder="Seguimiento, tratamientos, acuerdos...">${this._esc(g.notas || '')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form>`);
   },
@@ -4876,10 +4876,10 @@ const Dashboard = {
 
   showCamadaForm() {
     this.showFormModal('Alta de camada', `<form data-submit="saveCamada">
-      <div class="form-row"><div class="form-group"><label>Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label>Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
-      <div class="form-row"><div class="form-group"><label>Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label>Especie *</label><select id="cm-especie" required>${this._especiesDomesticas().map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>
-      <div class="form-row"><div class="form-group"><label>Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label>Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
-      <div class="form-row"><div class="form-group"><label>Sexo *</label><select id="cm-sexo"><option value="Macho">Macho</option><option value="Hembra">Hembra</option></select></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="cm-obl" checked> Grupo obligatorio</label></div></div>
+      <div class="form-row"><div class="form-group"><label for="cm-grupo">Nombre del grupo *</label><input type="text" id="cm-grupo" required placeholder="Ej: Camada Luna Mayo 2026"></div><div class="form-group"><label for="cm-base">Nombre base *</label><input type="text" id="cm-base" required placeholder="Ej: Luna"></div></div>
+      <div class="form-row"><div class="form-group"><label for="cm-cantidad">Cantidad *</label><input type="number" id="cm-cantidad" min="1" max="12" value="3" required></div><div class="form-group"><label for="cm-especie">Especie *</label><select id="cm-especie" required>${this._especiesDomesticas().map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div></div>
+      <div class="form-row"><div class="form-group"><label for="cm-raza">Raza</label><input type="text" id="cm-raza" placeholder="Ej: Mestizo"></div><div class="form-group"><label for="cm-edad">Edad</label><input type="text" id="cm-edad" placeholder="Ej: 2 meses"></div></div>
+      <div class="form-row"><div class="form-group"><label for="cm-sexo">Sexo *</label><select id="cm-sexo"><option value="Macho">Macho</option><option value="Hembra">Hembra</option></select></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="cm-obl" checked> Grupo obligatorio</label></div></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Crear camada</button></div>
     </form>`);
   },
@@ -6214,8 +6214,8 @@ const Dashboard = {
     if (p.desenlace) { this.showSnackbar('El caso está cerrado; no se pueden añadir notas de fase.', 'warning'); return; }
     this.showFormModal('Nota de fase · ' + (p.fase || ''), `
       <form data-submit="guardarNotaFase" data-sarg0="${adopcionId}">
-        <div class="form-group"><label>Fase actual</label><input type="text" value="${this._esc(p.fase || '')}" disabled></div>
-        <div class="form-group"><label>Nota</label><textarea id="hf-nota" rows="4" placeholder="Escribe una nota para esta fase (opcional pero recomendada)"></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Se guardará con tu usuario y la fecha/hora actual.</div></div>
+        <div class="form-group"><label for="hf-fase-actual">Fase actual</label><input type="text" id="hf-fase-actual" value="${this._esc(p.fase || '')}" disabled></div>
+        <div class="form-group"><label for="hf-nota">Nota</label><textarea id="hf-nota" rows="4" placeholder="Escribe una nota para esta fase (opcional pero recomendada)"></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Se guardará con tu usuario y la fecha/hora actual.</div></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar nota</button></div>
       </form>`);
   },
@@ -6771,10 +6771,10 @@ const Dashboard = {
     this.showFormModal('Registrar entrega · ' + (p.animal || ''), `
       <form data-submit="saveEntrega" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Registra la entrega fisica del animal. El checklist ayuda a comprobar que todo esta listo.</span></div>
-        <div class="form-row"><div class="form-group"><label>Fecha de entrega *</label><input type="date" id="en-fecha" value="${this._esc(p.fecha_entrega || new Date().toISOString().slice(0,10))}" required></div><div class="form-group"><label>Persona que recibe</label><input type="text" id="en-recibe" value="${this._esc(p.adoptante || '')}" placeholder="Nombre del adoptante"></div></div>
+        <div class="form-row"><div class="form-group"><label for="en-fecha">Fecha de entrega *</label><input type="date" id="en-fecha" value="${this._esc(p.fecha_entrega || new Date().toISOString().slice(0,10))}" required></div><div class="form-group"><label for="en-recibe">Persona que recibe</label><input type="text" id="en-recibe" value="${this._esc(p.adoptante || '')}" placeholder="Nombre del adoptante"></div></div>
         <div class="form-group"><label>Checklist de entrega</label><div class="check-grid">${this._entregaChecklist().map(it => { const fijo = it.id === 'contrato'; return `<label class="check-item"><input type="checkbox" id="en-chk-${it.id}" ${(fijo || marcas[it.id]) ? 'checked' : ''} ${fijo ? 'disabled' : ''}><span>${this._esc(it.label)}${fijo ? ' (ya verificado)' : ''}${it.opcional ? ' (opcional)' : ''}</span></label>`; }).join('')}</div></div>
-        <div class="form-group"><label>Foto de la entrega (opcional)</label><input type="file" id="en-foto" accept="image/*"><div style="font-size:var(--text-xs);color:var(--gray-400);margin-top:4px">Se sube a Drive y queda enlazada al caso.</div></div>
-        <div class="form-group"><label>Observaciones</label><textarea id="en-obs" rows="3" placeholder="Estado del animal, acuerdos, material entregado...">${this._esc(p.entrega_observaciones || '')}</textarea></div>
+        <div class="form-group"><label for="en-foto">Foto de la entrega (opcional)</label><input type="file" id="en-foto" accept="image/*"><div style="font-size:var(--text-xs);color:var(--gray-400);margin-top:4px">Se sube a Drive y queda enlazada al caso.</div></div>
+        <div class="form-group"><label for="en-obs">Observaciones</label><textarea id="en-obs" rows="3" placeholder="Estado del animal, acuerdos, material entregado...">${this._esc(p.entrega_observaciones || '')}</textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar entrega</button></div>
       </form>`);
   },
@@ -6843,9 +6843,9 @@ const Dashboard = {
     this.showFormModal('Prueba de adaptacion · ' + (p.animal || ''), `
       <form data-submit="savePrueba" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>La <b>prueba</b> es el periodo corto de adaptacion (15-30 dias). El <b>seguimiento</b> se registra despues, a 1, 3, 6 y 12 meses.</span></div>
-        <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="pb-fecha" value="${new Date().toISOString().slice(0,10)}" required></div><div class="form-group"><label>Resultado *</label><select id="pb-resultado" required><option value="Continua la adopcion">Continua la adopcion</option><option value="Seguimiento especial">Seguimiento especial</option><option value="Devolucion recomendada">Devolucion recomendada</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label for="pb-fecha">Fecha *</label><input type="date" id="pb-fecha" value="${new Date().toISOString().slice(0,10)}" required></div><div class="form-group"><label for="pb-resultado">Resultado *</label><select id="pb-resultado" required><option value="Continua la adopcion">Continua la adopcion</option><option value="Seguimiento especial">Seguimiento especial</option><option value="Devolucion recomendada">Devolucion recomendada</option></select></div></div>
         <div class="form-group"><label>Checklist de adaptacion</label><div class="check-grid">${this._pruebaChecklist().map(it => `<label class="check-item"><input type="checkbox" id="pb-chk-${it.id}"><span>${this._esc(it.label)}</span></label>`).join('')}</div></div>
-        <div class="form-group"><label>Observaciones</label><textarea id="pb-nota" rows="3" placeholder="Como esta el animal, incidencias, acuerdos..."></textarea></div>
+        <div class="form-group"><label for="pb-nota">Observaciones</label><textarea id="pb-nota" rows="3" placeholder="Como esta el animal, incidencias, acuerdos..."></textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar prueba</button></div>
       </form>`);
   },
@@ -7122,7 +7122,7 @@ const Dashboard = {
       <form data-submit="guardarAvanceFase" data-sarg0="${id}">
         <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>Vas a cerrar <b>${this._esc(p.fase)}</b> y avanzar a <b>${this._esc(next)}</b>. Se guardará quién realiza el cambio y la fecha de cierre de la fase.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Siguiente fase</div><div class="detail-answer">${this._esc(next)}</div></div></div>
-        <div class="form-group"><label>Nota de cierre de fase (opcional)</label><textarea id="af-nota" rows="4" placeholder="Observaciones, acuerdos, incidencias... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
+        <div class="form-group"><label for="af-nota">Nota de cierre de fase (opcional)</label><textarea id="af-nota" rows="4" placeholder="Observaciones, acuerdos, incidencias... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.arrowRight} Confirmar avance</button></div>
       </form>`);
   },
@@ -7192,7 +7192,7 @@ const Dashboard = {
       <form data-submit="guardarRetrocesoFase" data-sarg0="${id}">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>Vas a retroceder de <b>${this._esc(p.fase)}</b> a <b>${this._esc(prev)}</b>. ${this._esc(extra)} Se guardará quién realiza el cambio y la fecha.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase)}</div></div><div class="detail-field"><div class="detail-question">Fase destino</div><div class="detail-answer">${this._esc(prev)}</div></div></div>
-        <div class="form-group"><label>Nota del retroceso (opcional)</label><textarea id="rf-nota" rows="4" placeholder="Motivo del retroceso, observaciones... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
+        <div class="form-group"><label for="rf-nota">Nota del retroceso (opcional)</label><textarea id="rf-nota" rows="4" placeholder="Motivo del retroceso, observaciones... Si no hay nota, se registrará como &quot;Sin nota&quot;."></textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.arrowLeft} Confirmar retroceso</button></div>
       </form>`);
   },
@@ -7243,7 +7243,7 @@ const Dashboard = {
       <form data-submit="guardarDevolucion" data-sarg0="${id}">
         <div class="alert-item warning" style="margin-bottom:14px">${Icons.alertTriangle} <span>El caso <b>no se elimina</b>: quedará con desenlace <b>Devuelto</b> y se conservará en el historial. El animal volverá a <b>Disponible</b> y la solicitud a <b>En proceso</b>.</span></div>
         <div class="detail-section" style="margin-bottom:12px"><div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase || '—')}</div></div><div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(p.adoptante || '—')}</div></div></div>
-        <div class="form-group"><label>Motivo de la devolución *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej.: No se ha adaptado al hogar, cambio de circunstancias del adoptante..."></textarea></div>
+        <div class="form-group"><label for="dv-motivo">Motivo de la devolución *</label><textarea id="dv-motivo" rows="4" required placeholder="Ej.: No se ha adaptado al hogar, cambio de circunstancias del adoptante..."></textarea></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Registrar devolución</button></div>
       </form>`);
   },
@@ -7325,10 +7325,10 @@ const Dashboard = {
     this.showFormModal('Nuevo seguimiento', `
       <form data-submit="saveSeguimiento" data-sarg0="${p.id}">
       <div class="alert-item info" style="margin-bottom:14px">${Icons.calendar} <span>El <b>seguimiento</b> es el acompanamiento a largo plazo (1, 3, 6 y 12 meses). La <b>prueba</b> de adaptacion es el periodo corto de 15-30 dias y se registra en su propia seccion.</span></div>
-      <div class="form-row"><div class="form-group"><label>Fecha *</label><input type="date" id="sg-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
-      <div class="form-group"><label>Tipo *</label><select id="sg-tipo" required><option value="Llamada">Llamada</option><option value="Visita">Visita</option><option value="Email">Email</option><option value="Otro">Otro</option></select></div></div>
-      <div class="form-group"><label>Hito</label><select id="sg-hito">${opciones}</select><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Selecciona el hito para marcarlo como hecho en la ficha.</div></div>
-      <div class="form-group"><label>Nota *</label><textarea id="sg-nota" rows="3" required placeholder="Como esta el animal, acuerdos..."></textarea></div>
+      <div class="form-row"><div class="form-group"><label for="sg-fecha">Fecha *</label><input type="date" id="sg-fecha" value="${new Date().toISOString().slice(0, 10)}" required></div>
+      <div class="form-group"><label for="sg-tipo">Tipo *</label><select id="sg-tipo" required><option value="Llamada">Llamada</option><option value="Visita">Visita</option><option value="Email">Email</option><option value="Otro">Otro</option></select></div></div>
+      <div class="form-group"><label for="sg-hito">Hito</label><select id="sg-hito">${opciones}</select><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Selecciona el hito para marcarlo como hecho en la ficha.</div></div>
+      <div class="form-group"><label for="sg-nota">Nota *</label><textarea id="sg-nota" rows="3" required placeholder="Como esta el animal, acuerdos..."></textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar seguimiento</button></div>
       </form>`);
   },
@@ -7404,7 +7404,7 @@ const Dashboard = {
           <div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(p.fase || '—')}</div></div>
           <div class="detail-field"><div class="detail-question">Estado</div><div class="detail-answer">${this._esc(p.estado || '—')}</div></div>
         </div>
-        <div class="form-group"><label>Motivo de anulación *</label><textarea id="an-motivo" rows="4" required placeholder="Indica por qué se anula el caso..."></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El motivo es obligatorio y quedará registrado en el historial.</div></div>
+        <div class="form-group"><label for="an-motivo">Motivo de anulación *</label><textarea id="an-motivo" rows="4" required placeholder="Indica por qué se anula el caso..."></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">El motivo es obligatorio y quedará registrado en el historial.</div></div>
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-danger">${Icons.ban} Anular caso</button></div>
       </form>`);
   },
