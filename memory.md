@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado y al día** (D1, C1, auditoría D3 completa). Suite: **521/521**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado y al día** (D1, C1, auditoría D3 completa). **Track E cerrado** (E1–E5, código/auditoría incremental). Suite: **521/521**.
 
 ## Entregado
 
@@ -54,7 +54,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v245` (visor público: skip link; navegación con `aria-current="page"`; admin: título/foco en navegación, login con SVG decorativos ocultos a AT, mejoras transversales de a11y en módulos, restauración de foco al cerrar modales —incl. confirmación/contrato—, estados “sin resultados” en socios/lista negra, labels asociados en formularios y corrección de ámbito/IDs en actividad/reportes).
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v252` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`).
 - `npm test`: **521/521** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
 
 ## Decisiones cerradas
@@ -82,7 +82,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ## Pendiente de desarrollo (otros tracks)
 
 - **Track B (externo, `C:\Users\JonEg\Documents\proyectos\main`):** B1–B4 consumo del canal, metas/SEO, prerender/sitemap/robots/301/410 y paridad.
-- **Track E (este repo, iterativo):** E1 homogeneizar módulos, E2 limpiar CSS/primitivas, E3 modularizar `dashboard.js`, E4 rendimiento percibido, E5 a11y/responsive/QA por rol.
+- **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
 - **Solo si se aprueba:** C3 ficha configurable §7.3 v1.1 y C4 `forms/submit` (decisiones previas y alcance aparte).
 
 ## Mapa rápido
@@ -92,10 +92,11 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 | Visor | `src/publico.html`, `src/js/publico.js`, `src/css/publico.css` |
 | Prerender | `scripts/prerender-publico.js`, `tests/prerender.test.js`, `tests/fixtures/prerender/` |
 | Gestor | `src/js/web.js`, `src/js/api.js` |
+| Admin (modular) | `src/js/dashboard.js`, `src/js/dashboard-actividad.js`, `src/js/dashboard-finanzas.js`, `src/js/dashboard-blacklist.js`, `src/js/dashboard-web.js` |
 | Media | `apps-script/WebPublicaciones.gs` (`webSubirMedia`), carpeta por ficha en Drive |
 | Backend | `apps-script/WebPublicaciones.gs`, `apps-script/Code.gs` (endpoints públicos) |
 | CI | `.github/workflows/deploy.yml` |
-| Docs | `AGENTS.md`, `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`, `PROGRESO.md` |
+| Docs | `AGENTS.md`, `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`, `PROGRESO.md`, `memory.md`, `PLAN_MASTER_EJECUCION.md` |
 
 ## Cómo reproducir en local
 
@@ -106,6 +107,7 @@ npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
 ```
 
-## Historial de commits recientes (2026-11-14)
+## Historial de commits recientes
 
-`714f053`…`06ce8fa` visor/SEO/prerender/retiradas/docs — `870735f` A3 (fallo retiradas bloquea deploy) — `7fbeca0` UI móvil publicaciones (`v229`) — `9435a6d` eliminar borrador publicación web de animal (solo `WebPublicaciones`, `v230`, pendiente `.gs`) — `d4daabf` C2 prerender (redirect 301/oculta/JSON-LD-canonical, 495 tests) — `39fb362` C1 restaurar retirada (evento/historia, `v231`, pendiente `.gs`).
+- **2026-11-14:** `714f053`…`06ce8fa` visor/SEO/prerender/retiradas/docs — `870735f` A3 (fallo retiradas bloquea deploy) — `7fbeca0` UI móvil publicaciones (`v229`) — `9435a6d` eliminar borrador publicación web de animal (`v230`) — `d4daabf` C2 prerender (redirect 301/oculta/JSON-LD-canonical) — `39fb362` C1 restaurar retirada (`v231`).
+- **2026-11-15 (Track E, `e86a662`…`8d93563`):** mejoras a11y/navegación y foco (`e86a662`, `df2e7c8`, `08a17f0`, `3d77fb2`, `f7d339e`, `0a9b748`, `f32308c`, `8d93563`), labels/formularios y estados (`c47e12d`, `09b0121`, `fd17604`, `ed1152a`, `e2fcac1`, `f7ac2f9`), rendimiento/lazy y SW (`dbe4537`, `v246`–`v252`), modularización E3 (`bd9cb8f` actividad, `4817c44` finanzas, `5ae8149` blacklist, `ecfc77d` delegados web) y sincronía documental (`2971d45`).

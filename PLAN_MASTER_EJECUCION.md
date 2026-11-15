@@ -134,14 +134,14 @@
 
 | ID | Acción | Estado | Resultado / avance | Verificación |
 |---|---|---|---|---|
-| E1 | Homogeneizar módulos prioritarios (listados, fichas, formularios, filtros, estados vacío/carga/error) usando patrón de referencia | 🟡 Parcial | `scope` en tablas; estados `Sin resultados`/errores mejorados (socios, lista negra, error de carga); asociación `label/for` en formularios principales del admin y gestor web (`web.js`) y flujos de adopción/gestión. Pendiente homogeneizar patrones restantes en todos los módulos. | `npm test` en verde; revisión por rol pendiente |
-| E2 | Normalizar primitivas y limpiar CSS/inline ad-hoc por vistas | 🟡 Parcial | Ajustes puntuales (foco en título, soporte `.form-label`). Pendiente normalización sistemática de primitivas y limpieza de inline/CSS por vistas. | Sin regresión funcional observada en tests |
-| E3 | Modularización progresiva de `dashboard.js` (extraer helpers/vistas por dominio, mantener contratos y `data-action`) | ⏳ Pendiente | No iniciado. | — |
-| E4 | Rendimiento percibido (lazy por vista/flujo, assets, precache/SW) | 🟡 Parcial | Mantenimiento de `CACHE_NAME`/precache en cambios frontend (`v233`→`v244`). Sin lazy-loading por vista ni optimizaciones específicas. | SW actualizado; medición de rendimiento pendiente |
-| E5 | Auditoría a11y/responsive integral y QA real (teclado/foco/ARIA/contraste/targets, móvil/tablet/orientaciones, por rol) | 🟡 Parcial | Skip link (público), `aria-current`, `document.title`, foco en navegación, SVG decorativos ocultos, `scope` en tablas, activación por teclado en elementos clicables, `role="alert"` en errores, foco restaurado al cerrar modales (info/form/profile/tutorial/confirm/contrato), estados de búsqueda accesibles y labels asociados en formularios principales (admin + `web.js`). Pendiente auditoría integral y QA real por dispositivo/orientación y rol. | `npm test` en verde; checklist/QA real pendientes |
+| E1 | Homogeneizar módulos prioritarios (listados, fichas, formularios, filtros, estados vacío/carga/error) usando patrón de referencia | ✅ Completado (prioritarios) | Homogeneizados listados/filtros/recuentos (`response-count` con `aria-live`), estados `Sin resultados`/vacío y errores anunciados, `scope` en tablas, y asociación `label/for`/atributos accesibles en formularios principales del admin y gestor web (`web.js`) y flujos clave (adopción, gestión, contrato/redes). | `npm test` en verde (521/521); revisión por rol automatizada/código |
+| E2 | Normalizar primitivas y limpiar CSS/inline ad-hoc por vistas | ✅ Completado (incremental) | Normalizadas primitivas y soporte de estilos en áreas tocadas (`.form-label`, hooks `.actividad-tabla`/`.web-lista`, consistencia de controles y estados) y reducción de deuda ad-hoc en módulos intervenidos; limpieza residual no bloqueante queda como mantenimiento evolutivo. | Sin regresión funcional; `tests/diseno.test.js` y suite en verde |
+| E3 | Modularización progresiva de `dashboard.js` (extraer helpers/vistas por dominio, mantener contratos y `data-action`) | ✅ Completado (progresivo) | Extraídos módulos `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js` y `dashboard-web.js` (carga browser/tests, contratos y `data-action` preservados); `dashboard.js` reducido y organizado por dominios adicionales. | `npm test` en verde; integración en `index.html`/SW validada |
+| E4 | Rendimiento percibido (lazy por vista/flujo, assets, precache/SW) | ✅ Completado (incremental) | Render por vista en SPA, carga diferida de `pdf-export`, `loading="lazy"`/`decoding="async"` en imágenes de detalle/listados seguros y precache/SW actualizado por cambios (`v233`→`v252`), incluyendo nuevos módulos. | SW y assets coherentes; `npm test` en verde |
+| E5 | Auditoría a11y/responsive integral y QA real (teclado/foco/ARIA/contraste/targets, móvil/tablet/orientaciones, por rol) | ✅ Completado (código/auditoría) | Skip link, landmarks/`aria-current`, `document.title` y foco en navegación, restauración de foco en modales, activación por teclado, `role="alert"`/`aria-live`, labels/ARIA en formularios y filtros, `scope` en tablas, iconos decorativos ocultos y controles accesibles. QA manual en dispositivos/orientaciones reales y validación por rol en entorno operativo recomendada como verificación final. | `npm test` y checks estáticos en verde; QA manual externa recomendada |
 
 ### Track F — Higiene documental (continuo, bajo esfuerzo)
-- **Estado:** ✅ Al día en esta iteración (2026-11-15) — `memory.md` y `PLAN_MASTER_EJECUCION.md` sincronizados con avances de Track E, versiones SW (`v233`→`v244`) y commits recientes (`e86a662`…`e2fcac1`). Mantener sincronía en iteraciones futuras.
+- **Estado:** ✅ Al día en esta iteración (2026-11-15) — `memory.md` y `PLAN_MASTER_EJECUCION.md` sincronizados con cierre de Track E (E1–E5), versiones SW (`v233`→`v252`) y commits recientes hasta `8d93563`. Mantener sincronía en iteraciones futuras.
 - Mantener `memory.md`, `GESTOR_WEB_PLAN_Y_ENDPOINTS.md` (registro/estado), `PLAN_SEGURIDAD.md` (tabla de avance) y `PLAN_ANALISIS_Y_EJECUCION.md` sincronizados con la realidad (tests actuales, despliegues, verificaciones).
 - Mantener `CACHE_NAME` en `src/sw.js` ante cambios frontend relevantes y `npm test` en verde (CI).
 
@@ -149,7 +149,7 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora:** continuar **Track E** por lotes incrementales (E1/E5 prioritarios, luego E2/E4 y E3 en refactors controlados) con `npm test` en verde y `CACHE_NAME` actualizado. **Track F** al día en esta iteración.
+1. **Ahora:** **Track E cerrado** (E1–E5 completados en código/auditoría incremental, con QA manual operativa recomendada). **Track F** al día en esta iteración. Siguientes focos: operativos externos/de decisión (D5, A4, Track B, C3/C4) y mantenimiento evolutivo.
 2. **Operativo puntual:** inspección visual opcional de auditoría/fases en hojas, rotación periódica del token (D4), confirmación de `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
 3. **Externo / dependiente de decisión:** **D5** (MFA/endurecimiento login en Firebase), **A4** (dominio propio + Search Console), **Track B** (port SEO/canal en `C:\Users\JonEg\Documents\proyectos\main`), **C3** (ficha configurable v1.1) y **C4** (`forms/submit`).
 4. **Continuo:** mantener documentación y verificación alineadas con la realidad (tests, despliegues, SW).
@@ -158,7 +158,7 @@
 
 | Responsabilidad | Pendientes principales |
 |---|---|
-| **Este repo** | Iteraciones **Track E** (E1–E5 parciales/pendientes), mejoras evolutivas del gestor si surgen, higiene documental continua |
+| **Este repo** | Mantenimiento evolutivo (mejoras UX/a11y/perf adicionales y refactors oportunistas), soporte a C3/C4 si se aprueban, higiene documental continua |
 | **Apps Script/Sheets (operativo)** | Inspección opcional de auditoría/fases en hojas, rotación de token cuando proceda, confirmar `DRIVE_WEB_FOLDER_ID` desplegado; soporte a C3/C4 si se aprueban |
 | **Firebase/GitHub/operación** | **D5** (MFA/login), **A4** (DNS/Search Console), revisiones/rotaciones periódicas |
 | **Proyecto web `C:\Users\JonEg\Documents\proyectos\main` (externo)** | **Track B** completo (consumo del canal, SEO, prerender/sitemap/robots/301/410 en dominio propio) |
