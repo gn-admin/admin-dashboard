@@ -129,16 +129,49 @@ function validarFichaHtml(html, esperado) {
   return errores;
 }
 
+/** Lápida (410 lógico): noindex,nofollow y ni canónica ni JSON-LD. */
+function validarLapidaHtml(html) {
+  const texto = String(html || '');
+  const errores = [];
+  if (!/<meta name="robots" content="noindex,nofollow">/.test(texto)) errores.push('falta robots noindex,nofollow');
+  if (/<link rel="canonical"/.test(texto)) errores.push('no debe llevar canonical');
+  if (/application\/ld\+json/.test(texto)) errores.push('no debe llevar JSON-LD');
+  return errores;
+}
+
+/** Página de paso (301 en Pages): noindex,follow y una canónica al destino. */
+function validarRedirectHtml(html, destino) {
+  const texto = String(html || '');
+  const errores = [];
+  if (!/<meta name="robots" content="noindex,follow">/.test(texto)) errores.push('falta robots noindex,follow');
+  const canonicals = texto.match(/<link rel="canonical" href="[^"]*">/g) || [];
+  if (canonicals.length !== 1) errores.push('se esperaba 1 canonical y hay ' + canonicals.length);
+  else if (destino) {
+    const href = canonicals[0].match(/href="([^"]*)"/);
+    if (!href || href[1] !== String(destino)) errores.push('canonical no apunta al destino');
+  }
+  if (/application\/ld\+json/.test(texto)) errores.push('no debe llevar JSON-LD');
+  return errores;
+}
+
 /**
- * Valida el HTML de cada ficha generada: exactamente un JSON-LD parseable y
- * una sola canónica, coherente con la URL de la página. Las retiradas y las
- * redirecciones tienen su propio contrato (`noindex`, sin JSON-LD) y no pasan
- * por aquí. Sin esto, una ficha rota llegaba a publicarse.
+ * Valida el HTML de cada página generada según su tipo: ficha (un JSON-LD
+ * parseable y una sola canónica propia), lápida (noindex,nofollow sin canónica
+ * ni JSON-LD) o redirección (noindex,follow con canónica al destino). Sin esto,
+ * una página rota llegaba a publicarse.
  */
 function validarPaginas(paginas, base) {
   const errores = [];
   (paginas || []).forEach(p => {
-    if (!p || p.retirada || p.redirect) return;
+    if (!p) return;
+    if (p.retirada) {
+      validarLapidaHtml(p.html).forEach(e => errores.push(p.slug + ' (retirada): ' + e));
+      return;
+    }
+    if (p.redirect) {
+      validarRedirectHtml(p.html, p.destino).forEach(e => errores.push(p.slug + ' (redirección): ' + e));
+      return;
+    }
     validarFichaHtml(p.html, { canonical: urlEstatica(base, p.slug) })
       .forEach(e => errores.push(p.slug + ': ' + e));
   });
@@ -358,7 +391,7 @@ function construirSalida(publicaciones, base, retiradas, redirects) {
     if (!from || publicados.has(from) || lapidas.has(from)) return;
     const destino = (r && r.to) || (toSlug ? urlEstatica(base, toSlug) : '');
     if (!destino) return;
-    paginas.push({ slug: from, redirect: true, html: paginaRedirect(destino) });
+    paginas.push({ slug: from, redirect: true, destino: destino, html: paginaRedirect(destino) });
   });
   // Índice de páginas generadas: el visor solo declara como canónica una
   // estática que ya existe (una ficha recién publicada aún no la tiene).
@@ -517,7 +550,8 @@ async function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, validarSalida, validarPaginas, validarFichaHtml, anotacion, anotar,
+  sitemapXml, robotsTxt, validarSalida, validarPaginas, validarFichaHtml, validarLapidaHtml,
+  validarRedirectHtml, anotacion, anotar,
   paginaEstatica, paginaRetirada, paginaRedirect, construirSalida, main
 };
 

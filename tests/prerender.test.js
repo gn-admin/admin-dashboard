@@ -281,11 +281,43 @@ test('validarPaginas exige JSON-LD parseable y una sola canónica por ficha', ()
   assert.match(prerender.validarPaginas(jsonRoto, BASE).join(' '), /JSON-LD no parseable/);
 });
 
-test('validarPaginas deja fuera retiradas y redirecciones (contrato propio)', () => {
-  assert.deepEqual(prerender.validarPaginas([
-    { slug: 'retirada', retirada: true, html: '' },
-    { slug: 'vieja', redirect: true, html: '' }
-  ], BASE), []);
+test('validarPaginas acepta lápidas y redirecciones con su contrato', () => {
+  const salida = prerender.construirSalida([muestra], BASE, [{ slug: 'historia-retirada' }], [
+    { slug: 'laia-antigua', currentSlug: 'laia-2026', status: 301 }
+  ]);
+  assert.deepEqual(prerender.validarPaginas(salida.paginas, BASE), []);
+});
+
+test('validarPaginas rechaza una lápida con canónica o JSON-LD', () => {
+  const lapida = prerender.paginaRetirada();
+  assert.deepEqual(prerender.validarLapidaHtml(lapida), []);
+
+  const conCanonica = lapida.replace('</head>', '  <link rel="canonical" href="https://x.test/a.html">\n</head>');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', retirada: true, html: conCanonica }], BASE).join(' '), /vieja \(retirada\): no debe llevar canonical/);
+
+  const conJsonLd = lapida.replace('</head>', '  <script type="application/ld+json">{}</script>\n</head>');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', retirada: true, html: conJsonLd }], BASE).join(' '), /no debe llevar JSON-LD/);
+
+  const sinNoindex = lapida.replace('<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', retirada: true, html: sinNoindex }], BASE).join(' '), /falta robots noindex,nofollow/);
+});
+
+test('validarPaginas rechaza una redirección sin canónica al destino', () => {
+  const destino = prerender.urlEstatica(BASE, 'laia-2026');
+  const page = prerender.paginaRedirect(destino);
+  assert.deepEqual(prerender.validarRedirectHtml(page, destino), []);
+
+  const sinCanonica = page.replace(/<link rel="canonical"[^>]*>/, '');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', redirect: true, destino: destino, html: sinCanonica }], BASE).join(' '), /se esperaba 1 canonical y hay 0/);
+
+  const aOtro = page.replace(/rel="canonical" href="[^"]*"/, 'rel="canonical" href="https://otro.test/x.html"');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', redirect: true, destino: destino, html: aOtro }], BASE).join(' '), /canonical no apunta al destino/);
+
+  const malRobots = prerender.paginaRedirect(destino).replace('content="noindex,follow"', 'content="noindex,nofollow"');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', redirect: true, destino: destino, html: malRobots }], BASE).join(' '), /falta robots noindex,follow/);
+
+  const conJsonLd = page.replace('</head>', '  <script type="application/ld+json">{}</script>\n</head>');
+  assert.match(prerender.validarPaginas([{ slug: 'vieja', redirect: true, destino: destino, html: conJsonLd }], BASE).join(' '), /no debe llevar JSON-LD/);
 });
 
 test('el prerender se detiene si una ficha sale sin JSON-LD', async () => {
