@@ -8290,3 +8290,6 @@ body.web-picker-abierto { overflow: hidden; }
   .web-picker-item .btn { width: 100%; }
 }
 
+/* Hook de JS para la tabla de actividad por página. */
+.actividad-tabla { min-height: 0; }
+

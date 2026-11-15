@@ -8784,8 +8784,8 @@ const Dashboard = {
             <button type="button" class="btn btn-outline-green btn-sm" data-action="exportActividadCsv">${Icons.download} CSV</button>
           </div>
         </div>
-        <div class="list-header"><span class="response-count">${rows.length} registros</span></div>
-        <div class="card"><div class="card-body card-body-flush" id="actividad-tabla">${cuerpo}</div></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${rows.length} registros</span></div>
+        <div class="card"><div class="card-body card-body-flush actividad-tabla" id="actividad-tabla">${cuerpo}</div></div>
       </div>
       <div class="page-detail-container"></div>`;
   },
@@ -8810,7 +8810,7 @@ const Dashboard = {
   filterActividad(container) {
     const q = container?.querySelector('.search-box input')?.value?.toLowerCase() || '';
     const t = container?.querySelector('.filter-row select')?.value || '';
-    const c = document.getElementById('actividad-tabla');
+    const c = container?.querySelector('.actividad-tabla') || document.getElementById('actividad-tabla');
     if (!c) return;
     const tv = (f) => { const d = Date.parse(String(f || '').replace(' ', 'T')); return isNaN(d) ? 0 : d; };
     let rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha));
@@ -8905,8 +8905,8 @@ const Dashboard = {
             <button type="button" class="btn btn-outline-green btn-sm" data-action="exportActividadCsv">${Icons.download} CSV</button>
           </div>
         </div>
-        <div class="list-header"><span class="response-count">${(this.actividad||[]).length} registros</span></div>
-        <div class="card-body-flush" id="actividad-tabla">${(this.actividad||[]).length ? this._renderActividadTabla([...(this.actividad||[])].sort((a,b)=>{const tv=f=>{const d=Date.parse(String(f||'').replace(' ','T'));return isNaN(d)?0:d;};return tv(b.fecha)-tv(a.fecha);})) : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro.</p></div>`}</div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${(this.actividad||[]).length} registros</span></div>
+        <div class="card-body-flush actividad-tabla" id="actividad-tabla-reportes">${(this.actividad||[]).length ? this._renderActividadTabla([...(this.actividad||[])].sort((a,b)=>{const tv=f=>{const d=Date.parse(String(f||'').replace(' ','T'));return isNaN(d)?0:d;};return tv(b.fecha)-tv(a.fecha);})) : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.activity}</div><h3>Sin actividad registrada</h3><p>Cada alta, cambio de fase, contrato o gasto deja aqui su rastro.</p></div>`}</div>
       </div></div>`;
     this._pintarMemoria();
   },
