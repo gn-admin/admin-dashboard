@@ -8,14 +8,14 @@ PWA de administración para protectora (Grupo Nebak): encuestas de Google Forms 
 
 - Front: GitHub Pages desde `main` vía Actions, repo **público**.
 - Back: Google Apps Script (un proyecto, una implementación `/exec`), Sheets como BBDD.
-- Auth: Firebase email/contraseña. Sin roles (todos admin, por decisión).
+- Auth: Firebase email/contraseña + roles en `Roles.gs` (`admin`, `coordinador`, `voluntario`, `tesoreria`, `consulta`, `sin_acceso`), con denegación por defecto y matriz de lectura/escritura por endpoint verificada en vivo.
 
 ## Comandos
 
 - `npm run dev` — genera config y sirve en `http://localhost:8080`.
 - `npm run build` — regenera config (`node scripts/gen-config.js`).
 - `npm run prerender` — genera fichas estáticas, `sitemap.xml` y `robots.txt` desde el canal público (el deploy lo ejecuta tras los tests; avisos como anotaciones del run). Fixtures en `tests/fixtures/prerender/`.
-- `npm test` — `node --test tests/*.test.js` (574 tests en verde, 16 ficheros). 15/11: prueba E2E real superada (alta, portada en Drive, publicación, estática, visor, 410 y limpieza del borrador) sin tocar la ficha del animal. 15/11: el cron de GitHub resultó no fiable (un solo run programado, ~7 h tarde y fallido), así que el deploy ahora lo dispara el backend al publicar/retirar; añadido borrado de media en Drive (`web-media-eliminar`). 15/11: cerrado el hueco de la ficha recién publicada (cron cada 30 min, índice `publicaciones/index.json` y canonical solo si la estática existe) y el gestor ya no permite publicar fichas incompletas. 15/11: gestor web reordenado en móvil (estadísticas y fichas compactas, selector en filas) y login sin gate de reCAPTCHA. 15/11: corregida la delegación de `Dashboard` (los módulos `dashboard-*` no se fusionaban en el navegador, dejando inertes pestañas y botones del gestor).. Corren en CI y bloquean el despliegue.
+- `npm test` — `node --test tests/*.test.js` (576 tests en verde, 16 ficheros). 15/11: prueba E2E real superada (alta, portada en Drive, publicación, estática, visor, 410 y limpieza del borrador) sin tocar la ficha del animal. 15/11: el cron de GitHub resultó no fiable (un solo run programado, ~7 h tarde y fallido), así que el deploy ahora lo dispara el backend al publicar/retirar (hook en `WebPublicaciones.gs` + red de seguridad en el router de `Code.gs`, con deduplicación de 60 s), chip de estado y botón «Regenerar web» en el gestor; añadido borrado de media en Drive (`web-media-eliminar`). 15/11: cerrado el hueco de la ficha recién publicada (cron cada 30 min, índice `publicaciones/index.json` y canonical solo si la estática existe) y el gestor ya no permite publicar fichas incompletas. 15/11: gestor web reordenado en móvil (estadísticas y fichas compactas, selector en filas) y login sin gate de reCAPTCHA. 15/11: corregida la delegación de `Dashboard` (los módulos `dashboard-*` no se fusionaban en el navegador, dejando inertes pestañas y botones del gestor).. Corren en CI y bloquean el despliegue.
 - Media del gestor web: una carpeta de Drive por ficha (`animales|eventos|historias/<slug>`) bajo `DRIVE_WEB_FOLDER_ID`; se sube desde el formulario de la publicación.
 - Ficha configurable (C3): `ficha` aditivo (plantilla/bloques/lectura), validado en backend y aplicado solo en detalle y prerender.
 
