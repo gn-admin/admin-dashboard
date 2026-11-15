@@ -218,7 +218,7 @@ const Web = {
         <button type="button" role="tab" class="web-tab ${this.tab === 'evento' ? 'active' : ''}" aria-selected="${this.tab === 'evento'}" data-action="cambiarTabWeb" data-arg0="evento">Eventos e historias</button>
       </div>
       <div class="filters-bar">
-        <div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar publicación" placeholder="Buscar por título, slug o nombre..." value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
+        <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar publicación" placeholder="Buscar por título, slug o nombre..." value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
         <div class="filter-row">
           <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
             <option value="">Todos los estados</option>
@@ -437,7 +437,7 @@ const Web = {
           </div>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="cerrarPickerWeb" aria-label="Cerrar">${cerrar}</button>
         </div>
-        <div class="search-box"><span class="search-icon"></span><input type="search" aria-label="Buscar animal sin publicación" placeholder="Buscar por nombre o especie..." data-input="onPickerWebBuscar"></div>
+        <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="search" aria-label="Buscar animal sin publicación" placeholder="Buscar por nombre o especie..." data-input="onPickerWebBuscar"></div>
         <div id="web-picker-lista" class="web-picker-lista">${this._pickerLista()}</div>
       </div>`;
   },

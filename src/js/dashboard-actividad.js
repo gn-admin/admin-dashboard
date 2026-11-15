@@ -36,7 +36,7 @@
     const cuerpo = this._renderActividadTabla(rows);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>

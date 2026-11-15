@@ -2651,7 +2651,7 @@ const Dashboard = {
     this._shown[surveyId] = 20;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
         <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
@@ -4335,7 +4335,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
-        <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
+        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
           <select aria-label="Filtrar animales por estado" data-change="onAnimalEstadoFilterChange" data-cpass="el">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
@@ -8109,7 +8109,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
         <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
+      <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
         <select aria-label="Filtrar por tipo de socio" data-change="onSocioTipoFilterChange" data-cpass="el">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
@@ -8496,7 +8496,7 @@ const Dashboard = {
         <div class="alert-item warning" style="cursor:pointer" role="button" tabindex="0" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
