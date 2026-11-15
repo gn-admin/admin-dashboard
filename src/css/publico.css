@@ -29,6 +29,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.pub-skip {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.6rem 0.9rem;
+  background: var(--pub-primary-dark);
+  color: #fff;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+.pub-skip:focus { top: 0.75rem; }
+
 h1, h2, h3, h4 {
   font-family: 'Montserrat', 'Inter', sans-serif;
   line-height: 1.15;

@@ -124,7 +124,7 @@
 | D4 | Gestión/rotación de token API y revisión de logs/exposición (`?token=`) | GAS/GitHub/operativo | Alta | 2.2 |
 | D5 | MFA para admins/elevados y endurecimiento login (reCAPTCHA/App Check según viabilidad) | Firebase | Media-alta | 2.1 |
 | D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Avanzado.** Perfiles, lecturas y escrituras/acciones por API directa verificados por rol (incl. `sin_acceso` revocado) + UI de bloqueo; checklist en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Pendiente: caso no listado, verificación de auditoría en hojas (D3) y formalizar revisión/incidentes periódicos. |
-| D7 | Revisar canal público del gestor web frente a criterio 4.1 (lista blanca, CORS/dominio, sin datos internos) | GAS/config | Media | 4.1 |
+| D7 | Revisar canal público del gestor web frente a criterio 4.1 (lista blanca, CORS/dominio, sin datos internos) | GAS/config | Media | 4.1 | **Revisado en código (repo).** Endpoints públicos allowlistados (`publicaciones/publicacion/animales-publicos/eventos-publicos/historias-publicas/config-publica/taxonomias/sitemap/redirects/retiradas`), solo GET, resueltos antes de exigir token; devuelven datos publicados/listados/indexables o retirados según función (sin datos internos del gestor). JSONP soportado; CORS/preflight y dominio siguen condicionados al despliegue (pendiente validación formal en entorno). |
 
 **Criterio de cierre:** hitos 1.1, 1.3, 5.1, 2.2, 5.2 y (según viabilidad) 2.1 completados y verificados; objetivo ~80–85%.
 

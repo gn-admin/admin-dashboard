@@ -54,7 +54,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v232`.
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v233` (visor público: enlace de salto al contenido).
 - `npm test`: **508/508** (incluye `tests/roles-d1.test.js`: matriz de autorización D1 sobre el `Code.gs` real).
 
 ## Decisiones cerradas
@@ -77,7 +77,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 3. **D3 (auditoría):** comprobar en la hoja de auditoría de producción el registro de `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles; verificar historial de fases operativo.
 4. **D4 (token):** rotación/revisión de `?token=` y exposición/logs (GitHub Secrets + config GAS); limitación estructural conocida.
 5. **D5 (Firebase):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
-6. **D7:** revisión formal de CORS/dominio y lista blanca del canal público (revisión de código: allowlist pública, solo GET, datos publicados/listados/retirados según endpoint; JSONP, sin auth en esos endpoints).
+6. **D7:** validación formal en entorno de CORS/dominio del canal público. Revisión de código completada: allowlist pública, solo GET, resuelto antes de auth, y datos publicados/listados/indexables o retirados según endpoint (sin datos internos).
 7. **A4 (aplazado):** dominio propio y Search Console.
 8. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
 
