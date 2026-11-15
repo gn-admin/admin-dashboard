@@ -208,6 +208,7 @@ function webFilaAPublicacion(fila) {
     cta: webParseJson(f.cta_json, null),
     animal: webParseJson(f.animal_json, null),
     evento: webParseJson(f.evento_json, null),
+    ficha: webParseJson(f.ficha_json, null),
     publicado_en: webIsoFecha(f.publicado_en),
     actualizado_en: webIsoFecha(f.actualizado_en),
     creado_en: webIsoFecha(f.creado_en),
@@ -383,8 +384,10 @@ function webBloqueEvento(curado) {
 /**
  * Composición ÚNICA del contrato `Publicacion`.
  * La usan `web-animales-preview` y el canal público: mismo objeto.
+ * `opts.ficha` (o tercer arg true) incluye `ficha` (solo detalle/preview/prerender, no listados).
  */
-function webConstruirPublicacion(publicacion, origen) {
+function webConstruirPublicacion(publicacion, origen, opts) {
+  var incluirFicha = opts === true || !!(opts && opts.ficha);
   var p = publicacion || {};
   var media = p.media || {};
   var seoIn = p.seo || {};
@@ -440,6 +443,7 @@ function webConstruirPublicacion(publicacion, origen) {
   }
   if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
   if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
+  if (incluirFicha && p.ficha && typeof p.ficha === 'object') out.ficha = p.ficha;
   return out;
 }
 
@@ -538,7 +542,7 @@ function webGetAnimal(animalId) {
       estado_publicacion: 'borrador', indexable: true, listed: true, featured: false, orden: 0,
       titulo: webTexto(a.nombre), extracto: '', contenido_html: webTexto(a.descripcion),
       categoria: '', estado_publico: webTexto(a.estado), especie: webTexto(a.especie),
-      autor: '', tags: [], media: {}, seo: {}, cta: null, animal: {}, evento: null,
+      autor: '', tags: [], media: {}, seo: {}, cta: null, animal: {}, evento: null, ficha: null,
       publicado_en: '', actualizado_en: '', creado_en: ''
     };
   }
@@ -569,6 +573,9 @@ function webUpsertAnimal(body) {
     return { status: 'error', error: 'El slug "' + slug + '" ya está en uso por otra publicación' };
   }
 
+  var fichaVal = (body && (body.ficha !== undefined || body.ficha_json !== undefined))
+    ? (body.ficha !== undefined ? body.ficha : body.ficha_json)
+    : (previa ? previa.ficha : null);
   var registro = {
     id: (previa && previa.id) || ('web_' + webUuid()),
     tipo: 'animal',
@@ -592,6 +599,7 @@ function webUpsertAnimal(body) {
     cta_json: JSON.stringify(body.cta || null),
     animal_json: JSON.stringify(body.animal || {}),
     evento_json: '',
+    ficha_json: (fichaVal && typeof fichaVal === 'object') ? JSON.stringify(fichaVal) : '',
     publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
     actualizado_en: webAhora(),
     creado_en: (previa && previa.creado_en) || webAhora()
@@ -678,7 +686,7 @@ function webPreviewAnimal(animalId) {
   var pub = webPublicacionDeOrigen('animal', animalId);
   if (!pub) return { status: 'error', error: 'Este animal aún no tiene configuración web' };
   var a = webMapaAnimales()[String(animalId)] || null;
-  return { status: 'success', data: webConstruirPublicacion(pub, a) };
+  return { status: 'success', data: webConstruirPublicacion(pub, a, { ficha: true }) };
 }
 
 // ==================== GESTOR · EVENTOS E HISTORIAS ====================
@@ -723,7 +731,7 @@ function webListarEventos(params) {
 function webPreviewEvento(id) {
   var pub = webPublicacionPorId(id);
   if (!pub) return { status: 'error', error: 'Publicación no encontrada' };
-  return { status: 'success', data: webConstruirPublicacion(pub, null) };
+  return { status: 'success', data: webConstruirPublicacion(pub, null, { ficha: true }) };
 }
 
 function webGetEvento(id) {
@@ -752,6 +760,9 @@ function webUpsertEvento(body, user) {
     return { status: 'error', error: 'El slug "' + slug + '" ya está en uso por otra publicación' };
   }
 
+  var fichaVal = (body && (body.ficha !== undefined || body.ficha_json !== undefined))
+    ? (body.ficha !== undefined ? body.ficha : body.ficha_json)
+    : (previa ? previa.ficha : null);
   var registro = {
     id: (previa && previa.id) || ('web_' + webUuid()),
     tipo: tipo,
@@ -775,6 +786,7 @@ function webUpsertEvento(body, user) {
     cta_json: JSON.stringify(body.cta || null),
     animal_json: '',
     evento_json: JSON.stringify(body.event || {}),
+    ficha_json: (fichaVal && typeof fichaVal === 'object') ? JSON.stringify(fichaVal) : '',
     publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
     actualizado_en: webAhora(),
     creado_en: (previa && previa.creado_en) || webAhora()
@@ -1214,7 +1226,7 @@ function webPublicacionPublica(slug) {
   var pubs = webPublicables();
   for (var i = 0; i < pubs.length; i++) {
     if (pubs[i].slug === s) {
-      return { status: 'success', data: webConstruirPublicacion(pubs[i], pubs[i].tipo === 'animal' ? mapa[String(pubs[i].origen_id)] : null) };
+      return { status: 'success', data: webConstruirPublicacion(pubs[i], pubs[i].tipo === 'animal' ? mapa[String(pubs[i].origen_id)] : null, { ficha: true }) };
     }
   }
   // Slug antiguo: se devuelve la ficha actual con la redireccion permanente.
@@ -1230,7 +1242,7 @@ function webPublicacionPublica(slug) {
           slug: pubs[j].slug,
           permanent: true
         },
-        data: webConstruirPublicacion(pubs[j], pubs[j].tipo === 'animal' ? mapa[String(pubs[j].origen_id)] : null)
+        data: webConstruirPublicacion(pubs[j], pubs[j].tipo === 'animal' ? mapa[String(pubs[j].origen_id)] : null, { ficha: true })
       };
     }
   }
