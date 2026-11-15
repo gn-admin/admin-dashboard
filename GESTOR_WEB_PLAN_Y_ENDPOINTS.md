@@ -372,14 +372,14 @@ Reglas:
 - **Formulario:** subida desde la publicación de animal (portada, galería, vídeo, documento) y de evento/historia (portada, galería, documento). Los documentos se guardan en `media.documents` (`nombre|url`) y **no se publican**.
 - Requiere `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env` y regenerar `Config.gs`; sin esa variable el endpoint avisa y no sube nada. Los enlaces de carpeta no se publican nunca.
 
-#### D. Decisiones abiertas antes de implementar
+#### D. Decisiones (cerradas el 2026-11-15)
 
-- [ ] **Almacenamiento de la ficha (celda vs fichero).** Base: `ficha_json` compacto en celda (límite ~50k chars). Si hace falta, desbordamiento a fichero JSON en Drive + `fileId`/ruta en hoja. Regla: **nunca leer ficha por ítem en listados**; cargarla solo en detalle y en prerender.
-- [ ] **Vídeo incrustado o enlace.** La ficha real usa `<iframe>`; `src/publico.html` tiene hoy `frame-src 'none'` y `publico.js` enlaza. Incrustar exige abrir CSP a `youtube-nocookie.com`/`player.vimeo.com` y decidir consentimiento de cookies. Recomendación: mantener enlace hasta que la web final lo pida.
-- [ ] **Catálogo de iconos compartido.** Copiarlo en `publico.js` y en `blog-render.js` (hoy ya está duplicado el `svgFor`), o publicarlo como `GET ?endpoint=taxonomias`.
+- [x] **Almacenamiento de la ficha (celda vs fichero).** Decidido: `ficha_json` compacto en celda con límite de 45.000 caracteres (`webNormalizarFicha`). El desbordamiento a fichero JSON en Drive queda como plan B solo si una ficha real lo supera. Regla vigente: **nunca leer la ficha por ítem en listados**; viaja solo en detalle, preview y prerender.
+- [x] **Vídeo incrustado o enlace.** Decidido: **enlace, no incrustado**. La CSP del visor mantiene `frame-src 'none'`, no hay consentimiento de cookies que gestionar y el saneado elimina cualquier `<iframe>`; los vídeos de la ficha se publican como `url` + `title`/`provider`/`note`. Si la web final pide reproducción incrustada, se abre la CSP y se decide consentimiento en ese momento.
+- [x] **Catálogo de iconos compartido.** Decidido: se mantiene **duplicado local** (`svgFor` en `publico.js` y en el render de la web) y no se publica un endpoint nuevo; el catálogo cerrado ya viaja en el contrato de la ficha como clave (`icon`), que es lo que necesita la web para resolver el SVG en su propio código.
 - [x] **HTML libre en `contentHtml` y `sections`.** Decidido: **se sanea en el servidor con lista blanca** (`webSanearHtml`), al construir el payload público (detalle, listados y prerender). Lo guardado no se modifica (reversible) y nada publicado lleva `script`, `style`, `iframe`, formularios ni atributos `on*`. `sections` no existe en el contrato actual (la ficha usa `bloques`), así que de momento solo aplica a `contentHtml`.
-- [ ] **Orden de bloques configurable.** Se propone solo visibilidad; un orden libre complica el layout y el render de la web.
-- [ ] **Retrocompatibilidad de `tags` en animales.** Añadir el campo al formulario no rompe nada, pero hay publicaciones antiguas sin etiquetas.
+- [x] **Orden de bloques configurable.** Decidido: **solo visibilidad** (`ficha.bloques` con `true/false` por bloque). El orden lo fija la plantilla; un orden libre complicaría el layout sin demanda real.
+- [x] **Retrocompatibilidad de `tags` en animales.** Decidido: campo **aditivo y opcional**; las publicaciones antiguas sin etiquetas se siguen pintando sin la fila de etiquetas, y el payload no gana campos vacíos si no hay `tags`.
 
 #### E. Factibilidad y notas de implementación (GitHub Pages + GAS, 2026-11-15)
 
