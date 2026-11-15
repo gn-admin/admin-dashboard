@@ -37,7 +37,7 @@
 | 3.1 Minimizar/limpiar caché cliente | 🟡 Avanzado en repo (~64–66%) | Limpieza logout/cambio, restricciones por permisos, `responses/notas` solo en memoria; ajustes finos SW/cobertura posibles. |
 | 3.2 Hardening frontend (CSP enforcement en meta, Permissions-Policy, errores/deps) | 🟡 Parcial en repo (~66%) | Hecho dentro de límites GitHub Pages; verificación producción recomendada. |
 | 4.1 Canal público separado de solo lectura | ✅ Revisado en código y producción | Allowlist pública, solo GET, antes de auth y sin datos internos; verificado en vivo. |
-| 5.1 Auditoría/historial operativos en GAS/hojas | ✅ Cerrado en lo verificable | Instrumentación en código/tests y flujos operativos; pendiente operativa opcional: inspección visual de filas y subida de mejora repo `web-media-subir`. |
+| 5.1 Auditoría/historial operativos en GAS/hojas | ✅ Cerrado | Instrumentación desplegada y verificada en producción (código/tests y flujos operativos). Inspección visual de filas: opcional. |
 | 5.2 Pruebas por rol, revisión periódica y respuesta a incidentes | ⏳ Operativo | Checklist y procedimiento pendientes de formalizar/ejecutar |
 
 ### 1.3 Modernización UI/UX (`PLAN_ANALISIS_Y_EJECUCION.md`)
@@ -120,7 +120,7 @@
 |---|---|---|---|---|
 | D1 | **Autorización por endpoint en GAS** + `user-profile` devuelve `sin_acceso` a no reconocidos (email normalizado) + denegación por defecto + minimización de datos | GAS/Sheets | Crítica | 1.1 | **Hecho.** Desplegado y validado en vivo (revocado, perfiles, matriz lecturas/escrituras por rol); regresión automatizada en `tests/roles-d1.test.js` y `tests/roles-auth.test.js` (no listado/revocado/normalización/fallbacks seguros). Residual operativo: confirmar `ROLES_USUARIOS`/`ADMIN_EMAILS` de producción (D2). |
 | D2 | Higiene de Roles/cuentas (depurar, mínimo privilegio, correos correctos) y reflejo de cambios | Sheets/operativo | Alta | 1.3 | **Verificado (config efectiva).** Roles desplegados resuelven correctamente (admin/coordinador/voluntario/tesorería/consulta y revocado→`sin_acceso`), con normalización y denegación por defecto testeadas. Mantener `ROLES_USUARIOS`/`ADMIN_EMAILS` alineados ante altas/bajas. |
-| D3 | Verificar auditoría e historial de fases operativos en producción (cabeceras/IDs/endpoints/escritura) | GAS/Sheets | Alta | 5.1 | **Cerrado en lo verificable.** Instrumentación en código/tests (`tests/auditoria-d3.test.js`) y flujos auditados operativos en producción (restaurar/retirar/estado web responden correctamente). Mejora en repo pendiente de subir: `web-media-subir` auditado y `_audit` robusto. Verificación visual de filas en la hoja de auditoría queda como comprobación operativa opcional. |
+| D3 | Verificar auditoría e historial de fases operativos en producción (cabeceras/IDs/endpoints/escritura) | GAS/Sheets | Alta | 5.1 | **Cerrado.** Instrumentación en código/tests (`tests/auditoria-d3.test.js`), desplegada y operativa en producción (incl. `web-media-subir` con permisos correctos). Inspección visual de filas en hoja: opcional. |
 | D4 | Gestión/rotación de token API y revisión de logs/exposición (`?token=`) | GAS/GitHub/operativo | Alta | 2.2 | **Revisado/cerrado (exposición y procedimiento).** Token en `?token=` por diseño (sin header auth por defecto), sin eco de secretos en workflow y sin exposición detectada en repo/cliente. Procedimiento de rotación definido (Secrets + config GAS + redespliegue); la rotación efectiva es una acción operativa a ejecutar cuando proceda. |
 | D5 | MFA para admins/elevados y endurecimiento login (reCAPTCHA/App Check según viabilidad) | Firebase | Media-alta | 2.1 | **Pendiente externo.** Configurar en consola Firebase (MFA para cuentas elevadas; reCAPTCHA/App Check si viable). |
 | D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Cerrado en repo/verificable.** Automatizado (521 tests, Code/Auth/Roles), verificado en vivo por rol (incl. revocado, UI y matriz API directa), checklist y procedimiento documentados en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Residual operativo: auditoría en hojas (D3) y ejecución periódica/revisión de incidentes. |
@@ -148,7 +148,7 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora:** acciones operativas puntuales (subir mejora D3 de `.gs`, rotación periódica de token, inspección opcional de auditoría en hojas). **D1–D4, D6–D7 cerrados/verificados** (excepto D5 externo y A4 aplazado). Continuar con Track E y, si aplica, Track B/A4/C3/C4.
+1. **Ahora:** acciones operativas puntuales (rotación periódica de token, inspección opcional de auditoría en hojas). **D1–D4, D6–D7 cerrados** (solo D5 externo y A4 aplazado pendientes en D/A). Continuar con Track E y, si aplica, Track B/A4/C3/C4.
 2. **En paralelo inmediato:** `D1, D2, D3, D4` (seguridad backend/operativa crítica) y preparación de `B1` (contrato ya estable). 
 3. **Corto plazo:** `A3` (CI, tras confirmar A2) + `C1` (restaurar retirada, tras A2) + `C2` (pruebas) + `D5/D6/D7` según viabilidad.
 4. **Medio plazo (con dominio disponible):** `A4 → B2/B3/B4` (SEO/indexación real en web externa).

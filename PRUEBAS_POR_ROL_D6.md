@@ -14,8 +14,7 @@
 - [x] **D4 (exposición):** token en `?token=` por diseño, sin eco de secretos en workflow ni exposición detectada en cliente.
 
 **Pendiente (operativo/manual):**
-- [ ] **Subir `apps-script/Code.gs` (repo):** mejora D3 (`web-media-subir` auditado, `_audit` robusto).
-- [ ] **D3 (opcional):** inspección visual de filas en hoja de auditoría/fases (incl. `web-media-subir` tras subir).
+- [ ] **D3 (opcional):** inspección visual de filas en hoja de auditoría/fases.
 - [ ] **D4 (periódico):** rotación del token cuando proceda.
 - [ ] **D5:** MFA/endurecimiento en Firebase.
 
