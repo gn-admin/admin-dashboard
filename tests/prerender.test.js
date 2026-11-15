@@ -207,7 +207,7 @@ test('una ficha publicada manda sobre una lápida del mismo slug', () => {
 
 test('htmlDetalle se puede usar sin DOM (lo reutiliza el prerender)', () => {
   const html = Publico.htmlDetalle(muestra);
-  assert.match(html, /<article class="pub-detalle">/);
+  assert.match(html, /<article class="pub-detalle( [^"]*)?">/);
   assert.match(html, /pub-back/);
   assert.match(html, /pub-facts-grid/);
 });

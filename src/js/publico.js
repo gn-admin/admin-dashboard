@@ -432,38 +432,59 @@ const Publico = {
     this.aplicarSeo(p);
   },
 
+  _normalizarFichaCfg(ficha) {
+    let f = ficha;
+    if (typeof f === 'string') { try { f = JSON.parse(f); } catch (e) { return null; } }
+    if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+    const plantillas = ['ficha', 'historia'];
+    const plantilla = plantillas.includes(String(f.plantilla || '').toLowerCase()) ? String(f.plantilla).toLowerCase() : 'ficha';
+    const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    const src = f.bloques && typeof f.bloques === 'object' ? f.bloques : {};
+    const bloques = {};
+    for (const k of Object.keys(def)) {
+      const v = src[k];
+      bloques[k] = (v === false || v === 'false') ? false : true;
+    }
+    return { plantilla, bloques, mostrarLectura: !(f.mostrarLectura === false || f.mostrarLectura === 'false') };
+  },
+
   /**
    * HTML de la ficha sin tocar el DOM: lo comparten el visor y el prerender
    * estático (`scripts/prerender-publico.js`).
    */
   htmlDetalle(p) {
+    const cfg = this._normalizarFichaCfg(p && p.ficha);
+    const b = (cfg && cfg.bloques) || { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    const mostrarLectura = cfg ? cfg.mostrarLectura : true;
+    const plantilla = (cfg && cfg.plantilla) || 'ficha';
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const estado = p.status ? `<span class="pub-tag pub-tag--estado">${this.esc(this.estadoTexto(p.status))}</span>` : '';
-    const cta = (p.cta && this.urlSegura(p.cta.url))
-      ? `<a class="pub-btn" href="${this.esc(this.urlSegura(p.cta.url))}" rel="noopener">${this.esc(p.cta.label || 'Ver más')}</a>`
+    const ctaObj = (p.cta && this.urlSegura(p.cta.url)) ? p.cta : null;
+    const cta = (b.cta && ctaObj)
+      ? `<a class="pub-btn" href="${this.esc(this.urlSegura(ctaObj.url))}" rel="noopener">${this.esc(ctaObj.label || 'Ver más')}</a>`
       : '';
-    const etiquetas = (p.tags || []).filter(Boolean).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('');
-    const hechos = (p.icons || []).filter(i => i && (i.label || i.value)).map(i => {
+    const etiquetas = (b.etiquetas && Array.isArray(p.tags)) ? p.tags.filter(Boolean).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('') : '';
+    const hechos = (b.datos && Array.isArray(p.icons)) ? p.icons.filter(i => i && (i.label || i.value)).map(i => {
       const meta = this._icono(i.label || '', i.icon || '', p);
       return `<article class="pub-fact ${meta.tone}">
         <div class="pub-fact-icon" aria-hidden="true">${meta.svg}</div>
         <div class="pub-fact-copy"><h3>${this.esc(i.label || i.icon || '')}</h3><p>${this.esc(i.value || '')}</p></div>
       </article>`;
-    }).join('');
-    const galeria = (p.gallery || [])
+    }).join('') : '';
+    const galeria = (b.galeria && Array.isArray(p.gallery)) ? p.gallery
       .map((g, i) => ({
         src: this.urlSegura(g && g.src),
         alt: (g && (g.alt || g.caption)) || ((p.title ? p.title + ' ' : 'Imagen ') + (i + 1)),
         pie: (g && g.caption) || ''
       }))
       .filter(g => g.src)
-      .map(g => `<figure class="pub-figura"><img src="${this.esc(g.src)}" alt="${this.esc(g.alt)}" loading="lazy">${g.pie ? `<figcaption>${this.esc(g.pie)}</figcaption>` : ''}</figure>`).join('');
-    const videos = (p.videos || []).filter(v => v && this.urlSegura(v.url)).map(v => `
+      .map(g => `<figure class="pub-figura"><img src="${this.esc(g.src)}" alt="${this.esc(g.alt)}" loading="lazy">${g.pie ? `<figcaption>${this.esc(g.pie)}</figcaption>` : ''}</figure>`).join('') : '';
+    const videos = (b.videos && Array.isArray(p.videos)) ? p.videos.filter(v => v && this.urlSegura(v.url)).map(v => `
       <a href="${this.esc(this.urlSegura(v.url))}" target="_blank" rel="noopener noreferrer">
         <span>${this.esc(v.title || 'Ver vídeo')}</span>
         <span aria-hidden="true">${this.esc((v.provider || 'vídeo').toUpperCase())} ↗</span>
-      </a>`).join('');
+      </a>`).join('') : '';
 
     const acciones = cta
       ? `<div class="pub-acciones">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
@@ -471,13 +492,13 @@ const Publico = {
     const metaLinea = [
       estado,
       p.publishedAt ? `<span>${this.esc(this.fecha(p.publishedAt))}</span>` : '',
-      p.readTime ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : '',
+      (mostrarLectura && p.readTime) ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : '',
       p.author ? `<span>${this.esc(p.author)}</span>` : ''
     ].filter(Boolean).join('');
 
     return `
       <a class="pub-back" href="#/">← Todas las publicaciones</a>
-      <article class="pub-detalle">
+      <article class="pub-detalle pub-detalle--${this.esc(plantilla)}">
         <header class="pub-ficha-hero">
           <div class="pub-ficha-copy">
             <p class="pub-eyebrow">${this.esc(p.category || 'Ficha')}</p>
@@ -496,7 +517,7 @@ const Publico = {
         </section>
         ${galeria ? `<section class="pub-section" aria-label="Galería de imágenes"><div class="pub-section-head"><h2>Galería</h2></div><div class="pub-galeria">${galeria}</div></section>` : ''}
         ${videos ? `<section class="pub-section" aria-label="Vídeos"><div class="pub-section-head"><h2>Vídeo</h2></div><div class="pub-videos">${videos}</div></section>` : ''}
-        ${p.animal ? this._bloqueAnimal(p.animal) : ''}
+        ${(b.fichaAnimal && p.animal) ? this._bloqueAnimal(p.animal) : ''}
         ${p.event ? this._bloqueEvento(p.event) : ''}
         ${cta ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>` : ''}
       </article>`;
