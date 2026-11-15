@@ -976,6 +976,7 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     b.estado.animales.push(animal());
     b.estado.publicaciones.push(fila());
     const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
+    assert.equal(r.data.backend, '2026-11-15.5');
     assert.equal(r.data.deploy.disparado, true);
     assert.equal(b.llamadas.length, 1);
     assert.match(b.llamadas[0].url, /repos\/gn-admin\/admin-dashboard\/actions\/workflows\/deploy\.yml\/dispatches$/);
@@ -1045,6 +1046,6 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.equal(con.data.configurado, true);
     assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
     // Marcador para detectar implementaciones antiguas desde el panel.
-    assert.equal(con.data.version, '2026-11-15.4');
+    assert.equal(con.data.version, '2026-11-15.5');
   });
 });

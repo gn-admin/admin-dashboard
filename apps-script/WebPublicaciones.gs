@@ -746,7 +746,7 @@ function webEstadoAnimal(body, user) {
   var ok = updateSheetRow(webSheetConfig(), previa.id, cambios);
   if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  var respuesta = { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
+  var respuesta = { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
   // Ocultar, publicar o retirar cambia las páginas estáticas: deploy inmediato.
   return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
 }
@@ -938,7 +938,7 @@ function webEstadoEvento(body, user) {
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  var respuesta = { status: 'success', data: { id: id, estado_publicacion: estado } };
+  var respuesta = { status: 'success', data: { id: id, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
   return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
 }
 
@@ -1290,7 +1290,7 @@ function webCarpetaEnArbolMedia(carpeta, raizId, nivel) {
 var WEB_DEPLOY_DEFECTOS = { repo: 'gn-admin/admin-dashboard', ref: 'main', workflow: 'deploy.yml' };
 // Marcador de versión del backend: `web-deploy-estado` lo devuelve para poder
 // distinguir si el panel habla con una implementación antigua.
-var WEB_DEPLOY_VERSION = '2026-11-15.4';
+var WEB_DEPLOY_VERSION = '2026-11-15.5';
 var WEB_DEPLOY_DEDUPE_SEG = 60;
 
 function webDeployPropiedades() {
@@ -1370,13 +1370,19 @@ function webDeployProbar() {
   return resultado;
 }
 
-/** Adjunta el resultado del deploy a una respuesta correcta, sin alterarla. */
+/**
+ * Adjunta el resultado del deploy a una respuesta correcta. El deploy nunca
+ * rompe la acción, pero si falla se ve el motivo en `data.deploy` (nada de
+ * silencios: un catch mudo ocultaba que el hook no llegaba a ejecutarse).
+ */
 function webConDeploy(respuesta, motivo) {
   if (!respuesta || respuesta.status !== 'success') return respuesta;
+  respuesta.data = respuesta.data || {};
   try {
-    respuesta.data = respuesta.data || {};
     respuesta.data.deploy = webDispararDeploy(motivo);
-  } catch (err) { /* el deploy nunca rompe el guardado */ }
+  } catch (err) {
+    respuesta.data.deploy = { ok: false, disparado: false, error: 'Excepción en webDispararDeploy: ' + err.message };
+  }
   return respuesta;
 }
 
