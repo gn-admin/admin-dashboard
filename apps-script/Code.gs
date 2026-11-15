@@ -60,14 +60,12 @@ function _isAdmin(user) { return _role(user) === 'admin'; }
 function _canReadEndpoint(endpoint, user) {
   var role = _role(user);
   if (_isAdmin(user) || role === 'coordinador') return true;
-  // D1: sin_acceso solo puede leer su perfil (para que el frontend muestre el estado).
-  if (role === 'sin_acceso') return endpoint === 'user-profile';
   // Gestor web: contenido público y metadatos SEO de las publicaciones.
   if (String(endpoint).indexOf('web-') === 0) return false;
   // consulta: lectura general (acotada por DataFilter donde aplique)
   if (role === 'consulta') return true;
   if (role === 'voluntario') {
-    // Sin datos sensibles/finanzas globales/blacklist/contratos según política; lectura operativa básica
+    // Sin datos sensibles/finanzas globales/blacklist/contratos segA�n polA-tica; lectura operativa bA�sica
     var deny = { 'blacklist':1, 'donaciones':1, 'gastos':1, 'inventario':1, 'contratos':1 };
     return !deny[endpoint];
   }
@@ -81,8 +79,7 @@ function _canReadEndpoint(endpoint, user) {
 function _canWriteEndpoint(endpoint, user) {
   var role = _role(user);
   if (_isAdmin(user)) return true;
-  // D1: sin_acceso y consulta no escriben.
-  if (role === 'sin_acceso' || role === 'consulta') return false;
+  if (role === 'consulta') return false;
   // Gestor web: solo admin y coordinación publican contenido.
   if (String(endpoint).indexOf('web-') === 0) return role === 'coordinador';
 
@@ -140,10 +137,6 @@ function handleGet(endpoint, user, e) {
     case 'responses':
       return handleGetResponses(e, user);
     case 'user-profile':
-      // D1: para sin_acceso se minimizan datos (solo estado de acceso).
-      if (String(user.role || '').toLowerCase().trim() === 'sin_acceso') {
-        return jsonResponse({ role: 'sin_acceso', email: user.email || '' });
-      }
       return jsonResponse({ uid: user.uid, email: user.email, role: user.role, name: user.name || user.email });
 
     case 'animales': return jsonResponse({ data: _dataForUser(readSheet(CONFIG.sheets.animales), user) });
