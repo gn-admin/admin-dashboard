@@ -167,11 +167,13 @@ const App = {
         web: 'Web / Contenido público'
       };
       const title = titles[page] || 'Dashboard';
-      document.getElementById('page-title').textContent = title;
+      const pageTitle = document.getElementById('page-title');
+      if (pageTitle) pageTitle.textContent = title;
       document.title = title + ' - Grupo Nebak';
       this.closeSidebar();
       this.closeMasMenu();
       Dashboard.loadPage(page);
+      if (pageTitle) pageTitle.focus({ preventScroll: true });
     };
     // Nota: se probo envolver `aplicar` en document.startViewTransition para
     // un cross-fade entre paginas, pero en navegadores con la API presente

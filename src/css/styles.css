@@ -1175,6 +1175,10 @@ body {
   color: var(--gray-900);
 }
 
+.topbar-title:focus {
+  outline: none;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
