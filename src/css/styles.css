@@ -6362,6 +6362,14 @@ select.form-input {
 }
 
 /* Acceso público desde el login: visor de publicaciones sin sesión. */
+.login-recaptcha-notice {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gray-500);
+}
+.login-recaptcha-notice a { color: inherit; text-decoration: underline; }
+
 .login-public-link {
   display: flex;
   align-items: center;

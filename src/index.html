@@ -11,12 +11,12 @@
   <!-- Seguridad: CSP activa (con limitaciones de GitHub Pages; no sustituye cabeceras HTTP). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://www.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
+    script-src 'self' https://www.gstatic.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://www.google.com https://www.recaptcha.net;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src 'self' data: https://fonts.gstatic.com;
     img-src 'self' data: https: blob:;
-    connect-src 'self' https://script.google.com https://script.googleusercontent.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://firebaseinstallations.googleapis.com;
-    frame-src 'none';
+    connect-src 'self' https://script.google.com https://script.googleusercontent.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://firebaseinstallations.googleapis.com https://www.google.com https://www.recaptcha.net;
+    frame-src https://www.google.com https://www.recaptcha.net;
     worker-src 'self' blob:;
     frame-ancestors 'none';
     base-uri 'self';
@@ -96,6 +96,7 @@
             <span class="spinner" style="display:none"></span>
           </button>
         </form>
+        <p class="login-recaptcha-notice" style="margin-top:12px;font-size:12px;opacity:.75;line-height:1.4">Este sitio está protegido por reCAPTCHA y se aplican la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de privacidad</a> y los <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Términos de servicio</a> de Google.</p>
         <button type="button" id="pwa-login-install" class="login-install" style="display:none">
           <span class="login-install-icon" id="pwa-login-install-icon"></span>
           <span>Instalar como app</span>
@@ -421,6 +422,7 @@
   <div id="error-message" class="toast-error" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="js/config.js"></script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6Lf_hiEuAAAAAIPhzqJgNuXEJmO7Rghx6ZTMduI5"></script>
   <script src="js/icons.js"></script>
   <script src="js/pwa.js"></script>
   <script src="js/auth.js"></script>

@@ -18,6 +18,11 @@ function handleRequest(e, method) {
 
     var rl = checkRateLimit(e);
     if (rl && rl.blocked) return jsonResponse({ status: 'warning', error: 'Demasiadas peticiones: espera unos segundos y reintenta' }, 429);
+    // D5: verificación reCAPTCHA previa al login (público, sin token Firebase).
+    if (method === 'POST' && endpoint === 'login-recaptcha') {
+      return handleLoginRecaptcha(e);
+    }
+
 
     var token = extractToken(e);
     if (!token) return jsonResponse({ error: 'Token no proporcionado' }, 401);
@@ -114,6 +119,25 @@ function _canWriteEndpoint(endpoint, user) {
 
 function _deny(msg) {
   return jsonResponse({ status: 'error', error: msg || 'No autorizado para esta acción' }, 403);
+}
+
+function handleLoginRecaptcha(e) {
+  try {
+    var body = {};
+    try {
+      if (e && e.postData && e.postData.contents) body = JSON.parse(e.postData.contents);
+    } catch (parseErr) { body = {}; }
+    var token = (e && e.parameter && (e.parameter.recaptcha_token || e.parameter.token)) || body.recaptcha_token || body.token || '';
+    var action = (e && e.parameter && (e.parameter.recaptcha_action || e.parameter.action)) || body.recaptcha_action || body.action || 'login';
+    var v = verificarRecaptchaV3(token, action || 'login');
+    if (!v.ok) {
+      try { Logger.log('login-recaptcha rechazado: ' + (v.motivo || 'unknown')); } catch (logErr) {}
+      return jsonResponse({ status: 'error', error: 'No se pudo verificar la solicitud. Inténtalo de nuevo.' }, 403);
+    }
+    return jsonResponse({ status: 'success', ok: true });
+  } catch (err) {
+    return jsonResponse({ status: 'error', error: 'No se pudo verificar la solicitud. Inténtalo de nuevo.' }, 500);
+  }
 }
 
 function _audit(endpoint, user, body, result) {

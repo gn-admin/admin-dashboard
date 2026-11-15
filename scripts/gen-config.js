@@ -78,6 +78,8 @@ const CONFIG = {
     email: '${env('CONTACTO_EMAIL')}'
   },
 
+  recaptchaSiteKey: '${env('RECAPTCHA_SITE_KEY', '')}',
+
   // Datos que aparecen en los contratos. Si no se configuran, el documento
   // solo muestra el nombre y los datos de contacto disponibles.
   asociacion: {
