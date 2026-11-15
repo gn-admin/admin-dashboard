@@ -365,13 +365,13 @@ function handlePost(endpoint, user, e) {
       if (body && body.accion === 'eliminar') return jsonResponse(webEliminarAnimal(body, user));
       return jsonResponse(webUpsertAnimal(body, user));
     case 'web-animales-estado':
-      return jsonResponse(webEstadoAnimal(body, user));
+      return jsonResponse(_webAnotarDeploy(webEstadoAnimal(body, user), body && body.estado_publicacion));
     case 'web-eventos':
-      if (body && body.accion === 'archivar') return jsonResponse(webArchivarEvento(body, user));
-      if (body && body.accion === 'restaurar') return jsonResponse(webRestaurarEvento(body, user));
-      return jsonResponse(webUpsertEvento(body, user));
+      if (body && body.accion === 'archivar') return jsonResponse(_webAnotarDeploy(webArchivarEvento(body, user), 'retirado'));
+      if (body && body.accion === 'restaurar') return jsonResponse(_webAnotarDeploy(webRestaurarEvento(body, user), 'borrador'));
+      return jsonResponse(_webAnotarDeploy(webUpsertEvento(body, user), body && body.estado_publicacion));
     case 'web-eventos-estado':
-      return jsonResponse(webEstadoEvento(body, user));
+      return jsonResponse(_webAnotarDeploy(webEstadoEvento(body, user), body && body.estado_publicacion));
     case 'web-media-subir': {
       var _rm = jsonResponse(webSubirMedia(body)); _audit(endpoint, user, body, _rm); return _rm;
     }
@@ -386,6 +386,23 @@ function handlePost(endpoint, user, e) {
     default:
       return jsonResponse({ error: 'Endpoint no encontrado' }, 404);
   }
+}
+
+// Red de seguridad del deploy: si la respuesta no trae `data.deploy` (versión
+// antigua de WebPublicaciones.gs o hook que no se ejecutó), se dispara aquí.
+// Con `borrador` no hay nada público que regenerar y no se llama a GitHub.
+function _webAnotarDeploy(respuesta, estado) {
+  if (!respuesta || respuesta.status !== 'success') return respuesta;
+  var nuevo = String(estado || '').toLowerCase();
+  if (!nuevo || nuevo === 'borrador') return respuesta;
+  respuesta.data = respuesta.data || {};
+  if (respuesta.data.deploy) return respuesta; // ya lo anotó el gestor web
+  try {
+    respuesta.data.deploy = webDispararDeploy('estado');
+  } catch (err) {
+    respuesta.data.deploy = { ok: false, disparado: false, error: 'No se pudo disparar el deploy: ' + ((err && err.message) || err) };
+  }
+  return respuesta;
 }
 
 function handleDelete(endpoint, user, e) {
