@@ -354,7 +354,9 @@ async function json(url) {
 }
 
 async function recolectarRetiradas(api) {
-  const res = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=retiradas');
+  // `nocache=1` evita que el prerender publique una lápida obsoleta si el canal
+  // acaba de restaurar/retirar una publicación (cache interna ~60 s).
+  const res = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=retiradas&nocache=1');
   if (!res || res.status !== 'success') {
     throw new Error((res && (res.error || res.detail)) || 'El canal no devolvió retiradas');
   }
@@ -371,7 +373,7 @@ async function recolectar(api, fallos) {
   let totalPages = 1;
   do {
     const res = await json(api + (api.indexOf('?') === -1 ? '?' : '&') +
-      'endpoint=publicaciones&page=' + page + '&pageSize=50');
+      'endpoint=publicaciones&page=' + page + '&pageSize=50&nocache=1');
     if (!res || res.status !== 'success') {
       throw new Error((res && (res.error || res.detail)) || 'El canal no devolvió publicaciones');
     }
@@ -385,7 +387,7 @@ async function recolectar(api, fallos) {
     if (item.listed === false || !slugSeguro(item.slug)) continue;
     try {
       const res = await json(api + (api.indexOf('?') === -1 ? '?' : '&') +
-        'endpoint=publicacion&slug=' + encodeURIComponent(item.slug));
+        'endpoint=publicacion&slug=' + encodeURIComponent(item.slug) + '&nocache=1');
       if (res && res.status === 'success' && res.data) detalle.push(res.data);
     } catch (e) {
       if (fallos) fallos.push(item.slug + ': ' + e.message);
@@ -437,7 +439,7 @@ async function main(argv = process.argv.slice(2)) {
         anotar('warning', mensaje + ' Se continúa por --soft.');
       }
       try {
-        const r = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=redirects');
+        const r = await json(api + (api.indexOf('?') === -1 ? '?' : '&') + 'endpoint=redirects&nocache=1');
         redirects = (r && r.data) || [];
       } catch (e) {
         anotar('warning', 'No se pudieron leer las redirecciones (' + e.message + '). Se continúa sin páginas de redirección.');

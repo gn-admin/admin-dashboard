@@ -360,6 +360,7 @@ const Dashboard = {
       voluntario: 'Voluntario/a',
       tesoreria: 'Tesorería',
       consulta: 'Consulta',
+      sin_acceso: 'Sin acceso',
       usuario: 'Usuario'
     }[key] || raw;
   },

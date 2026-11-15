@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). Según indicación del usuario, los `.gs` (C1 restaurar, borrado de borrador de publicación web de animal y D1 autorización/`sin_acceso`) están implementados/desplegados; en repo los cambios D1 locales de `apps-script/Auth.gs`/`apps-script/Roles.gs` están gitignored y `apps-script/Code.gs` tiene ajustes D1 no commiteados (alinear/registrar con lo desplegado). Suite: **495/495**.
+El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Pendiente:** subir el lote `.gs` (D1 + C1 + auditoría de borrado) a Apps Script; el repo ya está alineado y con regresión automatizada. Suite: **508/508**.
 
 ## Entregado
 
@@ -38,7 +38,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 - Alta/edición de publicaciones de animales, eventos e historias; completitud, SEO, media, CTA, preview y slug check.
 - Historial de slugs (`slug_historial`) con 301 desde `?endpoint=redirects`; un slug histórico no se reutiliza.
 - Resumen con totales por tipo y por estado, diagnósticos de hoja y aviso de cabeceras.
-- **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`) y verificado en producción (Playwright).
+- **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`), verificado en producción (Playwright) y con auditoría `eliminar_publicacion` en el lote `.gs` pendiente de subir.
 - **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`) y **verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, slug conservado; tras deploy/prerender la lápida estática responde 404, no figura en sitemap ni en `retiradas`, y el front desplegado incluye la acción de restaurar (`API.restaurarWebEvento`). `retiradas` puede servir cache ~60 s sin `nocache=1`.
 
 ### Media por ficha (Drive)
@@ -54,8 +54,8 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v228`.
-- `npm test`: **495/495**.
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v232`.
+- `npm test`: **508/508** (incluye `tests/roles-d1.test.js`: matriz de autorización D1 sobre el `Code.gs` real).
 
 ## Decisiones cerradas
 
@@ -67,22 +67,28 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ## Pendiente manual / verificación (fuera de git o de siguiente deploy)
 
-2. **Alinear `.gs` local ↔ desplegado ↔ git:** `Code.gs`/`Auth.gs`/`Roles.gs`/`WebPublicaciones.gs` desplegados según usuario (C1, borrado borrador animal, D1). En local, `Auth.gs`/`Roles.gs` (gitignored) y `Code.gs` tienen cambios D1 no reflejados en git; evitar exponer secretos y dejar registro coherente del lote desplegado.
-3. **Raíz de media:** confirmada en `.env`/`Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
+1. **Subir el lote `.gs` a Apps Script (manual, pendiente):**
+   - `apps-script/Code.gs` — D1: `_role` por defecto `sin_acceso`, `_dataForUser` deniega sin usuario, `sin_acceso` solo lee `user-profile` (minimizado a `role`+`email`), sin escrituras; `web-eliminar-animal` pasa `user` para auditoría; textos corregidos.
+   - `apps-script/WebPublicaciones.gs` — C1 (`webRestaurarEvento` → `borrador` con slug y auditoría `restaurar_publicacion`), borrado de publicación de animal con auditoría `eliminar_publicacion`.
+   - `apps-script/Auth.gs` — `getUserRole` con denegación por defecto (`sin_acceso` si no hay rol, no listado, revocado o error; sin fallback a admin si `ADMIN_EMAILS` está vacío).
+   - `apps-script/Roles.gs` — `ROL_POR_DEFECTO_USUARIO_NO_LISTADO='sin_acceso'`, `COMPATIBILIDAD_TODOS_ADMIN_SI_VACIO=false`, usuario revocado de prueba `gn.test.revocado@example.test` (`activo:false`).
+   - `apps-script/Config.gs` — sin cambios funcionales; confirmar que el desplegado incluye `DRIVE_WEB_FOLDER_ID` y `ADMIN_EMAILS` correctos.
+   - Tras subir: **Nueva versión** del Web App (Implementar → Administrar implementaciones) y crear en Firebase Auth `gn.test.revocado@example.test` con la contraseña de pruebas para validar `sin_acceso`.
+2. **Raíz de media:** confirmada en `.env`/`Config.gs` local (ID en `.internal-docs`, no versionado). Confirmar que `Config.gs` desplegado en Apps Script incluye `DRIVE_WEB_FOLDER_ID`.
 3. **A4 aplazado**: dominio propio y Search Console (sobre `github.io` es opcional enviar sitemap mientras tanto). Port del SEO al proyecto real (`C:\Users\JonEg\Documents\proyectos\main`).
 4. Indexación real y auditoría formal: dependen del dominio y del proyecto web.
 
 **A2/A2.2 verificado:** endpoints públicos y prerender/SEO correctos en `github.io`; caso retirada `prueba-retirada-playwright` comprobado (`retiradas`, `gone`, slug reservado) y lápida estática publicada fuera de sitemap tras deploy.
 
-**Verificación 2026-11-15 (con .gs desplegados):** C1 restaurar evento en vivo **OK** (→ borrador, canal fresco sin `gone`/fuera de `retiradas`, lápida estática eliminada tras deploy/prerender, front con restaurar desplegado). D1 **parcial**: `user-profile` correcto y matriz de lecturas verificada para `admin`, `coordinador`, `tesoreria`, `consulta` y `voluntario` (coherente con política; ver pruebas ejecutadas); pendiente caso `sin_acceso` (no listado/revocado), escrituras/denegaciones por API directa por rol y D2–D5/D7 (ver [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)).
+**Verificación 2026-11-15 (con `.gs` previos desplegados):** C1 restaurar evento en vivo **OK** (→ borrador, canal fresco sin `gone`/fuera de `retiradas`, lápida estática eliminada tras deploy/prerender, front con restaurar desplegado). D1 **parcial**: `user-profile` correcto y matriz de lecturas verificada para `admin`, `coordinador`, `tesoreria`, `consulta` y `voluntario` (coherente con política; ver pruebas ejecutadas). **Repo listo**: matriz D1 fijada en `tests/roles-d1.test.js` (508/508), prerender lee el canal con `nocache=1` y el lote `.gs` está cerrado para subir. Pendiente tras subir: caso `sin_acceso` real (revocado/no listado), escrituras/denegaciones por API directa por rol y D2–D5/D7 (ver [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)).
 
 ## Siguientes pasos propuestos
 
-2. **D1/D6 validación completa (operativo):** probar `sin_acceso` (no listado/revocado), confirmar restricciones por endpoint en UI y API directa, y ejecutar matriz por rol ([`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)). Verificar que `ROLES_USUARIOS`/`ADMIN_EMAILS` cubren a todos los legítimos.
-3. **Track D pendiente:** D2 higiene de roles/cuentas, D3 auditoría/historial operativo en hojas, D4 rotación/revisión token, D5 MFA (Firebase), D7 revisión formal del canal público.
-4. **Track B (externo):** port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).
-5. **Track E (repo):** homogeneizar módulos (E1), limpiar CSS/primitivas (E2), modularizar `dashboard.js` (E3), rendimiento (E4), a11y/responsive/QA por rol (E5).
-6. **A4 aplazado:** dominio propio + Search Console cuando aplique. C3/C4 solo tras decisión/alcance.
+1. **D1/D6 validación completa (operativo, tras subir `.gs`):** probar `sin_acceso` (revocado `gn.test.revocado@example.test` y no listado), confirmar restricciones por endpoint en UI y API directa, y ejecutar matriz por rol ([`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md)). Verificar que `ROLES_USUARIOS`/`ADMIN_EMAILS` cubren a todos los legítimos.
+2. **Track D pendiente:** D2 higiene de roles/cuentas, D3 auditoría/historial operativo en hojas, D4 rotación/revisión token, D5 MFA (Firebase), D7 revisión formal del canal público.
+3. **Track B (externo):** port SEO/consumo al proyecto web real (`C:\Users\JonEg\Documents\proyectos\main`).
+4. **Track E (repo):** homogeneizar módulos (E1), limpiar CSS/primitivas (E2), modularizar `dashboard.js` (E3), rendimiento (E4), a11y/responsive/QA por rol (E5).
+5. **A4 aplazado:** dominio propio + Search Console cuando aplique. C3/C4 solo tras decisión/alcance.
 
 ## Mapa rápido
 
@@ -99,7 +105,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 489 tests
+npm test                                   # 508 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

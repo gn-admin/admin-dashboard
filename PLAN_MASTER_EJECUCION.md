@@ -15,10 +15,10 @@
 | Área | Estado | Entregado | Pendiente |
 |---|---|---|---|
 | F0 Contratos/modelo | ✅ Cerrada | Hoja única `WebPublicaciones`, taxonomía `animal|evento|historia`, slug único por tipo, estados/flags, payload `Publicacion` normalizado (`preview == feed`), alias `/api` y `/v1`, JSONP, `forms/submit` fuera de alcance | — |
-| F1 Backend gestor (GAS) | ✅ Implementado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | **Desplegar nueva versión de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs`** para activar en vivo `retirado`, `gone` (410 lógico) y `?endpoint=retiradas` (la l�pida ya existe en código/tests; en `/exec` puede no estar activa) |
+| F1 Backend gestor (GAS) | ✅ Implementado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | **Lote final pendiente de subir** (`Code.gs`, `WebPublicaciones.gs`, `Auth.gs`, `Roles.gs`): D1 con denegación por defecto/`sin_acceso`, C1 y auditoría de borrado. `retirado`/`gone`/`?endpoint=retiradas` ya activos y verificados. |
 | F2 UI Gestor web (admin) | ✅ Implementado | Sección “Web/Contenido público”, alta guiada, curación animal/evento/historia, preview, slug-check, resumen, integración en ficha, permisos UI, estilos, `web.js`/`api.js`/rutas/SW | Revisión visual final en Pages/uso real tras despliegues; mejoras evolutivas menores si surgen |
-| F3 Canal público | ✅ Implementado | `/api/publicaciones`, detalle por slug, alias `/v1/*`, `config/taxonomias/sitemap/redirects/retiradas`, filtros/paginación/búsqueda, cache interna, 404/301/410 lógico, JSONP | Validar en producción tras desplegar `.gs` (especialmente `gone`/`retiradas`) |
-| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (489 verdes) | **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
+| F3 Canal público | ✅ Implementado | `/api/publicaciones`, detalle por slug, alias `/v1/*`, `config/taxonomias/sitemap/redirects/retiradas`, filtros/paginación/búsqueda, cache interna, 404/301/410 lógico, JSONP | **Verificado en producción** (canal sin token, `gone`/`retiradas`, cache ~60 s; prerender usa `nocache=1`). |
+| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (508 verdes) | **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
 | F5 Ajustes/calidad/operación | 🟡 Parcial | Completitud, consistencia preview↔público, cache/paginación, diagnóstico hoja/pestaña, historial de slug+301, retirada/410+l�pida, páginas de retirada, recuentos, docs operativa interna | Dominio propio + Search Console + sitemap en raíz; indexación/auditoría real; convertir aviso de retiradas en error si falla tras desplegar; **restaurar/salida de retirada** desde panel y auditoría de quién retira (propuesto); fixtures adicionales (301, oculta) y validación JSON-LD/canónica única |
 | §7.3 Ficha configurable / media | 🟡 Parcial (media hecha, configuración pendiente) | Media por ficha en Drive (`animales|eventos|historias/<slug>`), `web-media-subir`, normalización enlaces, galería `url|alt|pie`, documentos privados, límites/tipos; análisis y contrato aditivo v1.1 planificado | **No implementado:** ficha configurable (`ficha_json`/plantilla/bloques/iconos/tags/CTA kind/salud curada/campos animal extra), decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos compartido, saneado HTML, orden bloques, tags retrocompatibles) |
 
@@ -53,7 +53,7 @@
 | 5 UX por pantallas | 🟡 | Patrón adopciones, skeleton navegación | Homogeneizar todos los módulos (listados/fichas/formularios/filtros/estados) |
 | 6 A11y/responsive/pulido | 🟡 | Mejoras base (foco, aria-live, reduced-motion) | Auditoría integral, foco/teclado/ARIA/contraste/targets, QA real por rol/viewport |
 
-> Nota: el plan registra métricas antiguas (357/470 tests en distintas filas) frente al estado actual del repo (489 tests según `AGENTS`/`memory`); conviene actualizar el registro al ejecutar nuevas iteraciones.
+> Nota: el plan registra métricas antiguas (357/470 tests en distintas filas) frente al estado actual del repo (508 tests según `AGENTS`/`memory`); conviene actualizar el registro al ejecutar nuevas iteraciones.
 
 ### 1.4 Documentación y organización
 - **Consolidado hecho:** seguridad en un solo `PLAN_SEGURIDAD.md`; gestor web en `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`; `.internal-docs` raíz reducida y agrupada por relación.
@@ -82,9 +82,9 @@
 |---|---|---|---|---|---|
 | A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` (+ `Auth.gs`/`Roles.gs` para D1 coherente) | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"`, `?endpoint=retiradas`, C1 y D1 | **Hecho según usuario.** A2 y C1 (backend/canal fresco) verificados en vivo; D1 verificado parcialmente (admin). Mantener alineación lote desplegado ↔ repo/local. |
 | A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | **Hecho.** Canal/endpoints, SPA/estática/SEO, `retiradas` y detalle `gone` verificados; caso real `prueba-retirada-playwright` con lápida estática publicada (noindex, fuera de sitemap) en `github.io`. |
-| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Hecho.** Implementado y efectivo (falla si no puede leer `retiradas`, salvo `--soft`); validado en flujo real. Suite 495/495. |
+| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Hecho.** Implementado y efectivo (falla si no puede leer `retiradas`, salvo `--soft`); validado en flujo real. Suite 508/508. |
 | A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | **Aplazado** (decisión): se usa `github.io`. Opcional: Search Console/sitemap sobre la URL actual hasta tener dominio propio. |
-| A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **Parcial.** `memory.md`/plan actualizados (2026-11-15) y checklist D6 añadido (`PRUEBAS_POR_ROL_D6.md`). Pendiente: desplegar front con UI C1, regenerar prerender (retirar lápida restaurada), y validar consistencia preview↔público/casos 301/410 en vivo. |
+| A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **OK.** C1 verificado en vivo (front desplegado, lápida eliminada tras prerender, sitemap/retiradas limpios), D6 documentado con matriz/checklist y repo alineado. Queda la validación operativa D1 tras subir `.gs`. |
 
 **Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y revisión operativa residual de A5 (consistencia preview↔público/casos 301/410 en uso real).
 
@@ -108,7 +108,7 @@
 | ID | Acción | Dónde | Prioridad | Resultado esperado | Notas |
 |---|---|---|---|---|---|
 | C1 | **Restaurar publicación retirada** desde panel + registro de quién retira/restaura | Repo + GAS | Alta | Salida controlada de `retirado` y trazabilidad | **OK.** Backend y front desplegados y verificados en vivo (restauración → borrador, slug conservado; sin `gone`/fuera de `retiradas` en fresco, lápida estática eliminada tras deploy/prerender, acción de restaurar disponible). Cache `retiradas` ~60 s. |
-| C2 | Hardening de pruebas/prerender (fixtures 301 y ficha oculta, validación JSON-LD/canónica única, caso `gone`) | Repo | Media | Regresiones cubiertas | **Avanzado en repo**: fixtures `redirect-301`/`oculta`, soporte de redirecciones estáticas, `validarFichaHtml` (JSON-LD/canonical únicos), 495 tests. `npm test` + `npm run prerender --fixture`. |
+| C2 | Hardening de pruebas/prerender (fixtures 301 y ficha oculta, validación JSON-LD/canónica única, caso `gone`) | Repo | Media | Regresiones cubiertas | **Avanzado en repo**: fixtures `redirect-301`/`oculta`, soporte de redirecciones estáticas, `validarFichaHtml` (JSON-LD/canonical únicos), 508 tests. `npm test` + `npm run prerender --fixture`. |
 | C3 | **§7.3 Ficha configurable (v1.1 aditivo)** — solo si se aprueba | Repo + GAS/Sheets | Media-baja (decisión requerida) | Plantilla/bloques, iconos, galería/alt-pie completo, salud curada, CTA kind, campos animal/tags, etc. | **Antes:** cerrar decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos, saneado HTML, orden bloques, tags). Mantener compatibilidad: sin `ficha` = comportamiento actual. Implementar por etapas (contrato/validación → backend → UI → visor → port web) |
 | C4 | `forms/submit` (opcional) | GAS + web | Baja / alcance aparte | Envío real de formularios | Canal separado; requiere reCAPTCHA server-side, validación/antiabuso, plantillas/correos y políticas |
 
@@ -118,12 +118,12 @@
 
 | ID | Acción | Dónde | Prioridad | Hito plan |
 |---|---|---|---|---|
-| D1 | **Autorización por endpoint en GAS** + `user-profile` devuelve `sin_acceso` a no reconocidos (email normalizado) + denegación por defecto + minimización de datos | GAS/Sheets | Crítica | 1.1 | **Parcial (desplegado según usuario, verificación parcial).** Admin OK (`user-profile` completo); pendiente probar `sin_acceso` no listado/revocado y denegaciones por endpoint/rol en UI+API directa. Requiere `ROLES_USUARIOS`/`ADMIN_EMAILS` completos. |
+| D1 | **Autorización por endpoint en GAS** + `user-profile` devuelve `sin_acceso` a no reconocidos (email normalizado) + denegación por defecto + minimización de datos | GAS/Sheets | Crítica | 1.1 | **Implementado en repo; pendiente subir `.gs` y validar.** `Code.gs`/`Auth.gs`/`Roles.gs` con denegación por defecto (`sin_acceso`), perfil minimizado y sin escrituras; matriz fijada en `tests/roles-d1.test.js`. Tras desplegar: probar `sin_acceso` revocado/no listado y denegaciones por rol en UI+API directa. |
 | D2 | Higiene de Roles/cuentas (depurar, mínimo privilegio, correos correctos) y reflejo de cambios | Sheets/operativo | Alta | 1.3 |
 | D3 | Verificar auditoría e historial de fases operativos en producción (cabeceras/IDs/endpoints/escritura) | GAS/Sheets | Alta | 5.1 |
 | D4 | Gestión/rotación de token API y revisión de logs/exposición (`?token=`) | GAS/GitHub/operativo | Alta | 2.2 |
 | D5 | MFA para admins/elevados y endurecimiento login (reCAPTCHA/App Check según viabilidad) | Firebase | Media-alta | 2.1 |
-| D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Parcial.** Checklist/matriz y procedimiento base añadidos en repo: [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Pendiente ejecución completa por rol y casos `sin_acceso`/revocado. |
+| D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Parcial.** Lecturas verificadas en vivo para admin/coordinador/tesorería/consulta/voluntario y denegaciones sin token; checklist en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md) y regresión D1 en `tests/roles-d1.test.js`. Pendiente: `sin_acceso` real y escrituras/denegaciones por API directa tras subir el lote `.gs`. |
 | D7 | Revisar canal público del gestor web frente a criterio 4.1 (lista blanca, CORS/dominio, sin datos internos) | GAS/config | Media | 4.1 |
 
 **Criterio de cierre:** hitos 1.1, 1.3, 5.1, 2.2, 5.2 y (según viabilidad) 2.1 completados y verificados; objetivo ~80–85%.
@@ -148,7 +148,7 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora:** validación D1/D6 completa (caso `sin_acceso` revocado/no listado y escrituras/denegaciones por API directa por rol) y cierre operativo residual de A5. A2/A3/C1 verificados en vivo.
+1. **Ahora (tras subir `.gs`):** validación D1/D6 completa (caso `sin_acceso` revocado/no listado y escrituras/denegaciones por API directa por rol) y cierre operativo residual de A5. A2/A3/C1 verificados en vivo.
 2. **En paralelo inmediato:** `D1, D2, D3, D4` (seguridad backend/operativa crítica) y preparación de `B1` (contrato ya estable). 
 3. **Corto plazo:** `A3` (CI, tras confirmar A2) + `C1` (restaurar retirada, tras A2) + `C2` (pruebas) + `D5/D6/D7` según viabilidad.
 4. **Medio plazo (con dominio disponible):** `A4 → B2/B3/B4` (SEO/indexación real en web externa).

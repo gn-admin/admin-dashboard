@@ -2,6 +2,19 @@
 
 > Checklist operativo para validar autorización, visibilidad y acciones por rol tras D1. **Sin secretos**: no incluir tokens, contraseñas, IDs reales sensibles ni datos personales. Ejecutar en entorno de pruebas y, cuando aplique, verificar también por API directa.
 
+## 0. Estado de verificación (2026-11-15)
+
+**Automatizado en repo:** `tests/roles-d1.test.js` carga el `apps-script/Code.gs` real y fija la matriz `_role`/`_canReadEndpoint`/`_canWriteEndpoint` (denegación por defecto, `sin_acceso` sin lecturas ni escrituras, perfil minimizado y alcance de cada rol). Suite completa: **508/508**.
+
+**Verificado en vivo (solo lecturas):** `admin`, `coordinador`, `tesoreria`, `consulta` y `voluntario` con las permitidas/denegadas esperadas; `web-*` restringido a admin/coordinador; sin token y con token inválido denegado; canal público accesible sin token; C1 (restaurar retirada) correcto.
+
+**Pendiente tras subir el lote `.gs`** (`Code.gs`, `WebPublicaciones.gs`, `Auth.gs`, `Roles.gs`; `Config.gs` solo si cambió):
+- [ ] Crear en Firebase Auth `gn.test.revocado@example.test` (entrada `activo:false` en `Roles.gs`) con la contraseña de pruebas.
+- [ ] `sin_acceso` revocado: perfil mínimo, bloqueo de UI y denegación total por API directa.
+- [ ] `sin_acceso` no listado: cualquier cuenta Firebase fuera de `ROLES_USUARIOS`/`ADMIN_EMAILS`.
+- [ ] Escrituras/denegaciones por rol por API directa (crear/editar/borrar/cambiar estado) en entorno controlado.
+- [ ] Auditoría: `restaurar_publicacion` y `eliminar_publicacion` dejan registro en la hoja.
+
 ## 1. Roles esperados
 
 | Rol | Acceso esperado (resumen) |

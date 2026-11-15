@@ -652,7 +652,7 @@ function webEstadoAnimal(body, user) {
   return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
 }
 
-function webEliminarAnimal(body) {
+function webEliminarAnimal(body, user) {
   var cfg = webSheetConfig();
   if (!cfg) return webDiagnostico();
   var animalId = webTexto(body && body.animal_id);
@@ -665,8 +665,10 @@ function webEliminarAnimal(body) {
   if (previa.estado_publicacion === 'retirado') {
     return { status: 'error', error: 'No se puede eliminar una publicación retirada.' };
   }
+  var slug = previa.slug;
   var ok = deleteSheetRow(cfg, previa.id);
   if (!ok) return { status: 'error', error: 'No se pudo eliminar la publicación web' };
+  try { registrarAuditoria('eliminar_publicacion', 'web_animal', previa.id, user, { slug: slug, animal_id: animalId }); } catch (e) {}
   return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, eliminado: true } };
 }
 
@@ -851,13 +853,13 @@ function webRestaurarEvento(body, user) {
   var id = webTexto(body && body.id);
   if (!id) return { status: 'error', error: 'Falta id' };
   var previa = webPublicacionPorId(id);
-  if (!previa) return { status: 'error', error: 'PublicaciA3n no encontrada' };
-  if (previa.tipo === 'animal') return { status: 'error', error: 'Los animales no se restauran desde aquA-' };
+  if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
+  if (previa.tipo === 'animal') return { status: 'error', error: 'Los animales no se restauran desde aquí' };
   if (previa.estado_publicacion !== 'retirado') {
     return { status: 'success', success: true, data: { id: id, estado_publicacion: previa.estado_publicacion, slug: previa.slug } };
   }
   var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
-  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontrA3 la publicaciA3n a restaurar' };
+  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
   try { registrarAuditoria('restaurar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
   return { status: 'success', success: true, data: { id: id, estado_publicacion: 'borrador', slug: previa.slug } };
 }

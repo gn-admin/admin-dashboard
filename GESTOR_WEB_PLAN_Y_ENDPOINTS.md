@@ -162,7 +162,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ### 4.3 Utilidades de gestor — implementado
 - [x] `GET ?endpoint=web-resumen`: contadores (publicados, borradores, ocultos, sin publicar, incompletas, sin SEO).
-- [x] Registro operativo de acciones de publicación (`registrarAuditoria` con `publicacion_web` / `archivar_publicacion`; si la hoja de auditoría está configurada).
+- [x] Registro operativo de acciones de publicación (`registrarAuditoria` con `publicacion_web` al cambiar estado, y `retirar_publicacion` / `restaurar_publicacion` / `eliminar_publicacion` en las acciones destructivas del gestor; si la hoja de auditoría está configurada).
 
 ---
 
