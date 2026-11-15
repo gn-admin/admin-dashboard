@@ -264,13 +264,28 @@ const Web = {
     return { texto: 'Deploy lanzado. La web se actualizará en 2–3 min', tipo: undefined };
   },
 
-  async _cargarEstadoDeploy() {
-    const res = await API.estadoDeployWeb();
-    this._deployEstado = (res && res.data) || null;
+  _pintarChipDeploy() {
     const cont = document.getElementById('web-deploy-estado');
-    if (!cont) return this._deployEstado;
+    if (!cont) return false;
     const info = this.estadoDeployTexto(this._deployEstado);
     cont.innerHTML = `<span class="web-deploy-chip ${info.ok ? 'ok' : 'ko'}">${this._esc(info.texto)}</span>`;
+    return true;
+  },
+
+  async _cargarEstadoDeploy(intento) {
+    if (typeof API.estadoDeployWeb !== 'function') {
+      this._deployEstado = null;
+      this._pintarChipDeploy();
+      return null;
+    }
+    const res = await API.estadoDeployWeb();
+    this._deployEstado = (res && res.data) || null;
+    // El panel monta la página en varios pasos: si el chip aún no está en el
+    // DOM, se reintenta un par de veces en vez de quedarse vacío.
+    if (!this._pintarChipDeploy() && (intento || 0) < 4) {
+      await new Promise(r => setTimeout(r, 300));
+      return this._cargarEstadoDeploy((intento || 0) + 1);
+    }
     return this._deployEstado;
   },
 
