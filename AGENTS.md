@@ -10,7 +10,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 
 - `npm run dev` — genera config (`.env` → `src/js/config.js`) y sirve en `http://localhost:8080`.
 - `npm run build` — regenera la config manualmente (`node scripts/gen-config.js`).
-- `npm test` (`node --test tests/*.test.js`) - unitarios de lógica pura del front, sin dependencias (554 tests, 16 ficheros). Incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`, que cargan/verifican los `.gs` reales para autorización, resolución de roles e instrumentación de auditoría. Se corren en CI y un test en rojo bloquea el despliegue. `tests/roles-auth.test.js` se omite si faltan `Roles.gs`/`Auth.gs` (no versionados): local 554, CI 544.
+- `npm test` (`node --test tests/*.test.js`) - unitarios de lógica pura del front, sin dependencias (**610 tests, 156 suites** en el estado actual). Incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`, que cargan/verifican los `.gs` reales para autorización, resolución de roles e instrumentación de auditoría. Se corren en CI y un test en rojo bloquea el despliegue. `tests/roles-auth.test.js` se omite si faltan `Roles.gs`/`Auth.gs` (no versionados).
 - `npm run prerender` — genera las páginas estáticas de `src/publicaciones/`, `sitemap.xml` y `robots.txt` desde el canal público. El deploy lo ejecuta tras los tests y **bloquea** si no puede generarlos (`--fixture`, `--dry`, `--soft` para uso manual). Fixtures versionadas en `tests/fixtures/prerender/` (ficha normal, retirada y sin portada) para validar el HTML sin canal real. Los avisos salen como anotaciones del run (`::warning::`/`::error::`).
 
 ## Reglas importantes
@@ -42,4 +42,4 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 
 La documentación operativa detallada (`AGENTS.md` completo, `PROGRESO.md`, `PLANNING.md`, `docs/`, `apps-script/README.md`) se ha movido a `.internal-docs/` y **no se sube a git**. Allí están los IDs de hojas, formularios, detalles de endpoints, reglas de seguridad interna y estado de pendientes.
 
-En el repo, [`memory.md`](memory.md) resume qué se ha hecho (entregado, decisiones, pendientes manuales y verificación) y [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md) contiene contratos, estados y plan por fases.
+En el repo, [`memory.md`](memory.md) resume qué se ha hecho (entregado, decisiones, pendientes manuales y verificación), [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md) contiene contratos, estados y plan por fases, y [`PLAN_GESTOR_FICHAS_PUBLICACIONES.md`](PLAN_GESTOR_FICHAS_PUBLICACIONES.md) recoge el análisis/plan (fases F0–F4, sin implementación) para separar ficha interna y publicación, unificar “qué mostrar” y evitar conflictos futuros. [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) reúne lo planificado para ejecutar en el proyecto `main` (fuera de este repo).

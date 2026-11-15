@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender cada 30 minutos. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (controles estructurados), visor y pruebas. Suite: **554/554**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender disparado por el backend (cron como red de seguridad). **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados**. **Track E cerrado** (E1–E5). **D5 (reCAPTCHA servidor): verificado** (token válido `ok:true`, inválidos 403; gate de login desactivado por decisión). **C3 (ficha configurable):** decisiones cerradas e implementación en repo (contrato aditivo `ficha_json` normalizado/saneado, solo detalle/preview; UI estructurada en gestor; visor/prerender con fallback; tests incluidos). Pendiente en este repo: QA visual manual 360/1280 y confirmar precedencia de overrides (`ficha.tags/cta` etc.) si aplica; port a `main` externo. Suite: **610/610**.
 
 ## Entregado
 
@@ -104,14 +104,17 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **D5 (reCAPTCHA):** ✅ **verificado el 2026-11-15** con la site key de `src/js/config.js` sobre `gn-admin.github.io`: token real → `{"ok":true}` (secreto correcto, dominio autorizado, score ≥ 0,5) y acción distinta o token inventado → 403 (fail closed). El gate del login sigue desactivado por decisión. Único pendiente, solo si se reactiva: secreto `RECAPTCHA_SITE_KEY` en GitHub y redepliegue (el `config.js` desplegado se genera sin site key).
-2. **D3 (opcional):** inspección visual en la hoja de auditoría/fases para confirmar filas escritas.
-3. **D4 (acción periódica):** ejecutar rotación del token cuando proceda (Secrets + config GAS + redespliegue).
-4. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
+1. **C3 (QA visual en este repo):** pasada manual 360/1280 en visor/estáticas con y sin `ficha`; revisar si overrides de `ficha` (`tags/cta/icons/gallery/videos`) deben prevalecer en render.
+2. **D5 (condicional):** verificación servidor OK; gate de login desactivado. Si se reactiva, añadir `RECAPTCHA_SITE_KEY` como secreto de GitHub y redeplegar.
+3. **D3 (opcional):** inspección visual en la hoja de auditoría/fases.
+4. **D4 (acción periódica):** rotación del token cuando proceda (Secrets + config GAS + redespliegue).
+5. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
 
-**Mejoras futuras opcionales (no imprescindibles):** MFA para cuentas elevadas y App Check/endurecimiento adicional en Firebase.
 
-**Nota de alcance:** el dominio propio/indexación del sitio publicado corresponde al proyecto `main` (ver `TRANSFERIR_A_MAIN.md`). Decisión vigente: el gestor se sirve en `https://gn-admin.github.io/admin-dashboard/`; el dominio propio queda fuera de este plan. Este repositorio es para gestión (aunque esté accesible públicamente).
+## Análisis y planes añadidos (2026-11-16)
+
+- **[`PLAN_GESTOR_FICHAS_PUBLICACIONES.md`](PLAN_GESTOR_FICHAS_PUBLICACIONES.md):** análisis profundo y plan por fases (F0–F4, sin implementación) para separar ficha interna y publicación (animal derivada vs evento/historia autónoma), definir ficha como fuente de verdad + capa de “qué mostrar” (whitelist/precedencia/C3), y evitar conflictos futuros (modelo, UI/UX responsive y lógica). Incluye QA estática C3 ejecutada (con/sin `ficha`, viewport/reglas responsive) y observaciones.
+- **Análisis global encargado (en curso, fuera de publicaciones):** auditoría exhaustiva de **seguridad** y de **UI/UX** del proyecto (inconsistencias, accesibilidad, responsive, flujos y endurecimiento en todos los módulos). Resultados pendientes de consolidar e incorporar.
 
 ## Pendiente de desarrollo (otros tracks)
 
