@@ -2652,7 +2652,7 @@ const Dashboard = {
     el.innerHTML = `
       <div class="page-list-container">
         <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
-        <div class="list-header"><span class="response-count">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -4334,7 +4334,7 @@ const Dashboard = {
       : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
         <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
           <select aria-label="Filtrar animales por estado" data-change="onAnimalEstadoFilterChange" data-cpass="el">
             <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
@@ -5190,7 +5190,7 @@ const Dashboard = {
     const counts = {all:this.familias.length, Libre:this.familias.filter(f=>capacidadDe(f)==='Libre').length, Ocupada:this.familias.filter(f=>capacidadDe(f)==='Ocupada').length};
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaForm">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaForm">${Icons.plus} Nueva</button></div>
       <div class="filters-bar"><div class="filter-row">
         <select aria-label="Filtrar familias de acogida" data-change="onFosterFilterChange" data-cpass="el">
           <option value="all" ${filter==='all'?'selected':''}>Todas (${counts.all})</option>
@@ -5400,7 +5400,7 @@ const Dashboard = {
     const faseCls = { entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' };
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${casos.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${casos.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
         <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
           <div class="pipeline" role="list" aria-label="Casos por fase">${fases.map(ff => {
             const n = casos.filter(c => c.fase === ff).length;
@@ -5834,7 +5834,7 @@ const Dashboard = {
     const fases = this._fasesAdopcion();
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count">${this.adopciones.length} procesos</span><button type="button" class="btn btn-primary btn-sm" data-action="showAdopcionForm">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${this.adopciones.length} procesos</span><button type="button" class="btn btn-primary btn-sm" data-action="showAdopcionForm">${Icons.plus} Nueva</button></div>
       <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
         <div class="pipeline" role="list" aria-label="Procesos por fase">${fases.map(f=>{
           const count = this.adopciones.filter(p=>p.fase===f).length;
@@ -8108,7 +8108,7 @@ const Dashboard = {
           <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
           <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
       <div class="filters-bar"><div class="search-box"><span class="search-icon"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
         <select aria-label="Filtrar por tipo de socio" data-change="onSocioTipoFilterChange" data-cpass="el">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
@@ -8572,7 +8572,7 @@ const Dashboard = {
         <div class="stats-grid" style="margin-bottom:16px">
           <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
         <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Donante</th><th scope="col">Importe</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -8651,7 +8651,7 @@ const Dashboard = {
           <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
           <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
         </div></div>
-        <div class="list-header"><span class="response-count">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
         <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Artículo</th><th scope="col">Stock</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td data-label="Artículo">${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td data-label="Stock"><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button> <button type="button" class="btn btn-sm btn-outline-green" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button> <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
