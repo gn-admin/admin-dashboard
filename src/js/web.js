@@ -324,13 +324,13 @@ const Web = {
         ${e.estado_publicacion === 'publicado'
           ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
-        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicaciA3n')}" title="Retirar (410)">${Icons.trash}</button>`}}
+        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>`}
       </td>
     </tr>`;
   },
 
   _chips(faltan) {
-    const labels = { titulo: 'Título', slug: 'Slug', categoria: 'Categoría', contenido: 'Descripción', imagen: 'Imagen', seo: 'SEO', publicacion: 'Sin configurar' };
+    const labels = { titulo: 'Título', slug: 'Slug', categoria: 'Categoría', contenido: 'Descripción', imagen: 'Imagen', coverImage: 'Portada', seo: 'SEO', publicacion: 'Sin configurar' };
     if (!faltan || !faltan.length) return `<span class="estado-badge aprobada">Completa</span>`;
     return faltan.map(f => `<span class="web-chip-missing">${this._esc(labels[f] || f)}</span>`).join(' ');
   },
@@ -457,7 +457,7 @@ const Web = {
           <b>${this._esc(a.nombre || '—')}</b>
           <span class="web-sub">${this._esc([a.especie, a.estado].filter(Boolean).join(' · '))}</span>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" data-action="crearPublicacionWeb" data-arg0="${this._esc(a.animal_id)}">Crear publicación</button>
+        <button type="button" class="btn btn-primary btn-sm" data-action="crearPublicacionWeb" data-arg0="${this._esc(a.animal_id)}" aria-label="Crear publicación de ${this._esc(a.nombre || 'este animal')}">${(typeof Icons !== 'undefined' && Icons.plus) ? Icons.plus : ''} Crear</button>
       </div>`).join('');
   },
 

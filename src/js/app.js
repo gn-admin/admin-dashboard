@@ -297,37 +297,15 @@ const App = {
       btn.classList.add('loading');
       btn.disabled = true;
 
-      const msgRecaptcha = 'No se pudo verificar la solicitud. Inténtalo de nuevo.';
-      const verificarRecaptchaLogin = async () => {
-        const siteKey = (typeof CONFIG !== 'undefined' && CONFIG.recaptchaSiteKey) || '';
-        if (!siteKey) throw new Error(msgRecaptcha);
-        if (!window.grecaptcha || typeof grecaptcha.execute !== 'function') throw new Error(msgRecaptcha);
-        const token = await new Promise((resolve, reject) => {
-          try {
-            grecaptcha.ready(() => {
-              grecaptcha.execute(siteKey, { action: 'login' }).then(resolve).catch(() => reject(new Error(msgRecaptcha)));
-            });
-          } catch (err) { reject(new Error(msgRecaptcha)); }
-        });
-        if (!token) throw new Error(msgRecaptcha);
-        const url = `${CONFIG.apiUrl}?endpoint=login-recaptcha`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ recaptcha_token: token, recaptcha_action: 'login' })
-        });
-        let data = null;
-        try { data = await res.json(); } catch (e2) { data = null; }
-        if (!data || data.status !== 'success') throw new Error((data && data.error) || msgRecaptcha);
-        return true;
-      };
-
+      // Sin gate de reCAPTCHA: Firebase Auth ya valida las credenciales y el
+      // chequeo previo quedaba fuera del flujo real de autenticación, además de
+      // bloquear accesos legítimos cuando el score del navegador era bajo.
       try {
-        await verificarRecaptchaLogin();
         await Auth.loginWithEmail(email, password);
       }
       catch (err) {
-        errorEl.textContent = (err && err.code === 'LOGIN_FAILED') ? Auth._msgLogin(err) : ((err && err.message) || msgRecaptcha);
+        const msg = (err && err.code === 'LOGIN_FAILED') ? Auth._msgLogin(err) : 'No se pudo iniciar sesión. Inténtalo de nuevo.';
+        errorEl.textContent = msg;
         errorEl.classList.add('active');
       }
       finally { btn.classList.remove('loading'); btn.disabled = false; }
