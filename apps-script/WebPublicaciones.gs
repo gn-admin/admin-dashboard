@@ -1499,6 +1499,34 @@ function webDispararDeploy(motivo, opciones) {
 }
 
 /**
+ * Diagnóstico del cuerpo que está corriendo. Si el panel recibe respuestas con
+ * forma antigua (p. ej. estados sin `backend`), ejecutar esta función desde el
+ * editor y mirar el Registro: dice si la función cargada es la del repo.
+ */
+function webDiagnosticoCuerpo() {
+  var marca = function (fn) {
+    var src = '';
+    try { src = typeof fn === 'function' ? String(fn) : ''; } catch (e) { src = ''; }
+    return {
+      existe: !!src,
+      longitud: src.length,
+      con_backend: src.indexOf('backend') !== -1,
+      con_hook: src.indexOf('webConDeploy') !== -1,
+      con_saneado: src.indexOf('webSanearHtml') !== -1
+    };
+  };
+  var salida = {
+    version: WEB_DEPLOY_VERSION,
+    estado_evento: marca(typeof webEstadoEvento === 'function' ? webEstadoEvento : null),
+    estado_animal: marca(typeof webEstadoAnimal === 'function' ? webEstadoAnimal : null),
+    construir: marca(typeof webConstruirPublicacion === 'function' ? webConstruirPublicacion : null),
+    router: marca(typeof _webAnotarDeploy === 'function' ? _webAnotarDeploy : null)
+  };
+  Logger.log(JSON.stringify(salida));
+  return salida;
+}
+
+/**
  * Prueba manual del deploy, para lanzar desde el editor de Apps Script:
  * seleccionar `webDeployProbar` → Ejecutar → Registro de ejecución. Si el
  * token está bien, devuelve `{"ok":true,"disparado":true,"codigo":204}`.

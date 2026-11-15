@@ -98,8 +98,14 @@ describe('un solo sitio dispara el deploy', () => {
     casos.forEach((re) => assert.match(CODE, re));
   });
 
+  it('el router expone el diagnóstico del cuerpo que responde', () => {
+    assert.match(CODE, /case 'web-deploy-cuerpo'/);
+    assert.match(CODE, /estado_evento: \{ longitud: _src\.length, con_backend:/);
+  });
+
   it('WebPublicaciones.gs ya no dispara ni anota el deploy por su cuenta', () => {
-    assert.equal(WEB.indexOf('webConDeploy'), -1);
+    // Sin llamadas al hook antiguo (el diagnóstico solo lo nombra como texto).
+    assert.doesNotMatch(WEB, /webConDeploy\s*\(/);
     // Solo la definición y la prueba manual del editor llaman al disparador.
     assert.equal((WEB.match(/webDispararDeploy\s*\(/g) || []).length, 2);
   });

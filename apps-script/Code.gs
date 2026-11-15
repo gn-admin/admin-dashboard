@@ -383,6 +383,21 @@ function handlePost(endpoint, user, e) {
     }
     case 'web-deploy-estado':
       return jsonResponse(webDeployEstado());
+    case 'web-deploy-cuerpo': {
+      // Diagnóstico: qué cuerpo responde de verdad (no lo que creemos tener).
+      // Vive en el router porque este archivo sí es el que atiende el panel.
+      var _src = '';
+      try { _src = String(webEstadoEvento); } catch (err) { _src = ''; }
+      var _version = '';
+      try { _version = webDeployEstado().data.version; } catch (err) { _version = ''; }
+      return jsonResponse({ status: 'success', data: {
+        version: _version,
+        version_en_contexto: typeof WEB_DEPLOY_VERSION === 'undefined' ? null : WEB_DEPLOY_VERSION,
+        estado_evento: { longitud: _src.length, con_backend: _src.indexOf('backend') !== -1, cola: _src.slice(-200) },
+        con_webConDeploy: typeof webConDeploy === 'function',
+        construir_con_saneado: String(webConstruirPublicacion).indexOf('webSanearHtml') !== -1
+      } });
+    }
     default:
       return jsonResponse({ error: 'Endpoint no encontrado' }, 404);
   }
