@@ -54,7 +54,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v234` (visor público: skip link; navegación con `aria-current="page"`).
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v235` (visor público: skip link; navegación con `aria-current="page"`; admin: título de documento por página y SVG decorativos del login ocultos a AT).
 - `npm test`: **521/521** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
 
 ## Decisiones cerradas

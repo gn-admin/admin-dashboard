@@ -166,7 +166,9 @@ const App = {
         almacen: 'Almacén',
         web: 'Web / Contenido público'
       };
-      document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
+      const title = titles[page] || 'Dashboard';
+      document.getElementById('page-title').textContent = title;
+      document.title = title + ' - Grupo Nebak';
       this.closeSidebar();
       this.closeMasMenu();
       Dashboard.loadPage(page);
