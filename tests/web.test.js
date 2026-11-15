@@ -347,6 +347,41 @@ describe('Web: retiradas en el gestor', () => {
   });
 });
 
+describe('Web._fichaPresentacion (C3)', () => {
+  global.FichaConfig = require('../src/js/ficha-config.js');
+  const porDefecto = extra => Object.assign({
+    plantilla: 'ficha',
+    bloques: { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true },
+    mostrarLectura: true
+  }, extra || {});
+
+  it('sin ficha previa y todo por defecto no envía nada', () => {
+    assert.equal(Web._fichaPresentacion(null, porDefecto()), undefined);
+  });
+
+  it('envía plantilla y bloques cuando cambian', () => {
+    const f = Web._fichaPresentacion(null, porDefecto({ plantilla: 'historia', bloques: { galeria: false }, mostrarLectura: false }));
+    assert.equal(f.plantilla, 'historia');
+    assert.equal(f.bloques.galeria, false);
+    assert.equal(f.bloques.datos, true);
+    assert.equal(f.mostrarLectura, false);
+  });
+
+  it('conserva los extras del JSON avanzado (iconos, galería, cta)', () => {
+    const previa = porDefecto({ icons: [{ icon: 'edad', label: 'Edad', value: '2 años' }], cta: { label: 'Ver', url: 'https://x', kind: 'url' } });
+    const f = Web._fichaPresentacion(previa, porDefecto({ plantilla: 'historia' }));
+    assert.equal(f.plantilla, 'historia');
+    assert.equal(f.icons.length, 1);
+    assert.equal(f.cta.kind, 'url');
+  });
+
+  it('con ficha previa, volver a los valores por defecto sí se envía', () => {
+    const previa = porDefecto({ plantilla: 'historia' });
+    const f = Web._fichaPresentacion(previa, porDefecto());
+    assert.equal(f.plantilla, 'ficha');
+  });
+});
+
 describe('Web: helpers de escape', () => {
   it('escapa HTML cuando no hay Dashboard cargado', () => {
     assert.equal(Web._esc('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');

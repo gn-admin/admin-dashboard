@@ -509,11 +509,6 @@ const Web = {
     const contacto = animal.contact || {};
     const health = animal.health || {};
     this._webFichaForm = d.ficha || d.ficha_json || null;
-    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
-    const fichaNorm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(this._webFichaForm) : this._webFichaForm;
-    const fichaTxt = fichaNorm && typeof fichaNorm === 'object'
-      ? JSON.stringify(fichaNorm, null, 2)
-      : (typeof fichaNorm === 'string' ? fichaNorm : '');
 
     const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
       <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. La ficha interna del animal no se expone: solo lo que rellenes aquí.</p>
@@ -549,7 +544,7 @@ const Web = {
           </div>
           <div class="form-group"><label for="web-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
           <div class="form-group"><label for="web-videos">Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
-          <div class="form-group"><label for="web-iconos">Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
+          <div class="form-group"><label for="web-iconos">Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea><p class="web-slug-hint">Claves de icono: edad, ubicacion, caracter, salud, adopcion, acogida, contacto, urgente, hogar.</p></div>
           <div class="form-row">
             <div class="form-group"><label for="web-file-portada">Subir portada</label><input type="file" id="web-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
             <div class="form-group"><label for="web-file-galeria">Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
@@ -593,14 +588,19 @@ const Web = {
             <div class="form-group"><label for="web-contact-email">Email de contacto</label><input type="email" id="web-contact-email" class="form-input" value="${this._esc(contacto.email || '')}"></div>
             <div class="form-group"><label for="web-contact-tel">Teléfono de contacto</label><input type="text" id="web-contact-tel" class="form-input" value="${this._esc(contacto.phone || '')}"></div>
           </div>
-          <div class="form-group"><label><input type="checkbox" id="web-special-needs" ${health.specialNeeds ? 'checked' : ''}> Necesidades especiales</label></div>
+          <div class="form-row">
+            ${[['vaccinated', 'Vacunado'], ['dewormed', 'Desparasitado'], ['neutered', 'Esterilizado'], ['microchipped', 'Microchip'], ['specialNeeds', 'Necesidades especiales']].map(([k, label]) => `<div class="form-group"><label for="web-health-${k}">${label}</label>
+              <select id="web-health-${k}" class="form-input">
+                <option value="" ${health[k] === undefined ? 'selected' : ''}>Heredar</option>
+                <option value="si" ${health[k] === true ? 'selected' : ''}>Sí</option>
+                <option value="no" ${health[k] === false ? 'selected' : ''}>No</option>
+              </select></div>`).join('')}
+          </div>
         </div>
       </details>
 
-      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Configuración de ficha (avanzado, C3)</summary>
-        <div class="detail-collapse-body">
-          <div class="form-group"><label for="web-ficha-json">Ficha configurable (JSON)</label><textarea id="web-ficha-json" class="form-input" rows="6" placeholder='{"plantilla":"ficha","bloques":{"datos":true}}'>${this._esc(fichaTxt)}</textarea><p class="web-slug-hint">Opcional (propuesta C3). Define plantilla/bloques/lectura; se aplica en detalle/prerender y nunca en listados. Déjalo vacío para usar el comportamiento actual.</p></div>
-        </div>
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Presentación de la ficha</summary>
+        <div class="detail-collapse-body">${this._fichaPresentacionHtml('web-', this._webFichaForm)}</div>
       </details>
 
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
@@ -608,7 +608,13 @@ const Web = {
           <div class="form-row">
             <div class="form-group"><label for="web-cta-label">CTA · etiqueta</label><input type="text" id="web-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar"></div>
             <div class="form-group"><label for="web-cta-url">CTA · URL</label><input type="text" id="web-cta-url" class="form-input" value="${this._esc(cta.url || '')}" placeholder="https://..."></div>
+            <div class="form-group"><label for="web-cta-kind">CTA · intención</label>
+              <select id="web-cta-kind" class="form-input">
+                <option value="" ${cta.kind ? '' : 'selected'}>Enlace normal</option>
+                ${['adopcion', 'acogida', 'contacto'].map(k => `<option value="${k}" ${cta.kind === k ? 'selected' : ''}>${k}</option>`).join('')}
+              </select></div>
           </div>
+          <div class="form-group"><label for="web-tags">Etiquetas (separadas por comas)</label><input type="text" id="web-tags" class="form-input" value="${this._esc((d.tags || []).join(', '))}" placeholder="perro, adopcion"></div>
           <div class="form-group"><label for="web-seo-title">Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
           <div class="form-group"><label for="web-seo-desc">Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
           <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
@@ -663,7 +669,10 @@ const Web = {
         icons: this.parseIconos(v('web-iconos') ? v('web-iconos').value : ''),
         documents: documentos
       },
-      cta: txt('web-cta-label') && txt('web-cta-url') ? { label: txt('web-cta-label'), url: txt('web-cta-url') } : null,
+      tags: this.parseLista(txt('web-tags')),
+      cta: txt('web-cta-label') && txt('web-cta-url')
+        ? Object.assign({ label: txt('web-cta-label'), url: txt('web-cta-url') }, txt('web-cta-kind') ? { kind: txt('web-cta-kind') } : {})
+        : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.
       seo: {
         metaTitle: txt('web-seo-title'),
@@ -678,30 +687,74 @@ const Web = {
         foster: { temporary: txt('web-foster-temp') === 'si', durationLabel: txt('web-foster-dur') },
         location: { city: txt('web-loc-city'), province: txt('web-loc-prov') },
         contact: { email: txt('web-contact-email'), phone: txt('web-contact-tel') },
-        health: { specialNeeds: checked('web-special-needs') }
+        health: (() => {
+          const salud = {};
+          [['vaccinated', 'web-health-vaccinated'], ['dewormed', 'web-health-dewormed'],
+            ['neutered', 'web-health-neutered'], ['microchipped', 'web-health-microchipped'],
+            ['specialNeeds', 'web-health-specialNeeds']].forEach(([k, id]) => {
+            const val = txt(id);
+            if (val === 'si') salud[k] = true;
+            else if (val === 'no') salud[k] = false;
+          });
+          return salud;
+        })()
       }
     };
-    const ficha = this._leerFichaForm('web-ficha-json');
+    const ficha = this._leerFichaPresentacion('web-');
     if (ficha) data.ficha = ficha;
     return data;
   },
 
-  _leerFichaForm(id) {
-    const el = document.getElementById(id);
-    if (!el) return undefined;
-    const raw = String(el.value || '').trim();
-    if (!raw) return undefined; // vacío: no enviar (preserva estado servidor)
-    try {
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
-      const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
-      if (FC && typeof FC.normalizarFicha === 'function') {
-        const n = FC.normalizarFicha(parsed);
-        return n || undefined;
-      }
-      return parsed;
-    } catch (e) { /* inválido: ignorar para no romper guardado */ }
-    return undefined;
+  /**
+   * Ficha configurable (C3) desde los controles: conserva los extras del JSON
+   * avanzado y no envía nada si no había ficha y todo sigue por defecto.
+   */
+  _fichaPresentacion(previa, cfg) {
+    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    const norm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(cfg) : cfg;
+    if (!norm) return undefined;
+    const base = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(previa) : previa;
+    const out = { plantilla: norm.plantilla, bloques: norm.bloques, mostrarLectura: norm.mostrarLectura };
+    ['icons', 'gallery', 'videos', 'cta'].forEach(k => { if (base && base[k]) out[k] = base[k]; });
+    const porDefecto = out.plantilla === 'ficha' && out.mostrarLectura &&
+      Object.keys(out.bloques || {}).every(k => out.bloques[k] === true);
+    if (!base && porDefecto) return undefined;
+    return out;
+  },
+
+  _leerFichaPresentacion(prefijo) {
+    const el = id => document.getElementById(prefijo + id);
+    const bloques = {};
+    [['datos', 'bloque-datos'], ['galeria', 'bloque-galeria'], ['videos', 'bloque-videos'],
+      ['fichaAnimal', 'bloque-animal'], ['etiquetas', 'bloque-etiquetas'], ['cta', 'bloque-cta']]
+      .forEach(([clave, id]) => { const c = el(id); bloques[clave] = c ? !!c.checked : true; });
+    const sel = el('ficha-plantilla');
+    const lectura = el('ficha-lectura');
+    return this._fichaPresentacion(this._webFichaForm, {
+      plantilla: sel && sel.value === 'historia' ? 'historia' : 'ficha',
+      bloques: bloques,
+      mostrarLectura: lectura ? !!lectura.checked : true
+    });
+  },
+
+  /** Controles de presentación de la ficha (plantilla, bloques y lectura). */
+  _fichaPresentacionHtml(prefijo, ficha) {
+    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    const cfg = (FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(ficha) : ficha) || {};
+    const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    const b = Object.assign({}, def, cfg.bloques || {});
+    const bloques = [['datos', 'datos', 'Datos destacados'], ['galeria', 'galeria', 'Galería'], ['videos', 'videos', 'Vídeos'],
+      ['fichaAnimal', 'animal', 'Ficha del animal'], ['etiquetas', 'etiquetas', 'Etiquetas'], ['cta', 'cta', 'Botones CTA']];
+    return `<div class="form-group"><label for="${prefijo}ficha-plantilla">Plantilla de la ficha</label>
+        <select id="${prefijo}ficha-plantilla" class="form-input">
+          <option value="ficha" ${cfg.plantilla !== 'historia' ? 'selected' : ''}>Ficha (datos y animal)</option>
+          <option value="historia" ${cfg.plantilla === 'historia' ? 'selected' : ''}>Historia (sin ficha de animal)</option>
+        </select></div>
+      <div class="form-row">
+        ${bloques.map(([clave, id, label]) => `<div class="form-group"><label><input type="checkbox" id="${prefijo}bloque-${id}" ${b[clave] !== false ? 'checked' : ''}> ${label}</label></div>`).join('')}
+      </div>
+      <div class="form-group"><label><input type="checkbox" id="${prefijo}ficha-lectura" ${cfg.mostrarLectura !== false ? 'checked' : ''}> Mostrar tiempo de lectura</label></div>
+      <p class="web-slug-hint">Se aplica en la ficha y en el prerender; los listados no la cargan. Si no tocas nada se mantiene el comportamiento actual.</p>`;
   },
 
   _leerArchivoBase64(file) {
@@ -813,11 +866,6 @@ const Web = {
     const cta = d.cta || {};
     const hoy = new Date().toISOString().slice(0, 10);
     this._webFichaForm = d.ficha || d.ficha_json || null;
-    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
-    const fichaNorm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(this._webFichaForm) : this._webFichaForm;
-    const fichaTxt = fichaNorm && typeof fichaNorm === 'object'
-      ? JSON.stringify(fichaNorm, null, 2)
-      : (typeof fichaNorm === 'string' ? fichaNorm : '');
 
     const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
       <div class="form-row">
@@ -886,10 +934,8 @@ const Web = {
         </div>
       </details>
 
-      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Configuración de ficha (avanzado, C3)</summary>
-        <div class="detail-collapse-body">
-          <div class="form-group"><label for="we-ficha-json">Ficha configurable (JSON)</label><textarea id="we-ficha-json" class="form-input" rows="6" placeholder='{"plantilla":"historia","bloques":{"datos":true}}'>${this._esc(fichaTxt)}</textarea><p class="web-slug-hint">Opcional (propuesta C3). Define plantilla/bloques/lectura; se aplica en detalle/prerender y nunca en listados. Déjalo vacío para usar el comportamiento actual.</p></div>
-        </div>
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Presentación de la ficha</summary>
+        <div class="detail-collapse-body">${this._fichaPresentacionHtml('we-', this._webFichaForm)}</div>
       </details>
 
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
@@ -897,7 +943,13 @@ const Web = {
           <div class="form-row">
             <div class="form-group"><label for="we-cta-label">CTA · etiqueta</label><input type="text" id="we-cta-label" class="form-input" value="${this._esc(cta.label || '')}"></div>
             <div class="form-group"><label for="we-cta-url">CTA · URL</label><input type="text" id="we-cta-url" class="form-input" value="${this._esc(cta.url || '')}"></div>
+            <div class="form-group"><label for="we-cta-kind">CTA · intención</label>
+              <select id="we-cta-kind" class="form-input">
+                <option value="" ${cta.kind ? '' : 'selected'}>Enlace normal</option>
+                ${['adopcion', 'acogida', 'contacto'].map(k => `<option value="${k}" ${cta.kind === k ? 'selected' : ''}>${k}</option>`).join('')}
+              </select></div>
           </div>
+          <div class="form-group"><label for="we-tags">Etiquetas (separadas por comas)</label><input type="text" id="we-tags" class="form-input" value="${this._esc((d.tags || []).join(', '))}"></div>
           <div class="form-group"><label for="we-seo-title">Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
           <div class="form-group"><label for="we-seo-desc">Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
           <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
@@ -948,7 +1000,10 @@ const Web = {
         gallery: galeria,
         documents: documentos
       },
-      cta: txt('we-cta-label') && txt('we-cta-url') ? { label: txt('we-cta-label'), url: txt('we-cta-url') } : null,
+      tags: this.parseLista(txt('we-tags')),
+      cta: txt('we-cta-label') && txt('we-cta-url')
+        ? Object.assign({ label: txt('we-cta-label'), url: txt('we-cta-url') }, txt('we-cta-kind') ? { kind: txt('we-cta-kind') } : {})
+        : null,
       // Solo lo editable: canonical, OG y robots los deriva el backend.
       seo: {
         metaTitle: txt('we-seo-title'),
@@ -965,7 +1020,7 @@ const Web = {
         registration: { required: checked('we-reg-required'), url: txt('we-reg-url'), label: txt('we-reg-label') }
       }
     };
-    const ficha = this._leerFichaForm('we-ficha-json');
+    const ficha = this._leerFichaPresentacion('we-');
     if (ficha) data.ficha = ficha;
     return data;
   },

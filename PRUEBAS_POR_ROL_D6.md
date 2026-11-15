@@ -4,7 +4,7 @@
 
 ## 0. Estado de verificación (2026-11-15)
 
-**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **540/540** en local. En CI, `roles-auth.test.js` se omite porque `Roles.gs`/`Auth.gs` no se versionan (checkout limpio): **530/530** ejecutados, sin fallos. `roles-d1` y `auditoria-d3` sí corren siempre (usan `Code.gs`/`WebPublicaciones.gs` versionados).
+**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **544/544** en local. En CI, `roles-auth.test.js` se omite porque `Roles.gs`/`Auth.gs` no se versionan (checkout limpio): **534/534** ejecutados, sin fallos. `roles-d1` y `auditoria-d3` sí corren siempre (usan `Code.gs`/`WebPublicaciones.gs` versionados).
 
 **Verificado en vivo (con lote `.gs` desplegado):**
 - [x] **D1/D2:** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; roles desplegados resuelven correctamente (revocado→`sin_acceso`) con denegación por defecto.
