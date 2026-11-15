@@ -129,6 +129,22 @@ function validarFichaHtml(html, esperado) {
   return errores;
 }
 
+/**
+ * Valida el HTML de cada ficha generada: exactamente un JSON-LD parseable y
+ * una sola canónica, coherente con la URL de la página. Las retiradas y las
+ * redirecciones tienen su propio contrato (`noindex`, sin JSON-LD) y no pasan
+ * por aquí. Sin esto, una ficha rota llegaba a publicarse.
+ */
+function validarPaginas(paginas, base) {
+  const errores = [];
+  (paginas || []).forEach(p => {
+    if (!p || p.retirada || p.redirect) return;
+    validarFichaHtml(p.html, { canonical: urlEstatica(base, p.slug) })
+      .forEach(e => errores.push(p.slug + ': ' + e));
+  });
+  return errores;
+}
+
 function validarSalida(salida) {
   const errores = [];
   const sitemap = salida && salida.sitemap;
@@ -467,7 +483,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   const salida = construirSalida(publicaciones, base, retiradas, redirects);
-  const errores = validarSalida(salida);
+  const errores = validarSalida(salida).concat(validarPaginas(salida.paginas, base));
   if (errores.length) {
     const mensaje = 'Salida incompleta: ' + errores.join('; ');
     if (!args.soft) {
@@ -501,7 +517,7 @@ async function main(argv = process.argv.slice(2)) {
 
 module.exports = {
   basePublica, apiUrlDeConfig, slugSeguro, urlEstatica,
-  sitemapXml, robotsTxt, validarSalida, validarFichaHtml, anotacion, anotar,
+  sitemapXml, robotsTxt, validarSalida, validarPaginas, validarFichaHtml, anotacion, anotar,
   paginaEstatica, paginaRetirada, paginaRedirect, construirSalida, main
 };
 

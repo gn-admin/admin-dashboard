@@ -260,8 +260,51 @@ test('fixture ficha oculta/no listada: no se genera ni entra en sitemap', async 
     assert.match(sitemap, /publicaciones\/visible\.html/);
     assert.doesNotMatch(sitemap, /oculta\.html/);
     assert.equal((sitemap.match(/<url>/g) || []).length, 2); // listado + visible
+    const indice = JSON.parse(fs.readFileSync(path.join(out, 'publicaciones', 'index.json'), 'utf8'));
+    assert.deepEqual(indice.publicados, ['visible']);
+    assert.deepEqual(indice.retirados, []);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('validarPaginas exige JSON-LD parseable y una sola canónica por ficha', () => {
+  const salida = prerender.construirSalida([muestra], BASE);
+  assert.deepEqual(prerender.validarPaginas(salida.paginas, BASE), []);
+
+  const rota = [{ slug: 'laia-2026', html: '<html><head></head><body>x</body></html>' }];
+  const errores = prerender.validarPaginas(rota, BASE).join(' ');
+  assert.match(errores, /laia-2026: se esperaba 1 bloque JSON-LD/);
+  assert.match(errores, /laia-2026: se esperaba 1 canonical/);
+
+  const jsonRoto = [{ slug: 'laia-2026', html: '<script type="application/ld+json">{</script><link rel="canonical" href="' + prerender.urlEstatica(BASE, 'laia-2026') + '">' }];
+  assert.match(prerender.validarPaginas(jsonRoto, BASE).join(' '), /JSON-LD no parseable/);
+});
+
+test('validarPaginas deja fuera retiradas y redirecciones (contrato propio)', () => {
+  assert.deepEqual(prerender.validarPaginas([
+    { slug: 'retirada', retirada: true, html: '' },
+    { slug: 'vieja', redirect: true, html: '' }
+  ], BASE), []);
+});
+
+test('el prerender se detiene si una ficha sale sin JSON-LD', async () => {
+  const original = Publico.jsonLd;
+  Publico.jsonLd = () => null;
+  try {
+    await assert.rejects(() => generar('ficha-normal.json'), /JSON-LD/);
+  } finally {
+    Publico.jsonLd = original;
+  }
+});
+
+test('el prerender se detiene si una ficha sale con dos canónicas', async () => {
+  const original = Publico.htmlDetalle;
+  Publico.htmlDetalle = () => '<p>ficha</p><link rel="canonical" href="https://duplicada.test/x">';
+  try {
+    await assert.rejects(() => generar('ficha-normal.json'), /canonical/);
+  } finally {
+    Publico.htmlDetalle = original;
   }
 });
 
@@ -290,9 +333,23 @@ test('fixture redirect 301: genera página de paso noindex y no va al sitemap', 
     assert.match(sitemap, /luna-nueva\.html/);
     assert.doesNotMatch(sitemap, /luna-vieja\.html/);
     assert.equal((sitemap.match(/<url>/g) || []).length, 2); // listado + destino
+    const indice = JSON.parse(fs.readFileSync(path.join(out, 'publicaciones', 'index.json'), 'utf8'));
+    assert.deepEqual(indice.publicados, ['luna-nueva']); // el slug histórico no entra
+    assert.deepEqual(indice.retirados, []);
   } finally {
     fs.rmSync(out, { recursive: true, force: true });
   }
+});
+
+test('un slug histórico retirado no genera redirección (gana la lápida)', () => {
+  const salida = prerender.construirSalida([muestra], BASE, [{ slug: 'laia-antigua' }], [
+    { slug: 'laia-antigua', currentSlug: 'laia-2026', status: 301 }
+  ]);
+  const paginas = salida.paginas.filter(p => p.slug === 'laia-antigua');
+  assert.equal(paginas.length, 1);
+  assert.ok(paginas[0].retirada);
+  assert.equal(paginas[0].redirect, undefined);
+  assert.match(paginas[0].html, /Publicación retirada/);
 });
 
 test('construirSalida genera redirecciones 301 estáticas fuera del sitemap', () => {
