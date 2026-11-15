@@ -36,7 +36,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 - Prerender y fixtures: `scripts/prerender-publico.js`, `tests/fixtures/prerender/`.
 - Media: una carpeta de Drive por publicación (`apps-script/WebPublicaciones.gs` · `webSubirMedia`), con `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env`.
 - Backend: Google Apps Script (desplegado por separado). El canal web y el gestor viven en `apps-script/WebPublicaciones.gs` y los endpoints públicos en `Code.gs`.
-- Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`), rama `main`. Publicar, guardar o retirar en el gestor dispara el deploy vía `workflow_dispatch` desde Apps Script (`webDispararDeploy`, token en `GITHUB_DEPLOY_TOKEN` de las propiedades del script); el cron de 30 min es solo red de seguridad y no es puntual.
+- Despliegue: GitHub Pages (workflow `.github/workflows/deploy.yml`), rama `main`. Publicar, guardar, ocultar, retirar o restaurar en el gestor dispara el deploy vía `workflow_dispatch`; el disparo vive **solo** en `_webAnotarDeploy` (`Code.gs`, que decide con el estado guardado en la respuesta) y llama a `webDispararDeploy` mediante `GITHUB_DEPLOY_TOKEN` de las propiedades del script. No añadir disparos en `WebPublicaciones.gs`: dos lógicas acaban divergiendo. El cron de 30 min es solo red de seguridad y no es puntual.
 
 ## Documentación interna
 

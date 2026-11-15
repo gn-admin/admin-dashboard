@@ -959,25 +959,32 @@ describe('media: borrado de archivos en Drive', () => {
 });
 
 describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
-  it('sin token no llama a GitHub y la acción sigue siendo success', () => {
-    const b = crearBackend();
-    b.estado.animales.push(animal());
-    b.estado.publicaciones.push(fila());
-    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
-    assert.equal(r.status, 'success');
-    assert.equal(r.data.deploy.disparado, false);
-    assert.match(r.data.deploy.error, /GITHUB_DEPLOY_TOKEN/);
-    assert.equal(b.llamadas.length, 0);
-  });
-
-  it('ocultar o publicar manda workflow_dispatch con el ref configurado', () => {
+  it('el backend no dispara: el router es el único punto de disparo', () => {
     const b = crearBackend();
     b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
     b.estado.animales.push(animal());
     b.estado.publicaciones.push(fila());
     const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
-    assert.equal(r.data.backend, '2026-11-15.5');
-    assert.equal(r.data.deploy.disparado, true);
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.estado_publicacion, 'oculto');
+    assert.equal(r.data.backend, '2026-11-15.6');
+    assert.equal(r.data.deploy, undefined);
+    assert.equal(b.llamadas.length, 0);
+  });
+
+  it('sin token devuelve el motivo y nunca lanza', () => {
+    const b = crearBackend();
+    const r = b.ctx.webDispararDeploy('estado');
+    assert.equal(r.disparado, false);
+    assert.match(r.error, /GITHUB_DEPLOY_TOKEN/);
+    assert.equal(b.llamadas.length, 0);
+  });
+
+  it('manda workflow_dispatch con el ref y el token configurados', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    const r = b.ctx.webDispararDeploy('estado');
+    assert.equal(r.disparado, true);
     assert.equal(b.llamadas.length, 1);
     assert.match(b.llamadas[0].url, /repos\/gn-admin\/admin-dashboard\/actions\/workflows\/deploy\.yml\/dispatches$/);
     assert.equal(b.llamadas[0].opts.method, 'post');
@@ -985,26 +992,25 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.deepEqual(plano(JSON.parse(b.llamadas[0].opts.payload)), { ref: 'main' });
   });
 
-  it('retirar un evento también dispara el deploy', () => {
+  it('retirar un evento tampoco dispara desde el backend (lo hace el router)', () => {
     const b = crearBackend();
     b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
     b.estado.publicaciones.push(fila({ id: 'web_ev', tipo: 'evento', origen_id: '', slug: 'fiesta' }));
     const r = b.ctx.webArchivarEvento({ id: 'web_ev' }, { email: 'x@y.es' });
     assert.equal(r.status, 'success');
-    assert.equal(r.data.deploy.disparado, true);
-    assert.equal(b.llamadas.length, 1);
+    assert.equal(r.data.estado_publicacion, 'retirado');
+    assert.equal(r.data.deploy, undefined);
+    assert.equal(b.llamadas.length, 0);
   });
 
   it('no repite el dispatch dentro de la ventana de deduplicación', () => {
     const b = crearBackend();
     b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
-    b.estado.animales.push(animal());
-    b.estado.publicaciones.push(fila());
-    const uno = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, null);
-    const dos = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, null);
-    assert.equal(uno.data.deploy.disparado, true);
-    assert.equal(dos.data.deploy.disparado, false);
-    assert.equal(dos.data.deploy.motivo, 'en_cola');
+    const uno = b.ctx.webDispararDeploy('estado');
+    const dos = b.ctx.webDispararDeploy('estado');
+    assert.equal(uno.disparado, true);
+    assert.equal(dos.disparado, false);
+    assert.equal(dos.motivo, 'en_cola');
     assert.equal(b.llamadas.length, 1);
   });
 
@@ -1016,16 +1022,13 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.equal(b.llamadas.length, 2);
   });
 
-  it('un error de GitHub no rompe la publicación', () => {
+  it('un error de GitHub no lanza y devuelve el código', () => {
     const b = crearBackend();
     b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
     b.respuestaGithub.codigo = 403;
-    b.estado.animales.push(animal());
-    b.estado.publicaciones.push(fila());
-    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, null);
-    assert.equal(r.status, 'success');
-    assert.equal(r.data.deploy.disparado, false);
-    assert.equal(r.data.deploy.codigo, 403);
+    const r = b.ctx.webDispararDeploy('estado');
+    assert.equal(r.disparado, false);
+    assert.equal(r.codigo, 403);
   });
 
   it('borrar un borrador no dispara nada', () => {
@@ -1046,6 +1049,6 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.equal(con.data.configurado, true);
     assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
     // Marcador para detectar implementaciones antiguas desde el panel.
-    assert.equal(con.data.version, '2026-11-15.5');
+    assert.equal(con.data.version, '2026-11-15.6');
   });
 });

@@ -363,12 +363,12 @@ function handlePost(endpoint, user, e) {
     // ==================== GESTOR WEB (admin) ====================
     case 'web-animales':
       if (body && body.accion === 'eliminar') return jsonResponse(webEliminarAnimal(body, user));
-      return jsonResponse(webUpsertAnimal(body, user));
+      return jsonResponse(_webAnotarDeploy(webUpsertAnimal(body, user), body && body.estado_publicacion));
     case 'web-animales-estado':
       return jsonResponse(_webAnotarDeploy(webEstadoAnimal(body, user), body && body.estado_publicacion));
     case 'web-eventos':
-      if (body && body.accion === 'archivar') return jsonResponse(_webAnotarDeploy(webArchivarEvento(body, user), 'retirado'));
-      if (body && body.accion === 'restaurar') return jsonResponse(_webAnotarDeploy(webRestaurarEvento(body, user), 'borrador'));
+      if (body && body.accion === 'archivar') return jsonResponse(_webAnotarDeploy(webArchivarEvento(body, user), 'retirado', true));
+      if (body && body.accion === 'restaurar') return jsonResponse(_webAnotarDeploy(webRestaurarEvento(body, user), 'borrador', true));
       return jsonResponse(_webAnotarDeploy(webUpsertEvento(body, user), body && body.estado_publicacion));
     case 'web-eventos-estado':
       return jsonResponse(_webAnotarDeploy(webEstadoEvento(body, user), body && body.estado_publicacion));
@@ -388,15 +388,17 @@ function handlePost(endpoint, user, e) {
   }
 }
 
-// Red de seguridad del deploy: si la respuesta no trae `data.deploy` (versión
-// antigua de WebPublicaciones.gs o hook que no se ejecutó), se dispara aquí.
-// Con `borrador` no hay nada público que regenerar y no se llama a GitHub.
-function _webAnotarDeploy(respuesta, estado) {
+// Único punto de disparo del deploy: todo endpoint web que cambia lo que se
+// publica pasa por aquí. El estado que decide es el de la respuesta (el que
+// ha quedado guardado), no el que manda el cliente.
+// Con `borrador` no hay nada público que regenerar y no se llama a GitHub,
+// salvo que la acción lo pida (`forzar`, p. ej. restaurar quita la lápida).
+function _webAnotarDeploy(respuesta, estado, forzar) {
   if (!respuesta || respuesta.status !== 'success') return respuesta;
-  var nuevo = String(estado || '').toLowerCase();
-  if (!nuevo || nuevo === 'borrador') return respuesta;
+  var nuevo = String((respuesta.data && respuesta.data.estado_publicacion) || estado || '').toLowerCase();
+  if (!forzar && (!nuevo || nuevo === 'borrador')) return respuesta;
   respuesta.data = respuesta.data || {};
-  if (respuesta.data.deploy) return respuesta; // ya lo anotó el gestor web
+  if (respuesta.data.deploy) return respuesta; // ya viene anotado (doble cobro evitado)
   try {
     respuesta.data.deploy = webDispararDeploy('estado');
   } catch (err) {

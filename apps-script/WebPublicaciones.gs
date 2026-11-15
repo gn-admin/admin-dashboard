@@ -719,7 +719,9 @@ function webUpsertAnimal(body) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
   var respuesta = { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
-  return registro.estado_publicacion === 'publicado' ? webConDeploy(respuesta, 'guardado') : respuesta;
+  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) al ver el
+  // estado resultante: aquí no se llama a GitHub para no tener dos lógicas.
+  return respuesta;
 }
 
 function webEstadoAnimal(body, user) {
@@ -747,8 +749,9 @@ function webEstadoAnimal(body, user) {
   if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
   var respuesta = { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
-  // Ocultar, publicar o retirar cambia las páginas estáticas: deploy inmediato.
-  return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
+  // Ocultar, publicar o retirar cambia las páginas estáticas: el deploy lo
+  // dispara el router al leer `estado_publicacion` de esta respuesta.
+  return respuesta;
 }
 
 function webEliminarAnimal(body, user) {
@@ -913,7 +916,9 @@ function webUpsertEvento(body, user) {
   }
   try { registrarAuditoria('publicacion_web', 'web_' + tipo, registro.id, user, { estado: registro.estado_publicacion, slug: registro.slug }); } catch (e) {}
   var respuesta = { status: 'success', data: webFilaAPublicacion(registro) };
-  return registro.estado_publicacion === 'publicado' ? webConDeploy(respuesta, 'guardado') : respuesta;
+  // El deploy lo dispara el router (`Code.gs` → `_webAnotarDeploy`) al ver el
+  // estado resultante: aquí no se llama a GitHub para no tener dos lógicas.
+  return respuesta;
 }
 
 function webEstadoEvento(body, user) {
@@ -939,7 +944,7 @@ function webEstadoEvento(body, user) {
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
   var respuesta = { status: 'success', data: { id: id, estado_publicacion: estado, backend: WEB_DEPLOY_VERSION } };
-  return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
+  return respuesta;
 }
 
 function webArchivarEvento(body, user) {
@@ -956,7 +961,7 @@ function webArchivarEvento(body, user) {
   var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
   try { registrarAuditoria('retirar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
-  return webConDeploy({ status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } }, 'retirada');
+  return { status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } };
 }
 
 function webRestaurarEvento(body, user) {
@@ -971,8 +976,9 @@ function webRestaurarEvento(body, user) {
   var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
   try { registrarAuditoria('restaurar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
-  // Restaurar quita la lápida: hay que regenerar las estáticas.
-  return webConDeploy({ status: 'success', success: true, data: { id: id, estado_publicacion: 'borrador', slug: previa.slug } }, 'restauracion');
+  // Restaurar quita la lápida: el router lo trata como cambio de lo publicado
+  // aunque el estado resultante sea `borrador`.
+  return { status: 'success', success: true, data: { id: id, estado_publicacion: 'borrador', slug: previa.slug } };
 }
 
 // ==================== UTILIDADES DEL GESTOR ====================
@@ -1290,7 +1296,7 @@ function webCarpetaEnArbolMedia(carpeta, raizId, nivel) {
 var WEB_DEPLOY_DEFECTOS = { repo: 'gn-admin/admin-dashboard', ref: 'main', workflow: 'deploy.yml' };
 // Marcador de versión del backend: `web-deploy-estado` lo devuelve para poder
 // distinguir si el panel habla con una implementación antigua.
-var WEB_DEPLOY_VERSION = '2026-11-15.5';
+var WEB_DEPLOY_VERSION = '2026-11-15.6';
 var WEB_DEPLOY_DEDUPE_SEG = 60;
 
 function webDeployPropiedades() {
@@ -1368,22 +1374,6 @@ function webDeployProbar() {
   var resultado = webDispararDeploy('prueba-manual', { forzar: true });
   Logger.log(JSON.stringify(webDeployEstado().data) + ' → ' + JSON.stringify(resultado));
   return resultado;
-}
-
-/**
- * Adjunta el resultado del deploy a una respuesta correcta. El deploy nunca
- * rompe la acción, pero si falla se ve el motivo en `data.deploy` (nada de
- * silencios: un catch mudo ocultaba que el hook no llegaba a ejecutarse).
- */
-function webConDeploy(respuesta, motivo) {
-  if (!respuesta || respuesta.status !== 'success') return respuesta;
-  respuesta.data = respuesta.data || {};
-  try {
-    respuesta.data.deploy = webDispararDeploy(motivo);
-  } catch (err) {
-    respuesta.data.deploy = { ok: false, disparado: false, error: 'Excepción en webDispararDeploy: ' + err.message };
-  }
-  return respuesta;
 }
 
 // ==================== CANAL PÚBLICO ====================
