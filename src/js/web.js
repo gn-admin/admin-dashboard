@@ -570,6 +570,7 @@ const Web = {
             <div class="form-group"><label for="web-file-doc">Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
           </div>
           <div class="form-group"><label for="web-docs">Documentos de la ficha (nombre|url por línea)</label><textarea id="web-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+          <div class="web-media-lista" id="web-media-lista" aria-live="polite"></div>
           <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos (los usa la web), no la carpeta; los documentos quedan privados. La portada, la galería y los vídeos se enlazan solos. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
         </div>
       </details>
@@ -647,6 +648,7 @@ const Web = {
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar publicación</button></div>
     </form>`;
     if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) Dashboard.showFormModal('Publicación web · ' + (origen.nombre || 'Animal'), html);
+    this._pintarMediaFormulario('web');
   },
 
   _leerFormAnimal() {
@@ -783,6 +785,46 @@ const Web = {
     });
   },
 
+  /** Identificador de un archivo de Drive a partir de su enlace. */
+  driveFileId(url) {
+    const s = String(url || '');
+    let m = s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+    if (m) return m[1];
+    m = s.match(/\/d\/([A-Za-z0-9_-]{10,})/);
+    return m ? m[1] : '';
+  },
+
+  /**
+   * Archivos de Drive enlazados en el formulario, para poder borrarlos.
+   * `campos`: {cover, galeria, videos, docs} con el texto tal cual está.
+   */
+  extraerMediaFormulario(campos) {
+    const c = campos || {};
+    const salida = [];
+    const vistos = {};
+    const push = (url, tipo, etiqueta) => {
+      const fileId = this.driveFileId(url);
+      if (!fileId || vistos[fileId]) return;
+      vistos[fileId] = true;
+      salida.push({ fileId, url: String(url || ''), tipo, etiqueta: etiqueta || tipo });
+    };
+    push(c.cover, 'portada', 'Portada');
+    String(c.galeria || '').split('\n').forEach(l => push(String(l).split('|')[0], 'galeria', 'Galería'));
+    String(c.videos || '').split('\n').forEach(l => push(String(l).split('|')[1], 'video', 'Vídeo'));
+    String(c.docs || '').split('\n').forEach(l => {
+      const p = String(l).split('|');
+      push(p[1] || p[0], 'documento', (p[0] || 'Documento').trim());
+    });
+    return salida;
+  },
+
+  /** Quita de un texto multilínea las líneas que apuntan a un archivo. */
+  quitarMediaDeTexto(texto, fileId) {
+    return String(texto || '').split('\n')
+      .filter(l => this.driveFileId(l) !== fileId)
+      .join('\n');
+  },
+
   _campoMedia(tipo, prefijo) {
     const campos = { portada: prefijo + '-cover', galeria: prefijo + '-galeria', video: prefijo + '-videos', documento: prefijo + '-docs' };
     return campos[tipo] || '';
@@ -826,9 +868,47 @@ const Web = {
         if (!d.url) throw new Error((res && res.error) || 'El backend no devolvió la URL');
         this._anadirMedia(campo, tipo, d, file.name, prefijo);
       }
+      this._pintarMediaFormulario(prefijo);
       this._snack('Archivo(s) subidos a la carpeta de la ficha');
     } catch (err) {
       this._snackErr(err, 'No se pudo subir: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    }
+  },
+
+  /** Chips con los archivos de Drive enlazados en el formulario. */
+  _mediaFormularioHtml(prefijo) {
+    const v = sufijo => { const el = document.getElementById(prefijo + sufijo); return el ? String(el.value || '') : ''; };
+    const lista = this.extraerMediaFormulario({ cover: v('-cover'), galeria: v('-galeria'), videos: v('-videos'), docs: v('-docs') });
+    if (!lista.length) return '';
+    return '<p class="web-media-titulo">Archivos en Drive de esta ficha</p>' + lista.map(m =>
+      `<span class="web-media-chip">${this._esc(m.etiqueta)}<button type="button" class="web-media-chip-x" data-action="borrarMediaWeb" data-pass="el" data-file-id="${this._esc(m.fileId)}" data-prefijo="${this._esc(prefijo)}" aria-label="Borrar ${this._esc(m.etiqueta)} de Drive">×</button></span>`
+    ).join('');
+  },
+
+  _pintarMediaFormulario(prefijo) {
+    const cont = document.getElementById(prefijo + '-media-lista');
+    if (cont) cont.innerHTML = this._mediaFormularioHtml(prefijo);
+  },
+
+  /** Borra el archivo de Drive y lo quita de los campos del formulario. */
+  async borrarMediaWeb(el) {
+    const fileId = el && el.getAttribute('data-file-id');
+    const prefijo = (el && el.getAttribute('data-prefijo')) || 'web';
+    if (!fileId) return;
+    if (typeof window !== 'undefined' && window.confirm && !window.confirm('¿Borrar este archivo de Drive? No se puede deshacer.')) return;
+    try {
+      await API.eliminarMediaWeb(fileId);
+      ['-cover', '-galeria', '-videos', '-docs'].forEach(sufijo => {
+        const campo = document.getElementById(prefijo + sufijo);
+        if (!campo) return;
+        campo.value = sufijo === '-cover'
+          ? (this.driveFileId(campo.value) === fileId ? '' : campo.value)
+          : this.quitarMediaDeTexto(campo.value, fileId);
+      });
+      this._pintarMediaFormulario(prefijo);
+      this._snack('Archivo borrado de Drive. Guarda la publicación para quitar el enlace.');
+    } catch (err) {
+      this._snackErr(err, 'No se pudo borrar el archivo: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
     }
   },
 
@@ -919,6 +999,7 @@ const Web = {
         <div class="form-group"><label for="we-file-doc">Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
       </div>
       <div class="form-group"><label for="we-docs">Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+      <div class="web-media-lista" id="we-media-lista" aria-live="polite"></div>
       <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
 
       <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
@@ -982,6 +1063,7 @@ const Web = {
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar publicación</button></div>
     </form>`;
     if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) Dashboard.showFormModal((d.tipo === 'historia' ? 'Historia web' : 'Evento web') + (d.id ? '' : ' · nueva'), html);
+    this._pintarMediaFormulario('we');
   },
 
   _leerFormEvento() {

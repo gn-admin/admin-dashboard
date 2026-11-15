@@ -187,6 +187,12 @@ const API = {
     }
     return this._post('web-media-subir', { publicacion_id: publicacionId, tipo, archivo_base64: base64, nombre, mime_type: mimeType });
   },
+  // Borra de Drive un archivo de la media. Sin publicación solo se acepta si
+  // está dentro de la carpeta raíz de media (útil para huérfanos).
+  async eliminarMediaWeb(fileId, publicacionId) {
+    if (!fileId) throw new Error('Falta el identificador del archivo');
+    return this._post('web-media-eliminar', { file_id: fileId, publicacion_id: publicacionId || '' });
+  },
   async updateDocumento(id, data) { const r = await this._post('update-documento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteDocumento(id) { return this._post('delete-documento', { id }); },
 

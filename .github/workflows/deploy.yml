@@ -5,9 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Cada 30 min: una ficha recién publicada (o una retirada) genera su página
-    # estática sin esperar a un push. GitHub puede retrasar el inicio unos
-    # minutos bajo carga, así que el margen real es de ~30-40 min.
+    # Red de seguridad. Lo normal es que el deploy lo dispare el backend de
+    # Apps Script al publicar/retirar (`webDispararDeploy` → workflow_dispatch).
+    # Los programados de GitHub no son puntuales: pueden retrasarse horas o no
+    # llegar bajo carga, así que no se usan para garantizar plazos.
     - cron: '*/30 * * * *'
 
 permissions:

@@ -410,3 +410,38 @@ describe('Web: helpers de escape', () => {
     assert.equal(Web._esc(null), '');
   });
 });
+
+describe('Web: media de Drive enlazada en el formulario', () => {
+  it('saca el identificador de los enlaces de Drive', () => {
+    const id = '1AbCdEfGhIjKlMnOpQrStUv';
+    assert.equal(Web.driveFileId('https://drive.google.com/thumbnail?id=' + id + '&sz=w1200'), id);
+    assert.equal(Web.driveFileId('https://drive.google.com/uc?id=' + id + '&export=download'), id);
+    assert.equal(Web.driveFileId('https://drive.google.com/file/d/' + id + '/view'), id);
+    assert.equal(Web.driveFileId('https://ejemplo.es/foto.jpg'), '');
+    assert.equal(Web.driveFileId(null), '');
+  });
+
+  it('lista portada, galería, vídeos y documentos sin repetir', () => {
+    const a = '1AbCdEfGhIjKlMnOpQrStUv';
+    const b = '1ZzYyXxWwVvUuTtSsRrQqPp';
+    const c = '1QqWwEeRrTtYyUuIiOoPpAa';
+    const lista = Web.extraerMediaFormulario({
+      cover: 'https://drive.google.com/thumbnail?id=' + a + '&sz=w1200',
+      galeria: 'https://drive.google.com/thumbnail?id=' + b + '&sz=w1600|Alt\nhttps://drive.google.com/thumbnail?id=' + a + '&sz=w1600',
+      videos: 'Presentación|https://drive.google.com/file/d/' + c + '/view',
+      docs: 'Contrato|https://drive.google.com/uc?id=' + c + '&export=download'
+    });
+    assert.deepEqual(lista.map(m => m.tipo), ['portada', 'galeria', 'video']);
+    assert.deepEqual(lista.map(m => m.fileId), [a, b, c]);
+    assert.equal(lista[2].etiqueta, 'Vídeo');
+  });
+
+  it('quita del texto solo las líneas del archivo borrado', () => {
+    const a = '1AbCdEfGhIjKlMnOpQrStUv';
+    const b = '1ZzYyXxWwVvUuTtSsRrQqPp';
+    const texto = 'https://drive.google.com/thumbnail?id=' + a + '&sz=w1200|Uno\nhttps://drive.google.com/thumbnail?id=' + b + '&sz=w1200|Dos';
+    const limpio = Web.quitarMediaDeTexto(texto, a);
+    assert.equal(limpio, 'https://drive.google.com/thumbnail?id=' + b + '&sz=w1200|Dos');
+    assert.equal(Web.quitarMediaDeTexto('', a), '');
+  });
+});

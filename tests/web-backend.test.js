@@ -27,6 +27,14 @@ function crearBackend() {
       getId: () => id,
       getName: () => nombre,
       getUrl: () => 'https://drive.test/folder/' + id,
+      getParents() {
+        const padreObj = padre === 'ROOT_MEDIA'
+          ? carpetaDrive('media', 'ROOT_MEDIA', null)
+          : (padre ? (drive.carpetas.find(x => x.folder.getId() === padre) || {}).folder : null);
+        let i = 0;
+        const arr = padreObj ? [padreObj] : [];
+        return { hasNext: () => i < arr.length, next: () => arr[i++] };
+      },
       getFoldersByName(n) {
         const hits = drive.carpetas.filter(c => c.nombre === n && c.padre === id).map(c => c.folder);
         let i = 0;
@@ -55,6 +63,17 @@ function crearBackend() {
     };
     return folder;
   }
+  // Propiedades del script, caché y llamadas a GitHub simuladas.
+  const props = {};
+  const cache = {
+    datos: {},
+    get(k) { return this.datos[k] || null; },
+    put(k, v) { this.datos[k] = v; },
+    remove(k) { delete this.datos[k]; }
+  };
+  const llamadas = [];
+  const respuestaGithub = { codigo: 204, texto: '' };
+
   const ctx = {
     SpreadsheetApp: {
       openById(id) {
@@ -92,6 +111,32 @@ function crearBackend() {
         const c = drive.carpetas.find(x => x.folder.getId() === id);
         if (!c) throw new Error('Carpeta no encontrada');
         return c.folder;
+      },
+      getFileById(id) {
+        const reg = drive.archivos.find(a => a.id === id);
+        if (!reg) throw new Error('Archivo no encontrado');
+        const carpeta = drive.carpetas.find(c => c.folder.getId() === reg.carpeta);
+        return {
+          getId: () => reg.id,
+          getName: () => reg.nombre,
+          setTrashed(v) { reg.eliminado = !!v; },
+          getParents() {
+            let i = 0;
+            const arr = carpeta ? [carpeta.folder] : [];
+            return { hasNext: () => i < arr.length, next: () => arr[i++] };
+          }
+        };
+      }
+    },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k in props ? props[k] : null) }) },
+    CacheService: { getScriptCache: () => cache },
+    UrlFetchApp: {
+      fetch(url, opts) {
+        llamadas.push({ url, opts });
+        return {
+          getResponseCode: () => respuestaGithub.codigo,
+          getContentText: () => respuestaGithub.texto
+        };
       }
     },
     readSheet(cfg) {
@@ -120,7 +165,7 @@ function crearBackend() {
   };
   vm.createContext(ctx);
   vm.runInContext(FUENTE, ctx, { filename: 'WebPublicaciones.gs' });
-  return { ctx, estado, hojas, drive };
+  return { ctx, estado, hojas, drive, props, cache, llamadas, respuestaGithub };
 }
 
 function animal(extra) {
@@ -850,5 +895,154 @@ describe('slugs históricos y redirecciones 301', () => {
     assert.ok(hist.indexOf('luna') === -1, 'el slug actual no debe figurar en el historial');
     assert.ok(hist.indexOf('luna-2026') !== -1, 'el slug abandonado debe quedar para redirigir');
     assert.equal(b.ctx.webPublicacionPublica('luna-2026').redirect.slug, 'luna');
+  });
+});
+
+describe('media: borrado de archivos en Drive', () => {
+  function subida(b, extra) {
+    return b.ctx.webSubirMedia(Object.assign({
+      publicacion_id: 'web_1', tipo: 'portada', archivo_base64: 'QUJD',
+      nombre: 'x.jpg', mime_type: 'image/jpeg'
+    }, extra || {}));
+  }
+
+  it('borra el archivo de la carpeta de la ficha (papelera)', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    const up = subida(b);
+    const r = b.ctx.webEliminarMedia({ publicacion_id: 'web_1', file_id: up.data.fileId });
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.eliminado, true);
+    assert.equal(r.data.nombre, up.data.nombre);
+    assert.equal(b.drive.archivos[0].eliminado, true);
+  });
+
+  it('rechaza archivos de otra publicación', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    b.estado.publicaciones.push(fila({ id: 'web_ev', tipo: 'evento', origen_id: '', slug: 'fiesta' }));
+    const animalFile = subida(b);
+    b.ctx.webSubirMedia({
+      publicacion_id: 'web_ev', tipo: 'portada', archivo_base64: 'QUJD',
+      nombre: 'fiesta.jpg', mime_type: 'image/jpeg'
+    });
+    const r = b.ctx.webEliminarMedia({ publicacion_id: 'web_ev', file_id: animalFile.data.fileId });
+    assert.equal(r.status, 'error');
+    assert.match(r.error, /no pertenece/);
+    assert.equal(b.drive.archivos[0].eliminado, undefined);
+  });
+
+  it('sin publicación solo borra dentro del árbol de media', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    const up = subida(b);
+    const ok = b.ctx.webEliminarMedia({ file_id: up.data.fileId });
+    assert.equal(ok.status, 'success');
+
+    b.drive.archivos.push({ id: 'file-ajeno', nombre: 'otro.jpg', mime: 'image/jpeg', carpeta: 'OTRA_CARPETA' });
+    const ko = b.ctx.webEliminarMedia({ file_id: 'file-ajeno' });
+    assert.equal(ko.status, 'error');
+    assert.match(ko.error, /no pertenece/);
+    assert.equal(b.drive.archivos[1].eliminado, undefined);
+  });
+
+  it('valida publicación, archivo y raíz configurada', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    const up = subida(b);
+    assert.match(b.ctx.webEliminarMedia({}).error, /file_id/);
+    assert.match(b.ctx.webEliminarMedia({ publicacion_id: 'nope', file_id: up.data.fileId }).error, /no encontrada/i);
+    assert.match(b.ctx.webEliminarMedia({ file_id: 'no-existe' }).error, /No se pudo borrar/);
+    b.ctx.CONFIG.DRIVE_WEB_FOLDER_ID = '';
+    assert.match(b.ctx.webEliminarMedia({ file_id: up.data.fileId }).error, /DRIVE_WEB_FOLDER_ID/);
+  });
+});
+
+describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
+  it('sin token no llama a GitHub y la acción sigue siendo success', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.deploy.disparado, false);
+    assert.match(r.data.deploy.error, /GITHUB_DEPLOY_TOKEN/);
+    assert.equal(b.llamadas.length, 0);
+  });
+
+  it('ocultar o publicar manda workflow_dispatch con el ref configurado', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, { email: 'x@y.es' });
+    assert.equal(r.data.deploy.disparado, true);
+    assert.equal(b.llamadas.length, 1);
+    assert.match(b.llamadas[0].url, /repos\/gn-admin\/admin-dashboard\/actions\/workflows\/deploy\.yml\/dispatches$/);
+    assert.equal(b.llamadas[0].opts.method, 'post');
+    assert.equal(b.llamadas[0].opts.headers.Authorization, 'Bearer ghp_prueba');
+    assert.deepEqual(plano(JSON.parse(b.llamadas[0].opts.payload)), { ref: 'main' });
+  });
+
+  it('retirar un evento también dispara el deploy', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    b.estado.publicaciones.push(fila({ id: 'web_ev', tipo: 'evento', origen_id: '', slug: 'fiesta' }));
+    const r = b.ctx.webArchivarEvento({ id: 'web_ev' }, { email: 'x@y.es' });
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.deploy.disparado, true);
+    assert.equal(b.llamadas.length, 1);
+  });
+
+  it('no repite el dispatch dentro de la ventana de deduplicación', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const uno = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, null);
+    const dos = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, null);
+    assert.equal(uno.data.deploy.disparado, true);
+    assert.equal(dos.data.deploy.disparado, false);
+    assert.equal(dos.data.deploy.motivo, 'en_cola');
+    assert.equal(b.llamadas.length, 1);
+  });
+
+  it('el disparo manual ignora la caché y puede repetirse', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    assert.equal(b.ctx.webDispararDeploy('manual', { forzar: true }).disparado, true);
+    assert.equal(b.ctx.webDispararDeploy('manual', { forzar: true }).disparado, true);
+    assert.equal(b.llamadas.length, 2);
+  });
+
+  it('un error de GitHub no rompe la publicación', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    b.respuestaGithub.codigo = 403;
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' }, null);
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.deploy.disparado, false);
+    assert.equal(r.data.deploy.codigo, 403);
+  });
+
+  it('borrar un borrador no dispara nada', () => {
+    const b = crearBackend();
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    b.estado.publicaciones.push(fila({ id: 'web_draft', estado_publicacion: 'borrador' }));
+    const r = b.ctx.webEliminarAnimal({ animal_id: '' }, null);
+    assert.equal(r.status, 'error');
+    assert.equal(b.llamadas.length, 0);
+  });
+
+  it('expone si está configurado sin filtrar el token', () => {
+    const b = crearBackend();
+    const sin = b.ctx.webDeployEstado();
+    assert.equal(sin.data.configurado, false);
+    b.props.GITHUB_DEPLOY_TOKEN = 'ghp_prueba';
+    const con = b.ctx.webDeployEstado();
+    assert.equal(con.data.configurado, true);
+    assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
   });
 });

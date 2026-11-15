@@ -154,7 +154,7 @@ function _audit(endpoint, user, body, result) {
       'delete-seguimiento':1,'delete-recordatorio':1,'delete-inventario':1,'delete-grupo':1,'delete-historial-fase-adopcion':1,
       'upload-foto-animal':1,'upload-documento':1,'send-contrato-email':1,'blacklist':1,'update-blacklist':1,
       'contratos':1,'update-contrato':1,'adopciones':1,'update-adopcion':1,'acogidas':1,'update-acogida':1,
-      'socios':1,'update-socio':1,'web-media-subir':1
+      'socios':1,'update-socio':1,'web-media-subir':1,'web-media-eliminar':1,'web-deploy':1
     };
     if (!sensitive[endpoint]) return;
     var id = (body && (body.id || body.contrato_id || body.response_id)) || '';
@@ -375,6 +375,14 @@ function handlePost(endpoint, user, e) {
     case 'web-media-subir': {
       var _rm = jsonResponse(webSubirMedia(body)); _audit(endpoint, user, body, _rm); return _rm;
     }
+    case 'web-media-eliminar': {
+      var _rx = jsonResponse(webEliminarMedia(body)); _audit(endpoint, user, body, _rx); return _rx;
+    }
+    case 'web-deploy': {
+      var _rd = jsonResponse(webDispararDeploy('manual', { forzar: true })); _audit(endpoint, user, body, _rd); return _rd;
+    }
+    case 'web-deploy-estado':
+      return jsonResponse(webDeployEstado());
     default:
       return jsonResponse({ error: 'Endpoint no encontrado' }, 404);
   }

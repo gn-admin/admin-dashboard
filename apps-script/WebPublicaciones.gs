@@ -718,7 +718,8 @@ function webUpsertAnimal(body) {
   } catch (err) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
-  return { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
+  var respuesta = { status: 'success', data: webFilaAPublicacion(registro), guardado: guardado };
+  return registro.estado_publicacion === 'publicado' ? webConDeploy(respuesta, 'guardado') : respuesta;
 }
 
 function webEstadoAnimal(body, user) {
@@ -745,7 +746,9 @@ function webEstadoAnimal(body, user) {
   var ok = updateSheetRow(webSheetConfig(), previa.id, cambios);
   if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  return { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
+  var respuesta = { status: 'success', data: { id: previa.id, animal_id: animalId, estado_publicacion: estado } };
+  // Ocultar, publicar o retirar cambia las páginas estáticas: deploy inmediato.
+  return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
 }
 
 function webEliminarAnimal(body, user) {
@@ -909,7 +912,8 @@ function webUpsertEvento(body, user) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
   try { registrarAuditoria('publicacion_web', 'web_' + tipo, registro.id, user, { estado: registro.estado_publicacion, slug: registro.slug }); } catch (e) {}
-  return { status: 'success', data: webFilaAPublicacion(registro) };
+  var respuesta = { status: 'success', data: webFilaAPublicacion(registro) };
+  return registro.estado_publicacion === 'publicado' ? webConDeploy(respuesta, 'guardado') : respuesta;
 }
 
 function webEstadoEvento(body, user) {
@@ -934,7 +938,8 @@ function webEstadoEvento(body, user) {
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
-  return { status: 'success', data: { id: id, estado_publicacion: estado } };
+  var respuesta = { status: 'success', data: { id: id, estado_publicacion: estado } };
+  return estado === 'borrador' ? respuesta : webConDeploy(respuesta, 'estado');
 }
 
 function webArchivarEvento(body, user) {
@@ -951,7 +956,7 @@ function webArchivarEvento(body, user) {
   var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
   try { registrarAuditoria('retirar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
-  return { status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } };
+  return webConDeploy({ status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } }, 'retirada');
 }
 
 function webRestaurarEvento(body, user) {
@@ -966,7 +971,8 @@ function webRestaurarEvento(body, user) {
   var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
   if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
   try { registrarAuditoria('restaurar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
-  return { status: 'success', success: true, data: { id: id, estado_publicacion: 'borrador', slug: previa.slug } };
+  // Restaurar quita la lápida: hay que regenerar las estáticas.
+  return webConDeploy({ status: 'success', success: true, data: { id: id, estado_publicacion: 'borrador', slug: previa.slug } }, 'restauracion');
 }
 
 // ==================== UTILIDADES DEL GESTOR ====================
@@ -1196,6 +1202,168 @@ function webSubirMedia(body) {
     Logger.log('webSubirMedia error: ' + err.message);
     return { status: 'error', error: 'Error subiendo a Drive: ' + err.message };
   }
+}
+
+/**
+ * Borra (a la papelera) un archivo de la media de la web. Con
+ * `publicacion_id` solo se acepta si el archivo está en la carpeta de esa
+ * ficha; sin publicación, si está dentro del árbol de `DRIVE_WEB_FOLDER_ID`.
+ * Nunca se puede borrar nada ajeno a la carpeta de media.
+ */
+function webEliminarMedia(body) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var fileId = webTexto(body && (body.file_id || body.fileId));
+  if (!fileId) return { status: 'error', error: 'Falta file_id' };
+  var raiz = webRaizMedia();
+  if (!raiz) return { status: 'error', error: 'DRIVE_WEB_FOLDER_ID no configurado en Config.gs' };
+
+  var carpetaFichaId = '';
+  var publicacionId = webTexto(body && body.publicacion_id);
+  if (publicacionId) {
+    var p = webPublicacionPorId(publicacionId);
+    if (!p) return { status: 'error', error: 'Publicación no encontrada' };
+    var carpeta = webBuscarCarpetaFicha(p);
+    if (carpeta.error) return { status: 'error', error: carpeta.error };
+    carpetaFichaId = carpeta.folderId;
+  }
+
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var dentro = false;
+    var padres = file.getParents();
+    while (padres.hasNext()) {
+      var padre = padres.next();
+      if (carpetaFichaId) {
+        if (padre.getId() === carpetaFichaId) dentro = true;
+      } else if (webCarpetaEnArbolMedia(padre, raiz.getId(), 0)) {
+        dentro = true;
+      }
+      if (dentro) break;
+    }
+    if (!dentro) return { status: 'error', error: 'El archivo no pertenece a la carpeta de esta publicación' };
+    var nombre = file.getName();
+    file.setTrashed(true);
+    return { status: 'success', success: true, data: { fileId: fileId, nombre: nombre, eliminado: true } };
+  } catch (err) {
+    return { status: 'error', error: 'No se pudo borrar el archivo: ' + err.message };
+  }
+}
+
+/** Carpeta de la ficha sin crearla (para comprobar antes de borrar). */
+function webBuscarCarpetaFicha(p) {
+  var raiz = webRaizMedia();
+  if (!raiz) return { error: 'DRIVE_WEB_FOLDER_ID no configurado en Config.gs' };
+  try {
+    var nombreTipo = WEB_CARPETAS_TIPO[webTexto(p && p.tipo)] || 'publicaciones';
+    var itTipo = raiz.getFoldersByName(nombreTipo);
+    if (!itTipo.hasNext()) return { folderId: '', nombre: webRutaCarpeta(p) };
+    var carpetaTipo = itTipo.next();
+    var slug = webTexto(p && p.slug) || webTexto(p && p.id) || 'sin-slug';
+    var it = carpetaTipo.getFoldersByName(slug);
+    if (!it.hasNext()) return { folderId: '', nombre: webRutaCarpeta(p) };
+    return { folderId: it.next().getId(), nombre: webRutaCarpeta(p) };
+  } catch (err) {
+    return { error: 'No se pudo abrir la carpeta de la ficha: ' + err.message };
+  }
+}
+
+/** ¿La carpeta cuelga del árbol de la raíz de media? (máx. 4 niveles). */
+function webCarpetaEnArbolMedia(carpeta, raizId, nivel) {
+  if (!carpeta || !raizId) return false;
+  nivel = nivel || 0;
+  if (nivel > 4) return false;
+  if (carpeta.getId() === raizId) return true;
+  var padres = carpeta.getParents();
+  while (padres.hasNext()) {
+    if (webCarpetaEnArbolMedia(padres.next(), raizId, nivel + 1)) return true;
+  }
+  return false;
+}
+
+// ==================== DESPLIEGUE AUTOMÁTICO ====================
+//
+// El cron de GitHub Pages no es puntual (puede retrasarse horas o no llegar),
+// así que publicar, editar o retirar dispara el workflow por API. El token
+// vive en las propiedades del script (`GITHUB_DEPLOY_TOKEN`), nunca en el repo.
+
+var WEB_DEPLOY_DEFECTOS = { repo: 'gn-admin/admin-dashboard', ref: 'main', workflow: 'deploy.yml' };
+var WEB_DEPLOY_DEDUPE_SEG = 60;
+
+function webDeployPropiedades() {
+  try { return PropertiesService.getScriptProperties(); } catch (err) { return null; }
+}
+
+function webDeployConfig() {
+  var props = webDeployPropiedades();
+  var leer = function (clave, defecto) {
+    var v = '';
+    try { v = props ? webTexto(props.getProperty(clave)) : ''; } catch (err) { v = ''; }
+    return v || defecto;
+  };
+  return {
+    token: leer('GITHUB_DEPLOY_TOKEN', ''),
+    repo: leer('GITHUB_DEPLOY_REPO', WEB_DEPLOY_DEFECTOS.repo),
+    ref: leer('GITHUB_DEPLOY_REF', WEB_DEPLOY_DEFECTOS.ref),
+    workflow: leer('GITHUB_DEPLOY_WORKFLOW', WEB_DEPLOY_DEFECTOS.workflow)
+  };
+}
+
+/** Estado de la configuración del deploy (nunca devuelve el token). */
+function webDeployEstado() {
+  var cfg = webDeployConfig();
+  return { status: 'success', data: { configurado: !!cfg.token, repo: cfg.repo, ref: cfg.ref, workflow: cfg.workflow } };
+}
+
+/**
+ * Lanza `workflow_dispatch` del deploy de Pages. Nunca lanza excepción: si
+ * falta el token o GitHub falla se devuelve el motivo y la acción principal
+ * (publicar, guardar, retirar) sigue siendo un éxito.
+ */
+function webDispararDeploy(motivo, opciones) {
+  opciones = opciones || {};
+  var cfg = webDeployConfig();
+  if (!cfg.token) return { ok: false, disparado: false, error: 'Deploy automático sin configurar (falta GITHUB_DEPLOY_TOKEN)' };
+
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache && !opciones.forzar) {
+      if (cache.get('web-deploy')) return { ok: true, disparado: false, motivo: 'en_cola' };
+      cache.put('web-deploy', '1', WEB_DEPLOY_DEDUPE_SEG);
+    }
+  } catch (err) { /* sin caché se sigue: mejor un deploy de más que ninguno */ }
+
+  var url = 'https://api.github.com/repos/' + cfg.repo + '/actions/workflows/' + cfg.workflow + '/dispatches';
+  try {
+    var res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        Authorization: 'Bearer ' + cfg.token,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      },
+      payload: JSON.stringify({ ref: cfg.ref }),
+      muteHttpExceptions: true
+    });
+    var codigo = res.getResponseCode();
+    if (codigo >= 200 && codigo < 300) return { ok: true, disparado: true, codigo: codigo };
+    Logger.log('webDispararDeploy ' + codigo + ': ' + String(res.getContentText()).slice(0, 300));
+    return { ok: false, disparado: false, codigo: codigo, error: 'GitHub respondió ' + codigo };
+  } catch (err) {
+    Logger.log('webDispararDeploy error: ' + err.message);
+    return { ok: false, disparado: false, error: 'No se pudo llamar a GitHub: ' + err.message };
+  }
+}
+
+/** Adjunta el resultado del deploy a una respuesta correcta, sin alterarla. */
+function webConDeploy(respuesta, motivo) {
+  if (!respuesta || respuesta.status !== 'success') return respuesta;
+  try {
+    respuesta.data = respuesta.data || {};
+    respuesta.data.deploy = webDispararDeploy(motivo);
+  } catch (err) { /* el deploy nunca rompe el guardado */ }
+  return respuesta;
 }
 
 // ==================== CANAL PÚBLICO ====================

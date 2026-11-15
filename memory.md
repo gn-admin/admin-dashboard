@@ -22,7 +22,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Guarda de despliegue**: bloquea con `exit 1` si no puede leer el canal, si falla una ficha o si sitemap/robots no son válidos; no borra la salida anterior. `--soft` solo avisa (uso manual).
 - **Avisos en Actions** y guarda: falla el deploy si no puede leer `retiradas` (salvo `--soft`, A3) o si sitemap/robots no son válidos; no borra la salida anterior.
 - **Fixtures versionadas** en `tests/fixtures/prerender/`: `ficha-normal.json`, `retirada.json`, `sin-portada.json`, `oculta.json`, `redirect-301.json`. Genera también páginas de **redirección 301** estáticas (noindex, canonical/refresh al destino, fuera de sitemap) y valida **JSON-LD/canonical únicos** (`validarFichaHtml`). C2 avanzado (`d4daabf`).
-- Integrado en `.github/workflows/deploy.yml` después de `npm test`; además **cada 30 minutos** (`cron: '*/30 * * * *'`) para que una ficha recién publicada (o una retirada) tenga su página estática sin esperar a un push: margen real ~30-40 min. Concurrencia en cola para no cancelar un deploy en curso.
+- Integrado en `.github/workflows/deploy.yml` después de `npm test`. **El deploy lo dispara el backend** al publicar, guardar o retirar (`webDispararDeploy` → `workflow_dispatch`, deduplicado 60 s), así que la estática está en 2–4 min. El cron `*/30 * * * *` queda solo como red de seguridad: no es puntual (ver «Despliegue»). Concurrencia en cola para no cancelar un deploy en curso.
 - **Índice de estáticas** (`publicaciones/index.json`, `{generadoEn, publicados, retirados}`): el visor solo declara `canonical`/`og:url` hacia `publicaciones/<slug>.html` cuando el índice confirma que esa página ya existe; si aún no se ha generado, omite el canonical en vez de apuntar a un 404. Sin índice (fallo de red) mantiene la canónica estática. El SW sirve ese JSON con red primero.
 
 ### Retiradas y 410
@@ -32,7 +32,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - Nuevo endpoint público `?endpoint=retiradas` con los slugs retirados (y sus históricos) para que la web publique una página de retirada.
 - Página estática de retirada: `noindex,nofollow`, sin canonical ni JSON-LD, **fuera del sitemap**. Si una ficha publicada recupera el slug, la ficha manda sobre la lápida.
 - Gestor: botón «Retirar (410)» con confirmación; el resumen cuenta las retiradas aparte (tarjeta «Retiradas», fuera de borradores e incompletas) y el listado las muestra con badge, sin acciones de republicar ni volver a retirar.
-- Plazo máximo documentado: **~24 h** (siguiente ejecución) **+ 5–10 min** de pipeline; ~48 h si fallan dos ejecuciones seguidas. Se puede forzar con `workflow_dispatch`.
+- Plazo real desde 2026-11-15: **2–4 min** (el backend dispara el deploy al retirar). Si el disparo falla, el cron de 30 min es la red de seguridad y, en el peor caso, el siguiente push.
 
 ### Gestor de contenido (`src/js/web.js` + `apps-script/WebPublicaciones.gs`)
 
@@ -59,8 +59,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 - **Animal (ciclo completo y limpio):** publicación `prueba-e2e-elizabeth` sobre el animal Elizabeth **sin tocar su ficha interna**: alta en `borrador`, portada PNG generada al vuelo y subida a Drive (`animales/prueba-e2e-elizabeth/`, `fileId 1ewh1Eh9Y3RL1B4IFl6Mvq4L_ITaN1JtP`), publicación, estática verificada (title, canonical, `og:image`, JSON-LD, en sitemap), visor con portada (1200 px reales) y texto, y `index.json` con el slug → el canonical del visor pasó de **omitido** (mientras no existía la estática) a la URL estática. Limpieza: `oculto` → eliminación de la fila; el siguiente prerender deja su página en **404** y el slug libre.
 - **410 real:** evento de pruebas `prueba-retirada-playwright` con portada en `eventos/…` (`fileId 1EVI7TGKKHal3m5pQegEZkoisqzuW6mBW`), publicado y verificado, luego retirado → canal `status:"gone"`, lápida estática `noindex,nofollow` sin canonical, fuera de sitemap, presente en `?endpoint=retiradas` y visor «Publicación retirada». Queda **retirado** (los eventos no tienen borrado).
-- **Restos:** los dos PNG siguen en Drive (no hay endpoint de borrado) y las filas de auditoría. Cero cambios en animales, familias o adopciones.
-- **Observación:** las estáticas se regeneraron con dos `workflow_dispatch` manuales (16:16 y 16:45 UTC); en la ventana de prueba **no apareció ningún run `schedule`** a las 16:00/16:30, así que la latencia ≤30-40 min del cron sigue sin verificarse en vivo.
+- **Diagnóstico del cron (2026-11-15):** solo hay **un** run `schedule` en todo el historial: llegó a las 10:59 UTC cuando el cron era `17 3 * * *` (≈7 h de retraso) y encima falló en `npm test`. En la ventana de prueba no hubo ninguno a las 16:00 ni a las 16:30: GitHub retrasa o descarta los programados bajo carga. Las estáticas de la prueba las generaron dos `workflow_dispatch` a mano (16:16 y 16:45). Conclusión: el cron **no es fiable** y no se usa como garantía.
+- **Solución implantada:** `webDispararDeploy` en `WebPublicaciones.gs` lanza `workflow_dispatch` al publicar, guardar o retirar (ocultar, retirar, restaurar incluidos), con deduplicación de 60 s y sin romper la acción si GitHub falla. Token en la propiedad de script `GITHUB_DEPLOY_TOKEN`; endpoint admin `POST web-deploy` (forzado) para relanzarlo a mano y `web-deploy-estado` para ver si está configurado.
 
 ### Media por ficha (Drive)
 
@@ -71,12 +71,13 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - Formularios: animal (portada, galería, vídeo, documento) y evento/historia (portada, galería, documento). Los documentos se guardan en `media.documents` y no se publican.
 - **Galería:** `url|alt|pie` por línea, retrocompatible (una URL sola sigue valiendo); el visor pinta `<figure>`/`<figcaption>`.
 - **Enlaces de Drive normalizados al pegar:** fichero → `thumbnail?id=…&sz=w1200|w1600` (imagen) o `/file/d/…/view` (vídeo/documento); enlace de carpeta → rechazado con aviso al guardar.
+- **Borrado (2026-11-15):** `POST web-media-eliminar` `{file_id, publicacion_id?}` manda el archivo a la papelera. Con `publicacion_id` exige que esté en la carpeta de esa ficha; sin él, dentro del árbol de `DRIVE_WEB_FOLDER_ID` (huérfanos de fichas ya borradas). En los formularios, cada archivo enlazado sale como chip con «×» que borra en Drive y limpia el campo.
 - Requiere `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env` y regenerar `Config.gs`.
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v262` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
-- `npm test`: **554/554** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
+- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v263` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
+- `npm test`: **569/569** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`; +15 de borrado de media y deploy automático).
 
 ## Decisiones cerradas
 
