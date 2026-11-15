@@ -100,7 +100,8 @@ describe('un solo sitio dispara el deploy', () => {
 
   it('el router expone el diagnóstico del cuerpo que responde', () => {
     assert.match(CODE, /case 'web-deploy-cuerpo'/);
-    assert.match(CODE, /estado_evento: \{ longitud: _src\.length, con_backend:/);
+    assert.match(CODE, /estado_evento: \{ con_backend: _src\.indexOf\('backend'\) !== -1, cola: _src\.slice\(-200\) \}/);
+    assert.match(CODE, /construir_con_saneado: String\(webConstruirPublicacion\)\.indexOf\('webSanearHtml'\) !== -1/);
   });
 
   it('WebPublicaciones.gs ya no dispara ni anota el deploy por su cuenta', () => {

@@ -125,7 +125,9 @@ function webAhora() {
 var WEB_HTML_ETIQUETAS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'ul', 'ol', 'li', 'blockquote', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'figure', 'figcaption', 'img', 'hr', 'code', 'pre', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub'];
 var WEB_HTML_VACIAS = ['br', 'hr', 'img'];
 var WEB_HTML_ATRIBUTOS = { a: ['href', 'title'], img: ['src', 'alt', 'width', 'height'], td: ['colspan', 'rowspan'], th: ['colspan', 'rowspan'] };
-var WEB_HTML_PROHIBIDAS = 'script|style|iframe|object|embed|applet|svg|math|form|input|button|select|option|textarea|link|meta|base|noscript|template|frame|frameset';
+// Solo las que arrastran contenido peligroso: el resto de etiquetas no
+// permitidas se descarta igualmente en el paso de la lista blanca.
+var WEB_HTML_PROHIBIDAS = 'script|style|iframe|object|embed|applet|svg|math|form|noscript|template|textarea';
 
 /** `true` si la URL se puede usar como `href`/`src` (relativa, http(s), mailto o tel). */
 function webUrlSegura(valor) {
@@ -157,8 +159,8 @@ function webGaleriaSegura(lista) {
     var src = webUrlSegura(g.src || g.url);
     if (!src) return;
     var copia = webClonarPlano(g);
+    delete copia.url; // `src` es la forma canónica que lee el visor
     copia.src = src;
-    if (copia.url) copia.url = src;
     out.push(copia);
   });
   return out;
@@ -186,8 +188,8 @@ function webFichaSegura(ficha) {
   if (Array.isArray(copia.videos)) copia.videos = webVideosSeguros(copia.videos);
   if (copia.cta && typeof copia.cta === 'object') {
     var url = webUrlSegura(copia.cta.url);
-    if (url) copia.cta = webClonarPlano(copia.cta);
-    if (url) copia.cta.url = url; else delete copia.cta;
+    if (!url) delete copia.cta;
+    else { copia.cta = webClonarPlano(copia.cta); copia.cta.url = url; }
   }
   return copia;
 }
@@ -1496,34 +1498,6 @@ function webDispararDeploy(motivo, opciones) {
     Logger.log('webDispararDeploy error: ' + err.message);
     return { ok: false, disparado: false, error: 'No se pudo llamar a GitHub: ' + err.message };
   }
-}
-
-/**
- * Diagnóstico del cuerpo que está corriendo. Si el panel recibe respuestas con
- * forma antigua (p. ej. estados sin `backend`), ejecutar esta función desde el
- * editor y mirar el Registro: dice si la función cargada es la del repo.
- */
-function webDiagnosticoCuerpo() {
-  var marca = function (fn) {
-    var src = '';
-    try { src = typeof fn === 'function' ? String(fn) : ''; } catch (e) { src = ''; }
-    return {
-      existe: !!src,
-      longitud: src.length,
-      con_backend: src.indexOf('backend') !== -1,
-      con_hook: src.indexOf('webConDeploy') !== -1,
-      con_saneado: src.indexOf('webSanearHtml') !== -1
-    };
-  };
-  var salida = {
-    version: WEB_DEPLOY_VERSION,
-    estado_evento: marca(typeof webEstadoEvento === 'function' ? webEstadoEvento : null),
-    estado_animal: marca(typeof webEstadoAnimal === 'function' ? webEstadoAnimal : null),
-    construir: marca(typeof webConstruirPublicacion === 'function' ? webConstruirPublicacion : null),
-    router: marca(typeof _webAnotarDeploy === 'function' ? _webAnotarDeploy : null)
-  };
-  Logger.log(JSON.stringify(salida));
-  return salida;
 }
 
 /**
