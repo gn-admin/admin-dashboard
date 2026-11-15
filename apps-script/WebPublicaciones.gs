@@ -1356,6 +1356,17 @@ function webDispararDeploy(motivo, opciones) {
   }
 }
 
+/**
+ * Prueba manual del deploy, para lanzar desde el editor de Apps Script:
+ * seleccionar `webDeployProbar` → Ejecutar → Registro de ejecución. Si el
+ * token está bien, devuelve `{"ok":true,"disparado":true,"codigo":204}`.
+ */
+function webDeployProbar() {
+  var resultado = webDispararDeploy('prueba-manual', { forzar: true });
+  Logger.log(JSON.stringify(webDeployEstado().data) + ' → ' + JSON.stringify(resultado));
+  return resultado;
+}
+
 /** Adjunta el resultado del deploy a una respuesta correcta, sin alterarla. */
 function webConDeploy(respuesta, motivo) {
   if (!respuesta || respuesta.status !== 'success') return respuesta;
