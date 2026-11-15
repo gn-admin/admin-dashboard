@@ -388,6 +388,22 @@ describe('Web._fichaPresentacion (C3)', () => {
   });
 });
 
+describe('Web: publicar solo fichas completas', () => {
+  it('sin faltantes no bloquea', () => {
+    assert.deepEqual(Web._faltantesPublicacion({ completitud: { ok: true, faltan: [] } }), []);
+    assert.deepEqual(Web._faltantesPublicacion(null), []);
+  });
+
+  it('traduce los campos del backend a etiquetas legibles', () => {
+    const faltan = Web._faltantesPublicacion({ completitud: { faltan: ['titulo', 'coverImage', 'contenido_html', 'seo.metaDescription', 'estado_publico'] } });
+    assert.deepEqual(faltan, ['Título', 'Portada', 'Descripción', 'Meta descripción', 'Estado']);
+  });
+
+  it('un campo desconocido se muestra tal cual', () => {
+    assert.equal(Web._campoLabel('raro'), 'raro');
+  });
+});
+
 describe('Web: helpers de escape', () => {
   it('escapa HTML cuando no hay Dashboard cargado', () => {
     assert.equal(Web._esc('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');

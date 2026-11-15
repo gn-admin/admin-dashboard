@@ -111,6 +111,45 @@ describe('Publico.urlEstatica', () => {
   });
 });
 
+describe('Publico.canonicaFicha: solo cuando la estática existe', () => {
+  const conLocation = fn => {
+    const previo = global.location;
+    global.location = { origin: 'https://gn-admin.github.io', pathname: '/admin-dashboard/publico.html', search: '' };
+    try { return fn(); } finally { global.location = previo; }
+  };
+
+  it('sin índice cargado mantiene la canónica estática', () => {
+    const previo = Publico._indice;
+    Publico._indice = null;
+    try {
+      conLocation(() => assert.equal(Publico.canonicaFicha({ slug: 'laia' }),
+        'https://gn-admin.github.io/admin-dashboard/publicaciones/laia.html'));
+    } finally { Publico._indice = previo; }
+  });
+
+  it('con la página ya generada usa la estática', () => {
+    const previo = Publico._indice;
+    Publico._indice = new Set(['laia']);
+    try {
+      conLocation(() => assert.equal(Publico.canonicaFicha({ slug: 'laia' }),
+        'https://gn-admin.github.io/admin-dashboard/publicaciones/laia.html'));
+    } finally { Publico._indice = previo; }
+  });
+
+  it('si aún no se ha generado no declara canonical (evita apuntar a un 404)', () => {
+    const previo = Publico._indice;
+    Publico._indice = new Set(['otra']);
+    try {
+      conLocation(() => assert.equal(Publico.canonicaFicha({ slug: 'laia' }), ''));
+    } finally { Publico._indice = previo; }
+  });
+
+  it('sin publicación no hay canónica', () => {
+    assert.equal(Publico.canonicaFicha(null), '');
+    assert.equal(Publico.canonicaFicha({}), '');
+  });
+});
+
 describe('Publico.jsonLd', () => {
   it('animal -> Article con about y fechas', () => {
     const ld = Publico.jsonLd({

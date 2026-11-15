@@ -19,6 +19,8 @@ const Publico = {
   items: [],
   paginacion: null,
   _req: 0,
+  /** Slugs con página estática generada (null = índice aún sin cargar). */
+  _indice: null,
 
   // ==================== LÓGICA PURA ====================
 
@@ -109,6 +111,33 @@ const Publico = {
     return location.origin + dir + 'publicaciones/' + encodeURIComponent(s) + '.html';
   },
 
+  /**
+   * Carga el índice que publica el prerender (`publicaciones/index.json`).
+   * Si falla, `_indice` queda a null y se mantiene la canónica estática: es
+   * preferible a un canonical inestable.
+   */
+  async cargarIndice() {
+    if (this._indice) return this._indice;
+    try {
+      const res = await fetch('publicaciones/index.json', { cache: 'no-cache' });
+      if (!res.ok) return null;
+      const datos = await res.json();
+      this._indice = new Set(((datos && datos.publicados) || []).map(String));
+    } catch (e) { /* sin índice: comportamiento anterior */ }
+    return this._indice;
+  },
+
+  /**
+   * Canónica de una ficha. Solo apunta a `publicaciones/<slug>.html` cuando el
+   * índice confirma que esa página ya se generó; si aún no existe (ficha recién
+   * publicada) se omite el canonical en vez de declarar un 404.
+   */
+  canonicaFicha(pub) {
+    if (!pub || !pub.slug) return '';
+    if (!this._indice) return this.urlEstatica(pub.slug);
+    return this._indice.has(String(pub.slug)) ? this.urlEstatica(pub.slug) : '';
+  },
+
   jsonLd(pub) {
     if (!pub) return null;
     const url = this.urlSegura((pub.seo && pub.seo.canonical) || pub.canonical || pub.url) || '';
@@ -152,9 +181,10 @@ const Publico = {
 
   // ==================== ARRANQUE / NAVEGACIÓN ====================
 
-  iniciar() {
+  async iniciar() {
     this._bind();
     window.addEventListener('hashchange', () => this.rutear());
+    await this.cargarIndice();
     this.rutear();
   },
 
@@ -637,7 +667,7 @@ const Publico = {
     const canonica = meta.canonical
       ? (this.urlSegura(meta.canonical) || '')
       : (esFicha
-        ? this.urlEstatica(pub.slug)
+        ? this.canonicaFicha(pub)
         : ((pub || typeof location === 'undefined') ? '' : location.origin + location.pathname));
     document.title = meta.title;
     this._meta('name', 'description', meta.description);

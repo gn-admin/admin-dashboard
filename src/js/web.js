@@ -330,9 +330,25 @@ const Web = {
   },
 
   _chips(faltan) {
-    const labels = { titulo: 'Título', slug: 'Slug', categoria: 'Categoría', contenido: 'Descripción', imagen: 'Imagen', coverImage: 'Portada', seo: 'SEO', publicacion: 'Sin configurar' };
     if (!faltan || !faltan.length) return `<span class="estado-badge aprobada">Completa</span>`;
-    return faltan.map(f => `<span class="web-chip-missing">${this._esc(labels[f] || f)}</span>`).join(' ');
+    return faltan.map(f => `<span class="web-chip-missing">${this._esc(this._campoLabel(f))}</span>`).join(' ');
+  },
+
+  /** Etiqueta legible de un campo que impide publicar. */
+  _campoLabel(campo) {
+    const labels = {
+      titulo: 'Título', slug: 'Slug', categoria: 'Categoría', estado_publico: 'Estado',
+      contenido: 'Descripción', contenido_html: 'Descripción', imagen: 'Imagen',
+      coverImage: 'Portada', seo: 'SEO', 'seo.metaDescription': 'Meta descripción',
+      publicacion: 'Sin configurar'
+    };
+    return labels[campo] || campo;
+  },
+
+  /** Campos que impiden publicar una ficha (los calcula el backend). */
+  _faltantesPublicacion(fila) {
+    const faltan = (fila && fila.completitud && fila.completitud.faltan) || [];
+    return faltan.map(f => this._campoLabel(f));
   },
 
   _vacio(titulo, texto) {
@@ -1056,18 +1072,33 @@ const Web = {
         this._snack('Configura primero la publicación web de este animal', 'warning');
         return this.abrirAnimal(identificador);
       }
+      if (estado === 'publicado' && fila) {
+        const faltan = this._faltantesPublicacion(fila);
+        if (faltan.length) {
+          this._snack('Antes de publicar falta: ' + faltan.join(', '), 'warning');
+          return this.abrirAnimal(identificador);
+        }
+      }
       try {
         await API.setWebAnimalEstado(identificador, estado);
-        this._snack(estado === 'publicado' ? 'Publicado en la web' : 'Publicación ocultada');
+        this._snack(estado === 'publicado' ? 'Publicado en la web. La página SEO se genera en los próximos 30 minutos' : 'Publicación ocultada');
         await this.recargar();
       } catch (err) {
         this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
       }
       return;
     }
+    const fila = (this.eventos || []).find(e => String(e.id) === String(identificador));
+    if (estado === 'publicado' && fila) {
+      const faltan = this._faltantesPublicacion(fila);
+      if (faltan.length) {
+        this._snack('Antes de publicar falta: ' + faltan.join(', '), 'warning');
+        return this.abrirEvento(identificador);
+      }
+    }
     try {
       await API.setWebEventoEstado(identificador, estado);
-      this._snack(estado === 'publicado' ? 'Publicado en la web' : 'Publicación ocultada');
+      this._snack(estado === 'publicado' ? 'Publicado en la web. La página SEO se genera en los próximos 30 minutos' : 'Publicación ocultada');
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));

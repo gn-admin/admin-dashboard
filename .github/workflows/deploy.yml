@@ -5,9 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Ejecución diaria para que una retirada genere su página estática (410/noindex)
-    # sin esperar a un push. GitHub usa UTC: 03:17 UTC ≈ 04:17/05:17 en Madrid.
-    - cron: '17 3 * * *'
+    # Cada 30 min: una ficha recién publicada (o una retirada) genera su página
+    # estática sin esperar a un push. GitHub puede retrasar el inicio unos
+    # minutos bajo carga, así que el margen real es de ~30-40 min.
+    - cron: '*/30 * * * *'
 
 permissions:
   contents: read

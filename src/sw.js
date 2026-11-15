@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'gn-encuestas-v261';
+﻿const CACHE_NAME = 'gn-encuestas-v262';
 const OFFLINE_URL = './offline.html';
 const STATIC_ASSETS = [
   './',
@@ -73,6 +73,15 @@ self.addEventListener('fetch', event => {
       fetch(event.request).catch(() =>
         caches.match(event.request).then(m => m || Response.error())
       )
+    );
+    return;
+  }
+
+  // Índice del prerender: red primero para no dejar la canónica congelada
+  // (cache-first lo serviría viejo tras publicar o retirar una ficha).
+  if (url.pathname.endsWith('/publicaciones/index.json')) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request).then(m => m || Response.error()))
     );
     return;
   }

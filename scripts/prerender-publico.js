@@ -344,7 +344,14 @@ function construirSalida(publicaciones, base, retiradas, redirects) {
     if (!destino) return;
     paginas.push({ slug: from, redirect: true, html: paginaRedirect(destino) });
   });
-  return { paginas: paginas, sitemap: sitemapXml(urls), robots: robotsTxt(base) };
+  // Índice de páginas generadas: el visor solo declara como canónica una
+  // estática que ya existe (una ficha recién publicada aún no la tiene).
+  const indice = JSON.stringify({
+    generadoEn: new Date().toISOString(),
+    publicados: Array.from(publicados).sort(),
+    retirados: Array.from(lapidas).sort()
+  }, null, 2);
+  return { paginas: paginas, sitemap: sitemapXml(urls), robots: robotsTxt(base), indice: indice };
 }
 
 async function json(url) {
@@ -482,12 +489,13 @@ async function main(argv = process.argv.slice(2)) {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   salida.paginas.forEach(p => fs.writeFileSync(path.join(dir, p.slug + '.html'), p.html, 'utf8'));
+  fs.writeFileSync(path.join(dir, 'index.json'), salida.indice, 'utf8');
   fs.writeFileSync(path.join(out, 'sitemap.xml'), salida.sitemap, 'utf8');
   fs.writeFileSync(path.join(out, 'robots.txt'), salida.robots, 'utf8');
   const totalRetiradas = salida.paginas.filter(p => p.retirada).length;
   const totalRedir = salida.paginas.filter(p => p.redirect).length;
   console.log('[prerender] ' + (salida.paginas.length - totalRetiradas - totalRedir) + ' fichas + ' +
-    totalRetiradas + ' retiradas + ' + totalRedir + ' redirecciones + sitemap.xml + robots.txt en ' + out);
+    totalRetiradas + ' retiradas + ' + totalRedir + ' redirecciones + index.json + sitemap.xml + robots.txt en ' + out);
   return salida;
 }
 

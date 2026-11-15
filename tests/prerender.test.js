@@ -112,6 +112,17 @@ test('construirSalida omite lo no listado y normaliza los slugs', () => {
   assert.equal(salida.paginas[0].slug, 'laia-2026');
   assert.equal(salida.sitemap.split('<url>').length - 1, 2); // listado + ficha
   assert.match(salida.sitemap, /publicaciones\/laia-2026\.html/);
+  const indice = JSON.parse(salida.indice);
+  assert.deepEqual(indice.publicados, ['laia-2026']);
+  assert.deepEqual(indice.retirados, []);
+  assert.ok(indice.generadoEn);
+});
+
+test('el índice incluye retiradas y omite el slug publicado que recupera su ficha', () => {
+  const salida = prerender.construirSalida([muestra], BASE, [{ slug: 'historia-retirada' }, { slug: 'laia-2026' }]);
+  const indice = JSON.parse(salida.indice);
+  assert.deepEqual(indice.publicados, ['laia-2026']);
+  assert.deepEqual(indice.retirados, ['historia-retirada']);
 });
 
 test('anotacion produce comandos de GitHub Actions escapados', () => {
@@ -124,6 +135,8 @@ test('fixture ficha normal: HTML completo sin JavaScript', async () => {
   const { out } = await generar('ficha-normal.json');
   try {
     const html = fs.readFileSync(path.join(out, 'publicaciones', 'laia.html'), 'utf8');
+    const indice = JSON.parse(fs.readFileSync(path.join(out, 'publicaciones', 'index.json'), 'utf8'));
+    assert.ok(indice.publicados.includes('laia'));
     assert.match(html, /<title>Laia, border collie en adopción<\/title>/);
     assert.match(html, /rel="canonical" href="https:\/\/gn-admin\.github\.io\/admin-dashboard\/publicaciones\/laia\.html"/);
     assert.match(html, /<meta property="og:image"/);

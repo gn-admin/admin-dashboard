@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (controles estructurados), visor y pruebas. Suite: **546/546**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender cada 30 minutos. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (controles estructurados), visor y pruebas. Suite: **554/554**.
 
 ## Entregado
 
@@ -22,7 +22,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Guarda de despliegue**: bloquea con `exit 1` si no puede leer el canal, si falla una ficha o si sitemap/robots no son válidos; no borra la salida anterior. `--soft` solo avisa (uso manual).
 - **Avisos en Actions** y guarda: falla el deploy si no puede leer `retiradas` (salvo `--soft`, A3) o si sitemap/robots no son válidos; no borra la salida anterior.
 - **Fixtures versionadas** en `tests/fixtures/prerender/`: `ficha-normal.json`, `retirada.json`, `sin-portada.json`, `oculta.json`, `redirect-301.json`. Genera también páginas de **redirección 301** estáticas (noindex, canonical/refresh al destino, fuera de sitemap) y valida **JSON-LD/canonical únicos** (`validarFichaHtml`). C2 avanzado (`d4daabf`).
-- Integrado en `.github/workflows/deploy.yml` después de `npm test`; además **ejecución diaria** (`cron: '17 3 * * *'`, UTC) para aplicar retiradas sin push. Concurrencia en cola para no cancelar un deploy en curso.
+- Integrado en `.github/workflows/deploy.yml` después de `npm test`; además **cada 30 minutos** (`cron: '*/30 * * * *'`) para que una ficha recién publicada (o una retirada) tenga su página estática sin esperar a un push: margen real ~30-40 min. Concurrencia en cola para no cancelar un deploy en curso.
+- **Índice de estáticas** (`publicaciones/index.json`, `{generadoEn, publicados, retirados}`): el visor solo declara `canonical`/`og:url` hacia `publicaciones/<slug>.html` cuando el índice confirma que esa página ya existe; si aún no se ha generado, omite el canonical en vez de apuntar a un 404. Sin índice (fallo de red) mantiene la canónica estática. El SW sirve ese JSON con red primero.
 
 ### Retiradas y 410
 
@@ -41,6 +42,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Login sin reCAPTCHA (2026-11-15):** se quitó el gate `login-recaptcha` del formulario (script, aviso y llamada); Firebase Auth ya valida las credenciales y el chequeo previo bloqueaba accesos legítimos con score bajo. El endpoint sigue en el backend, sin uso desde el panel.
 - **Móvil del gestor web (2026-11-15):** estadísticas compactas (sin subtítulo, icono 34 px), acciones en rejilla, fichas de publicación con título destacado y botones 2×2 sin scroll horizontal (el `min-width: 540px` de `.data-table` ya se anula en modo tarjetas), y selector de «Nueva publicación» en filas con botón «Crear».
 - **Fix de delegación (2026-11-15):** `Dashboard` es `const` (no `window.Dashboard`), así que los módulos `dashboard-actividad|finanzas|blacklist|web` no se fusionaban en el navegador y sus acciones (`data-action`) no existían en producción; ahora resuelven el binding léxico. Verificado en producción (cargando el módulo nuevo con caché invalidada): la pestaña «Eventos e historias» cambia y lista el borrador. Con el service worker, `v259` propaga el arreglo.
+- **Publicar solo fichas completas (2026-11-15):** el gestor bloquea «Publicar» si el backend marca campos pendientes y muestra la lista legible (Título, Portada, Descripción, Meta descripción…), abriendo el formulario; el backend ya rechazaba esas publicaciones, esto evita el error sin explicación. El aviso de publicación recuerda que la página SEO tarda ≤30 min.
 - **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`), verificado en producción (Playwright) y con auditoría `eliminar_publicacion` en el backend desplegado.
 - **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`) y **verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, slug conservado; tras deploy/prerender la lápida estática responde 404, no figura en sitemap ni en `retiradas`, y el front desplegado incluye la acción de restaurar (`API.restaurarWebEvento`). `retiradas` puede servir cache ~60 s sin `nocache=1`.
 
@@ -66,8 +68,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v259` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
-- `npm test`: **546/546** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
+- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v262` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
+- `npm test`: **554/554** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
 
 ## Decisiones cerradas
 
@@ -81,7 +83,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 **Hecho en vivo (2026-11-15, lote `.gs` desplegado):**
 - A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK y allowlist interna protegida (endpoints privados exigen token).
-- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 546 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
+- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 554 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
@@ -116,7 +118,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 546 tests
+npm test                                   # 554 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
