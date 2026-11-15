@@ -1239,3 +1239,45 @@ function deleteDocumentoCaso(recordId) {
   }
   return deleteSheetRow(CONFIG.sheets.documentos, recordId);
 }
+
+// ==================== reCAPTCHA v3 (C4 forms/submit) ====================
+// Secreto en Script Properties: RECAPTCHA_SECRET (nunca en repo/código).
+function verificarRecaptchaV3(token, actionEsperada, remoteIp) {
+  var secret = PropertiesService.getScriptProperties().getProperty('RECAPTCHA_SECRET');
+  if (!secret) return { ok: false, motivo: 'config_missing_secret' };
+  if (!token) return { ok: false, motivo: 'missing_token' };
+
+  var payload = { secret: secret, response: String(token) };
+  if (remoteIp) payload.remoteip = String(remoteIp);
+
+  var resp;
+  try {
+    resp = UrlFetchApp.fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'post',
+      payload: payload,
+      muteHttpExceptions: true
+    });
+  } catch (e) {
+    return { ok: false, motivo: 'verify_request_failed' };
+  }
+
+  var body = {};
+  try { body = JSON.parse(resp.getContentText() || '{}'); } catch (e) {
+    return { ok: false, motivo: 'verify_parse_failed' };
+  }
+
+  if (!body.success) return { ok: false, motivo: 'invalid', codes: body['error-codes'] || [] };
+  if (actionEsperada && body.action !== actionEsperada) {
+    return { ok: false, motivo: 'action_mismatch', action: body.action || '' };
+  }
+
+  var hostname = String(body.hostname || '');
+  var hostOk = /(^|\.)github\.io$/i.test(hostname) || hostname === 'localhost';
+  if (!hostOk) return { ok: false, motivo: 'hostname_mismatch', hostname: hostname };
+
+  var score = typeof body.score === 'number' ? body.score : 0;
+  var UMBRAL = 0.5; // inicial: ajustar con datos reales
+  if (score < UMBRAL) return { ok: false, motivo: 'low_score', score: score };
+
+  return { ok: true, score: score, action: body.action || '', hostname: hostname };
+}
