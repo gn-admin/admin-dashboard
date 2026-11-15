@@ -920,12 +920,13 @@ const Web = {
     const ignorados = this._mediaIgnorados;
     if (!datos.titulo) { this._snack('Falta el título público', 'warning'); fin(); return; }
     try {
-      await API.saveWebAnimal({ animal_id: animalId, ...datos });
+      const res = await API.saveWebAnimal({ animal_id: animalId, ...datos });
       fin();
       if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
-      this._snack(ignorados
+      const aviso = this.avisoDeploy(res, ignorados
         ? 'Publicación guardada; se ignoraron ' + ignorados + ' enlace(s) de carpeta de Drive'
-        : 'Publicación guardada', ignorados ? 'warning' : undefined);
+        : 'Publicación guardada');
+      this._snack(aviso.texto, aviso.tipo || (ignorados ? 'warning' : undefined));
       await this.recargar();
     } catch (err) {
       fin();
@@ -1132,12 +1133,13 @@ const Web = {
     const ignorados = this._mediaIgnorados;
     if (!datos.titulo) { this._snack('Falta el título', 'warning'); fin(); return; }
     try {
-      await API.saveWebEvento({ id: id || undefined, ...datos });
+      const res = await API.saveWebEvento({ id: id || undefined, ...datos });
       fin();
       if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
-      this._snack(ignorados
+      const aviso = this.avisoDeploy(res, ignorados
         ? 'Publicación guardada; se ignoraron ' + ignorados + ' enlace(s) de carpeta de Drive'
-        : 'Publicación guardada', ignorados ? 'warning' : undefined);
+        : 'Publicación guardada');
+      this._snack(aviso.texto, aviso.tipo || (ignorados ? 'warning' : undefined));
       await this.recargar();
     } catch (err) {
       fin();
@@ -1146,6 +1148,28 @@ const Web = {
   },
 
   // ==================== ESTADO / PREVIEW / SLUG ====================
+
+  /**
+   * Aviso de una acción a partir de `data.deploy` del backend. Si el disparo
+   * del deploy falló, el gestor lo dice en vez de fingir que la web ya se está
+   * actualizando. Sin `data.deploy` (backend antiguo) deja el texto base.
+   */
+  avisoDeploy(res, base) {
+    const texto = String(base || '');
+    const d = (res && res.data && res.data.deploy) || null;
+    if (!d) return { texto, tipo: undefined };
+    if (d.ok === false) {
+      const motivo = d.error || (d.codigo ? 'GitHub respondió ' + d.codigo : 'sin detalle');
+      return {
+        texto: texto + ', pero el deploy automático no se ha lanzado (' + motivo + '). La web sigue con la versión anterior: relánzalo desde GitHub Actions.',
+        tipo: 'warning'
+      };
+    }
+    if (d.disparado === false) {
+      return { texto: texto + '. Ya hay un despliegue en marcha: la página SEO se actualizará en 2–3 min', tipo: undefined };
+    }
+    return { texto: texto + '. Regenerando la página SEO (2–3 min)', tipo: undefined };
+  },
 
   async cambiarEstado(tipo, identificador, estado) {
     if (tipo === 'animal') {
@@ -1162,8 +1186,10 @@ const Web = {
         }
       }
       try {
-        await API.setWebAnimalEstado(identificador, estado);
-        this._snack(estado === 'publicado' ? 'Publicado en la web. La página SEO se genera en los próximos 30 minutos' : 'Publicación ocultada');
+        const res = await API.setWebAnimalEstado(identificador, estado);
+        const base = estado === 'publicado' ? 'Publicado en la web' : (estado === 'retirado' ? 'Publicación retirada' : 'Publicación ocultada');
+        const aviso = this.avisoDeploy(res, base);
+        this._snack(aviso.texto, aviso.tipo);
         await this.recargar();
       } catch (err) {
         this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
@@ -1179,8 +1205,10 @@ const Web = {
       }
     }
     try {
-      await API.setWebEventoEstado(identificador, estado);
-      this._snack(estado === 'publicado' ? 'Publicado en la web. La página SEO se genera en los próximos 30 minutos' : 'Publicación ocultada');
+      const res = await API.setWebEventoEstado(identificador, estado);
+      const base = estado === 'publicado' ? 'Publicado en la web' : (estado === 'retirado' ? 'Publicación retirada' : 'Publicación ocultada');
+      const aviso = this.avisoDeploy(res, base);
+      this._snack(aviso.texto, aviso.tipo);
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo cambiar el estado: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
@@ -1193,8 +1221,9 @@ const Web = {
       if (!ok) return;
     }
     try {
-      await API.deleteWebEvento(id);
-      this._snack('Publicación retirada (410)');
+      const res = await API.deleteWebEvento(id);
+      const aviso = this.avisoDeploy(res, 'Publicación retirada (410)');
+      this._snack(aviso.texto, aviso.tipo);
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo archivar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
@@ -1203,18 +1232,19 @@ const Web = {
 
 
   async restaurarWebEvento(id, titulo) {
-    const nombreTxt = titulo || 'esta publicaciA3n';
+    const nombreTxt = titulo || 'esta publicación';
     if (typeof Dashboard !== 'undefined' && Dashboard._confirm) {
       const ok = await Dashboard._confirm(
-        `A­Restaurar ${nombreTxt}? VolverA­ a borrador (no publicada) manteniendo su slug; podrA­s revisarla y publicarla de nuevo.`,
+        `¿Restaurar ${nombreTxt}? Volverá a borrador (no publicada) manteniendo su slug; podrás revisarla y publicarla de nuevo.`,
         'Restaurar',
         'Restaurar'
       );
       if (!ok) return;
     }
     try {
-      await API.restaurarWebEvento(id);
-      this._snack('PublicaciA3n restaurada a borrador');
+      const res = await API.restaurarWebEvento(id);
+      const aviso = this.avisoDeploy(res, 'Publicación restaurada a borrador');
+      this._snack(aviso.texto, aviso.tipo);
       await this.recargar();
     } catch (err) {
       this._snackErr(err, 'No se pudo restaurar: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));

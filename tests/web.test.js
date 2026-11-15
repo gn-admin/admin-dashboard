@@ -411,6 +411,41 @@ describe('Web: helpers de escape', () => {
   });
 });
 
+describe('Web: aviso del deploy automático', () => {
+  it('sin data.deploy deja el texto base', () => {
+    assert.deepEqual(Web.avisoDeploy({ data: {} }, 'Publicado en la web'), { texto: 'Publicado en la web', tipo: undefined });
+    assert.deepEqual(Web.avisoDeploy(null, 'Publicado en la web'), { texto: 'Publicado en la web', tipo: undefined });
+  });
+
+  it('deploy disparado avisa de regeneración inmediata', () => {
+    const a = Web.avisoDeploy({ data: { deploy: { ok: true, disparado: true } } }, 'Publicado en la web');
+    assert.match(a.texto, /Regenerando la página SEO \(2–3 min\)/);
+    assert.doesNotMatch(a.texto, /30 minutos/);
+    assert.equal(a.tipo, undefined);
+  });
+
+  it('deploy en cola no promete un segundo run', () => {
+    const a = Web.avisoDeploy({ data: { deploy: { ok: true, disparado: false, motivo: 'en_cola' } } }, 'Publicación ocultada');
+    assert.match(a.texto, /Ya hay un despliegue en marcha/);
+    assert.equal(a.tipo, undefined);
+  });
+
+  it('si el deploy falla lo dice con el motivo y en warning', () => {
+    const a = Web.avisoDeploy({ data: { deploy: { ok: false, error: 'Deploy automático sin configurar (falta GITHUB_DEPLOY_TOKEN)' } } }, 'Publicado en la web');
+    assert.equal(a.tipo, 'warning');
+    assert.match(a.texto, /no se ha lanzado/);
+    assert.match(a.texto, /GITHUB_DEPLOY_TOKEN/);
+    assert.match(a.texto, /GitHub Actions/);
+    assert.match(a.texto, /^Publicado en la web/);
+  });
+
+  it('usa el código HTTP si no hay mensaje', () => {
+    const a = Web.avisoDeploy({ data: { deploy: { ok: false, codigo: 403 } } }, 'Publicación retirada (410)');
+    assert.equal(a.tipo, 'warning');
+    assert.match(a.texto, /403/);
+  });
+});
+
 describe('Web: media de Drive enlazada en el formulario', () => {
   it('saca el identificador de los enlaces de Drive', () => {
     const id = '1AbCdEfGhIjKlMnOpQrStUv';
