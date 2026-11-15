@@ -132,15 +132,16 @@
 **Objetivo:** completar la calidad percibida y mantenibilidad sin regresiones.
 **Dependencias:** ninguna externa; ejecutar entre hitos o en paralelo controlado.
 
-| ID | Acción | Resultado esperado | Verificación |
-|---|---|---|---|
-| E1 | Homogeneizar módulos prioritarios (listados, fichas, formularios, filtros, estados vacío/carga/error) usando patrón de referencia | Consistencia UX en encuestas/animales/acogidas/socios/donaciones/almacén/reportes | `npm test`, revisión por rol |
-| E2 | Normalizar primitivas y limpiar CSS/inline ad-hoc por vistas | UI coherente y menor deuda visual | Sin regresión visual/funcional |
-| E3 | Modularización progresiva de `dashboard.js` (extraer helpers/vistas por dominio, mantener contratos y `data-action`) | Mantenibilidad y cambios más seguros | `npm test` en cada extracción |
-| E4 | Rendimiento percibido (lazy por vista/flujo, assets, precache/SW) | Mejor carga en móvil | Medición básica, SW actualizado |
-| E5 | Auditoría a11y/responsive integral y QA real (teclado/foco/ARIA/contraste/targets, móvil/tablet/orientaciones, por rol) | Cumplimiento práctico y pulido | Checklist + pruebas en dispositivos |
+| ID | Acción | Estado | Resultado / avance | Verificación |
+|---|---|---|---|---|
+| E1 | Homogeneizar módulos prioritarios (listados, fichas, formularios, filtros, estados vacío/carga/error) usando patrón de referencia | 🟡 Parcial | `scope` en tablas y estados/mejoras puntuales en módulos (p. ej. “sin resultados” en socios, labels asociados en formularios clave, error de carga con `role="alert"`). Pendiente homogeneizar patrones en todos los módulos. | `npm test` en verde; revisión por rol pendiente |
+| E2 | Normalizar primitivas y limpiar CSS/inline ad-hoc por vistas | 🟡 Parcial | Ajustes puntuales (p. ej. foco en título). Pendiente normalización sistemática de primitivas y limpieza de inline/CSS por vistas. | Sin regresión funcional observada en tests |
+| E3 | Modularización progresiva de `dashboard.js` (extraer helpers/vistas por dominio, mantener contratos y `data-action`) | ⏳ Pendiente | No iniciado. | — |
+| E4 | Rendimiento percibido (lazy por vista/flujo, assets, precache/SW) | 🟡 Parcial | Mantenimiento de `CACHE_NAME`/precache en cambios frontend (`v233`→`v240`). Sin lazy-loading por vista ni optimizaciones específicas. | SW actualizado; medición de rendimiento pendiente |
+| E5 | Auditoría a11y/responsive integral y QA real (teclado/foco/ARIA/contraste/targets, móvil/tablet/orientaciones, por rol) | 🟡 Parcial | Skip link (público), `aria-current`, `document.title`, foco en navegación, SVG decorativos ocultos, `scope` en tablas, activación por teclado en elementos clicables, `role="alert"` en errores, foco restaurado al cerrar modales (info/form/profile/tutorial/confirm/contrato) y labels en formularios clave. Pendiente auditoría integral y QA real por dispositivo/orientación y rol. | `npm test` en verde; checklist/QA real pendientes |
 
 ### Track F — Higiene documental (continuo, bajo esfuerzo)
+- **Estado:** ✅ Al día en esta iteración (2026-11-15) — `memory.md` y `PLAN_MASTER_EJECUCION.md` sincronizados con avances de Track E, versiones SW y commits recientes (`e86a662`, `df2e7c8`, `08a17f0`, `3d77fb2`, `f7d339e`, `c47e12d` y siguientes). Mantener sincronía en iteraciones futuras.
 - Mantener `memory.md`, `GESTOR_WEB_PLAN_Y_ENDPOINTS.md` (registro/estado), `PLAN_SEGURIDAD.md` (tabla de avance) y `PLAN_ANALISIS_Y_EJECUCION.md` sincronizados con la realidad (tests actuales, despliegues, verificaciones).
 - Mantener `CACHE_NAME` en `src/sw.js` ante cambios frontend relevantes y `npm test` en verde (CI).
 
@@ -148,21 +149,19 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora:** acciones operativas puntuales (rotación periódica de token, inspección opcional de auditoría en hojas). **D1–D4, D6–D7 cerrados** (solo D5 externo y A4 aplazado pendientes en D/A). Continuar con Track E y, si aplica, Track B/A4/C3/C4.
-2. **En paralelo inmediato:** `D1, D2, D3, D4` (seguridad backend/operativa crítica) y preparación de `B1` (contrato ya estable). 
-3. **Corto plazo:** `A3` (CI, tras confirmar A2) + `C1` (restaurar retirada, tras A2) + `C2` (pruebas) + `D5/D6/D7` según viabilidad.
-4. **Medio plazo (con dominio disponible):** `A4 → B2/B3/B4` (SEO/indexación real en web externa).
-5. **Continuo / bajo bloqueo:** `Track E` en iteraciones pequeñas con `npm test` verde.
-6. **Solo tras decisión explícita:** `C3` (ficha configurable) por etapas y `C4` (forms) como alcance separado.
+1. **Ahora:** continuar **Track E** por lotes incrementales (E1/E5 prioritarios, luego E2/E4 y E3 en refactors controlados) con `npm test` en verde y `CACHE_NAME` actualizado. **Track F** al día en esta iteración.
+2. **Operativo puntual:** inspección visual opcional de auditoría/fases en hojas, rotación periódica del token (D4), confirmación de `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
+3. **Externo / dependiente de decisión:** **D5** (MFA/endurecimiento login en Firebase), **A4** (dominio propio + Search Console), **Track B** (port SEO/canal en `C:\Users\JonEg\Documents\proyectos\main`), **C3** (ficha configurable v1.1) y **C4** (`forms/submit`).
+4. **Continuo:** mantener documentación y verificación alineadas con la realidad (tests, despliegues, SW).
 
 ## 5. Resumen de “qué falta” por responsabilidad
 
 | Responsabilidad | Pendientes principales |
 |---|---|
-| **Este repo** | Cierre UI/prerender C1 y A5, C2/C3 (según decisión), iteraciones Track E, ajustes doc (Track F), apoyo D6 |
-| **Apps Script/Sheets (externo)** | C1/D1 desplegados según usuario (mantener alineación); validación completa D1/D3/D7, soporte C3/C4 si aplica |
-| **Firebase/GitHub/operación** | D5, parte D4/D6, A4 (DNS/SC), rotaciones/revisiones |
-| **Proyecto web `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (externo)** | Track B completo (consumo, SEO de publicaciones, prerender/sitemap/robots/301/410) |
+| **Este repo** | Iteraciones **Track E** (E1–E5 parciales/pendientes), mejoras evolutivas del gestor si surgen, higiene documental continua |
+| **Apps Script/Sheets (operativo)** | Inspección opcional de auditoría/fases en hojas, rotación de token cuando proceda, confirmar `DRIVE_WEB_FOLDER_ID` desplegado; soporte a C3/C4 si se aprueban |
+| **Firebase/GitHub/operación** | **D5** (MFA/login), **A4** (DNS/Search Console), revisiones/rotaciones periódicas |
+| **Proyecto web `C:\Users\JonEg\Documents\proyectos\main` (externo)** | **Track B** completo (consumo del canal, SEO, prerender/sitemap/robots/301/410 en dominio propio) |
 
 ## 6. Criterio global de “terminado”
 - **Gestor web:** canal y retiradas operativos en producción (A1–A2), documentación/CI alineadas, y (cuando aplique) dominio/indexación y port web completados.

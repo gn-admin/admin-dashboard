@@ -1429,6 +1429,7 @@ const Dashboard = {
       if (ok) { ok.textContent = okLabel || 'Confirmar'; ok.onclick = () => this._closeConfirm(true); }
       if (cancel) cancel.onclick = () => this._closeConfirm(false);
       modal.onclick = (e) => { if (e.target === modal) this._closeConfirm(false); };
+      if (modal.style.display !== 'flex') this._modalCaptureFocus('confirm-modal');
       if (modal.style.display !== 'flex') this._modalScrollLock(true);
       modal.style.display = 'flex';
       this._modalPush('confirm-modal');
@@ -1442,6 +1443,7 @@ const Dashboard = {
     modal.style.display = 'none';
     this._modalScrollLock(false);
     this._modalRemove('confirm-modal');
+    this._modalRestoreFocus('confirm-modal');
     const r = modal._resolve; modal._resolve = null;
     const ok = document.getElementById('confirm-ok');
     const cancel = document.getElementById('confirm-cancel');
@@ -7554,14 +7556,16 @@ const Dashboard = {
           </form>
         </div>
       </div>`;
-    if (modal.style.display !== 'flex') this._modalScrollLock(true);
+    const opening = modal.style.display !== 'flex';
+    if (opening) this._modalCaptureFocus('contrato-modal');
+    if (opening) this._modalScrollLock(true);
     modal.style.display = 'flex';
     this._modalPush('contrato-modal');
     const shell = modal.querySelector('.contrato-shell');
     if (shell) shell.classList.remove('doc-open');
     const toggle = document.getElementById('contrato-doc-toggle');
     if (toggle) toggle.innerHTML = Icons.eye + ' Ver documento';
-    this._modalScrollLock(true);
+    if (opening) this._modalScrollLock(true);
     this.injectIcons();
     this._setupFirmaCanvas('f1-firma');
     this._setupFirmaCanvas('f2-firma');
@@ -7670,6 +7674,7 @@ const Dashboard = {
     if (toggle) toggle.innerHTML = Icons.eye + ' Ver documento';
     this._modalScrollLock(false);
     this._modalRemove('contrato-modal');
+    this._modalRestoreFocus('contrato-modal');
   },
 
   async guardarContrato(e, adopcionId) {
