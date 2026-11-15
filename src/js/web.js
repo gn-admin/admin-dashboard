@@ -512,47 +512,47 @@ const Web = {
     const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
       <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. La ficha interna del animal no se expone: solo lo que rellenes aquí.</p>
       <div class="form-row">
-        <div class="form-group"><label>Estado de publicación *</label>
+        <div class="form-group"><label for="web-estado">Estado de publicación *</label>
           <select id="web-estado" class="form-input">
             ${['borrador', 'publicado', 'oculto'].map(e => `<option value="${e}" ${(d.estado_publicacion || 'borrador') === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
           </select></div>
-        <div class="form-group"><label>Slug *</label>
+        <div class="form-group"><label for="web-slug">Slug *</label>
           <input type="text" id="web-slug" class="form-input" value="${this._esc(d.slug || '')}" placeholder="luna-en-adopcion" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="animal">
           <p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
       </div>
-      <div class="form-group"><label>Título público *</label><input type="text" id="web-titulo" class="form-input" value="${this._esc(d.titulo || origen.nombre || '')}" required></div>
+      <div class="form-group"><label for="web-titulo">Título público *</label><input type="text" id="web-titulo" class="form-input" value="${this._esc(d.titulo || origen.nombre || '')}" required></div>
       <div class="form-row">
-        <div class="form-group"><label>Categoría pública *</label>
+        <div class="form-group"><label for="web-categoria">Categoría pública *</label>
           <select id="web-categoria" class="form-input">
             <option value="">Seleccionar...</option>
             ${['Gatos en adopción', 'Perros en adopción', 'Acogidas', 'Adoptados', 'Caso externo', 'Eventos', 'Historias'].map(c => `<option ${d.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}
           </select></div>
-        <div class="form-group"><label>Estado público *</label>
+        <div class="form-group"><label for="web-estado-publico">Estado público *</label>
           <select id="web-estado-publico" class="form-input">
             ${['en_adopcion', 'en_acogida', 'adoptado', 'reservado', 'urgente', 'cerrado'].map(e => `<option value="${e}" ${(d.estado_publico || origen.estado) === e ? 'selected' : ''}>${e.replace(/_/g, ' ')}</option>`).join('')}
           </select></div>
       </div>
-      <div class="form-group"><label>Extracto</label><textarea id="web-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
-      <div class="form-group"><label>Descripción pública * (admite HTML)</label><textarea id="web-contenido" class="form-input" rows="6" placeholder="<p>Texto de la ficha pública...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+      <div class="form-group"><label for="web-extracto">Extracto</label><textarea id="web-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
+      <div class="form-group"><label for="web-contenido">Descripción pública * (admite HTML)</label><textarea id="web-contenido" class="form-input" rows="6" placeholder="<p>Texto de la ficha pública...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
 
       <details class="detail-collapse" ${cover.src ? '' : 'open'}><summary>${Icons.fileText} Media (portada, galería, vídeos, iconos)</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
-            <div class="form-group"><label>Portada (URL)</label><input type="text" id="web-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
-            <div class="form-group"><label>Texto alternativo</label><input type="text" id="web-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
+            <div class="form-group"><label for="web-cover">Portada (URL)</label><input type="text" id="web-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
+            <div class="form-group"><label for="web-cover-alt">Texto alternativo</label><input type="text" id="web-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
           </div>
-          <div class="form-group"><label>Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
-          <div class="form-group"><label>Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
-          <div class="form-group"><label>Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
+          <div class="form-group"><label for="web-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
+          <div class="form-group"><label for="web-videos">Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
+          <div class="form-group"><label for="web-iconos">Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea></div>
           <div class="form-row">
-            <div class="form-group"><label>Subir portada</label><input type="file" id="web-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
-            <div class="form-group"><label>Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label for="web-file-portada">Subir portada</label><input type="file" id="web-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label for="web-file-galeria">Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Subir vídeo</label><input type="file" id="web-file-video" class="form-input" accept="video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="video" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
-            <div class="form-group"><label>Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label for="web-file-video">Subir vídeo</label><input type="file" id="web-file-video" class="form-input" accept="video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="video" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label for="web-file-doc">Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
           </div>
-          <div class="form-group"><label>Documentos de la ficha (nombre|url por línea)</label><textarea id="web-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+          <div class="form-group"><label for="web-docs">Documentos de la ficha (nombre|url por línea)</label><textarea id="web-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
           <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos (los usa la web), no la carpeta; los documentos quedan privados. La portada, la galería y los vídeos se enlazan solos. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
         </div>
       </details>
@@ -560,32 +560,32 @@ const Web = {
       <details class="detail-collapse"><summary>${Icons.paw} Ficha pública del animal</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
-            <div class="form-group"><label>Tamaño</label><input type="text" id="web-size" class="form-input" value="${this._esc(animal.size || '')}" placeholder="pequeño / mediano / grande"></div>
-            <div class="form-group"><label>Color</label><input type="text" id="web-color" class="form-input" value="${this._esc(animal.color || '')}"></div>
+            <div class="form-group"><label for="web-size">Tamaño</label><input type="text" id="web-size" class="form-input" value="${this._esc(animal.size || '')}" placeholder="pequeño / mediano / grande"></div>
+            <div class="form-group"><label for="web-color">Color</label><input type="text" id="web-color" class="form-input" value="${this._esc(animal.color || '')}"></div>
           </div>
-          <div class="form-group"><label>Temperamento (separado por comas)</label><input type="text" id="web-temperamento" class="form-input" value="${this._esc((animal.temperament || []).join(', '))}"></div>
+          <div class="form-group"><label for="web-temperamento">Temperamento (separado por comas)</label><input type="text" id="web-temperamento" class="form-input" value="${this._esc((animal.temperament || []).join(', '))}"></div>
           <div class="form-row">
-            <div class="form-group"><label>Compatibilidad con perros</label><input type="text" id="web-compat-perros" class="form-input" value="${this._esc(compat.dogs || '')}"></div>
-            <div class="form-group"><label>Compatibilidad con gatos</label><input type="text" id="web-compat-gatos" class="form-input" value="${this._esc(compat.cats || '')}"></div>
-            <div class="form-group"><label>Compatibilidad con niños</label><input type="text" id="web-compat-ninos" class="form-input" value="${this._esc(compat.kids || '')}"></div>
+            <div class="form-group"><label for="web-compat-perros">Compatibilidad con perros</label><input type="text" id="web-compat-perros" class="form-input" value="${this._esc(compat.dogs || '')}"></div>
+            <div class="form-group"><label for="web-compat-gatos">Compatibilidad con gatos</label><input type="text" id="web-compat-gatos" class="form-input" value="${this._esc(compat.cats || '')}"></div>
+            <div class="form-group"><label for="web-compat-ninos">Compatibilidad con niños</label><input type="text" id="web-compat-ninos" class="form-input" value="${this._esc(compat.kids || '')}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Modalidad de adopción</label><input type="text" id="web-adop-mode" class="form-input" value="${this._esc(adop.mode || '')}" placeholder="presencial / a distancia"></div>
-            <div class="form-group"><label>Tasa (€)</label><input type="text" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
+            <div class="form-group"><label for="web-adop-mode">Modalidad de adopción</label><input type="text" id="web-adop-mode" class="form-input" value="${this._esc(adop.mode || '')}" placeholder="presencial / a distancia"></div>
+            <div class="form-group"><label for="web-adop-fee">Tasa (€)</label><input type="text" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
           </div>
-          <div class="form-group"><label>Requisitos de adopción</label><textarea id="web-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
+          <div class="form-group"><label for="web-adop-req">Requisitos de adopción</label><textarea id="web-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
           <div class="form-row">
-            <div class="form-group"><label>Acogida temporal</label>
+            <div class="form-group"><label for="web-foster-temp">Acogida temporal</label>
               <select id="web-foster-temp" class="form-input"><option value="no" ${foster.temporary ? '' : 'selected'}>No</option><option value="si" ${foster.temporary ? 'selected' : ''}>Sí</option></select></div>
-            <div class="form-group"><label>Duración de la acogida</label><input type="text" id="web-foster-dur" class="form-input" value="${this._esc(foster.durationLabel || '')}" placeholder="Ej: 3 meses"></div>
+            <div class="form-group"><label for="web-foster-dur">Duración de la acogida</label><input type="text" id="web-foster-dur" class="form-input" value="${this._esc(foster.durationLabel || '')}" placeholder="Ej: 3 meses"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Ciudad</label><input type="text" id="web-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
-            <div class="form-group"><label>Provincia</label><input type="text" id="web-loc-prov" class="form-input" value="${this._esc(loc.province || '')}"></div>
+            <div class="form-group"><label for="web-loc-city">Ciudad</label><input type="text" id="web-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
+            <div class="form-group"><label for="web-loc-prov">Provincia</label><input type="text" id="web-loc-prov" class="form-input" value="${this._esc(loc.province || '')}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Email de contacto</label><input type="email" id="web-contact-email" class="form-input" value="${this._esc(contacto.email || '')}"></div>
-            <div class="form-group"><label>Teléfono de contacto</label><input type="text" id="web-contact-tel" class="form-input" value="${this._esc(contacto.phone || '')}"></div>
+            <div class="form-group"><label for="web-contact-email">Email de contacto</label><input type="email" id="web-contact-email" class="form-input" value="${this._esc(contacto.email || '')}"></div>
+            <div class="form-group"><label for="web-contact-tel">Teléfono de contacto</label><input type="text" id="web-contact-tel" class="form-input" value="${this._esc(contacto.phone || '')}"></div>
           </div>
           <div class="form-group"><label><input type="checkbox" id="web-special-needs" ${health.specialNeeds ? 'checked' : ''}> Necesidades especiales</label></div>
         </div>
@@ -594,17 +594,17 @@ const Web = {
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
-            <div class="form-group"><label>CTA · etiqueta</label><input type="text" id="web-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar"></div>
-            <div class="form-group"><label>CTA · URL</label><input type="text" id="web-cta-url" class="form-input" value="${this._esc(cta.url || '')}" placeholder="https://..."></div>
+            <div class="form-group"><label for="web-cta-label">CTA · etiqueta</label><input type="text" id="web-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar"></div>
+            <div class="form-group"><label for="web-cta-url">CTA · URL</label><input type="text" id="web-cta-url" class="form-input" value="${this._esc(cta.url || '')}" placeholder="https://..."></div>
           </div>
-          <div class="form-group"><label>Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
-          <div class="form-group"><label>Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
+          <div class="form-group"><label for="web-seo-title">Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
+          <div class="form-group"><label for="web-seo-desc">Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
           <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
           <div class="form-row">
             <div class="form-group"><label><input type="checkbox" id="web-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
             <div class="form-group"><label><input type="checkbox" id="web-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
             <div class="form-group"><label><input type="checkbox" id="web-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
-            <div class="form-group"><label>Orden</label><input type="number" id="web-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
+            <div class="form-group"><label for="web-orden">Orden</label><input type="number" id="web-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
           </div>
         </div>
       </details>
@@ -782,67 +782,67 @@ const Web = {
 
     const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
       <div class="form-row">
-        <div class="form-group"><label>Tipo de contenido *</label>
+        <div class="form-group"><label for="we-tipo">Tipo de contenido *</label>
           <select id="we-tipo" class="form-input" data-change="onWebTipoChange" data-cpass="value">
             <option value="evento" ${d.tipo !== 'historia' ? 'selected' : ''}>Evento</option>
             <option value="historia" ${d.tipo === 'historia' ? 'selected' : ''}>Historia / blog</option>
           </select></div>
-        <div class="form-group"><label>Estado de publicación *</label>
+        <div class="form-group"><label for="we-estado">Estado de publicación *</label>
           <select id="we-estado" class="form-input">
             ${['borrador', 'publicado', 'oculto'].map(e => `<option value="${e}" ${(d.estado_publicacion || 'borrador') === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
           </select></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Título *</label><input type="text" id="we-titulo" class="form-input" value="${this._esc(d.titulo || '')}" required></div>
-        <div class="form-group"><label>Slug *</label><input type="text" id="we-slug" class="form-input" value="${this._esc(d.slug || '')}" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="${this._esc(d.tipo || 'evento')}"><p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
+        <div class="form-group"><label for="we-titulo">Título *</label><input type="text" id="we-titulo" class="form-input" value="${this._esc(d.titulo || '')}" required></div>
+        <div class="form-group"><label for="we-slug">Slug *</label><input type="text" id="we-slug" class="form-input" value="${this._esc(d.slug || '')}" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="${this._esc(d.tipo || 'evento')}"><p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Categoría *</label><input type="text" id="we-categoria" class="form-input" value="${this._esc(d.categoria || (d.tipo === 'historia' ? 'Historias' : 'Eventos'))}"></div>
-        <div class="form-group"><label>Estado público</label><input type="text" id="we-estado-publico" class="form-input" value="${this._esc(d.estado_publico || (d.tipo === 'historia' ? 'publicado' : 'programado'))}" placeholder="programado / activo / finalizado"></div>
+        <div class="form-group"><label for="we-categoria">Categoría *</label><input type="text" id="we-categoria" class="form-input" value="${this._esc(d.categoria || (d.tipo === 'historia' ? 'Historias' : 'Eventos'))}"></div>
+        <div class="form-group"><label for="we-estado-publico">Estado público</label><input type="text" id="we-estado-publico" class="form-input" value="${this._esc(d.estado_publico || (d.tipo === 'historia' ? 'publicado' : 'programado'))}" placeholder="programado / activo / finalizado"></div>
       </div>
-      <div class="form-group"><label>Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>
-      <div class="form-group"><label>Contenido * (admite HTML)</label><textarea id="we-contenido" class="form-input" rows="6">${this._esc(d.contenido_html || '')}</textarea></div>
+      <div class="form-group"><label for="we-extracto">Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>
+      <div class="form-group"><label for="we-contenido">Contenido * (admite HTML)</label><textarea id="we-contenido" class="form-input" rows="6">${this._esc(d.contenido_html || '')}</textarea></div>
       <div class="form-row">
-        <div class="form-group"><label>Portada (URL)</label><input type="text" id="we-cover" class="form-input" value="${this._esc(cover.src || '')}"></div>
-        <div class="form-group"><label>Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
+        <div class="form-group"><label for="we-cover">Portada (URL)</label><input type="text" id="we-cover" class="form-input" value="${this._esc(cover.src || '')}"></div>
+        <div class="form-group"><label for="we-cover-alt">Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
       </div>
-      <div class="form-group"><label>Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
+      <div class="form-group"><label for="we-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
       <div class="form-row">
-        <div class="form-group"><label>Subir portada</label><input type="file" id="we-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
-        <div class="form-group"><label>Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+        <div class="form-group"><label for="we-file-portada">Subir portada</label><input type="file" id="we-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+        <div class="form-group"><label for="we-file-galeria">Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+        <div class="form-group"><label for="we-file-doc">Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
       </div>
-      <div class="form-group"><label>Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+      <div class="form-group"><label for="we-docs">Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
       <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
 
       <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
-            <div class="form-group"><label>Modalidad / tipo</label><input type="text" id="we-kind" class="form-input" value="${this._esc(ev.kind || '')}" placeholder="jornada, mercadillo, puertas abiertas"></div>
-            <div class="form-group"><label>Zona horaria</label><input type="text" id="we-timezone" class="form-input" value="${this._esc(ev.timezone || 'Europe/Madrid')}"></div>
+            <div class="form-group"><label for="we-kind">Modalidad / tipo</label><input type="text" id="we-kind" class="form-input" value="${this._esc(ev.kind || '')}" placeholder="jornada, mercadillo, puertas abiertas"></div>
+            <div class="form-group"><label for="we-timezone">Zona horaria</label><input type="text" id="we-timezone" class="form-input" value="${this._esc(ev.timezone || 'Europe/Madrid')}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Inicio</label><input type="date" id="we-start" class="form-input" value="${this._esc((ev.startDate || hoy).slice(0, 10))}"></div>
-            <div class="form-group"><label>Fin</label><input type="date" id="we-end" class="form-input" value="${this._esc((ev.endDate || '').slice(0, 10))}"></div>
+            <div class="form-group"><label for="we-start">Inicio</label><input type="date" id="we-start" class="form-input" value="${this._esc((ev.startDate || hoy).slice(0, 10))}"></div>
+            <div class="form-group"><label for="we-end">Fin</label><input type="date" id="we-end" class="form-input" value="${this._esc((ev.endDate || '').slice(0, 10))}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Lugar</label><input type="text" id="we-loc-name" class="form-input" value="${this._esc(loc.name || '')}"></div>
-            <div class="form-group"><label>Dirección</label><input type="text" id="we-loc-address" class="form-input" value="${this._esc(loc.address || '')}"></div>
-            <div class="form-group"><label>Ciudad</label><input type="text" id="we-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
-            <div class="form-group"><label>URL online</label><input type="text" id="we-loc-online" class="form-input" value="${this._esc(loc.onlineUrl || '')}"></div>
+            <div class="form-group"><label for="we-loc-name">Lugar</label><input type="text" id="we-loc-name" class="form-input" value="${this._esc(loc.name || '')}"></div>
+            <div class="form-group"><label for="we-loc-address">Dirección</label><input type="text" id="we-loc-address" class="form-input" value="${this._esc(loc.address || '')}"></div>
+            <div class="form-group"><label for="we-loc-city">Ciudad</label><input type="text" id="we-loc-city" class="form-input" value="${this._esc(loc.city || '')}"></div>
+            <div class="form-group"><label for="we-loc-online">URL online</label><input type="text" id="we-loc-online" class="form-input" value="${this._esc(loc.onlineUrl || '')}"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label>Organiza</label><input type="text" id="we-org-name" class="form-input" value="${this._esc(org.name || '')}"></div>
-            <div class="form-group"><label>Email de contacto</label><input type="email" id="we-org-email" class="form-input" value="${this._esc(org.contactEmail || '')}"></div>
-            <div class="form-group"><label>Teléfono</label><input type="text" id="we-org-phone" class="form-input" value="${this._esc(org.phone || '')}"></div>
+            <div class="form-group"><label for="we-org-name">Organiza</label><input type="text" id="we-org-name" class="form-input" value="${this._esc(org.name || '')}"></div>
+            <div class="form-group"><label for="we-org-email">Email de contacto</label><input type="email" id="we-org-email" class="form-input" value="${this._esc(org.contactEmail || '')}"></div>
+            <div class="form-group"><label for="we-org-phone">Teléfono</label><input type="text" id="we-org-phone" class="form-input" value="${this._esc(org.phone || '')}"></div>
           </div>
-          <div class="form-group"><label>Público destinatario (separado por comas)</label><input type="text" id="we-audience" class="form-input" value="${this._esc((ev.audience || []).join(', '))}"></div>
+          <div class="form-group"><label for="we-audience">Público destinatario (separado por comas)</label><input type="text" id="we-audience" class="form-input" value="${this._esc((ev.audience || []).join(', '))}"></div>
           <div class="form-row">
             <div class="form-group"><label><input type="checkbox" id="we-reg-required" ${reg.required ? 'checked' : ''}> Requiere inscripción</label></div>
-            <div class="form-group"><label>URL de inscripción</label><input type="text" id="we-reg-url" class="form-input" value="${this._esc(reg.url || '')}"></div>
-            <div class="form-group"><label>Texto del botón</label><input type="text" id="we-reg-label" class="form-input" value="${this._esc(reg.label || '')}"></div>
+            <div class="form-group"><label for="we-reg-url">URL de inscripción</label><input type="text" id="we-reg-url" class="form-input" value="${this._esc(reg.url || '')}"></div>
+            <div class="form-group"><label for="we-reg-label">Texto del botón</label><input type="text" id="we-reg-label" class="form-input" value="${this._esc(reg.label || '')}"></div>
           </div>
         </div>
       </details>
@@ -850,11 +850,11 @@ const Web = {
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
-            <div class="form-group"><label>CTA · etiqueta</label><input type="text" id="we-cta-label" class="form-input" value="${this._esc(cta.label || '')}"></div>
-            <div class="form-group"><label>CTA · URL</label><input type="text" id="we-cta-url" class="form-input" value="${this._esc(cta.url || '')}"></div>
+            <div class="form-group"><label for="we-cta-label">CTA · etiqueta</label><input type="text" id="we-cta-label" class="form-input" value="${this._esc(cta.label || '')}"></div>
+            <div class="form-group"><label for="we-cta-url">CTA · URL</label><input type="text" id="we-cta-url" class="form-input" value="${this._esc(cta.url || '')}"></div>
           </div>
-          <div class="form-group"><label>Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
-          <div class="form-group"><label>Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
+          <div class="form-group"><label for="we-seo-title">Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
+          <div class="form-group"><label for="we-seo-desc">Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
           <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
           <div class="form-row">
             <div class="form-group"><label><input type="checkbox" id="we-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable</label></div>

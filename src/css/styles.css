@@ -2106,7 +2106,8 @@ body {
   margin-bottom: 16px;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-label {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--gray-700);
