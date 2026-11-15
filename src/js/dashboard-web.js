@@ -12,6 +12,7 @@
 abrirAnimalWeb(animalId) { return Web.abrirAnimal(animalId); },
 subirMediaWeb(el, tipo, prefijo, publicacionId) { return Web.subirMediaWeb(el, tipo, prefijo, publicacionId); },
 borrarMediaWeb(el) { return Web.borrarMediaWeb(el); },
+regenerarWeb(el) { return Web.regenerarWeb(el); },
 abrirEventoWeb(id) { return Web.abrirEvento(id); },
 abrirPublicacionWebAnimal(animalId) { return Web.abrirParaAnimal(animalId); },
 saveWebAnimal(e, animalId) { return Web.guardarAnimal(e, animalId); },

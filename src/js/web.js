@@ -18,6 +18,7 @@ const Web = {
   _filtros: { q: '', estado: '' },
   _ultimoPreview: null,
   _mediaIgnorados: 0,
+  _deployEstado: null,
 
   // ==================== LÓGICA PURA ====================
 
@@ -180,6 +181,7 @@ const Web = {
     await this.cargar();
     el.innerHTML = this._html();
     if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+    this._cargarEstadoDeploy();
   },
 
   async cargar() {
@@ -229,15 +231,64 @@ const Web = {
               ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionWeb">${Icons.plus} Nueva publicación</button>`
               : `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>`}
             <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="regenerarWeb" data-pass="el" title="Lanza el despliegue de GitHub Pages ahora">${Icons.refresh} Regenerar web</button>
             <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
           </div>
         </div>
       </div>
       ${this._avisoPublicados()}
+      <div id="web-deploy-estado" class="web-deploy-estado" aria-live="polite"></div>
       <div id="web-listado" class="web-lista">${this._tabla()}</div>
       <p class="web-nota">Los campos SEO son los metadatos que la web pública usará al renderizar cada ficha (title, description, canonical, robots, OG). La previsualización muestra exactamente el payload que entregará el canal público.</p>
     </div>
     <div class="page-detail-container"></div>`;
+  },
+
+  /** Texto del chip de estado del deploy (puro, para poder testearlo). */
+  estadoDeployTexto(data) {
+    if (!data) return { texto: 'Estado del deploy automático: no disponible (backend sin `web-deploy-estado`)', ok: false };
+    if (data.configurado) {
+      return { texto: 'Deploy automático activo · ' + (data.repo || 'repo') + ' (' + (data.ref || 'main') + ')', ok: true };
+    }
+    return { texto: 'Deploy automático sin configurar: falta GITHUB_DEPLOY_TOKEN en Apps Script', ok: false };
+  },
+
+  /** Mensaje del botón «Regenerar web» a partir de la respuesta del backend. */
+  mensajeDeployManual(res) {
+    const r = res || {};
+    if (r.ok === false) {
+      const motivo = r.error || (r.codigo ? 'GitHub respondió ' + r.codigo : 'sin detalle');
+      return { texto: 'No se pudo lanzar el deploy (' + motivo + '). La web no se actualizará hasta el próximo despliegue.', tipo: 'warning' };
+    }
+    if (r.disparado === false) return { texto: 'Ya hay un despliegue en marcha: la web se actualizará en 2–3 min', tipo: undefined };
+    return { texto: 'Deploy lanzado. La web se actualizará en 2–3 min', tipo: undefined };
+  },
+
+  async _cargarEstadoDeploy() {
+    const res = await API.estadoDeployWeb();
+    this._deployEstado = (res && res.data) || null;
+    const cont = document.getElementById('web-deploy-estado');
+    if (!cont) return this._deployEstado;
+    const info = this.estadoDeployTexto(this._deployEstado);
+    cont.innerHTML = `<span class="web-deploy-chip ${info.ok ? 'ok' : 'ko'}">${this._esc(info.texto)}</span>`;
+    return this._deployEstado;
+  },
+
+  /** Botón «Regenerar web»: dispara el workflow y cuenta el resultado. */
+  async regenerarWeb(el) {
+    const boton = el && el.tagName ? el : null;
+    if (boton) { boton.disabled = true; boton.setAttribute('aria-busy', 'true'); }
+    this._snack('Lanzando el despliegue de la web…');
+    try {
+      const res = await API.dispararDeployWeb();
+      const aviso = this.mensajeDeployManual(res);
+      this._snack(aviso.texto, aviso.tipo);
+      await this._cargarEstadoDeploy();
+    } catch (err) {
+      this._snackErr(err, 'No se pudo lanzar el deploy: ' + ((typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : ''));
+    } finally {
+      if (boton) { boton.disabled = false; boton.removeAttribute('aria-busy'); }
+    }
   },
 
   /** Aviso cuando nada está visible en la web: explica el siguiente paso. */

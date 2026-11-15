@@ -446,6 +446,41 @@ describe('Web: aviso del deploy automático', () => {
   });
 });
 
+describe('Web: botón «Regenerar web»', () => {
+  it('describe el estado de configuración del deploy', () => {
+    const activo = Web.estadoDeployTexto({ configurado: true, repo: 'gn-admin/admin-dashboard', ref: 'main' });
+    assert.equal(activo.ok, true);
+    assert.match(activo.texto, /Deploy automático activo/);
+    assert.match(activo.texto, /admin-dashboard/);
+
+    const sinToken = Web.estadoDeployTexto({ configurado: false });
+    assert.equal(sinToken.ok, false);
+    assert.match(sinToken.texto, /GITHUB_DEPLOY_TOKEN/);
+
+    const sinBackend = Web.estadoDeployTexto(null);
+    assert.equal(sinBackend.ok, false);
+    assert.match(sinBackend.texto, /no disponible/);
+  });
+
+  it('cuenta el resultado del disparo manual', () => {
+    const ok = Web.mensajeDeployManual({ ok: true, disparado: true, codigo: 204 });
+    assert.match(ok.texto, /Deploy lanzado/);
+    assert.match(ok.texto, /2–3 min/);
+    assert.equal(ok.tipo, undefined);
+
+    const enCola = Web.mensajeDeployManual({ ok: true, disparado: false, motivo: 'en_cola' });
+    assert.match(enCola.texto, /Ya hay un despliegue en marcha/);
+
+    const fallo = Web.mensajeDeployManual({ ok: false, error: 'GitHub respondió 401' });
+    assert.equal(fallo.tipo, 'warning');
+    assert.match(fallo.texto, /No se pudo lanzar el deploy/);
+    assert.match(fallo.texto, /401/);
+
+    const sinMensaje = Web.mensajeDeployManual({ ok: false, codigo: 404 });
+    assert.match(sinMensaje.texto, /404/);
+  });
+});
+
 describe('Web: media de Drive enlazada en el formulario', () => {
   it('saca el identificador de los enlaces de Drive', () => {
     const id = '1AbCdEfGhIjKlMnOpQrStUv';

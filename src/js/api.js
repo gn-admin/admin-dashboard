@@ -193,6 +193,16 @@ const API = {
     if (!fileId) throw new Error('Falta el identificador del archivo');
     return this._post('web-media-eliminar', { file_id: fileId, publicacion_id: publicacionId || '' });
   },
+  // Deploy de la web: estado de la configuración y disparo manual. El disparo
+  // devuelve `{ok:false}` en vez de lanzar para poder enseñar el motivo.
+  async estadoDeployWeb() {
+    try { return await this._post('web-deploy-estado', {}); }
+    catch (err) { return { status: 'error', data: null, error: (err && err.message) || 'No disponible' }; }
+  },
+  async dispararDeployWeb() {
+    try { return await this._post('web-deploy', {}); }
+    catch (err) { return { status: 'error', ok: false, codigo: (err && err.code) || null, error: (err && err.message) || 'No se pudo lanzar el deploy' }; }
+  },
   async updateDocumento(id, data) { const r = await this._post('update-documento', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteDocumento(id) { return this._post('delete-documento', { id }); },
 

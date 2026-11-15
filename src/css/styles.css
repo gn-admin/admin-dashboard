@@ -8225,6 +8225,14 @@ body.modal-open { overflow: hidden; }
   background: var(--gray-100, #f3f4f6); color: var(--gray-700, #374151);
 }
 .web-nota { font-size: var(--text-xs, 0.75rem); color: var(--gray-600, #4b5563); line-height: 1.55; margin: 12px 0 0; }
+.web-deploy-estado { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.web-deploy-estado:empty { display: none; }
+.web-deploy-chip {
+  font-size: var(--text-xs, 0.75rem); font-weight: 600; line-height: 1.4;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid currentColor;
+}
+.web-deploy-chip.ok { background: #e6f4ea; color: #146c43; }
+.web-deploy-chip.ko { background: #fff4e5; color: #7a4a00; }
 .web-media-lista { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 0; }
 .web-media-lista:empty { display: none; }
 .web-media-titulo { flex-basis: 100%; margin: 0; font-size: var(--text-xs, 0.75rem); font-weight: 600; color: var(--gray-600, #4b5563); }
