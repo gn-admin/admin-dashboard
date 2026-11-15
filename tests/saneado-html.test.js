@@ -111,3 +111,77 @@ describe('webSanearHtml (lista blanca)', () => {
     assert.equal(sanear(una), una);
   });
 });
+
+describe('contenido real ya publicado', () => {
+  // Texto exacto que devuelve el canal en producción (evento de prueba).
+  const REAL = '<p>Prueba técnica del gestor web: publicación de un evento de prueba, comprobación de la página estática y retirada con lápida noindex. No es un evento real.</p>';
+
+  it('el saneado lo deja byte a byte igual', () => {
+    assert.equal(sanear(REAL), REAL);
+    const pub = ctx.webConstruirPublicacion({
+      tipo: 'evento', slug: 'prueba-retirada-playwright', titulo: 'Prueba retirada Playwright',
+      extracto: 'Prueba', contenido_html: REAL,
+      media: { coverImage: { src: 'https://drive.google.com/thumbnail?id=1EVI7TGKKHal3m5pQEgEZkoisqzuW6mBW&sz=w1200', alt: 'Prueba' } }
+    }, null);
+    assert.equal(pub.contentHtml, REAL);
+    assert.equal(pub.coverImage.src, 'https://drive.google.com/thumbnail?id=1EVI7TGKKHal3m5pQEgEZkoisqzuW6mBW&sz=w1200');
+  });
+});
+
+describe('webUrlSegura en portada, galería, vídeos y CTA', () => {
+  const construir = (extra, opts) => ctx.webConstruirPublicacion(Object.assign({
+    tipo: 'evento', slug: 'jornada', titulo: 'Jornada', extracto: 'Resumen', contenido_html: '<p>ok</p>'
+  }, extra), null, opts);
+
+  it('portada: descarta esquemas peligrosos y cae al origen si lo hay', () => {
+    assert.equal(construir({ media: { coverImage: { src: 'javascript:alert(1)', alt: 'x' } } }).coverImage.src, '');
+    assert.equal(construir({ media: { coverImage: { src: 'data:image/png;base64,AAA' } } }).coverImage.src, '');
+    assert.equal(construir({ media: { coverImage: { src: '/img/portada.jpg' } } }).coverImage.src, '/img/portada.jpg');
+  });
+
+  it('galería: conserva seguras y descarta el resto sin tocar alt/pie', () => {
+    const pub = construir({ media: { gallery: [
+      { src: 'https://drive.google.com/thumbnail?id=abc', alt: 'Laia', caption: 'En casa' },
+      { src: 'javascript:alert(1)', alt: 'mala' },
+      { src: 'assets/foto.jpg' },
+      'https://ejemplo.org/foto.jpg',
+      { alt: 'sin src' }
+    ] } });
+    assert.deepEqual(JSON.parse(JSON.stringify(pub.gallery.map((g) => (typeof g === 'string' ? g : g.src)))), [
+      'https://drive.google.com/thumbnail?id=abc', 'assets/foto.jpg', 'https://ejemplo.org/foto.jpg'
+    ]);
+    assert.equal(pub.gallery[0].alt, 'Laia');
+    assert.equal(pub.gallery[0].caption, 'En casa');
+  });
+
+  it('vídeos: fuera los que no tienen URL segura', () => {
+    const pub = construir({ media: { videos: [
+      { url: 'https://youtu.be/abc', title: 'Vídeo', note: 'nota' },
+      { url: 'javascript:alert(1)' },
+      { title: 'sin url' }
+    ] } });
+    assert.equal(pub.videos.length, 1);
+    assert.equal(pub.videos[0].url, 'https://youtu.be/abc');
+    assert.equal(pub.videos[0].note, 'nota');
+  });
+
+  it('CTA: si la URL no es segura no se publica el botón', () => {
+    assert.equal(construir({ cta: { label: 'Donar', url: 'javascript:alert(1)' } }).cta, undefined);
+    assert.equal(construir({ cta: { label: 'Donar', url: 'https://ejemplo.org/donar', kind: 'url' } }).cta.url, 'https://ejemplo.org/donar');
+    assert.equal(construir({ cta: { label: 'Donar', url: 'https://ejemplo.org/donar', kind: 'adopcion' } }).cta.kind, 'adopcion');
+  });
+
+  it('ficha: sanea gallery, videos y cta anidados', () => {
+    const pub = construir({ ficha: {
+      plantilla: 'ficha',
+      bloques: {}, mostrarLectura: true,
+      gallery: [{ src: 'javascript:1' }, { src: '/a.jpg', alt: 'a' }],
+      videos: [{ url: 'data:text/html,x' }, { url: 'https://vimeo.com/1' }],
+      cta: { label: 'Adoptar', url: 'vbscript:msgbox', kind: 'url' }
+    } }, { ficha: true });
+    assert.equal(pub.ficha.gallery.length, 1);
+    assert.equal(pub.ficha.gallery[0].src, '/a.jpg');
+    assert.equal(pub.ficha.videos.length, 1);
+    assert.equal(pub.ficha.cta, undefined);
+  });
+});

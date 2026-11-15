@@ -137,6 +137,61 @@ function webUrlSegura(valor) {
   return u;
 }
 
+/** Copia un objeto plano sin arrastrar prototipos (filas de Sheets). */
+function webClonarPlano(obj) {
+  var copia = {};
+  for (var k in obj) if (Object.prototype.hasOwnProperty.call(obj, k)) copia[k] = obj[k];
+  return copia;
+}
+
+/** Galería con URL segura: descarta las entradas sin `src` utilizable. */
+function webGaleriaSegura(lista) {
+  var out = [];
+  (Array.isArray(lista) ? lista : []).forEach(function (g) {
+    if (typeof g === 'string') {
+      var directa = webUrlSegura(g);
+      if (directa) out.push(directa);
+      return;
+    }
+    if (!g || typeof g !== 'object') return;
+    var src = webUrlSegura(g.src || g.url);
+    if (!src) return;
+    var copia = webClonarPlano(g);
+    copia.src = src;
+    if (copia.url) copia.url = src;
+    out.push(copia);
+  });
+  return out;
+}
+
+/** Vídeos con URL segura (`javascript:`/`data:` fuera). */
+function webVideosSeguros(lista) {
+  var out = [];
+  (Array.isArray(lista) ? lista : []).forEach(function (v) {
+    if (!v || typeof v !== 'object') return;
+    var url = webUrlSegura(v.url);
+    if (!url) return;
+    var copia = webClonarPlano(v);
+    copia.url = url;
+    out.push(copia);
+  });
+  return out;
+}
+
+/** Ficha configurable con galería, vídeos y CTA saneados (sin tocar el resto). */
+function webFichaSegura(ficha) {
+  if (!ficha || typeof ficha !== 'object') return ficha;
+  var copia = webClonarPlano(ficha);
+  if (Array.isArray(copia.gallery)) copia.gallery = webGaleriaSegura(copia.gallery);
+  if (Array.isArray(copia.videos)) copia.videos = webVideosSeguros(copia.videos);
+  if (copia.cta && typeof copia.cta === 'object') {
+    var url = webUrlSegura(copia.cta.url);
+    if (url) copia.cta = webClonarPlano(copia.cta);
+    if (url) copia.cta.url = url; else delete copia.cta;
+  }
+  return copia;
+}
+
 function webEscaparAtributo(valor) {
   return String(valor === undefined || valor === null ? '' : valor)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -552,10 +607,12 @@ function webConstruirPublicacion(publicacion, origen, opts) {
   var media = p.media || {};
   var seoIn = p.seo || {};
   var cover = media.coverImage || {};
-  var src = webTexto(cover.src) || webFotoOrigen(origen);
+  // Las URLs de portada, galería, vídeos y CTA pasan por la misma lista blanca
+  // que el HTML: si no son seguras se descartan (la ficha se pinta sin ellas).
+  var src = webUrlSegura(webTexto(cover.src)) || webUrlSegura(webFotoOrigen(origen));
   var alt = webTexto(cover.alt) || webTexto(p.titulo) || webTexto(origen && origen.nombre);
-  var gallery = Array.isArray(media.gallery) ? media.gallery : [];
-  var videos = Array.isArray(media.videos) ? media.videos : [];
+  var gallery = webGaleriaSegura(media.gallery);
+  var videos = webVideosSeguros(media.videos);
   var icons = Array.isArray(media.icons) ? media.icons : [];
   var dominio = webDominioPublico();
   var ruta = webRutaPublica(p.tipo, p.slug);
@@ -598,14 +655,15 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     readTime: webTiempoLectura(p.contenido_html)
   };
 
-  if (p.cta && webTexto(p.cta.label) && webTexto(p.cta.url)) {
-    out.cta = { label: webTexto(p.cta.label), url: webTexto(p.cta.url) };
+  var ctaUrl = webUrlSegura(p.cta && p.cta.url);
+  if (p.cta && webTexto(p.cta.label) && ctaUrl) {
+    out.cta = { label: webTexto(p.cta.label), url: ctaUrl };
     var kindCta = webTexto(p.cta.kind).toLowerCase();
     if (WEB_FICHA_CTA_KINDS.indexOf(kindCta) !== -1) out.cta.kind = kindCta;
   }
   if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
   if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
-  if (incluirFicha && p.ficha && typeof p.ficha === 'object') out.ficha = p.ficha;
+  if (incluirFicha && p.ficha && typeof p.ficha === 'object') out.ficha = webFichaSegura(p.ficha);
   return out;
 }
 
