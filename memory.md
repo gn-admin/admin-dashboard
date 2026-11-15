@@ -55,6 +55,13 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - Visor y prerender: misma composición (`htmlDetalle`) respeta plantilla, bloques y `mostrarLectura`; sin `ficha` el HTML no cambia.
 - Pruebas: `tests/ficha-config.test.js` (helpers), `tests/web-backend.test.js` (guardado/normalización, detalle sí y listado no) y `tests/publico.test.js` (bloques/plantilla).
 
+### Prueba E2E real (2026-11-15)
+
+- **Animal (ciclo completo y limpio):** publicación `prueba-e2e-elizabeth` sobre el animal Elizabeth **sin tocar su ficha interna**: alta en `borrador`, portada PNG generada al vuelo y subida a Drive (`animales/prueba-e2e-elizabeth/`, `fileId 1ewh1Eh9Y3RL1B4IFl6Mvq4L_ITaN1JtP`), publicación, estática verificada (title, canonical, `og:image`, JSON-LD, en sitemap), visor con portada (1200 px reales) y texto, y `index.json` con el slug → el canonical del visor pasó de **omitido** (mientras no existía la estática) a la URL estática. Limpieza: `oculto` → eliminación de la fila; el siguiente prerender deja su página en **404** y el slug libre.
+- **410 real:** evento de pruebas `prueba-retirada-playwright` con portada en `eventos/…` (`fileId 1EVI7TGKKHal3m5pQegEZkoisqzuW6mBW`), publicado y verificado, luego retirado → canal `status:"gone"`, lápida estática `noindex,nofollow` sin canonical, fuera de sitemap, presente en `?endpoint=retiradas` y visor «Publicación retirada». Queda **retirado** (los eventos no tienen borrado).
+- **Restos:** los dos PNG siguen en Drive (no hay endpoint de borrado) y las filas de auditoría. Cero cambios en animales, familias o adopciones.
+- **Observación:** las estáticas se regeneraron con dos `workflow_dispatch` manuales (16:16 y 16:45 UTC); en la ventana de prueba **no apareció ningún run `schedule`** a las 16:00/16:30, así que la latencia ≤30-40 min del cron sigue sin verificarse en vivo.
+
 ### Media por ficha (Drive)
 
 - Una **carpeta por publicación** en Drive, separada por tipo: `animales/<slug>`, `eventos/<slug>`, `historias/<slug>` dentro de la raíz `DRIVE_WEB_FOLDER_ID`; se busca por nombre y se reutiliza.
