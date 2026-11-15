@@ -104,7 +104,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **D5 (reCAPTCHA, operativo):** configurar dominios/hostname/umbral en consola reCAPTCHA v3 y realizar prueba e2e del login en entorno desplegado (código y `.gs` ya actualizados).
+1. **D5 (reCAPTCHA):** ✅ **verificado el 2026-11-15** con la site key de `src/js/config.js` sobre `gn-admin.github.io`: token real → `{"ok":true}` (secreto correcto, dominio autorizado, score ≥ 0,5) y acción distinta o token inventado → 403 (fail closed). El gate del login sigue desactivado por decisión. Único pendiente, solo si se reactiva: secreto `RECAPTCHA_SITE_KEY` en GitHub y redepliegue (el `config.js` desplegado se genera sin site key).
 2. **D3 (opcional):** inspección visual en la hoja de auditoría/fases para confirmar filas escritas.
 3. **D4 (acción periódica):** ejecutar rotación del token cuando proceda (Secrets + config GAS + redespliegue).
 4. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
