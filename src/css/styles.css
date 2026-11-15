@@ -6618,6 +6618,10 @@ body {
   color: var(--gray-500);
 }
 
+.socios-no-results .empty-state {
+  margin: 0;
+}
+
 /* Los listados respiran: filtros agrupados y cabeceras sin saltos. */
 .page-list-container > .filters-bar {
   padding: 12px;

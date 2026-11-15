@@ -1210,6 +1210,21 @@ const Dashboard = {
 
   // Pila LIFO de modales abiertos: Escape cierra siempre el más reciente.
   _modalStackInit() { if (!Array.isArray(this._modalStack)) this._modalStack = []; },
+  _modalFocusInit() { if (!this._modalFocusReturn || typeof this._modalFocusReturn !== 'object') this._modalFocusReturn = {}; },
+  _modalCaptureFocus(id) {
+    this._modalFocusInit();
+    if (this._modalFocusReturn[id]) return;
+    const ae = typeof document !== 'undefined' ? document.activeElement : null;
+    if (ae && ae !== document.body) this._modalFocusReturn[id] = ae;
+  },
+  _modalRestoreFocus(id) {
+    this._modalFocusInit();
+    const el = this._modalFocusReturn[id];
+    delete this._modalFocusReturn[id];
+    if (el && typeof el.focus === 'function' && (typeof document === 'undefined' || document.contains(el))) {
+      try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
+    }
+  },
   _modalPush(id) {
     this._modalStackInit();
     this._modalStack = this._modalStack.filter(x => x !== id);
@@ -2781,12 +2796,15 @@ const Dashboard = {
       };
       body.innerHTML = `<button type="button" class="btn btn-outline-green btn-sm tutorial-back" data-action="showTutorial">${Icons.arrowLeft} Todas las guías</button><h3 class="tutorial-guide-title">${titles[tab] || ''}</h3><div class="tutorial-panel">${panels[tab] || ''}</div>`;
     }
-    if (el.style.display !== 'flex') this._modalScrollLock(true);
+    const opening = el.style.display !== 'flex';
+    if (opening) this._modalCaptureFocus('tutorial-modal');
+    if (opening) this._modalScrollLock(true);
     el.style.display = 'flex';
     this._modalPush('tutorial-modal');
     el.onclick = (e) => { if (e.target === el) this.closeTutorial(); };
     body.scrollTop = 0;
     this.injectIcons();
+    this._focusModal(el);
   },
 
   _tutorialMenu() {
@@ -3037,6 +3055,7 @@ const Dashboard = {
     el.onclick = null;
     this._modalScrollLock(false);
     this._modalRemove('tutorial-modal');
+    this._modalRestoreFocus('tutorial-modal');
   },
 
   showProfile() {
@@ -3055,10 +3074,13 @@ const Dashboard = {
         <button type="button" class="btn btn-primary btn-sm" data-action="showTutorialFromProfile">${Icons.helpCircle} Guia de procesos</button>
         <button type="button" class="btn btn-danger btn-sm" data-action="doLogout">${Icons.xCircle} Cerrar sesion</button>
       </div>`;
+    this._modalCaptureFocus('profile-modal');
     if (el.style.display !== 'flex') this._modalScrollLock(true);
     el.style.display = 'flex';
+    this._modalPush('profile-modal');
     el.onclick = (e) => { if (e.target === el) this.closeProfile(); };
     this.injectIcons();
+    this._focusModal(el);
   },
 
   closeProfile() {
@@ -3067,6 +3089,8 @@ const Dashboard = {
     el.style.display = 'none';
     el.onclick = null;
     this._modalScrollLock(false);
+    this._modalRemove('profile-modal');
+    this._modalRestoreFocus('profile-modal');
   },
 
   showInfoModal(title, html) {
@@ -3076,7 +3100,9 @@ const Dashboard = {
     if (!modal || !body) return;
     if (titleEl) titleEl.textContent = title || 'Detalle';
     body.innerHTML = html;
-    if (modal.style.display !== 'flex') this._modalScrollLock(true);
+    const opening = modal.style.display !== 'flex';
+    if (opening) this._modalCaptureFocus('info-modal');
+    if (opening) this._modalScrollLock(true);
     modal.style.display = 'flex';
     this._modalPush('info-modal');
     modal.onclick = (e) => { if (e.target === modal) this.closeInfoModal(); };
@@ -3092,6 +3118,7 @@ const Dashboard = {
     modal.onclick = null;
     this._modalScrollLock(false);
     this._modalRemove('info-modal');
+    this._modalRestoreFocus('info-modal');
   },
 
   showFormModal(title, html) {
@@ -3102,7 +3129,9 @@ const Dashboard = {
     if (titleEl) titleEl.textContent = title || 'Formulario';
     body.innerHTML = html;
     body.classList.add('modal-body--form');
-    if (modal.style.display !== 'flex') this._modalScrollLock(true);
+    const opening = modal.style.display !== 'flex';
+    if (opening) this._modalCaptureFocus('form-modal');
+    if (opening) this._modalScrollLock(true);
     modal.style.display = 'flex';
     this._modalPush('form-modal');
     this.injectIcons();
@@ -3118,6 +3147,7 @@ const Dashboard = {
     if (body) body.classList.remove('modal-body--form');
     this._modalScrollLock(false);
     this._modalRemove('form-modal');
+    this._modalRestoreFocus('form-modal');
   },
 
   async viewCuestionarioModal(surveyId, responseId) {
@@ -8096,14 +8126,34 @@ const Dashboard = {
     const page = document.getElementById('page-socios');
     const cont = page?.querySelector('.page-list-container');
     if (!cont) return;
+    const tbody = cont.querySelector('.data-table tbody');
     const rows = cont.querySelectorAll('.data-table tbody tr');
     let visibles = 0;
     rows.forEach(tr => {
+      if (tr.classList.contains('socios-no-results')) { tr.style.display = 'none'; return; }
       if (tr.querySelector('.table-empty')) { tr.style.display = q ? 'none' : ''; return; }
       const ok = !q || (tr.textContent || '').toLowerCase().includes(q);
       tr.style.display = ok ? '' : 'none';
       if (ok) visibles++;
     });
+    let empty = tbody ? tbody.querySelector('.socios-no-results') : null;
+    if (tbody && q && visibles === 0 && !tbody.querySelector('.table-empty[style*="display: none"], .table-empty:not([style])')) {
+      // hay filas de datos pero ninguna coincide
+    }
+    if (tbody) {
+      const hasDataRows = Array.from(rows).some(tr => !tr.querySelector('.table-empty') && !tr.classList.contains('socios-no-results'));
+      if (q && visibles === 0 && hasDataRows) {
+        if (!empty) {
+          empty = document.createElement('tr');
+          empty.className = 'socios-no-results';
+          empty.innerHTML = `<td colspan="6"><div class="empty-state" role="status" style="padding:20px"><h3 style="margin:0">Sin resultados</h3><p style="margin:4px 0 0">Prueba con otro nombre, email o área.</p></div></td>`;
+          tbody.appendChild(empty);
+        }
+        empty.style.display = '';
+      } else if (empty) {
+        empty.style.display = 'none';
+      }
+    }
     const count = cont.querySelector('.response-count');
     if (count) count.textContent = visibles + (visibles === 1 ? ' registro' : ' registros');
   },
