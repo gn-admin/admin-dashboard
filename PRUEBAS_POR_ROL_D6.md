@@ -6,14 +6,19 @@
 
 **Automatizado en repo:** `tests/roles-d1.test.js` carga el `apps-script/Code.gs` real y fija la matriz `_role`/`_canReadEndpoint`/`_canWriteEndpoint` (denegación por defecto, `sin_acceso` sin lecturas ni escrituras, perfil minimizado y alcance de cada rol). Suite completa: **508/508**.
 
-**Verificado en vivo (solo lecturas):** `admin`, `coordinador`, `tesoreria`, `consulta` y `voluntario` con las permitidas/denegadas esperadas; `web-*` restringido a admin/coordinador; sin token y con token inválido denegado; canal público accesible sin token; C1 (restaurar retirada) correcto.
+**Verificado en vivo (con lote `.gs` desplegado):**
+- [x] `sin_acceso` **revocado** (`gn.test.revocado@example.test`, `activo:false`): login Firebase OK, `user-profile` mínimo `{"role":"sin_acceso","email", "status"}` (sin `uid`/`name`), UI de bloqueo/navegación oculta, lecturas operativas/`web-*` y escrituras denegadas por API directa.
+- [x] Perfiles completos (`uid,email,role,name`) para `admin`, `coordinador`, `voluntario`, `tesoreria`, `consulta`.
+- [x] **Matriz de lecturas** por API directa coherente con política (incl. `web-*` solo admin/coordinador; restricciones de voluntario/tesorería/consulta según alcance).
+- [x] **Matriz de escrituras/acciones** por API directa con ids inexistentes (sin modificar datos): denegaciones/autorizaciones coherentes con la política implementada (`coordinador` sin acciones solo-admin; `voluntario` sin borrados sensibles/finanzas/contratos/blacklist/web; `tesoreria` limitada a su ámbito; `consulta` y `sin_acceso` sin escrituras). Nota: `voluntario` no tiene permitido `delete-animal` (borrado no incluido en su allowlist de escritura).
+- [x] Sin token / token inválido denegados en endpoints privados.
+- [x] Canal público sin token OK (`config-publica`, `retiradas`, `sitemap`, `taxonomias`, `redirects`); detalle público coherente tras restauración (publicación en borrador no expuesta).
 
-**Pendiente tras subir el lote `.gs`** (`Code.gs`, `WebPublicaciones.gs`, `Auth.gs`, `Roles.gs`; `Config.gs` solo si cambió):
-- [ ] Crear en Firebase Auth `gn.test.revocado@example.test` (entrada `activo:false` en `Roles.gs`) con la contraseña de pruebas.
-- [ ] `sin_acceso` revocado: perfil mínimo, bloqueo de UI y denegación total por API directa.
-- [ ] `sin_acceso` no listado: cualquier cuenta Firebase fuera de `ROLES_USUARIOS`/`ADMIN_EMAILS`.
-- [ ] Escrituras/denegaciones por rol por API directa (crear/editar/borrar/cambiar estado) en entorno controlado.
-- [ ] Auditoría: `restaurar_publicacion` y `eliminar_publicacion` dejan registro en la hoja.
+**Pendiente (operativo/manual):**
+- [ ] `sin_acceso` **no listado**: cuenta Firebase autenticable no presente en `ROLES_USUARIOS`/`ADMIN_EMAILS` (misma ruta de denegación por defecto; falta cuenta de prueba).
+- [ ] Verificar en la hoja de **auditoría** de producción que `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles quedan registradas (D3).
+- [ ] Confirmar que `ROLES_USUARIOS`/`ADMIN_EMAILS` desplegados cubren a todos los usuarios legítimos (D2).
+- [ ] Escrituras con datos reales en entorno controlado (si se requiere validación funcional completa de negocio, más allá de autorización).
 
 ## 1. Roles esperados
 

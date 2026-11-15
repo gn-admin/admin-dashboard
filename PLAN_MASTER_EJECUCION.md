@@ -15,7 +15,7 @@
 | Área | Estado | Entregado | Pendiente |
 |---|---|---|---|
 | F0 Contratos/modelo | ✅ Cerrada | Hoja única `WebPublicaciones`, taxonomía `animal|evento|historia`, slug único por tipo, estados/flags, payload `Publicacion` normalizado (`preview == feed`), alias `/api` y `/v1`, JSONP, `forms/submit` fuera de alcance | — |
-| F1 Backend gestor (GAS) | ✅ Implementado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | **Lote final pendiente de subir** (`Code.gs`, `WebPublicaciones.gs`, `Auth.gs`, `Roles.gs`): D1 con denegación por defecto/`sin_acceso`, C1 y auditoría de borrado. `retirado`/`gone`/`?endpoint=retiradas` ya activos y verificados. |
+| F1 Backend gestor (GAS) | ✅ Implementado y desplegado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | Lote D1/C1/auditoría de borrado subido y desplegado (2026-11-15). `retirado`/`gone`/`?endpoint=retiradas` activos y verificados. Mantener `ROLES_USUARIOS`/`ADMIN_EMAILS` completos en el entorno desplegado. |
 | F2 UI Gestor web (admin) | ✅ Implementado | Sección “Web/Contenido público”, alta guiada, curación animal/evento/historia, preview, slug-check, resumen, integración en ficha, permisos UI, estilos, `web.js`/`api.js`/rutas/SW | Revisión visual final en Pages/uso real tras despliegues; mejoras evolutivas menores si surgen |
 | F3 Canal público | ✅ Implementado | `/api/publicaciones`, detalle por slug, alias `/v1/*`, `config/taxonomias/sitemap/redirects/retiradas`, filtros/paginación/búsqueda, cache interna, 404/301/410 lógico, JSONP | **Verificado en producción** (canal sin token, `gone`/`retiradas`, cache ~60 s; prerender usa `nocache=1`). |
 | F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (508 verdes) | **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
@@ -80,11 +80,11 @@
 
 | ID | Acción | Dónde | Tipo | Resultado esperado | Verificación |
 |---|---|---|---|---|---|
-| A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` (+ `Auth.gs`/`Roles.gs` para D1 coherente) | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"`, `?endpoint=retiradas`, C1 y D1 | **Hecho según usuario.** A2 y C1 (backend/canal fresco) verificados en vivo; D1 verificado parcialmente (admin). Mantener alineación lote desplegado ↔ repo/local. |
+| A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` (+ `Auth.gs`/`Roles.gs` para D1 coherente) | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"`, `?endpoint=retiradas`, C1 y D1 | **Hecho.** Lote desplegado y verificado: canal/C1 en vivo; D1 con `sin_acceso` revocado, perfiles y matriz de lecturas/escrituras por rol (API directa) coherentes con política. Repo/local alineado. |
 | A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | **Hecho.** Canal/endpoints, SPA/estática/SEO, `retiradas` y detalle `gone` verificados; caso real `prueba-retirada-playwright` con lápida estática publicada (noindex, fuera de sitemap) en `github.io`. |
 | A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Hecho.** Implementado y efectivo (falla si no puede leer `retiradas`, salvo `--soft`); validado en flujo real. Suite 508/508. |
 | A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | **Aplazado** (decisión): se usa `github.io`. Opcional: Search Console/sitemap sobre la URL actual hasta tener dominio propio. |
-| A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **OK.** C1 verificado en vivo (front desplegado, lápida eliminada tras prerender, sitemap/retiradas limpios), D6 documentado con matriz/checklist y repo alineado. Queda la validación operativa D1 tras subir `.gs`. |
+| A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | **OK.** C1 y lote `.gs` verificados en vivo, D6 documentado con matriz/checklist y repo alineado. Resta solo seguimiento operativo externo (auditoría en hojas/roles legítimos/D4–D5/D7 y caso no listado). |
 
 **Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y revisión operativa residual de A5 (consistencia preview↔público/casos 301/410 en uso real).
 
@@ -118,12 +118,12 @@
 
 | ID | Acción | Dónde | Prioridad | Hito plan |
 |---|---|---|---|---|
-| D1 | **Autorización por endpoint en GAS** + `user-profile` devuelve `sin_acceso` a no reconocidos (email normalizado) + denegación por defecto + minimización de datos | GAS/Sheets | Crítica | 1.1 | **Implementado en repo; pendiente subir `.gs` y validar.** `Code.gs`/`Auth.gs`/`Roles.gs` con denegación por defecto (`sin_acceso`), perfil minimizado y sin escrituras; matriz fijada en `tests/roles-d1.test.js`. Tras desplegar: probar `sin_acceso` revocado/no listado y denegaciones por rol en UI+API directa. |
+| D1 | **Autorización por endpoint en GAS** + `user-profile` devuelve `sin_acceso` a no reconocidos (email normalizado) + denegación por defecto + minimización de datos | GAS/Sheets | Crítica | 1.1 | **Hecho (desplegado y validado en lo verificable).** `sin_acceso` revocado con perfil mínimo y denegación total; matriz de lecturas/escrituras por rol por API directa coherente con política; regresión en `tests/roles-d1.test.js`. Pendiente solo operativo: caso **no listado** (sin cuenta de prueba) y confirmar `ROLES_USUARIOS`/`ADMIN_EMAILS` completos (D2). |
 | D2 | Higiene de Roles/cuentas (depurar, mínimo privilegio, correos correctos) y reflejo de cambios | Sheets/operativo | Alta | 1.3 |
 | D3 | Verificar auditoría e historial de fases operativos en producción (cabeceras/IDs/endpoints/escritura) | GAS/Sheets | Alta | 5.1 |
 | D4 | Gestión/rotación de token API y revisión de logs/exposición (`?token=`) | GAS/GitHub/operativo | Alta | 2.2 |
 | D5 | MFA para admins/elevados y endurecimiento login (reCAPTCHA/App Check según viabilidad) | Firebase | Media-alta | 2.1 |
-| D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Parcial.** Lecturas verificadas en vivo para admin/coordinador/tesorería/consulta/voluntario y denegaciones sin token; checklist en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md) y regresión D1 en `tests/roles-d1.test.js`. Pendiente: `sin_acceso` real y escrituras/denegaciones por API directa tras subir el lote `.gs`. |
+| D6 | Pruebas por rol (incl. `sin_acceso`/`consulta`) en UI y API directa + procedimiento de revisión/incidentes | Operativo (+repo apoyo) | Alta | 5.2 | **Avanzado.** Perfiles, lecturas y escrituras/acciones por API directa verificados por rol (incl. `sin_acceso` revocado) + UI de bloqueo; checklist en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Pendiente: caso no listado, verificación de auditoría en hojas (D3) y formalizar revisión/incidentes periódicos. |
 | D7 | Revisar canal público del gestor web frente a criterio 4.1 (lista blanca, CORS/dominio, sin datos internos) | GAS/config | Media | 4.1 |
 
 **Criterio de cierre:** hitos 1.1, 1.3, 5.1, 2.2, 5.2 y (según viabilidad) 2.1 completados y verificados; objetivo ~80–85%.
@@ -148,7 +148,7 @@
 
 ## 4. Orden de ejecución recomendado (óptimo)
 
-1. **Ahora (tras subir `.gs`):** validación D1/D6 completa (caso `sin_acceso` revocado/no listado y escrituras/denegaciones por API directa por rol) y cierre operativo residual de A5. A2/A3/C1 verificados en vivo.
+1. **Ahora:** cerrar pendientes operativos verificables de D1/D6/D2/D3 (caso `sin_acceso` no listado si hay cuenta, confirmar roles legítimos desplegados y registro en hoja de auditoría). A1–A3/A5, C1 y la matriz D1 por API directa verificados.
 2. **En paralelo inmediato:** `D1, D2, D3, D4` (seguridad backend/operativa crítica) y preparación de `B1` (contrato ya estable). 
 3. **Corto plazo:** `A3` (CI, tras confirmar A2) + `C1` (restaurar retirada, tras A2) + `C2` (pruebas) + `D5/D6/D7` según viabilidad.
 4. **Medio plazo (con dominio disponible):** `A4 → B2/B3/B4` (SEO/indexación real en web externa).
