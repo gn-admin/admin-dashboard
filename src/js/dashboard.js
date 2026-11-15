@@ -5059,7 +5059,7 @@ const Dashboard = {
     const normal = this._fotoSrc(a);
     const alt = this._esc(a.nombre || '');
     const fb = normal && normal !== grande ? ` onerror="this.onerror=null;this.src='${this._esc(normal)}'"` : '';
-    this.showInfoModal(a.nombre || 'Foto', `<img class="modal-foto" src="${this._esc(grande)}" alt="${alt}"${fb}>`);
+    this.showInfoModal(a.nombre || 'Foto', `<img class="modal-foto" src="${this._esc(grande)}" alt="${alt}" loading="lazy" decoding="async"${fb}>`);
   },
 
   async viewAnimal(id, opts) {
@@ -6286,7 +6286,7 @@ const Dashboard = {
     const faltan = this._entregaFaltantes(p);
     const chips = this._entregaChecklist().map(it => `<span class="${marcas[it.id] ? 'chip-ok' : 'chip-pending'}">${marcas[it.id] ? Icons.check : Icons.x} ${this._esc(it.label)}${it.opcional ? ' (opcional)' : ''}</span>`).join('');
     const foto = p.entrega_foto_url
-      ? `<div class="detail-field"><div class="detail-question">Foto de la entrega</div><div class="detail-answer"><a href="${this._esc(p.entrega_foto_url)}" target="_blank" rel="noopener noreferrer"><img class="entrega-foto" src="${this._esc(p.entrega_foto_url)}" alt="Foto de la entrega"></a></div></div>`
+      ? `<div class="detail-field"><div class="detail-question">Foto de la entrega</div><div class="detail-answer"><a href="${this._esc(p.entrega_foto_url)}" target="_blank" rel="noopener noreferrer"><img class="entrega-foto" src="${this._esc(p.entrega_foto_url)}" alt="Foto de la entrega" loading="lazy" decoding="async"></a></div></div>`
       : '';
     return `<div class="detail-section"><div class="detail-section-title">${Icons.home} Entrega</div>
       ${fecha ? `
@@ -6364,7 +6364,7 @@ const Dashboard = {
       : ((v === false || /^(no|false|0)$/i.test(String(v))) ? 'No' : '—');
     const field = (label, value) => `<div><span class="label">${label}</span>${this._esc(value || '—')}</div>`;
     const foto = a.foto
-      ? `<img src="${this._esc(a.foto)}" alt="${this._esc(a.nombre || 'Animal')}">`
+      ? `<img src="${this._esc(a.foto)}" alt="${this._esc(a.nombre || 'Animal')}" loading="lazy" decoding="async">`
       : `<div class="contrato-doc-foto-vacia">${Icons.paw}<span>Sin foto</span></div>`;
     return `<div class="contrato-doc-animal">
       <div class="contrato-doc-foto">${foto}</div>
@@ -6393,7 +6393,7 @@ const Dashboard = {
     const foto = o.foto || '';
     const paw = (typeof Icons !== 'undefined' && Icons.paw) || '';
     const fotoHtml = foto
-      ? `<img src="${this._esc(foto)}" alt="${this._esc(nombre || 'Animal')}">`
+      ? `<img src="${this._esc(foto)}" alt="${this._esc(nombre || 'Animal')}" loading="lazy" decoding="async">`
       : `<div class="contrato-animal-editor-foto-vacia">${paw}<span>Sin foto</span></div>`;
     return `<div class="contrato-animal-editor">
       <div class="contrato-animal-editor-head">
@@ -8308,7 +8308,7 @@ const Dashboard = {
     // Hero compacto: la foto acompana solo al nombre y badges; los campos
     // van a ancho completo debajo (antes la foto empujaba toda la ficha).
     const fotoHero = s.foto
-      ? `<img src="${this._esc(s.foto)}" alt="${this._esc(s.nombre)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);flex-shrink:0">`
+      ? `<img src="${this._esc(s.foto)}" alt="${this._esc(s.nombre)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);flex-shrink:0" loading="lazy" decoding="async">`
       : `<div style="width:72px;height:72px;border-radius:50%;background:var(--gray-100);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--primary);flex-shrink:0">${this._esc(this._inicialesNombre(s.nombre))}</div>`;
     const cuotaEstado = esSocio ? this._cuotaEstado(s) : null;
     this._showDetail('socios', s.nombre, `
