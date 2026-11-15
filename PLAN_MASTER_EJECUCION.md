@@ -80,13 +80,13 @@
 
 | ID | Acción | Dónde | Tipo | Resultado esperado | Verificación |
 |---|---|---|---|---|---|
-| A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"` y `?endpoint=retiradas`; canal coherente | **Hecho (confirmado por el usuario).** Falta verificación en vivo: `?endpoint=publicaciones/publicacion/retiradas/redirects/taxonomias/sitemap` OK; ficha retirada devuelve `gone`; slug bloqueado |
-| A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | Alta→feed→ficha→ocultar/retirar; `gone`/`retiradas` en vivo; prerender diario genera lápida/sitemap correcto |
-| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Implementado en repo** (`scripts/prerender-publico.js`: falla si no puede leer `retiradas`, salvo `--soft`). Pruebas prerender 17/17 y suite 489/489 verdes; efectivo en el próximo deploy. |
-| A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | Propiedad verificada, sitemap aceptado, URLs canónicas correctas |
+| A1 | Desplegar **nueva versión** de `apps-script/Code.gs` y `apps-script/WebPublicaciones.gs` | GAS (externo) | Manual crítico | Activos `retirado`, `status:"gone"` y `?endpoint=retiradas`; canal coherente | **Hecho.** Verificado en vivo (A2). Hay cambios `.gs` nuevos en repo (C1 restaurar, eliminar borrador publicación web de animal) **pendientes de redesplegar**. |
+| A2 | Verificación funcional de punta a punta en producción | GAS + Pages + gestor | Manual | Publicar/ocultar/retirar y consumo real validados | **Hecho.** Canal/endpoints, SPA/estática/SEO, `retiradas` y detalle `gone` verificados; caso real `prueba-retirada-playwright` con lápida estática publicada (noindex, fuera de sitemap) en `github.io`. |
+| A3 | Ajuste post-despliegue de observabilidad | Repo CI | Repo | Aviso de retiradas pasa a **error** si falla (evitar que una lápida rota pase) | **Hecho.** Implementado y efectivo (falla si no puede leer `retiradas`, salvo `--soft`); validado en flujo real. Suite 495/495. |
+| A4 | Dominio propio y Search Console | Dominio/hosting/DNS/SC (externo) | Externo | `sitemap.xml`/`robots.txt` en raíz, canonical `dominio+ruta`, sitemap enviado, indexación gestionable | **Aplazado** (decisión): se usa `github.io`. Opcional: Search Console/sitemap sobre la URL actual hasta tener dominio propio. |
 | A5 | Cierre operativo F5 en este proyecto | Repo/docs | Mixto | Procedimientos y chequeos completos | Actualizar `memory.md`/operativa; validar consistencia preview↔público y casos 301/410 |
 
-**Criterio de cierre Track A:** A2 verificado (caso `gone`/retirada en vivo pendiente de prueba con un dato real), A3 aplicado en repo, y A4 planificado/ejecutado cuando haya dominio. (A1 desplegado según confirmación.)
+**Criterio de cierre Track A:** A2 verificado (incl. `gone`/retirada y lápida estática en `github.io`) y A3 aplicado/efectivo. **Cerrado salvo A4** (dominio propio aplazado; uso actual en `github.io`). Nota: hay `.gs` nuevos en repo (C1, borrado de borrador animal) pendientes de redesplegar.
 
 ### Track B — Web externa: consumo e indexación real (paralelo tras A2, otro repositorio)
 **Objetivo:** que `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` muestre el contenido con el contrato y SEO de publicaciones.
@@ -107,8 +107,8 @@
 
 | ID | Acción | Dónde | Prioridad | Resultado esperado | Notas |
 |---|---|---|---|---|---|
-| C1 | **Restaurar publicación retirada** desde panel + registro de quién retira/restaura | Repo + GAS | Alta | Salida controlada de `retirado` y trazabilidad | Requiere regla: recuperar slug/lápida y efectos en feed/sitemap/estáticas (prerender diario o regeneración) |
-| C2 | Hardening de pruebas/prerender (fixtures 301 y ficha oculta, validación JSON-LD/canónica única, caso `gone`) | Repo | Media | Regresiones cubiertas | `npm test` + `npm run prerender --fixture` |
+| C1 | **Restaurar publicación retirada** desde panel + registro de quién retira/restaura | Repo + GAS | Alta | Salida controlada de `retirado` y trazabilidad | **Implementado en repo** (evento/historia → `borrador`, slug conservado, auditoría; UI/botón, tests). **Pendiente redesplegar `.gs` y validar en vivo**. |
+| C2 | Hardening de pruebas/prerender (fixtures 301 y ficha oculta, validación JSON-LD/canónica única, caso `gone`) | Repo | Media | Regresiones cubiertas | **Avanzado en repo**: fixtures `redirect-301`/`oculta`, soporte de redirecciones estáticas, `validarFichaHtml` (JSON-LD/canonical únicos), 495 tests. `npm test` + `npm run prerender --fixture`. |
 | C3 | **§7.3 Ficha configurable (v1.1 aditivo)** — solo si se aprueba | Repo + GAS/Sheets | Media-baja (decisión requerida) | Plantilla/bloques, iconos, galería/alt-pie completo, salud curada, CTA kind, campos animal/tags, etc. | **Antes:** cerrar decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos, saneado HTML, orden bloques, tags). Mantener compatibilidad: sin `ficha` = comportamiento actual. Implementar por etapas (contrato/validación → backend → UI → visor → port web) |
 | C4 | `forms/submit` (opcional) | GAS + web | Baja / alcance aparte | Envío real de formularios | Canal separado; requiere reCAPTCHA server-side, validación/antiabuso, plantillas/correos y políticas |
 
