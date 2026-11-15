@@ -18,7 +18,7 @@
 | F1 Backend gestor (GAS) | ✅ Implementado y desplegado | `WebPublicaciones.gs`/`Code.gs` (rutas, permisos, canal), validaciones, slug/completitud, endpoints gestor y públicos, pruebas | Lote D1/C1/auditoría de borrado subido y desplegado (2026-11-15). `retirado`/`gone`/`?endpoint=retiradas` activos y verificados. Mantener `ROLES_USUARIOS`/`ADMIN_EMAILS` completos en el entorno desplegado. |
 | F2 UI Gestor web (admin) | ✅ Implementado | Sección “Web/Contenido público”, alta guiada, curación animal/evento/historia, preview, slug-check, resumen, integración en ficha, permisos UI, estilos, `web.js`/`api.js`/rutas/SW | Revisión visual final en Pages/uso real tras despliegues; mejoras evolutivas menores si surgen |
 | F3 Canal público | ✅ Implementado | `/api/publicaciones`, detalle por slug, alias `/v1/*`, `config/taxonomias/sitemap/redirects/retiradas`, filtros/paginación/búsqueda, cache interna, 404/301/410 lógico, JSONP | **Verificado en producción** (canal sin token, `gone`/`retiradas`, cache ~60 s; prerender usa `nocache=1`). |
-| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (521 verdes) | **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`** (consumo del canal, metas/JSON-LD/redirects 301, 410 real/retiradas, rutas canónicas en dominio propio) — tarea del otro proyecto usando este contrato como referencia |
+| F4 Integración web + SEO de publicaciones | ✅ Cerrada en este proyecto / ➡️ externa en web real | Visor `publico.html` con tema, canónica única a estática, metas/OG/JSON-LD, prerender `scripts/prerender-publico.js`, `publicaciones/<slug>.html`, `sitemap.xml`, `robots.txt`, páginas de retirada `noindex`, guarda de deploy, cron diario, fixtures/tests (521 verdes) | **Trasladado a `TRANSFERIR_A_MAIN.md`** para ejecución en el proyecto `main` (fuera del alcance de este repo). |
 | F5 Ajustes/calidad/operación | 🟡 Parcial | Completitud, consistencia preview↔público, cache/paginación, diagnóstico hoja/pestaña, historial de slug+301, retirada/410+l�pida, páginas de retirada, recuentos, docs operativa interna | Dominio propio + Search Console + sitemap en raíz; indexación/auditoría real; convertir aviso de retiradas en error si falla tras desplegar; **restaurar/salida de retirada** desde panel y auditoría de quién retira (propuesto); fixtures adicionales (301, oculta) y validación JSON-LD/canónica única |
 | §7.3 Ficha configurable / media | 🟡 Parcial (media hecha, configuración pendiente) | Media por ficha en Drive (`animales|eventos|historias/<slug>`), `web-media-subir`, normalización enlaces, galería `url|alt|pie`, documentos privados, límites/tipos; análisis y contrato aditivo v1.1 planificado | **No implementado:** ficha configurable (`ficha_json`/plantilla/bloques/iconos/tags/CTA kind/salud curada/campos animal extra), decisiones abiertas (vídeo embebido vs enlace+CSP/cookies, catálogo iconos compartido, saneado HTML, orden bloques, tags retrocompatibles) |
 
@@ -88,18 +88,9 @@
 
 **Criterio de cierre Track A:** A2/A3 y C1 verificados (incl. front desplegado y lápida retirada tras prerender/deploy). **Cerrado salvo A4** (dominio propio aplazado; uso `github.io`) y revisión operativa residual de A5 (consistencia preview↔público/casos 301/410 en uso real).
 
-### Track B — Web externa: consumo e indexación real (paralelo tras A2, otro repositorio)
-**Objetivo:** que `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` muestre el contenido con el contrato y SEO de publicaciones.
-**Dependencias:** canal público verificado en vivo (A2) y, idealmente, dominio (A4).
-
-| ID | Acción | Dónde | Resultado esperado |
-|---|---|---|---|
-| B1 | Sustituir `blog-posts.json`/`HistoriasAPI` por consumo del canal (JSONP, filtros/paginación/`q`, detalle por slug) | Repo web | Listados y fichas desde API |
-| B2 | Aplicar metas/OG/JSON-LD/canonical/robots desde `seo` y payload; estados vacío/error/404/gone | Repo web | Render correcto por tipo (animal/evento/historia) |
-| B3 | Prerender/build por slug + `sitemap.xml`/`robots.txt` en raíz + redirects 301 desde `/v1/redirects` + manejo 410/retiradas | Repo web/hosting | Indexación y compartición correctas |
-| B4 | Validación de paridad con visor de referencia | Repo web | Fichas/tipos/estados equivalentes a `publico.html` |
-
-**Criterio de cierre:** contenido publicado visible e indexable en dominio real con metadatos correctos.
+### Track B — Web externa (`main`): trasladado
+**Estado:** planificación y ejecución **trasladadas a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para ejecutar en `C:\Users\JonEg\Documents\proyectos\main` (consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y paridad). **No forma parte del alcance de ejecución de este repositorio.**
+**Dependencias:** canal público verificado (A2) y, para indexación final, dominio propio (A4).
 
 ### Track C — Evolución funcional del Gestor web (repo, tras A2)
 **Objetivo:** completar capacidades de valor del gestor sin bloquear la puesta en marcha.
@@ -151,7 +142,7 @@
 
 1. **Ahora:** **Track E cerrado** (E1–E5 completados en código/auditoría incremental, con QA manual operativa recomendada). **Track F** al día en esta iteración. Siguientes focos: operativos externos/de decisión (D5, A4, Track B, C3/C4) y mantenimiento evolutivo.
 2. **Operativo puntual:** inspección visual opcional de auditoría/fases en hojas, rotación periódica del token (D4), confirmación de `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
-3. **Externo / dependiente de decisión:** **D5** (MFA/endurecimiento login en Firebase), **A4** (dominio propio + Search Console), **Track B** (port SEO/canal en `C:\Users\JonEg\Documents\proyectos\main`), **C3** (ficha configurable v1.1) y **C4** (`forms/submit`).
+3. **Externo / dependiente de decisión:** **D5** (MFA/endurecimiento login en Firebase), **A4** (dominio propio + Search Console), **C3** (ficha configurable v1.1) y **C4** (backend/alcance en este ecosistema si aplica). Lo planificado para `main` (Track B y formularios web C4) está trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md).
 4. **Continuo:** mantener documentación y verificación alineadas con la realidad (tests, despliegues, SW).
 
 ## 5. Resumen de “qué falta” por responsabilidad
@@ -161,7 +152,7 @@
 | **Este repo** | Mantenimiento evolutivo (mejoras UX/a11y/perf adicionales y refactors oportunistas), soporte a C3/C4 si se aprueban, higiene documental continua |
 | **Apps Script/Sheets (operativo)** | Inspección opcional de auditoría/fases en hojas, rotación de token cuando proceda, confirmar `DRIVE_WEB_FOLDER_ID` desplegado; soporte a C3/C4 si se aprueban |
 | **Firebase/GitHub/operación** | **D5** (MFA/login), **A4** (DNS/Search Console), revisiones/rotaciones periódicas |
-| **Proyecto web `C:\Users\JonEg\Documents\proyectos\main` (externo)** | **Track B** completo (consumo del canal, SEO, prerender/sitemap/robots/301/410 en dominio propio) |
+| **Proyecto `main` (externo)** | Ejecutar lo trasladado en [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (Track B y formularios C4 en web), fuera de este repo. |
 
 ## 6. Criterio global de “terminado”
 - **Gestor web:** canal y retiradas operativos en producción (A1–A2), documentación/CI alineadas, y (cuando aplique) dominio/indexación y port web completados.

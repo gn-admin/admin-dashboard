@@ -1,4 +1,4 @@
-# memory.md — Qué se ha hecho
+﻿# memory.md — Qué se ha hecho
 
 > Registro de trabajo del gestor web y del visor público (`publico.html`, simulación de la web real de Grupo Nebak).
 > Última actualización: 2026-11-15. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
@@ -54,7 +54,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v255` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; integraci�n C3: `ficha-config.js` cargado y usado para normalizar ficha en gestor/visor, precache actualizado).
+- GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v255` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; integraci�n C3: `ficha-config.js` cargado y usado para normalizar ficha en gestor/visor, precache actualizado).
 - `npm test`: **535/535** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
 
 ## Decisiones cerradas
@@ -81,7 +81,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ## Pendiente de desarrollo (otros tracks)
 
-- **Track B (externo, `C:\Users\JonEg\Documents\proyectos\main`):** B1–B4 consumo del canal, metas/SEO, prerender/sitemap/robots/301/410 y paridad.
+- **Track B / formularios en `main`:** planificación trasladada a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (ejecución en el proyecto `main`, fuera de este repo).
 - **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
 - **Track C (pendiente, sujeto a aprobación/decisiones):** C1/C2 hechos. **C3** plan refinado (objetivo de `ficha_json`, almacenamiento compacto/híbrido, regla de rendimiento: no leer ficha por ítem en listados de 20+ y cargarla solo en detalle/prerender, viabilidad GitHub Pages+GAS) y **C4** con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso). Requiere cerrar decisiones y aprobación antes de implementar.
 

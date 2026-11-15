@@ -26,7 +26,7 @@
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
 | Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 489 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada y 410) |
 | Ficha configurable desde la publicación | §7.3 | `- [ ]` analizada y planificada, sin implementar |
-| Port a la web (consumo del canal, metas, 301) | `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` | `→` tarea del proyecto web; guía en §7.2 |
+| Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
 
 **Pasos manuales pendientes (fuera de git):**
 
@@ -265,7 +265,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 **Criterio de aceptación:** el **100% de las comprobaciones se hace sobre `src/publico.html` + `src/js/publico.js`**. `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` se actualiza **después**, replicando lo ya validado (mismo contrato, mismas metas, mismos estados).
 - [x] Consumo del canal sin JSON estático, con filtros/búsqueda/paginación y estados vacío/error.
 - [x] Metas/OG/canonical/robots y JSON-LD (`Article`/`Event`/`BlogPosting`) aplicados desde la publicación, validados en el visor (§7.1).
-- [x] **Traspaso del port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` — fuera del alcance de este proyecto.** Aquí se entrega el contrato, el visor de referencia y la guía §7.2; la sustitución de `blog-posts.json`/`HistoriasAPI`, las metas, el JSON-LD, los 301 y los estados se ejecutan **desde el repositorio de la web**. No se marca como pendiente de este plan.
+- [x] **Port a `main` trasladado.** Planificación y guía movidas a `TRANSFERIR_A_MAIN.md` para ejecución en el proyecto `main` (fuera del alcance de este repo).
 - [x] **Prerender por slug y `sitemap.xml`/`robots.txt` físicos aplicados en la simulación** (`scripts/prerender-publico.js`, §7.4): una página estática por ficha con metas/JSON-LD, sitemap con `lastmod` y robots con `Sitemap:`. En la web se replica en su build; aquí queda además el **mapa 301** (`GET /v1/redirects`).
 - [~] **Auditoría formal de rendimiento/accesibilidad → tarea del proyecto web:** aquí está medido lo básico (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles).
 
@@ -293,20 +293,9 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 - [x] **Ficha real publicada (Laia):** el listado la muestra y la ficha se compone con datos reales; el prerender genera `publicaciones/laia.html` con metas, canonical y JSON-LD (§7.4).
 - [x] **Prerender SEO:** una página estática por ficha sin JavaScript, `sitemap.xml` y `robots.txt` generados desde el canal y verificados a 360/1280 (§7.4).
 
-### 7.2 Guía de port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`
+### 7.2 Port al proyecto `main` — trasladado
 
-> Se porta **lo ya validado en §7.1**. Referencia ejecutable: `src/js/publico.js` + `src/css/publico.css` + `src/publico.html`. **El port no es una tarea de este proyecto:** se ejecuta desde `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`, que recibe el contrato, esta guía y los criterios de §7.1 como aceptación. Aquí no se modifica el otro repositorio.
->
-> **Estilos ya alineados.** `src/css/publico.css` reproduce el tema de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`css/main.css`): tokens `--pub-*` equivalentes a `--brand*`/`--ink*`, Inter + Montserrat, hero de ficha a dos columnas, «Datos destacados» con iconos por etiqueta, cuerpo en tarjeta y listado con tarjetas de 24 px. Para portar basta reutilizar `main.css` tal cual y conservar el marcado (`pub-ficha-hero`, `pub-facts-grid`, `pub-fact`, `pub-card`, `pub-body`).
-
-1. **Consumo.** Sustituir `blog-posts.json` y `HistoriasAPI` por el canal: `GET {API_URL}?endpoint=publicaciones` (filtros `type`, `category`, `species`, `q`, `page`, `pageSize` ≤ 50) y `endpoint=publicacion&slug=…`. Desde el navegador usar **JSONP** (`&callback=`): Apps Script no da cabeceras CORS. Respetar el caché de 60 s y añadir `nocache=1` solo al depurar.
-2. **Metas.** `seo.metaTitle` → `<title>` y `og:title`; `seo.metaDescription` → `description` y `og:description`; `seo.ogImage` → `og:image`/`twitter:image`; `seo.robots` → `robots` (`noindex,nofollow` si `indexable === false`).
-3. **Canonical condicional.** Usar **solo** `seo.canonical || pub.canonical`. Si viene vacío (base GitHub Pages) **no emitir** `<link rel="canonical">` ni `og:url`; nunca derivarlo de `pub.url` (es una ruta relativa). En listado y páginas de estado, la URL propia de la página.
-4. **JSON-LD por tipo.** `animal` → `Article`; `evento` → `Event` (`startDate`, `endDate`, `location`, `organizer`, `offers` si hay inscripción); `historia` → `BlogPosting`. Un único `<script type="application/ld+json">`, y **ninguno** en 404/error.
-5. **Redirects 301.** Generar las reglas del hosting desde `GET /v1/redirects` (`from` → `to`, `status: 301`) en cada despliegue. En la ficha, si la respuesta trae `redirect.slug`, reescribir la URL sin recargar (`history.replaceState`).
-6. **Estados.** Distinguir *sin resultados* (filtros), *canal sin configurar* (`status:"warning"`), *error de red* (con reintento) y *no disponible* (`status:"error"`). Los dos últimos, `noindex,nofollow` y enlace al listado.
-7. **Antes de dar el port por bueno.** Repetir la lista de §7.1 en el dominio real: listado con filtros/paginación, fichas de los tres tipos, canonical ausente o correcto según base, JSON-LD correcto, 404, redirect de slug histórico, estados, y revisión visual a 360/1280 px.
-8. **Indexación real (opcional, siguiente paso).** Prerender por slug en build usando el canal como fuente y `sitemap.xml`/`robots.txt` físicos; el sitemap del backend solo emite URLs cuando hay dominio propio.
+La guía de port, consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y criterios de ejecución para la web real se han **trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para su ejecución en `C:\Users\JonEg\Documents\proyectos\main` (fuera del alcance de este repositorio).
 
 ### 7.3 Ficha de animal configurable desde la publicación — media implementada, resto pendiente
 
