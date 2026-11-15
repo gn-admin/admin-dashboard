@@ -375,6 +375,12 @@ describe('Web._fichaPresentacion (C3)', () => {
     assert.equal(f.cta.kind, 'url');
   });
 
+  it('en evento/historia no ofrece el bloque de ficha del animal', () => {
+    const html = Web._fichaPresentacionHtml('we-', null, false);
+    assert.doesNotMatch(html, /bloque-animal/);
+    assert.match(html, /bloque-datos/);
+  });
+
   it('con ficha previa, volver a los valores por defecto sí se envía', () => {
     const previa = porDefecto({ plantilla: 'historia' });
     const f = Web._fichaPresentacion(previa, porDefecto());

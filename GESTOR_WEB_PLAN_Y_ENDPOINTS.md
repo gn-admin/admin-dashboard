@@ -24,7 +24,7 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 544 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410 y ficha configurable) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 545 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410 y ficha configurable) |
 | Ficha configurable desde la publicación | §7.3 | `- [~]` contrato aditivo implementado y desplegado: backend validado, controles estructurados (plantilla/bloques/lectura, tags, salud, CTA kind), visor/prerender y pruebas; quedan decisiones de vídeo/HTML y el port |
 | Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
 
@@ -274,11 +274,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 > El visor es la **referencia ejecutable**: lo que aquí funciona es lo que se porta. No se dará por buena la web hasta que reproduzca §7.1 en su propio dominio.
 
-### 7.1 Aceptación del visor público (verificado 2026-11-15, 544 tests en verde)
+### 7.1 Aceptación del visor público (verificado 2026-11-15, 545 tests en verde)
 
 Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribir en la hoja) + endpoint real para el estado vacío.
 
-> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **544 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
+> Las suites que cargan `apps-script/*.gs` (`web-backend`, `sheets`) corren igual en local y en CI desde que se versionaron `Code.gs` y `WebPublicaciones.gs` (2026-11-14). `Config.gs` y el resto de archivos con datos reales siguen en `.gitignore`. Total: **545 tests** en ambos entornos (los últimos, tras vestir el visor con el tema de `nueva-version`, añadir el prerender SEO, las páginas de retirada y el 410).
 
 - [x] **Listado:** 12 tarjetas, contador “25 publicaciones”, enlaces relativos `#/publicacion/<slug>`, paginador “Página 1 de 3”.
 - [x] **Filtros y búsqueda:** la categoría elegida viaja como parámetro al endpoint; sin coincidencias muestra “Sin resultados” con acción para limpiar.
@@ -425,7 +425,7 @@ Reglas:
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **544/544** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive y ficha configurable).
+- `npm test`: **545/545** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive y ficha configurable).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
@@ -498,4 +498,4 @@ Reglas:
 | 2026-11-14 | 3 | Galería `url|alt|pie` con `<figure>`/`<figcaption>`, normalización de enlaces de Drive (carpetas rechazadas) y media separada por tipo (`animales|eventos|historias/<slug>`) | — | `tests/web.test.js`, `tests/prerender.test.js`, `tests/web-backend.test.js` |
 | 2026-11-15 | C3 | Contrato `ficha` aditivo: helpers de normalización, `ficha_json` en backend (detalle/preview, nunca listados), campo JSON en gestor y bloques/plantilla en visor/prerender | — | `tests/ficha-config.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js` |
 | 2026-11-15 | C3 | Endurecido en servidor: `webNormalizarFicha` (valores cerrados, listas/longitudes, máximo 45.000 caracteres), rechazo de fichas no objeto y `cta.kind` conservado en el payload | — | `tests/web-backend.test.js`, `tests/publico.test.js` |
-| 2026-11-15 | C3 | UI estructurada en el gestor: plantilla, toggles de bloques, tiempo de lectura, etiquetas, salud con «heredar» y CTA con intención; sin cambios no se envía `ficha` | `v257` | `tests/web.test.js` |
+| 2026-11-15 | C3 | UI estructurada en el gestor: plantilla, toggles de bloques, tiempo de lectura, etiquetas, salud con «heredar» y CTA con intención; sin cambios no se envía `ficha` | `v258` | `tests/web.test.js` |

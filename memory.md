@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (controles estructurados), visor y pruebas. Suite: **544/544**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados** (D1, C1, D3, D5 en repo). **Track E cerrado** (E1–E5). **C3 en curso**: contrato `ficha` aditivo implementado en backend, gestor (controles estructurados), visor y pruebas. Suite: **545/545**.
 
 ## Entregado
 
@@ -63,8 +63,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v257` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
-- `npm test`: **544/544** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
+- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v258` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
+- `npm test`: **545/545** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js` y `tests/ficha-config.test.js`).
 
 ## Decisiones cerradas
 
@@ -78,7 +78,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 **Hecho en vivo (2026-11-15, lote `.gs` desplegado):**
 - A2/A2.2, A3, A5 y C1 verificados (endpoints públicos, `gone`/`retiradas`, prerender/lápidas/sitemap, restauración a borrador). Canal público sin token OK y allowlist interna protegida (endpoints privados exigen token).
-- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 544 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
+- **D1/D2/D4/D6/D7 cerrados en lo verificable:** D1 (authz + `sin_acceso`, perfiles, matriz lecturas/escrituras, UI, tests Code/Auth/Roles), D2 (roles desplegados resuelven correctamente y seguros por defecto), D4 (token en `?token=` por diseño, sin eco de secretos/exposición detectada, procedimiento de rotación definido), D6 (automatizado 545 + verificación en vivo + procedimiento), D7 (canal allowlistado, solo GET, sin datos internos, verificado en producción). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md).
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
@@ -113,7 +113,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 544 tests
+npm test                                   # 545 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

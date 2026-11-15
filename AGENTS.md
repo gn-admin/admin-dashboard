@@ -10,7 +10,7 @@ PWA admin de Grupo Nebak: encuestas de Google Forms (pre-adopción perros/gatos 
 
 - `npm run dev` — genera config (`.env` → `src/js/config.js`) y sirve en `http://localhost:8080`.
 - `npm run build` — regenera la config manualmente (`node scripts/gen-config.js`).
-- `npm test` (`node --test tests/*.test.js`) - unitarios de lógica pura del front, sin dependencias (544 tests, 16 ficheros). Incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`, que cargan/verifican los `.gs` reales para autorización, resolución de roles e instrumentación de auditoría. Se corren en CI y un test en rojo bloquea el despliegue. `tests/roles-auth.test.js` se omite si faltan `Roles.gs`/`Auth.gs` (no versionados): local 544, CI 534.
+- `npm test` (`node --test tests/*.test.js`) - unitarios de lógica pura del front, sin dependencias (545 tests, 16 ficheros). Incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`, que cargan/verifican los `.gs` reales para autorización, resolución de roles e instrumentación de auditoría. Se corren en CI y un test en rojo bloquea el despliegue. `tests/roles-auth.test.js` se omite si faltan `Roles.gs`/`Auth.gs` (no versionados): local 545, CI 535.
 - `npm run prerender` — genera las páginas estáticas de `src/publicaciones/`, `sitemap.xml` y `robots.txt` desde el canal público. El deploy lo ejecuta tras los tests y **bloquea** si no puede generarlos (`--fixture`, `--dry`, `--soft` para uso manual). Fixtures versionadas en `tests/fixtures/prerender/` (ficha normal, retirada y sin portada) para validar el HTML sin canal real. Los avisos salen como anotaciones del run (`::warning::`/`::error::`).
 
 ## Reglas importantes

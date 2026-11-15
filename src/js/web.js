@@ -738,19 +738,20 @@ const Web = {
   },
 
   /** Controles de presentación de la ficha (plantilla, bloques y lectura). */
-  _fichaPresentacionHtml(prefijo, ficha) {
+  _fichaPresentacionHtml(prefijo, ficha, incluirAnimal) {
     const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
     const cfg = (FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(ficha) : ficha) || {};
     const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
     const b = Object.assign({}, def, cfg.bloques || {});
     const bloques = [['datos', 'datos', 'Datos destacados'], ['galeria', 'galeria', 'Galería'], ['videos', 'videos', 'Vídeos'],
-      ['fichaAnimal', 'animal', 'Ficha del animal'], ['etiquetas', 'etiquetas', 'Etiquetas'], ['cta', 'cta', 'Botones CTA']];
+      ['fichaAnimal', 'animal', 'Ficha del animal'], ['etiquetas', 'etiquetas', 'Etiquetas'], ['cta', 'cta', 'Botones CTA']]
+      .filter(b => incluirAnimal !== false || b[0] !== 'fichaAnimal');
     return `<div class="form-group"><label for="${prefijo}ficha-plantilla">Plantilla de la ficha</label>
         <select id="${prefijo}ficha-plantilla" class="form-input">
           <option value="ficha" ${cfg.plantilla !== 'historia' ? 'selected' : ''}>Ficha (datos y animal)</option>
           <option value="historia" ${cfg.plantilla === 'historia' ? 'selected' : ''}>Historia (sin ficha de animal)</option>
         </select></div>
-      <div class="form-row">
+      <div class="web-bloques">
         ${bloques.map(([clave, id, label]) => `<div class="form-group"><label><input type="checkbox" id="${prefijo}bloque-${id}" ${b[clave] !== false ? 'checked' : ''}> ${label}</label></div>`).join('')}
       </div>
       <div class="form-group"><label><input type="checkbox" id="${prefijo}ficha-lectura" ${cfg.mostrarLectura !== false ? 'checked' : ''}> Mostrar tiempo de lectura</label></div>
@@ -935,7 +936,7 @@ const Web = {
       </details>
 
       <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Presentación de la ficha</summary>
-        <div class="detail-collapse-body">${this._fichaPresentacionHtml('we-', this._webFichaForm)}</div>
+        <div class="detail-collapse-body">${this._fichaPresentacionHtml('we-', this._webFichaForm, false)}</div>
       </details>
 
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
