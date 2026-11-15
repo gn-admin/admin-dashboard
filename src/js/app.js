@@ -129,7 +129,12 @@ const App = {
         location.hash = 'dashboard';
         return;
       }
-      document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
+      document.querySelectorAll('.sidebar-link').forEach(l => {
+        const active = l.dataset.page === page;
+        l.classList.toggle('active', active);
+        if (active) l.setAttribute('aria-current', 'page');
+        else l.removeAttribute('aria-current');
+      });
       const bottomParent = this._bottomParent(page);
       document.querySelectorAll('.bottom-nav-item').forEach(l => {
         const active = l.id === 'mas-menu-toggle' ? bottomParent === 'mas' : l.dataset.page === bottomParent;
@@ -137,7 +142,12 @@ const App = {
         if (active) l.setAttribute('aria-current', 'page');
         else l.removeAttribute('aria-current');
       });
-      document.querySelectorAll('.mas-menu-item').forEach(i => i.classList.toggle('active', i.dataset.page === page));
+      document.querySelectorAll('.mas-menu-item').forEach(i => {
+        const active = i.dataset.page === page;
+        i.classList.toggle('active', active);
+        if (active) i.setAttribute('aria-current', 'page');
+        else i.removeAttribute('aria-current');
+      });
       const titles = {
         dashboard: 'Dashboard',
         encuestas: 'Encuestas',
