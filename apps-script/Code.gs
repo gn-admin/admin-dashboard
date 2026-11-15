@@ -118,7 +118,11 @@ function _deny(msg) {
 
 function _audit(endpoint, user, body, result) {
   try {
-    var ok = result && result.status !== 'error' && !result.error;
+    var r = result;
+    if (r && typeof r.getContent === 'function') {
+      try { r = JSON.parse(r.getContent()); } catch (e) { r = null; }
+    }
+    var ok = r && r.status !== 'error' && !r.error;
     if (!ok) return;
     var sensitive = {
       'delete-animal':1,'delete-familia':1,'delete-adopcion':1,'delete-socio':1,'delete-blacklist':1,'delete-contrato':1,
@@ -126,7 +130,7 @@ function _audit(endpoint, user, body, result) {
       'delete-seguimiento':1,'delete-recordatorio':1,'delete-inventario':1,'delete-grupo':1,'delete-historial-fase-adopcion':1,
       'upload-foto-animal':1,'upload-documento':1,'send-contrato-email':1,'blacklist':1,'update-blacklist':1,
       'contratos':1,'update-contrato':1,'adopciones':1,'update-adopcion':1,'acogidas':1,'update-acogida':1,
-      'socios':1,'update-socio':1
+      'socios':1,'update-socio':1,'web-media-subir':1
     };
     if (!sensitive[endpoint]) return;
     var id = (body && (body.id || body.contrato_id || body.response_id)) || '';

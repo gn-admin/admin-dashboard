@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` subido y desplegado** (D1, C1, auditoría de borrado); D1 validado en vivo y con regresión automatizada de Code/Auth/Roles. Suite: **518/518**.
+El flujo gestor → canal público → visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado** (D1, C1, auditoría de borrado) y validado en vivo; en repo hay una mejora adicional de instrumentación D3 (`web-media-subir` en `_audit`, pendiente de subir). Suite: **521/521**.
 
 ## Entregado
 
@@ -55,7 +55,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ### Despliegue
 
 - GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v233` (visor público: enlace de salto al contenido).
-- `npm test`: **518/518** (incluye `tests/roles-d1.test.js` y `tests/roles-auth.test.js`: matriz D1 y resolución de roles/denegación por defecto sobre los `.gs` reales).
+- `npm test`: **521/521** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
 
 ## Decisiones cerradas
 
@@ -72,11 +72,12 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 - **D1 cerrado en código y verificado en vivo (núcleo):** `sin_acceso` revocado con perfil mínimo, UI bloqueada y denegación total por API; perfiles completos por rol; matriz de lecturas/escrituras por API directa coherente con la política; regresión automatizada de `Code.gs`/`Auth.gs`/`Roles.gs` (no listado/revocado/normalización/fallbacks seguros). Detalle en [`PRUEBAS_POR_ROL_D6.md`](PRUEBAS_POR_ROL_D6.md). Queda solo la comprobación operativa con una cuenta Firebase **no listada** y confirmar roles legítimos desplegados.
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **D2 (higiene):** confirmar que los roles/correos desplegados cubren a todos los legítimos (mínimo privilegio). *(La resolución no listado/revocado está cubierta por tests automatizados y verificada en vivo para revocado; opcional: prueba con una cuenta Firebase no listada.)*
-3. **D3 (auditoría):** comprobar en la hoja de auditoría de producción el registro de `restaurar_publicacion`, `eliminar_publicacion` y acciones sensibles; verificar historial de fases operativo.
-4. **D4 (token):** rotación/revisión de `?token=` y exposición/logs (GitHub Secrets + config GAS); limitación estructural conocida.
-5. **D5 (Firebase):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
-6. **D7:** validación formal en entorno de CORS/dominio del canal público. Revisión de código completada: allowlist pública, solo GET, resuelto antes de auth, y datos publicados/listados/indexables o retirados según endpoint (sin datos internos).
+1. **Subir mejora `.gs` (repo):** `apps-script/Code.gs` refuerza D3 (audita `web-media-subir`, `_audit` robusto) y añade `tests/auditoria-d3.test.js` — requiere nueva versión del Web App.
+2. **D2 (ejecución):** confirmar que `ROLES_USUARIOS`/`ADMIN_EMAILS` desplegados cubren a todos los legítimos (mínimo privilegio). *Código/procedimiento y tests listos.*
+3. **D3 (verificación en hojas):** comprobar en la hoja de auditoría de producción el registro de `restaurar_publicacion`, `eliminar_publicacion`, `web-media-subir` y acciones sensibles; verificar historial de fases. *Instrumentación verificada en código/tests.*
+4. **D4 (ejecución):** rotar/revisar `?token=` y exposición/logs en GitHub Secrets + config/propiedades GAS y redesplegar. *Procedimiento definido; limitación estructural conocida.*
+5. **D5 (externo):** MFA para admins/elevados y endurecimiento de login (reCAPTCHA/App Check según viabilidad).
+6. **D7 (formal en entorno):** validar CORS/dominio en producción. *Revisión de código completada.*
 7. **A4 (aplazado):** dominio propio y Search Console.
 8. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado.
 
@@ -101,7 +102,7 @@ El flujo gestor → canal público → visor funciona de punta a punta en `https
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 508 tests
+npm test                                   # 521 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

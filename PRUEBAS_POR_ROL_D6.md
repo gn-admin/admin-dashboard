@@ -4,7 +4,7 @@
 
 ## 0. Estado de verificación (2026-11-15)
 
-**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs) y `tests/roles-auth.test.js` (Roles.gs/Auth.gs) fijan la matriz de autorización, la denegación por defecto, el perfil minimizado y la resolución de roles (no listado, revocado, normalización de email y fallbacks seguros). Suite completa: **518/518**.
+**Automatizado en repo:** `tests/roles-d1.test.js` (Code.gs), `tests/roles-auth.test.js` (Roles.gs/Auth.gs) y `tests/auditoria-d3.test.js` fijan autorización/denegación por defecto, resolución de roles e instrumentación de auditoría. Suite completa: **521/521**.
 
 **Verificado en vivo (con lote `.gs` desplegado):**
 - [x] `sin_acceso` **revocado** (`gn.test.revocado@example.test`, `activo:false`): login Firebase OK, `user-profile` mínimo `{"role":"sin_acceso","email", "status"}` (sin `uid`/`name`), UI de bloqueo/navegación oculta, lecturas operativas/`web-*` y escrituras denegadas por API directa.
