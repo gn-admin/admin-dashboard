@@ -101,7 +101,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 521 tests
+npm test                                   # 535 tests
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
