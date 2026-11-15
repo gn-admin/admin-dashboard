@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado y al día** (D1, C1, auditoría D3 completa). **Track E cerrado** (E1–E5, código/auditoría incremental). Suite: **531/531**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender diario. **Track A cerrado salvo A4** (dominio propio aplazado; se usa `github.io`). **Lote `.gs` desplegado y al día** (D1, C1, auditoría D3 completa). **Track E cerrado** (E1–E5, código/auditoría incremental). Suite: **535/535**.
 
 ## Entregado
 
@@ -55,7 +55,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ### Despliegue
 
 - GitHub Pages sirve `publico.html`, `publicaciones/laia.html`, `sitemap.xml` y `robots.txt` (200). Service worker actual `v252` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`).
-- `npm test`: **531/531** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
+- `npm test`: **535/535** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js` y `tests/auditoria-d3.test.js`).
 
 ## Decisiones cerradas
 
