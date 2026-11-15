@@ -8765,30 +8765,6 @@ const Dashboard = {
   showLoading() { document.getElementById('loading')?.classList.add('active'); },
   hideLoading() { document.getElementById('loading')?.classList.remove('active'); },
 
-  // ==================== GESTOR WEB (delegacion a Web) ====================
-  abrirAnimalWeb(animalId) { return Web.abrirAnimal(animalId); },
-  subirMediaWeb(el, tipo, prefijo, publicacionId) { return Web.subirMediaWeb(el, tipo, prefijo, publicacionId); },
-  abrirEventoWeb(id) { return Web.abrirEvento(id); },
-  abrirPublicacionWebAnimal(animalId) { return Web.abrirParaAnimal(animalId); },
-  saveWebAnimal(e, animalId) { return Web.guardarAnimal(e, animalId); },
-  saveWebEvento(e, id) { return Web.guardarEvento(e, id); },
-  cambiarEstadoWeb(tipo, id, estado) { return Web.cambiarEstado(tipo, id, estado); },
-  archivarWeb(id) { return Web.archivar(id); },
-  restaurarWebEvento(id, titulo) { return Web.restaurarWebEvento(id, titulo); },
-  eliminarWebAnimal(animalId, nombre) { return Web.eliminarWebAnimal(animalId, nombre); },
-  previewWeb(tipo, id) { return Web.preview(tipo, id); },
-  copiarPreviewWeb() { return Web.copiarPreview(); },
-  onWebSlugChange(el, id, tipo) { return Web.validarSlugInput(el, id, tipo); },
-  onWebTipoChange(valor) { return Web.onChangeTipo(valor); },
-  onWebSearch(el) { return Web.buscar(el.value); },
-  nuevaPublicacionWeb() { return Web.nuevaPublicacion(); },
-  cerrarPickerWeb() { return Web.cerrarPicker(); },
-  crearPublicacionWeb(animalId) { return Web.crearPublicacion(animalId); },
-  onPickerWebBuscar(el) { return Web.filtrarPicker(el.value); },
-  onWebEstadoFilter(valor) { return Web.filtrarEstado(valor); },
-  cambiarTabWeb(tab) { return Web.cambiarTab(tab); },
-  recargarWeb() { return Web.recargar(); },
-
   _errMsg(err) {
     if (!err) return 'Error desconocido';
     const m = err.message || err.error || '';
@@ -8872,5 +8848,6 @@ if (typeof module !== 'undefined' && module.exports) {
   try { Object.assign(Dashboard, require('./dashboard-actividad.js')); } catch (e) { /* browser-only load */ }
   try { Object.assign(Dashboard, require('./dashboard-finanzas.js')); } catch (e) { /* browser-only load */ }
   try { Object.assign(Dashboard, require('./dashboard-blacklist.js')); } catch (e) { /* browser-only load */ }
+  try { Object.assign(Dashboard, require('./dashboard-web.js')); } catch (e) { /* browser-only load */ }
   module.exports = Dashboard;
 }
