@@ -508,6 +508,10 @@ const Web = {
     const loc = animal.location || {};
     const contacto = animal.contact || {};
     const health = animal.health || {};
+    this._webFichaForm = d.ficha || d.ficha_json || null;
+    const fichaTxt = this._webFichaForm && typeof this._webFichaForm === 'object'
+      ? JSON.stringify(this._webFichaForm, null, 2)
+      : (typeof this._webFichaForm === 'string' ? this._webFichaForm : '');
 
     const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
       <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. La ficha interna del animal no se expone: solo lo que rellenes aquí.</p>
@@ -591,6 +595,12 @@ const Web = {
         </div>
       </details>
 
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Configuración de ficha (avanzado, C3)</summary>
+        <div class="detail-collapse-body">
+          <div class="form-group"><label for="web-ficha-json">Ficha configurable (JSON)</label><textarea id="web-ficha-json" class="form-input" rows="6" placeholder='{"plantilla":"ficha","bloques":{"datos":true}}'>${this._esc(fichaTxt)}</textarea><p class="web-slug-hint">Opcional (propuesta C3). Define plantilla/bloques/lectura; se aplica en detalle/prerender y nunca en listados. Déjalo vacío para usar el comportamiento actual.</p></div>
+        </div>
+      </details>
+
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
@@ -632,7 +642,7 @@ const Web = {
       .map(vid => Object.assign({}, vid, { url: norm(vid.url, 'video') })).filter(vid => vid.url);
     const documentos = this.parseDocumentos(v('web-docs') ? v('web-docs').value : '')
       .map(doc => Object.assign({}, doc, { url: norm(doc.url, 'documento') })).filter(doc => doc.url);
-    return {
+    const data = {
       estado_publicacion: txt('web-estado') || 'borrador',
       slug: this.normalizarSlug(txt('web-slug') || txt('web-titulo')),
       titulo: txt('web-titulo'),
@@ -669,6 +679,21 @@ const Web = {
         health: { specialNeeds: checked('web-special-needs') }
       }
     };
+    const ficha = this._leerFichaForm('web-ficha-json');
+    if (ficha) data.ficha = ficha;
+    return data;
+  },
+
+  _leerFichaForm(id) {
+    const el = document.getElementById(id);
+    if (!el) return undefined;
+    const raw = String(el.value || '').trim();
+    if (!raw) return undefined; // vacío: no enviar (preserva estado servidor)
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch (e) { /* inválido: ignorar para no romper guardado */ }
+    return undefined;
   },
 
   _leerArchivoBase64(file) {
@@ -779,6 +804,10 @@ const Web = {
     const reg = ev.registration || {};
     const cta = d.cta || {};
     const hoy = new Date().toISOString().slice(0, 10);
+    this._webFichaForm = d.ficha || d.ficha_json || null;
+    const fichaTxt = this._webFichaForm && typeof this._webFichaForm === 'object'
+      ? JSON.stringify(this._webFichaForm, null, 2)
+      : (typeof this._webFichaForm === 'string' ? this._webFichaForm : '');
 
     const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
       <div class="form-row">
@@ -847,6 +876,12 @@ const Web = {
         </div>
       </details>
 
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} Configuración de ficha (avanzado, C3)</summary>
+        <div class="detail-collapse-body">
+          <div class="form-group"><label for="we-ficha-json">Ficha configurable (JSON)</label><textarea id="we-ficha-json" class="form-input" rows="6" placeholder='{"plantilla":"historia","bloques":{"datos":true}}'>${this._esc(fichaTxt)}</textarea><p class="web-slug-hint">Opcional (propuesta C3). Define plantilla/bloques/lectura; se aplica en detalle/prerender y nunca en listados. Déjalo vacío para usar el comportamiento actual.</p></div>
+        </div>
+      </details>
+
       <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
@@ -886,7 +921,7 @@ const Web = {
       .map(g => Object.assign({}, g, { src: norm(g.src, 'galeria') })).filter(g => g.src);
     const documentos = this.parseDocumentos(v('we-docs') ? v('we-docs').value : '')
       .map(doc => Object.assign({}, doc, { url: norm(doc.url, 'documento') })).filter(doc => doc.url);
-    return {
+    const data = {
       tipo,
       estado_publicacion: txt('we-estado') || 'borrador',
       slug: this.normalizarSlug(txt('we-slug') || txt('we-titulo')),
@@ -920,6 +955,9 @@ const Web = {
         registration: { required: checked('we-reg-required'), url: txt('we-reg-url'), label: txt('we-reg-label') }
       }
     };
+    const ficha = this._leerFichaForm('we-ficha-json');
+    if (ficha) data.ficha = ficha;
+    return data;
   },
 
   async guardarEvento(e, id) {
