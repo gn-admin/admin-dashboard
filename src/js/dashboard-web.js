@@ -33,6 +33,7 @@ onPickerWebBuscar(el) { return Web.filtrarPicker(el.value); },
 onWebEstadoFilter(valor) { return Web.filtrarEstado(valor); },
 cambiarTabWeb(tab) { return Web.cambiarTab(tab); },
 recargarWeb() { return Web.recargar(); },
+moverFichaBloque(el, dir) { return Web.moverFichaBloque(el, dir); },
 
   };
 });

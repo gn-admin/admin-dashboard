@@ -132,6 +132,12 @@ const backendConfig = `var CONFIG = {
   // Raíz de media del gestor web: una subcarpeta por ficha. No se comparte.
   DRIVE_WEB_FOLDER_ID: '${env('APPS_SCRIPT_DRIVE_WEB_FOLDER_ID', '')}',
   CONTACT_EMAIL: '${env('CONTACTO_EMAIL', '')}',
+  // Buzon fijo en copia (CC) de los contratos enviados. Si esta vacio se usa
+  // CONTACT_EMAIL. Sirve para clasificar los contratos en la entidad.
+  CONTRATOS_CC_EMAIL: '${env('CONTRATOS_CC_EMAIL', env('CONTACTO_EMAIL', ''))}',
+  // Alias verificado en Gmail ("Enviar como") para el remitente del contrato.
+  // Vacio = se envia desde la cuenta propietaria del despliegue de Apps Script.
+  CONTRATO_FROM_EMAIL: '${env('CONTRATO_FROM_EMAIL', '')}',
   PUBLIC_WEB_BASE_URL: '${env('PUBLIC_WEB_BASE_URL', 'https://gn-admin.github.io/admin-dashboard')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario', COORDINADOR: 'coordinador', VOLUNTARIO: 'voluntario', TESORERIA: 'tesoreria', CONSULTA: 'consulta' },
   MAX_UPLOAD_BYTES: ${env('MAX_UPLOAD_BYTES', String(5 * 1024 * 1024))},

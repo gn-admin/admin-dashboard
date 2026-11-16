@@ -268,6 +268,71 @@ describe('Publico.htmlDetalle: ficha configurable (C3)', () => {
     assert.doesNotMatch(html, /min de lectura/);
     assert.match(html, /Luna es una perra sociable/);
   });
+
+  it('el bloque «contenido» se puede ocultar sin quitar el resto', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, { ficha: { bloques: { contenido: false } } }));
+    assert.doesNotMatch(html, /Sobre este caso/);
+    assert.match(html, /Datos destacados/);
+  });
+
+  it('respeta el orden de bloques configurado en la ficha', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, {
+      ficha: { orden: ['galeria', 'datos', 'cta', 'contenido'] }
+    }));
+    const galeria = html.indexOf('Galería');
+    const datos = html.indexOf('Datos destacados');
+    const contenido = html.indexOf('Sobre este caso');
+    assert.ok(galeria > 0 && datos > 0 && contenido > 0);
+    assert.ok(galeria < datos, 'la galería va antes que los datos');
+    assert.ok(datos < contenido, 'los datos van antes del contenido');
+  });
+
+  it('la ficha prevalece sobre los campos base de la publicación', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, {
+      ficha: {
+        tags: ['propia'],
+        cta: { label: 'CTA propio', url: 'https://x/propio', kind: 'url' },
+        gallery: []
+      }
+    }));
+    assert.match(html, /propia/);
+    assert.doesNotMatch(html, /pub-chip">perro</);
+    assert.match(html, /CTA propio/);
+    assert.doesNotMatch(html, /Quiero adoptar/);
+    assert.doesNotMatch(html, /Galería/); // galería vacía explícita
+  });
+
+  it('plantilla historia nunca pinta la ficha del animal', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, {
+      animal: { names: ['Luna'], species: 'Perro' },
+      ficha: { plantilla: 'historia', bloques: { fichaAnimal: true } }
+    }));
+    assert.doesNotMatch(html, /Ficha del animal/);
+  });
+
+  it('vídeo en modo enlace por defecto y fachada click-to-load en modo embed', () => {
+    const enlace = Publico.htmlDetalle(base);
+    assert.match(enlace, /href="https:\/\/youtu\.be\/abc"/);
+    assert.doesNotMatch(enlace, /pub-embed/);
+
+    const embed = Publico.htmlDetalle(Object.assign({}, base, {
+      videos: [{ title: 'Luna jugando', url: 'https://youtu.be/abc123XYZ' }],
+      ficha: { videoModo: 'embed' }
+    }));
+    assert.match(embed, /class="pub-embed"/);
+    assert.match(embed, /data-video-url="https:\/\/www\.youtube-nocookie\.com\/embed\/abc123XYZ\?autoplay=1&amp;rel=0"/);
+    assert.doesNotMatch(embed, /<iframe/);
+    assert.doesNotMatch(embed, /href="https:\/\/youtu\.be\/abc123XYZ"/);
+  });
+
+  it('en modo embed, un vídeo no reconocido mantiene el enlace externo', () => {
+    const html = Publico.htmlDetalle(Object.assign({}, base, {
+      videos: [{ title: 'Archivo', url: 'https://ejemplo.test/v.mp4' }],
+      ficha: { videoModo: 'embed' }
+    }));
+    assert.doesNotMatch(html, /pub-embed/);
+    assert.match(html, /href="https:\/\/ejemplo\.test\/v\.mp4"/);
+  });
 });
 
 describe('Publico.estadoTexto / esc', () => {

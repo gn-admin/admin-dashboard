@@ -13,6 +13,22 @@
 
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23EAF5EE'/%3E%3Ccircle cx='200' cy='128' r='34' fill='%23cfe3d6'/%3E%3Cellipse cx='200' cy='206' rx='58' ry='42' fill='%23cfe3d6'/%3E%3C/svg%3E";
 
+// Runtime del vídeo click-to-load (C3). En el navegador se carga antes que este
+// archivo; en Node (prerender y tests) se resuelve con require.
+const _PublicoEmbed = (typeof PublicoEmbed !== 'undefined' && PublicoEmbed)
+  ? PublicoEmbed
+  : (typeof module !== 'undefined' && module.exports
+    ? (function () { try { return require('./publico-embed.js'); } catch (e) { return null; } })()
+    : null);
+
+// Normalizador compartido con el gestor. En Node (prerender/tests) se resuelve
+// con require; en el navegador, `ficha-config.js` se carga antes.
+const _FichaConfig = (typeof FichaConfig !== 'undefined' && FichaConfig)
+  ? FichaConfig
+  : (typeof module !== 'undefined' && module.exports
+    ? (function () { try { return require('./ficha-config.js'); } catch (e) { return null; } })()
+    : null);
+
 const Publico = {
   params: { type: '', category: '', species: '', q: '', page: 1, pageSize: 12 },
   filtros: { type: [], category: [], status: [], species: [] },
@@ -463,54 +479,100 @@ const Publico = {
   },
 
   _normalizarFichaCfg(ficha) {
-    const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
+    const FC = _FichaConfig;
     if (FC && typeof FC.normalizarFicha === 'function') {
       const n = FC.normalizarFicha(ficha);
       if (!n) return null;
-      const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
-      const bloques = Object.assign({}, def, n.bloques || {});
-      return { plantilla: n.plantilla || 'ficha', bloques, mostrarLectura: n.mostrarLectura !== false };
+      const bloques = typeof FC.bloquesEfectivos === 'function'
+        ? FC.bloquesEfectivos(n)
+        : Object.assign({}, FC.BLOQUES_DEF || {}, n.bloques || {});
+      const orden = typeof FC.normalizarOrden === 'function' ? FC.normalizarOrden(n.orden) : n.orden;
+      const out = {
+        plantilla: n.plantilla || 'ficha',
+        bloques,
+        orden: Array.isArray(orden) ? orden : [],
+        videoModo: n.videoModo === 'embed' ? 'embed' : 'enlace',
+        mostrarLectura: n.mostrarLectura !== false
+      };
+      // Solo se copian los campos que la ficha define: su ausencia hereda la base.
+      ['icons', 'gallery', 'videos', 'tags', 'cta'].forEach(k => {
+        if (Object.prototype.hasOwnProperty.call(n, k)) out[k] = n[k];
+      });
+      return out;
     }
+    // Fallback sin FichaConfig (no debería ocurrir: se carga antes).
     let f = ficha;
     if (typeof f === 'string') { try { f = JSON.parse(f); } catch (e) { return null; } }
     if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
     const plantillas = ['ficha', 'historia'];
     const plantilla = plantillas.includes(String(f.plantilla || '').toLowerCase()) ? String(f.plantilla).toLowerCase() : 'ficha';
-    const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    const def = { datos: true, etiquetas: true, contenido: true, galeria: true, videos: true, fichaAnimal: plantilla !== 'historia', cta: true };
     const src = f.bloques && typeof f.bloques === 'object' ? f.bloques : {};
     const bloques = {};
     for (const k of Object.keys(def)) {
       const v = src[k];
-      bloques[k] = (v === false || v === 'false') ? false : true;
+      bloques[k] = (v === false || v === 'false') ? false : def[k];
     }
-    return { plantilla, bloques, mostrarLectura: !(f.mostrarLectura === false || f.mostrarLectura === 'false') };
+    const ordenDef = ['datos', 'etiquetas', 'contenido', 'galeria', 'videos', 'fichaAnimal', 'cta'];
+    const orden = [];
+    (Array.isArray(f.orden) ? f.orden : []).forEach(k => {
+      const key = String(k || '').trim();
+      if (Object.prototype.hasOwnProperty.call(def, key) && !orden.includes(key)) orden.push(key);
+    });
+    ordenDef.forEach(k => { if (!orden.includes(k)) orden.push(k); });
+    const out = {
+      plantilla,
+      bloques,
+      orden,
+      videoModo: String(f.videoModo || '').toLowerCase() === 'embed' ? 'embed' : 'enlace',
+      mostrarLectura: !(f.mostrarLectura === false || f.mostrarLectura === 'false')
+    };
+    ['icons', 'gallery', 'videos', 'tags'].forEach(k => { if (Array.isArray(f[k])) out[k] = f[k]; });
+    if (f.cta && typeof f.cta === 'object') out.cta = f.cta;
+    return out;
   },
 
   /**
    * HTML de la ficha sin tocar el DOM: lo comparten el visor y el prerender
    * estático (`scripts/prerender-publico.js`).
+   *
+   * Si hay `ficha`, manda su configuración: bloques, orden, modo de vídeo y
+   * campos enriquecidos (`icons`, `gallery`, `videos`, `tags`, `cta`), que
+   * prevalecen sobre los campos base de la publicación.
    */
   htmlDetalle(p) {
-    const cfg = this._normalizarFichaCfg(p && p.ficha);
-    const b = (cfg && cfg.bloques) || { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    p = p || {};
+    const cfg = this._normalizarFichaCfg(p.ficha);
+    const b = (cfg && cfg.bloques) || { datos: true, etiquetas: true, contenido: true, galeria: true, videos: true, fichaAnimal: true, cta: true };
     const mostrarLectura = cfg ? cfg.mostrarLectura : true;
     const plantilla = (cfg && cfg.plantilla) || 'ficha';
+    const videoModo = (cfg && cfg.videoModo) || 'enlace';
+    const orden = (cfg && Array.isArray(cfg.orden) && cfg.orden.length)
+      ? cfg.orden
+      : ['datos', 'etiquetas', 'contenido', 'galeria', 'videos', 'fichaAnimal', 'cta'];
+    const tiene = k => !!(cfg && Object.prototype.hasOwnProperty.call(cfg, k));
+    const icons = tiene('icons') ? (cfg.icons || []) : (Array.isArray(p.icons) ? p.icons : []);
+    const gallery = tiene('gallery') ? (cfg.gallery || []) : (Array.isArray(p.gallery) ? p.gallery : []);
+    const videos = tiene('videos') ? (cfg.videos || []) : (Array.isArray(p.videos) ? p.videos : []);
+    const tags = tiene('tags') ? (cfg.tags || []) : (Array.isArray(p.tags) ? p.tags : []);
+    const ctaFuente = tiene('cta') ? cfg.cta : p.cta;
+
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const estado = p.status ? `<span class="pub-tag pub-tag--estado">${this.esc(this.estadoTexto(p.status))}</span>` : '';
-    const ctaObj = (p.cta && this.urlSegura(p.cta.url)) ? p.cta : null;
+    const ctaObj = (ctaFuente && this.urlSegura(ctaFuente.url)) ? ctaFuente : null;
     const cta = (b.cta && ctaObj)
       ? `<a class="pub-btn" href="${this.esc(this.urlSegura(ctaObj.url))}" rel="noopener">${this.esc(ctaObj.label || 'Ver más')}</a>`
       : '';
-    const etiquetas = (b.etiquetas && Array.isArray(p.tags)) ? p.tags.filter(Boolean).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('') : '';
-    const hechos = (b.datos && Array.isArray(p.icons)) ? p.icons.filter(i => i && (i.label || i.value)).map(i => {
+    const etiquetas = (b.etiquetas && tags.length) ? tags.filter(Boolean).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('') : '';
+    const hechos = (b.datos && icons.length) ? icons.filter(i => i && (i.label || i.value)).map(i => {
       const meta = this._icono(i.label || '', i.icon || '', p);
       return `<article class="pub-fact ${meta.tone}">
         <div class="pub-fact-icon" aria-hidden="true">${meta.svg}</div>
         <div class="pub-fact-copy"><h3>${this.esc(i.label || i.icon || '')}</h3><p>${this.esc(i.value || '')}</p></div>
       </article>`;
     }).join('') : '';
-    const galeria = (b.galeria && Array.isArray(p.gallery)) ? p.gallery
+    const galeria = (b.galeria && gallery.length) ? gallery
       .map((g, i) => ({
         src: this.urlSegura(g && g.src),
         alt: (g && (g.alt || g.caption)) || ((p.title ? p.title + ' ' : 'Imagen ') + (i + 1)),
@@ -518,11 +580,20 @@ const Publico = {
       }))
       .filter(g => g.src)
       .map(g => `<figure class="pub-figura"><img src="${this.esc(g.src)}" alt="${this.esc(g.alt)}" loading="lazy">${g.pie ? `<figcaption>${this.esc(g.pie)}</figcaption>` : ''}</figure>`).join('') : '';
-    const videos = (b.videos && Array.isArray(p.videos)) ? p.videos.filter(v => v && this.urlSegura(v.url)).map(v => `
-      <a href="${this.esc(this.urlSegura(v.url))}" target="_blank" rel="noopener noreferrer">
-        <span>${this.esc(v.title || 'Ver vídeo')}</span>
-        <span aria-hidden="true">${this.esc((v.provider || 'vídeo').toUpperCase())} ↗</span>
-      </a>`).join('') : '';
+    const videosHtml = (b.videos && videos.length) ? videos.map(v => {
+      const url = this.urlSegura(v && v.url);
+      if (!url) return '';
+      const titulo = (v && v.title) || 'Vídeo';
+      if (videoModo === 'embed' && _PublicoEmbed) {
+        const datos = _PublicoEmbed.info(url);
+        if (datos) return _PublicoEmbed.fachada(datos, titulo);
+      }
+      return `
+      <a href="${this.esc(url)}" target="_blank" rel="noopener noreferrer">
+        <span>${this.esc(titulo)}</span>
+        <span aria-hidden="true">${this.esc(String((v && v.provider) || 'vídeo').toUpperCase())} ↗</span>
+      </a>`;
+    }).filter(Boolean).join('') : '';
 
     const acciones = cta
       ? `<div class="pub-acciones">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
@@ -533,6 +604,32 @@ const Publico = {
       (mostrarLectura && p.readTime) ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : '',
       p.author ? `<span>${this.esc(p.author)}</span>` : ''
     ].filter(Boolean).join('');
+
+    const secciones = {
+      datos: hechos ? `<section class="pub-section" aria-label="Datos destacados"><div class="pub-section-head"><h2>Datos destacados</h2></div><div class="pub-facts-grid">${hechos}</div></section>` : '',
+      etiquetas: etiquetas ? `<div class="pub-etiquetas">${etiquetas}</div>` : '',
+      contenido: (b.contenido && p.contentHtml) ? `<section class="pub-section">
+          <div class="pub-section-head"><h2>Sobre este caso</h2></div>
+          <div class="pub-body pub-html">${p.contentHtml}</div>
+        </section>` : '',
+      galeria: galeria ? `<section class="pub-section" aria-label="Galería de imágenes"><div class="pub-section-head"><h2>Galería</h2></div><div class="pub-galeria">${galeria}</div></section>` : '',
+      videos: videosHtml ? `<section class="pub-section" aria-label="Vídeos"><div class="pub-section-head"><h2>Vídeo</h2></div><div class="pub-videos">${videosHtml}</div></section>` : '',
+      fichaAnimal: (b.fichaAnimal && p.animal) ? this._bloqueAnimal(p.animal) : '',
+      cta: ''
+    };
+
+    const cuerpo = [];
+    let eventoPintado = false;
+    orden.forEach(k => {
+      if (k === 'cta') return; // el CTA final cierra la ficha
+      if (secciones[k]) cuerpo.push(secciones[k]);
+      if (k === 'fichaAnimal' && p.event) { cuerpo.push(this._bloqueEvento(p.event)); eventoPintado = true; }
+    });
+    if (p.event && !eventoPintado) cuerpo.push(this._bloqueEvento(p.event));
+
+    const ctaFinal = cta
+      ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
+      : '';
 
     return `
       <a class="pub-back" href="#/">← Todas las publicaciones</a>
@@ -547,17 +644,8 @@ const Publico = {
           </div>
           ${img ? `<div class="pub-ficha-media"><img src="${this.esc(img)}" alt="${this.esc(alt)}" fetchpriority="high"></div>` : ''}
         </header>
-        ${hechos ? `<section class="pub-section" aria-label="Datos destacados"><div class="pub-section-head"><h2>Datos destacados</h2></div><div class="pub-facts-grid">${hechos}</div></section>` : ''}
-        ${etiquetas ? `<div class="pub-etiquetas">${etiquetas}</div>` : ''}
-        <section class="pub-section">
-          <div class="pub-section-head"><h2>Sobre este caso</h2></div>
-          <div class="pub-body pub-html">${p.contentHtml || ''}</div>
-        </section>
-        ${galeria ? `<section class="pub-section" aria-label="Galería de imágenes"><div class="pub-section-head"><h2>Galería</h2></div><div class="pub-galeria">${galeria}</div></section>` : ''}
-        ${videos ? `<section class="pub-section" aria-label="Vídeos"><div class="pub-section-head"><h2>Vídeo</h2></div><div class="pub-videos">${videos}</div></section>` : ''}
-        ${(b.fichaAnimal && p.animal) ? this._bloqueAnimal(p.animal) : ''}
-        ${p.event ? this._bloqueEvento(p.event) : ''}
-        ${cta ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>` : ''}
+        ${cuerpo.join('\n')}
+        ${ctaFinal}
       </article>`;
   },
 

@@ -8250,6 +8250,16 @@ body.modal-open { overflow: hidden; }
 .web-bloques { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 4px 20px; margin: 4px 0 12px; }
 .web-bloques .form-group { margin: 0; }
 .web-bloques label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 500; }
+.web-bloques-orden { display: grid; gap: 6px; margin: 6px 0 10px; }
+.web-bloque-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 10px; border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 10px; background: var(--gray-50, #f9fafb);
+}
+.web-bloque-check { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 500; }
+.web-bloque-controles { display: inline-flex; gap: 4px; }
+.web-bloque-controles .btn { min-width: 34px; padding: 4px 8px; line-height: 1; }
+.web-bloque-controles .btn[disabled] { opacity: .38; cursor: default; }
 .web-preview-json {
   max-height: 60vh; overflow: auto; margin: 8px 0 12px;
   font-size: 12px; line-height: 1.45; white-space: pre;

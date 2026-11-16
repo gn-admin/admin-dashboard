@@ -1,11 +1,11 @@
 ﻿# memory.md — Qué se ha hecho
 
 > Registro de trabajo del gestor web y del visor público (`publico.html`, simulación de la web real de Grupo Nebak).
-> Última actualización: 2026-11-15. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
+> Última actualización: 2026-11-16. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender disparado por el backend (cron como red de seguridad). **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados**. **Track E cerrado** (E1–E5). **D5 (reCAPTCHA servidor): verificado** (token válido `ok:true`, inválidos 403; gate de login desactivado por decisión). **C3 (ficha configurable):** decisiones cerradas e implementación en repo (contrato aditivo `ficha_json` normalizado/saneado, solo detalle/preview; UI estructurada en gestor; visor/prerender con fallback; tests incluidos). Pendiente en este repo: QA visual manual 360/1280 y confirmar precedencia de overrides (`ficha.tags/cta` etc.) si aplica; port a `main` externo. Suite: **610/610**.
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender disparado por el backend (cron como red de seguridad). **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados**. **Track E cerrado** (E1–E5). **D5 (reCAPTCHA servidor): verificado** (token válido `ok:true`, inválidos 403; gate de login desactivado por decisión). **C3 (ficha configurable): v1.1 desarrollada en local, pendiente de desplegar** (contrato aditivo `ficha_json` normalizado/saneado, solo detalle/preview; orden de bloques, `contenido`, `videoModo`, `tags` propias y precedencia `ficha > base`; gestor con orden ↑/↓; visor/prerender y vídeo click-to-load; tests incluidos). QA visual 360/1280 verificada en local (sin desbordes, orden/precedencia y fachada de vídeo correctos). Pendiente en este repo: desplegar `.gs`/Pages; port a `main` externo. Suite: **646/646** en local (**636** en CI sin `Roles.gs`).
 
 ## Entregado
 
@@ -45,7 +45,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Publicar solo fichas completas (2026-11-15):** el gestor bloquea «Publicar» si el backend marca campos pendientes y muestra la lista legible (Título, Portada, Descripción, Meta descripción…), abriendo el formulario; el backend ya rechazaba esas publicaciones, esto evita el error sin explicación. El aviso de publicación ya no habla de 30 min: con el deploy inmediato dice que la página SEO se regenera en 2–3 min.
 - **Aviso del deploy en el gestor (2026-11-15):** `Web.avisoDeploy(res, base)` lee `data.deploy` de la respuesta y añade el estado real a todos los avisos (publicar, ocultar, retirar, restaurar, guardar). Si `ok:false`, el snack sale en `warning` con el motivo (p. ej. falta `GITHUB_DEPLOY_TOKEN`) y recuerda relanzarlo desde GitHub Actions; si `disparado:false` avisa de que ya hay uno en marcha.
 - **Prerender con red de seguridad completa (2026-11-15):** cada página generada se valida con `validarPaginas` según su tipo —ficha (un JSON-LD parseable y una sola canónica propia), lápida (`noindex,nofollow` sin canónica ni JSON-LD) y redirección (`noindex,follow` con canónica al destino)— y el deploy se detiene si alguna incumple, igual que con sitemap/robots. Cubierto con las fixtures de 301 por slug histórico y de publicación oculta, más un caso en que una lápida gana a la redirección del mismo slug.
-- **C3 cerrado en decisiones (2026-11-15):** almacenamiento en celda (45.000, plan B en Drive), vídeo **como enlace** (CSP `frame-src 'none'`), catálogo de iconos duplicado local, orden de bloques **solo visibilidad** y `tags` aditivo. Queda el port a `main` (entrega externa) y la comprobación visual 360/1280.
+- **C3 decisiones y modelo v1.1 (2026-11-16):** almacenamiento en celda (45.000, plan B en Drive), vídeo **enlace por defecto** + `embed` opcional con click-to-load (CSP `frame-src` solo a `youtube-nocookie`/`player.vimeo.com`), catálogo de iconos duplicado local, orden de bloques **configurable** (`ficha.orden`) además de visibilidad, `tags` propias de la ficha, bloque `contenido` y precedencia `ficha > base` (`icons/gallery/videos/tags/cta`). Queda el despliegue y el port a `main` (entrega externa); la comprobación visual 360/1280 ya está hecha en local.
 - **Saneado del HTML público (2026-11-15, C3):** `webSanearHtml` (`WebPublicaciones.gs`) aplica lista blanca de etiquetas y atributos al construir el payload (`contentHtml`), así que el gestor puede guardar HTML tal cual y lo publicado nunca lleva `script`, `style`, `iframe`, formularios ni `on*`. `webUrlSegura` limita `href`/`src` a relativa, `http(s)`, `mailto` y `tel` (rechaza `javascript:`, `data:` y entidades numéricas). Idempotente y cubierto por `tests/saneado-html.test.js`. Decisión cerrada en el plan (§7.3 D).
 - **URLs saneadas en portada, galería, vídeos y CTA (2026-11-15, C3):** `webUrlSegura` se aplica también a `coverImage.src` (con vuelta a la foto del animal), `gallery`, `videos`, `cta.url` y a los mismos campos dentro de `ficha`; las entradas con URL no segura se descartan en el payload (no se toca lo guardado). Verificado sobre el contenido real: 11 animales con descripciones en texto plano (sin etiquetas) y la única publicación (evento retirado de prueba, un `<p>`) salen byte a byte iguales.
 - **Único punto de disparo (2026-11-15):** el deploy lo decide solo `_webAnotarDeploy` (`Code.gs`), que envuelve `web-animales`, `web-animales-estado`, `web-eventos` (guardar/archivar/restaurar) y `web-eventos-estado`. Decide con el `estado_publicacion` que devuelve la respuesta (el guardado), no con el del cliente; dispara con `publicado`, `oculto` y `retirado`, y `forzar` solo hace falta en restaurar (deja la publicación en borrador y aun así hay que quitar la lápida). `WebPublicaciones.gs` no llama a GitHub: así no hay dos lógicas que puedan divergir.
@@ -55,14 +55,16 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **Eliminar borrador/configuración de publicación web de animal** (no publicada/no retirada): elimina solo la fila en `WebPublicaciones` y deja la ficha del animal intacta en BBDD. Implementado en repo (`9435a6d`, `v230`), verificado en producción (Playwright) y con auditoría `eliminar_publicacion` en el backend desplegado.
 - **Restaurar publicación retirada** (`evento|historia`, C1): vuelve a `borrador` manteniendo el slug, con auditoría `restaurar_publicacion`; botón en gestor. Implementado en repo (`39fb362`, `v231`) y **verificado en vivo (2026-11-15):** restauración de `prueba-retirada-playwright` → `borrador`, slug conservado; tras deploy/prerender la lápida estática responde 404, no figura en sitemap ni en `retiradas`, y el front desplegado incluye la acción de restaurar (`API.restaurarWebEvento`). `retiradas` puede servir cache ~60 s sin `nocache=1`.
 
-### Ficha configurable (C3)
+### Ficha configurable (C3 v1.1)
 
-- `ficha` es **aditivo**: `plantilla` (`ficha|historia`), `bloques` (datos, galeria, videos, fichaAnimal, etiquetas, cta), `mostrarLectura`, y opcionales `icons`/`gallery`/`videos`/`cta` (con `kind`).
-- Backend: columna `ficha_json` (se añade sola al final si la hoja ya existía), `webNormalizarFicha` cierra valores, acota listas/longitudes y rechaza fichas que no son objeto; máximo 45.000 caracteres.
-- Solo viaja en **detalle y preview**; los listados no la leen (regla de rendimiento). `cta.kind` (`adopcion|acogida|contacto|url`) se conserva en el payload.
-- Gestor: sección «Presentación de la ficha» con plantilla (ficha/historia), toggles de bloques y tiempo de lectura; etiquetas (`tags`), salud curada con «heredar» y CTA con intención (`kind`). Sin tocar nada no se envía `ficha` (compatibilidad).
-- Visor y prerender: misma composición (`htmlDetalle`) respeta plantilla, bloques y `mostrarLectura`; sin `ficha` el HTML no cambia.
-- Pruebas: `tests/ficha-config.test.js` (helpers), `tests/web-backend.test.js` (guardado/normalización, detalle sí y listado no) y `tests/publico.test.js` (bloques/plantilla).
+- `ficha` es **aditivo**: `plantilla` (`ficha|historia`), `bloques` (datos, etiquetas, contenido, galeria, videos, fichaAnimal, cta), `orden` (lista cerrada y completa), `videoModo` (`enlace|embed`), `tags` propias (máx. 20 × 40), `mostrarLectura` y opcionales `icons`/`gallery`/`videos`/`cta` (con `kind`).
+- **Precedencia:** si `ficha` define `icons`, `gallery`, `videos`, `tags` o `cta`, prevalecen sobre los campos base; si faltan, se heredan. Una lista vacía explícita oculta la base.
+- Backend: columna `ficha_json` (se añade sola al final si la hoja ya existía), `webNormalizarFicha` cierra valores, normaliza `orden`/`videoModo`/`tags`, acota listas/longitudes y rechaza fichas que no son objeto; máximo 45.000 caracteres. `webFichaSegura` normaliza al vuelo fichas antiguas y descarta URLs inseguras.
+- Solo viaja en **detalle, preview y prerender**; los listados no la leen (regla de rendimiento). `cta.kind` (`adopcion|acogida|contacto|url`) se conserva en el payload.
+- Gestor: sección «Presentación de la ficha» con plantilla (ficha/historia), bloques y **orden ↑/↓**, `videoModo`, `tags` propias y tiempo de lectura; salud curada con «heredar» y CTA con intención (`kind`). Sin tocar nada no se envía `ficha` (compatibilidad).
+- Visor y prerender: misma composición (`htmlDetalle`) respeta plantilla, bloques, orden, precedencia y `mostrarLectura`; la plantilla `historia` no pinta la ficha del animal; sin `ficha` el HTML no cambia.
+- **Vídeo click-to-load:** `publico-embed.js` pinta una fachada (sin peticiones) y solo monta el iframe al pulsar, con URL construida desde el id validado (`youtube-nocookie`/`player.vimeo.com`). Las páginas estáticas cargan solo ese runtime, no el visor SPA.
+- Pruebas: `tests/ficha-config.test.js` (modelo/orden/precedencia), `tests/web-backend.test.js` (guardado/normalización, detalle sí y listado no), `tests/publico.test.js` (bloques/orden/precedencia/embed) y `tests/publico-embed.test.js` (proveedores y montaje seguro).
 
 ### Prueba E2E real (2026-11-15)
 
@@ -85,8 +87,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v263` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js` y controles estructurados de presentación de la ficha en el gestor).
-- `npm test`: **576/576** (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`; +15 de borrado de media y deploy automático).
+- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v267` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js`, controles con orden de bloques y `publico-embed.js` con vídeo click-to-load).
+- `npm test`: **646/646** en local (**636** en CI, donde `roles-auth` se omite) (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`, `tests/publico-embed.test.js`; contrato C3 v1.1 y vídeo click-to-load).
 
 ## Decisiones cerradas
 
@@ -94,7 +96,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - El 410 se modela como `status:'gone'` porque el canal (JSONP) no puede devolver códigos HTTP; la lápida conserva el slug.
 - El prerender **bloquea** el deploy antes que publicar sin sitemap/robots.
 - El port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` **no pertenece a este repositorio**: se entrega documentado (§7.2 y §7.4 del plan).
-- No implementar la ficha configurable (§7.3) sin aprobación.
+- **C3 v1.1:** el vídeo se enlace por defecto; `embed` es opt-in con click-to-load y CSP acotada. El orden de bloques y los overrides (`ficha.icons/gallery/videos/tags/cta`) se resuelven en el render con precedencia `ficha > base`.
 
 ## Verificación y pendientes
 
@@ -104,7 +106,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **C3 (QA visual en este repo):** pasada manual 360/1280 en visor/estáticas con y sin `ficha`; revisar si overrides de `ficha` (`tags/cta/icons/gallery/videos`) deben prevalecer en render.
+1. **C3 (despliegue):** subir `WebPublicaciones.gs` y las líneas nuevas de `Config.gs` cuando se decida desplegar; después, probar en producción un vídeo real en modo `embed` (fachada → iframe). La QA visual 360/1280 (con y sin `ficha`), el orden/precedencia y la fachada ya están verificados en local, y el código y los tests están listos.
 2. **D5 (condicional):** verificación servidor OK; gate de login desactivado. Si se reactiva, añadir `RECAPTCHA_SITE_KEY` como secreto de GitHub y redeplegar.
 3. **D3 (opcional):** inspección visual en la hoja de auditoría/fases.
 4. **D4 (acción periódica):** rotación del token cuando proceda (Secrets + config GAS + redespliegue).
@@ -120,13 +122,13 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 - **Track B / formularios en `main`:** planificación trasladada a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (ejecución en el proyecto `main`, fuera de este repo).
 - **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
-- **Track C (pendiente, sujeto a aprobación/decisiones):** C1/C2 hechos. **C3 parcialmente implementado:** helpers (`ficha-config.js`), `ficha_json` en backend (detalle/preview, nunca listados) con normalización y límite, campo JSON avanzado en gestor, bloques/plantilla/lectura en visor y prerender, y pruebas de contrato. La UI ya es estructurada. Quedan las decisiones abiertas (vídeo embebido, saneado HTML, orden de bloques) y el port a `main`. **C3** plan refinado (objetivo de `ficha_json`, almacenamiento compacto/híbrido, regla de rendimiento: no leer ficha por ítem en listados de 20+ y cargarla solo en detalle/prerender, viabilidad GitHub Pages+GAS) y **C4** con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso). Requiere cerrar decisiones y aprobación antes de implementar.
+- **Track C (C3 v1.1 desarrollada en local):** C1/C2 hechos. **C3 v1.1 completa en código:** modelo (`orden`, `contenido`, `videoModo`, `tags`, precedencia), backend normalizado, gestor con orden ↑/↓, visor/prerender por orden y vídeo click-to-load, y pruebas de contrato. **Pendiente:** desplegar `.gs`/Pages y port a `main`; QA visual 360/1280 ya verificada en local. **C4** sigue con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso).
 
 ## Mapa rápido
 
 | Área | Archivos |
 |---|---|
-| Visor | `src/publico.html`, `src/js/publico.js`, `src/css/publico.css` |
+| Visor | `src/publico.html`, `src/js/publico.js`, `src/js/publico-embed.js`, `src/css/publico.css` |
 | Prerender | `scripts/prerender-publico.js`, `tests/prerender.test.js`, `tests/fixtures/prerender/` |
 | Gestor | `src/js/web.js`, `src/js/api.js` |
 | Admin (modular) | `src/js/dashboard.js`, `src/js/dashboard-actividad.js`, `src/js/dashboard-finanzas.js`, `src/js/dashboard-blacklist.js`, `src/js/dashboard-web.js` |
@@ -138,7 +140,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 554 tests
+npm test                                   # 646 tests en local (636 en CI)
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

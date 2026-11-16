@@ -23,9 +23,9 @@
 | Visor público (referencia de lo que verá la web) | `src/publico.html`, `src/css/publico.css`, `src/js/publico.js` | `- [x]` listado + detalle + SEO, con el tema de `nueva-version` |
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
-| Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v223`, assets `js/web.js`, `js/publico.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/sheets.test.js` | `- [x]` 554 en total (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410 y ficha configurable) |
-| Ficha configurable desde la publicación | §7.3 | `- [~]` contrato aditivo implementado y desplegado: backend validado, controles estructurados (plantilla/bloques/lectura, tags, salud, CTA kind), visor/prerender y pruebas; quedan decisiones de vídeo/HTML y el port |
+| Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v267`, assets `js/web.js`, `js/publico.js`, `js/publico-embed.js` y `css/publico.css` |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/publico-embed.test.js`, `tests/sheets.test.js` | `- [x]` 646 en local / 636 en CI (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410, ficha configurable v1.1 y vídeo click-to-load) |
+| Ficha configurable desde la publicación | §7.3 | `- [x]` contrato aditivo v1.1 **implementado en local** (sin desplegar): backend validado (orden, `videoModo`, `tags`, `contenido`), precedencia `ficha > base`, controles estructurados con orden, visor/prerender y pruebas; queda el despliegue de `.gs`/Pages y el port |
 | Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
 
 **Pasos manuales pendientes (fuera de git):**
@@ -300,13 +300,13 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 La guía de port, consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y criterios de ejecución para la web real se han **trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para su ejecución en `C:\Users\JonEg\Documents\proyectos\main` (fuera del alcance de este repositorio).
 
-### 7.3 Ficha de animal configurable desde la publicación — implementada por etapas (C3 en curso)
+### 7.3 Ficha de animal configurable desde la publicación — C3 v1.1 implementada en local
 
 **Pregunta de partida.** La ficha de `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` (`post.html` → `post-sheet--ficha`, render en `js/blog-render.js`) no es «título + HTML»: compone cabecera, datos destacados con iconos, etiquetas, galería, vídeo y bloque de animal. ¿Qué de eso debe poder configurarse en la publicación y qué tiene que enviar el endpoint?
 
 **Objetivo de `ficha_json`.** Campo opcional y aditivo para guardar la **configuración/contenido estructurado de la ficha** (bloques, plantilla, iconos, datos curados/CTA, etc.) y hacerla configurable desde el gestor sin ampliar el esquema fijo en cada cambio. Si no existe, se mantiene el render actual.
 
-**Estado (2026-11-15).** Contrato aditivo **implementado y desplegado**: backend (`ficha_json` normalizado, solo detalle/preview), gestor (**controles estructurados** de plantilla, bloques y lectura; etiquetas; salud curada con «heredar»; CTA con intención), visor y prerender, y pruebas de regresión. Quedan las decisiones de §D (vídeo embebido vs enlace, saneado de HTML, orden de bloques) y el port a la web.
+**Estado (2026-11-16).** C3 v1.1 **desarrollada y probada en local, pendiente de desplegar** (no se ha subido `WebPublicaciones.gs` ni Pages en esta ronda). Incluye: `ficha_json` normalizado (solo detalle/preview/prerender), `orden` de bloques, bloque `contenido`, `videoModo` (`enlace|embed`), `tags` propias de la ficha, precedencia `ficha > base`, controles del gestor con orden ↑/↓, visor/prerender y vídeo **click-to-load** opcional con CSP acotada. Los listados siguen sin cargar la ficha.
 
 #### A. Anatomía de la ficha de referencia
 
@@ -327,10 +327,10 @@ La plantilla se elige por categoría (`isFichaPost`): `Adoptados` cae a formato 
 
 | # | Hueco | Efecto actual | Propuesta |
 |---|---|---|---|
-| 1 | **Plantilla y visibilidad de bloques** | La web decide por categoría; el gestor no puede pedir «ficha sin galería» ni «historia con datos» | Bloque `ficha` opcional: `plantilla` (`ficha`\|`historia`) y `bloques` (booleanos de `datos`, `galeria`, `videos`, `fichaAnimal`, `etiquetas`, `cta`) |
+| 1 | **Plantilla y visibilidad de bloques** | La web decide por categoría; el gestor no puede pedir «ficha sin galería» ni «historia con datos» | Bloque `ficha` opcional: `plantilla` (`ficha`\|`historia`), `bloques` (booleanos de `datos`, `etiquetas`, `contenido`, `galeria`, `videos`, `fichaAnimal`, `cta`) y `orden` (lista cerrada y completa) |
 | 2 | **Catálogo de iconos** | `icon` se guarda pero el render decide el dibujo por regex de la etiqueta; dos fichas con la misma etiqueta pueden salir con iconos distintos | Catálogo cerrado de claves (edad, ubicacion, caracter, salud, adopcion, acogida, contacto, urgente, hogar) + fallback por etiqueta para no romper datos viejos |
 | 3 | **Galería sin alt ni pie** | Se pierde accesibilidad y el pie de foto que sí soporta el contrato | Formato `url\|alt\|pie` por línea (retrocompatible: `url` sola sigue valiendo) |
-| 4 | **Vídeo sin nota ni miniatura** | La ficha de referencia muestra nota bajo el vídeo | Añadir `nota` y `miniatura` al parser `título\|url`; decidir incrustar (ver D) |
+| 4 | **Vídeo sin nota ni miniatura** | La ficha de referencia muestra nota bajo el vídeo | Añadir `nota` y `miniatura` al parser `título\|url`; el modo `embed` se resuelve con fachada click-to-load (ver D) |
 | 5 | **Salud no curada** | `vaccinated/dewormed/neutered/microchipped` salen de la hoja interna (`vacunas`, `esterilizada`, `microchip`); en la web no se pueden corregir sin tocar el animal | Cinco checkboxes en «Ficha pública del animal» con **heredar** por defecto; el backend ya respeta el valor explícito de `animal.health` |
 | 6 | **Campos de animal ausentes en el formulario** | `age.value/unit`, `names[]`, `adoption.includes`, `foster.reason/expensesPolicy`, `location.shelter` existen en el contrato pero no se editan | Añadirlos al desplegable «Ficha pública del animal»; el payload ya los compone |
 | 7 | **CTA sin intención** | La web real abre formularios de adopción/acogida por `data-open-form`; el contrato solo manda `label`+`url` | `cta.kind`: `adopcion`\|`acogida`\|`contacto`\|`url` (por defecto `url`); el gestor puede sugerir el formulario y la web decide cómo abrirlo |
@@ -343,8 +343,11 @@ La plantilla se elige por categoría (`isFichaPost`): `Adoptados` cae a formato 
 // GET ?endpoint=publicacion&slug=…  (solo se añade si está configurado)
 "ficha": {
   "plantilla": "ficha",              // ficha | historia
-  "bloques": { "datos": true, "galeria": true, "videos": true,
-                "fichaAnimal": true, "etiquetas": true, "cta": true },
+  "bloques": { "datos": true, "etiquetas": true, "contenido": true,
+                "galeria": true, "videos": true, "fichaAnimal": true, "cta": true },
+  "orden": ["datos", "etiquetas", "contenido", "galeria", "videos", "fichaAnimal", "cta"],
+  "videoModo": "enlace",             // enlace | embed (click-to-load)
+  "tags": ["perro", "sociable"],     // opcional: prevalece sobre tags base
   "mostrarLectura": true
 },
 "cta": { "label": "Quiero adoptar", "url": "…", "kind": "adopcion" },
@@ -356,9 +359,12 @@ La plantilla se elige por categoría (`isFichaPost`): `Adoptados` cae a formato 
 Reglas:
 - **Aditivo y opcional:** ausencia de `ficha` = comportamiento actual; el visor y la web ignoran claves desconocidas.
 - **Compatibilidad:** `icon` pasa a ser clave sugerida, no obligatoria; `label` manda para el texto y el icono cae al catálogo o al regex.
+- **Precedencia:** si `ficha` define `icons`, `gallery`, `videos`, `tags` o `cta`, prevalecen sobre los campos base de la publicación (una lista vacía explícita oculta la base). Si no, se heredan.
+- **Orden de bloques:** `ficha.orden` se filtra a claves conocidas, se deduplica y se completa con las que falten en el orden por defecto (`datos`, `etiquetas`, `contenido`, `galeria`, `videos`, `fichaAnimal`, `cta`). La plantilla `historia` nunca pinta `fichaAnimal`.
+- **Vídeo:** por defecto `enlace` (sin peticiones a terceros). Con `videoModo: "embed"` el visor pinta una fachada propia y solo carga el iframe al pulsar; solo se aceptan YouTube (`youtube-nocookie`) y Vimeo. Las URLs no reconocidas mantienen el enlace.
 - **Persistencia y tamaño:** propuesta base, columna `ficha_json` en `WebPublicaciones` (añadirla a mano en hojas ya creadas, como `slug_historial`). **Límite de celda en Sheets ~50.000 caracteres**: mantener el JSON compacto (IDs/referencias, sin duplicar contenido pesado que ya vive en otros campos/Drive). Alternativa/híbrido si crece: guardar la ficha completa en un fichero JSON en Drive (p. ej. en la carpeta de la publicación) y almacenar su `fileId`/ruta en la hoja como desbordamiento.
 - **Rendimiento de lectura (regla):** los listados/secciones (historias, gatos/perros en adopción, feeds con 20+ ítems) **no deben** leer `ficha_json` ni ficheros por ítem: se resuelven con campos de la fila ya usados en tarjetas (slug, título, portada, extracto, categoría/estado, destacados). La ficha completa se carga **solo en el detalle** y en el **prerender** de la ficha (donde el coste se paga en build). Con caché interna del canal (~60 s) esto evita penalizar los listados.
-- **Validación:** `plantilla` y `bloques` cerrados a valores conocidos; `cta.kind` cerrado; el resto, texto saneado (ver decisiones). Publicar **no** exige la configuración nueva.
+- **Validación:** `plantilla`, `bloques`, `orden`, `videoModo` y `cta.kind` cerrados a valores conocidos; `tags` máx. 20 × 40 caracteres; el resto, texto saneado (ver decisiones). Publicar **no** exige la configuración nueva.
 
 #### C bis. Media por ficha — implementado
 
@@ -372,13 +378,14 @@ Reglas:
 - **Formulario:** subida desde la publicación de animal (portada, galería, vídeo, documento) y de evento/historia (portada, galería, documento). Los documentos se guardan en `media.documents` (`nombre|url`) y **no se publican**.
 - Requiere `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID` en `.env` y regenerar `Config.gs`; sin esa variable el endpoint avisa y no sube nada. Los enlaces de carpeta no se publican nunca.
 
-#### D. Decisiones (cerradas el 2026-11-15)
+#### D. Decisiones (cerradas; v1.1 revisada el 2026-11-16)
 
 - [x] **Almacenamiento de la ficha (celda vs fichero).** Decidido: `ficha_json` compacto en celda con límite de 45.000 caracteres (`webNormalizarFicha`). El desbordamiento a fichero JSON en Drive queda como plan B solo si una ficha real lo supera. Regla vigente: **nunca leer la ficha por ítem en listados**; viaja solo en detalle, preview y prerender.
-- [x] **Vídeo incrustado o enlace.** Decidido: **enlace, no incrustado**. La CSP del visor mantiene `frame-src 'none'`, no hay consentimiento de cookies que gestionar y el saneado elimina cualquier `<iframe>`; los vídeos de la ficha se publican como `url` + `title`/`provider`/`note`. Si la web final pide reproducción incrustada, se abre la CSP y se decide consentimiento en ese momento.
+- [x] **Vídeo incrustado o enlace.** Decidido (v1.1): **enlace por defecto** y `embed` opcional con **click-to-load**. La fachada no hace peticiones a terceros ni usa cookies; al pulsar se crea el iframe de `youtube-nocookie` o `player.vimeo.com`. La CSP del visor abre solo `frame-src` a esos dos dominios y el saneado sigue eliminando `<iframe>` del HTML libre. URLs no reconocidas mantienen el enlace externo.
 - [x] **Catálogo de iconos compartido.** Decidido: se mantiene **duplicado local** (`svgFor` en `publico.js` y en el render de la web) y no se publica un endpoint nuevo; el catálogo cerrado ya viaja en el contrato de la ficha como clave (`icon`), que es lo que necesita la web para resolver el SVG en su propio código.
 - [x] **HTML libre en `contentHtml` y `sections`.** Decidido: **se sanea en el servidor con lista blanca** (`webSanearHtml`), al construir el payload público (detalle, listados y prerender). Lo guardado no se modifica (reversible) y nada publicado lleva `script`, `style`, `iframe`, formularios ni atributos `on*`. `sections` no existe en el contrato actual (la ficha usa `bloques`), así que de momento solo aplica a `contentHtml`.
-- [x] **Orden de bloques configurable.** Decidido: **solo visibilidad** (`ficha.bloques` con `true/false` por bloque). El orden lo fija la plantilla; un orden libre complicaría el layout sin demanda real.
+- [x] **Orden de bloques configurable.** Decidido (v1.1): **visibilidad + orden** (`ficha.bloques` y `ficha.orden`). El backend cierra el orden a claves conocidas, elimina duplicados y completa las que falten; el gestor ofrece subir/bajar cada bloque. La plantilla `historia` desactiva `fichaAnimal` al renderizar.
+- [x] **Precedencia de campos de la ficha.** Decidido (v1.1): `ficha.icons/gallery/videos/tags/cta` prevalecen sobre los campos base cuando están presentes; si faltan, se heredan. Una lista vacía explícita oculta la base. Así el gestor puede sobrescribir la ficha del animal sin duplicar datos.
 - [x] **Retrocompatibilidad de `tags` en animales.** Decidido: campo **aditivo y opcional**; las publicaciones antiguas sin etiquetas se siguen pintando sin la fila de etiquetas, y el payload no gana campos vacíos si no hay `tags`.
 
 #### E. Factibilidad y notas de implementación (GitHub Pages + GAS, 2026-11-15)
@@ -387,14 +394,14 @@ Reglas:
 - **C4 viable con restricciones (alcance aparte):** verificación reCAPTCHA server-side vía `UrlFetchApp` (secreto en Script Properties) y persistencia/notificación con Sheets/`MailApp` dentro de cuotas; principal reto **CORS/preflight en POST** desde navegador a GAS. Requiere prototipo de transporte (p. ej. form `x-www-form-urlencoded`/iframe, UX sin lectura directa de respuesta) y política de antiabuso/datos.
 - **Repo público/Pages:** sin secretos en repo; site key pública aceptable, secretos solo en GitHub Secrets/Script Properties; Pages estático (redirects/410 ya resueltos con prerender/estado lógico).
 
-#### F. Plan de implementación (sin empezar, sujeto a aprobación C3)
+#### F. Plan de implementación (v1.1 completada en local; despliegue pendiente)
 
 1. [x] **Contrato y validación** (`WebPublicaciones.gs`): `ficha_json` → objeto `ficha` en `webConstruirPublicacion`; valores cerrados; tests de ausencia (payload idéntico al actual).
-2. [x] **Backend de guardado:** aceptar `ficha`, `cta.kind`, galería con `alt/pie`, vídeos con `nota`, `tags` y los campos de animal que faltan; validar longitudes y tipos.
-3. [x] **Gestor (`src/js/web.js`):** nueva sección «Presentación de la ficha» (plantilla, toggles de bloques, `mostrarLectura`), selectores de icono con catálogo, galería `url\|alt\|pie`, salud con tres estados, CTA con intención y `tags`.
-4. [x] **Visor (`publico.js` + `publico.css`):** render condicionado por `ficha.bloques`, plantilla `historia`, CTA por `kind` y salud explícita. Mantener el fallback actual cuando no venga `ficha`.
-5. **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story` y ocultar bloques; `publication.icons` con clave de catálogo.
-6. [~] **Aceptación:** payload sin `ficha` idéntico byte a byte al actual (test de regresión); ficha con `bloques` desactivados no pinta esos bloques; publicación antigua sigue renderizando igual; 360/1280 sin desbordes.
+2. [x] **Backend de guardado:** aceptar `ficha` (`plantilla`, `bloques`, `orden`, `videoModo`, `tags`), `cta.kind`, galería con `alt/pie`, vídeos con `nota` y los campos de animal que faltan; validar longitudes y tipos.
+3. [x] **Gestor (`src/js/web.js`):** sección «Presentación de la ficha» con plantilla, bloques y orden ↑/↓, `videoModo`, `tags` propias y `mostrarLectura`; los extras ya guardados (`icons`/`gallery`/`videos`/`cta`) se conservan al guardar. Sin cambios no se envía `ficha` (compatibilidad).
+4. [x] **Visor (`publico.js` + `publico.css` + `publico-embed.js`):** render por `ficha.orden`, precedencia `ficha > base`, plantilla `historia` sin bloque de animal, CTA por `kind`, fachada de vídeo click-to-load y fallback a enlace. Sin `ficha` el HTML no cambia.
+5. **Port a `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)`:** `blog-render.js` lee `pub.ficha` (si existe) para elegir `post-sheet--ficha` o `--story`, aplicar orden/precedencia, ocultar bloques y montar la fachada de vídeo; `publication.icons` con clave de catálogo.
+6. [x] **Aceptación:** payload sin `ficha` idéntico al actual; ficha con bloques desactivados no pinta esos bloques; orden y precedencia verificados en tests; publicación antigua sigue renderizando igual; las páginas estáticas solo cargan `publico-embed.js`. QA visual local a 360/1280 sin desbordes (ficha, historia, embed y ficha mínima) y `moverFichaBloque` probado en navegador.
 
 **Fuera de alcance:** exponer la ficha interna del animal, editor WYSIWYG, CSS/tema por publicación y multiplantilla más allá de `ficha`/`historia`.
 
@@ -425,7 +432,7 @@ Reglas:
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **554/554** (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive y ficha configurable).
+- `npm test`: **646/646** en local (**636** en CI, donde `roles-auth` se omite) (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive, ficha configurable v1.1 y vídeo click-to-load).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 
@@ -504,3 +511,8 @@ Reglas:
 | 2026-11-15 | C3 | Saneado del HTML público con lista blanca: `webSanearHtml`/`webUrlSegura` en `webConstruirPublicacion`, etiquetas/atributos permitidos, `javascript:`/`data:`/entidades numéricas rechazadas y saneado idempotente | — | `apps-script/WebPublicaciones.gs`, `tests/saneado-html.test.js` |
 | 2026-11-15 | C3 | Endurecido en servidor: `webNormalizarFicha` (valores cerrados, listas/longitudes, máximo 45.000 caracteres), rechazo de fichas no objeto y `cta.kind` conservado en el payload | — | `tests/web-backend.test.js`, `tests/publico.test.js` |
 | 2026-11-15 | C3 | UI estructurada en el gestor: plantilla, toggles de bloques, tiempo de lectura, etiquetas, salud con «heredar» y CTA con intención; sin cambios no se envía `ficha` | `v259` | `tests/web.test.js` |
+| 2026-11-16 | C3 | Modelo v1.1: bloque `contenido`, `orden` validado/deduplicado/completado, `videoModo` (`enlace\|embed`) y `tags` propias (20 × 40); backend y `ficha-config.js` alineados | — | `apps-script/WebPublicaciones.gs`, `src/js/ficha-config.js`, `tests/ficha-config.test.js`, `tests/web-backend.test.js` |
+| 2026-11-16 | C3 | Render por `ficha.orden` con precedencia `ficha > base` (`icons/gallery/videos/tags/cta`); plantilla `historia` sin ficha de animal; `contenido` opcional | — | `src/js/publico.js`, `tests/publico.test.js` |
+| 2026-11-16 | C3 | Vídeo click-to-load: fachada sin peticiones, iframe solo al pulsar, `youtube-nocookie`/`player.vimeo.com`, CSP `frame-src` acotada y runtime en estáticas | `v267` | `src/js/publico-embed.js`, `src/css/publico.css`, `src/publico.html`, `scripts/prerender-publico.js`, `tests/publico-embed.test.js`, `tests/prerender.test.js` |
+| 2026-11-16 | C3 | Gestor: orden ↑/↓ por bloque, selector de `videoModo`, etiquetas propias y conservación de extras del JSON; acción `moverFichaBloque` | — | `src/js/web.js`, `src/js/dashboard-web.js`, `src/css/styles.css`, `tests/web.test.js` |
+| 2026-11-16 | C3 | QA visual local: ficha, historia, embed y ficha mínima a 360/1280 sin desbordes; fachada→iframe correcta; `moverFichaBloque` y lectura del formulario probados en navegador | — | verificación manual (sin cambios de código) |

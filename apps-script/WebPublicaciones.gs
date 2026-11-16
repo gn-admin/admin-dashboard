@@ -21,7 +21,9 @@ var WEB_ADMIN_PAGE_SIZE_MAX = 500; // listado del gestor (admin)
 
 // Ficha configurable (C3): valores cerrados y límite de celda de Sheets.
 var WEB_FICHA_PLANTILLAS = ['ficha', 'historia'];
-var WEB_FICHA_BLOQUES = ['datos', 'galeria', 'videos', 'fichaAnimal', 'etiquetas', 'cta'];
+var WEB_FICHA_BLOQUES = ['datos', 'etiquetas', 'contenido', 'galeria', 'videos', 'fichaAnimal', 'cta'];
+var WEB_FICHA_ORDEN_DEF = ['datos', 'etiquetas', 'contenido', 'galeria', 'videos', 'fichaAnimal', 'cta'];
+var WEB_FICHA_VIDEO_MODOS = ['enlace', 'embed'];
 var WEB_FICHA_CTA_KINDS = ['adopcion', 'acogida', 'contacto', 'url'];
 var WEB_FICHA_MAX_CHARS = 45000;
 
@@ -183,7 +185,15 @@ function webVideosSeguros(lista) {
 /** Ficha configurable con galería, vídeos y CTA saneados (sin tocar el resto). */
 function webFichaSegura(ficha) {
   if (!ficha || typeof ficha !== 'object') return ficha;
-  var copia = webClonarPlano(ficha);
+  // Normaliza al vuelo las fichas antiguas (orden/videoModo/tags/bloques) y
+  // conserva claves desconocidas por si el contrato crece.
+  var normalizada = webNormalizarFicha(ficha) || ficha;
+  var copia = webClonarPlano(normalizada);
+  if (typeof ficha === 'object' && !Array.isArray(ficha)) {
+    Object.keys(ficha).forEach(function (k) {
+      if (!(k in copia)) copia[k] = webClonarPlano(ficha[k]);
+    });
+  }
   if (Array.isArray(copia.gallery)) copia.gallery = webGaleriaSegura(copia.gallery);
   if (Array.isArray(copia.videos)) copia.videos = webVideosSeguros(copia.videos);
   if (copia.cta && typeof copia.cta === 'object') {
@@ -391,6 +401,34 @@ function webFichaBool(valor, porDefecto) {
 }
 
 /**
+ * Orden de bloques: solo claves conocidas, sin duplicados y completo (añade
+ * los bloques que falten en el orden por defecto).
+ */
+function webFichaOrden(orden) {
+  var out = [];
+  (Array.isArray(orden) ? orden : []).forEach(function (item) {
+    var k = webTexto(item).slice(0, 30);
+    if (WEB_FICHA_BLOQUES.indexOf(k) === -1) return;
+    if (out.indexOf(k) !== -1) return;
+    out.push(k);
+  });
+  WEB_FICHA_ORDEN_DEF.forEach(function (k) { if (out.indexOf(k) === -1) out.push(k); });
+  return out;
+}
+
+/** Etiquetas propias de la ficha: máximo 20, 40 caracteres y sin duplicados. */
+function webFichaTags(tags) {
+  var out = [];
+  var src = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',') : []);
+  for (var i = 0; i < src.length && out.length < 20; i++) {
+    var v = webTexto(src[i]).slice(0, 40);
+    if (!v || out.indexOf(v) !== -1) continue;
+    out.push(v);
+  }
+  return out;
+}
+
+/**
  * Ficha configurable (C3): normaliza el objeto `ficha` con las mismas reglas
  * que `src/js/ficha-config.js` (valores cerrados, listas y longitudes acotadas).
  * Devuelve `null` cuando no hay ficha o el valor no es un objeto.
@@ -403,10 +441,13 @@ function webNormalizarFicha(valor) {
   var bloquesIn = (f.bloques && typeof f.bloques === 'object' && !Array.isArray(f.bloques)) ? f.bloques : {};
   var bloques = {};
   WEB_FICHA_BLOQUES.forEach(function (k) { bloques[k] = webFichaBool(bloquesIn[k], true); });
+  var videoModo = webTexto(f.videoModo).toLowerCase();
 
   var out = {
     plantilla: WEB_FICHA_PLANTILLAS.indexOf(plantilla) !== -1 ? plantilla : 'ficha',
     bloques: bloques,
+    orden: webFichaOrden(f.orden),
+    videoModo: WEB_FICHA_VIDEO_MODOS.indexOf(videoModo) !== -1 ? videoModo : 'enlace',
     mostrarLectura: webFichaBool(f.mostrarLectura, true)
   };
 
@@ -446,6 +487,7 @@ function webNormalizarFicha(valor) {
       };
     }).filter(function (x) { return !!x; }).slice(0, 10);
   }
+  if (f.tags !== undefined && f.tags !== null) out.tags = webFichaTags(f.tags);
   if (f.cta && typeof f.cta === 'object' && !Array.isArray(f.cta)) {
     var label = webTexto(f.cta.label || f.cta.texto).slice(0, 80);
     var urlCta = webTexto(f.cta.url).slice(0, 500);

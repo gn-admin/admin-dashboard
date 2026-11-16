@@ -367,6 +367,36 @@ describe('Web._fichaPresentacion (C3)', () => {
     assert.equal(f.mostrarLectura, false);
   });
 
+  it('envía orden, modo de vídeo y etiquetas propias', () => {
+    const f = Web._fichaPresentacion(null, porDefecto({
+      orden: ['galeria', 'datos', 'cta'],
+      videoModo: 'embed',
+      tags: ['propia', 'perro']
+    }));
+    assert.equal(f.videoModo, 'embed');
+    assert.deepEqual(f.tags, ['propia', 'perro']);
+    assert.equal(f.orden[0], 'galeria');
+    assert.ok(f.orden.includes('contenido'), 'el orden se completa con los bloques que falten');
+  });
+
+  it('sin etiquetas propias no se envía override (se heredan las de la publicación)', () => {
+    const previa = porDefecto({ tags: ['anterior'] });
+    const f = Web._fichaPresentacion(previa, porDefecto({ tags: [] }));
+    assert.equal(f.tags, undefined);
+  });
+
+  it('el formulario ofrece bloques (incluido contenido), orden, vídeo y etiquetas', () => {
+    const html = Web._fichaPresentacionHtml('web-', null, true);
+    assert.match(html, /bloque-datos/);
+    assert.match(html, /bloque-contenido/);
+    assert.match(html, /bloque-animal/);
+    assert.match(html, /ficha-orden-lista/);
+    assert.match(html, /moverFichaBloque/);
+    assert.match(html, /ficha-video-modo/);
+    assert.match(html, /valor="embed"|value="embed"/);
+    assert.match(html, /ficha-tags/);
+  });
+
   it('conserva los extras del JSON avanzado (iconos, galería, cta)', () => {
     const previa = porDefecto({ icons: [{ icon: 'edad', label: 'Edad', value: '2 años' }], cta: { label: 'Ver', url: 'https://x', kind: 'url' } });
     const f = Web._fichaPresentacion(previa, porDefecto({ plantilla: 'historia' }));

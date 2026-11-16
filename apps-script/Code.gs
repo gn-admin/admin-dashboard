@@ -799,9 +799,30 @@ function deleteAdopcionCascade(adopcionId) {
   return { success: ok, rollback: rolled };
 }
 
-// Envio del contrato firmado por email. Solo admite destinatarios que ya
-// figuren en el propio contrato (firmantes) o el email de la entidad/usuario
-// autenticado; nunca acepta direcciones arbitrarias del cliente.
+// Normaliza una direccion de correo recibida del cliente o de la hoja.
+// Devuelve '' si no es una direccion con forma valida (evita inyeccion de
+// cabeceras: nunca se permiten saltos de linea ni comas dentro de un email).
+function _emailLimpio(v) {
+  var e = String(v == null ? '' : v).trim().replace(/[\r\n]/g, '');
+  if (!e || e.indexOf(',') !== -1 || e.indexOf(';') !== -1) return '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return '';
+  return e;
+}
+
+// Envio del contrato firmado por email.
+//
+// Regla de destinatarios (por seguridad y para clasificar los contratos):
+//   To: adoptante (firmante 1 del contrato)
+//   CC: tutor / persona de apoyo (firmante 2, si existe) y el buzon fijo de
+//       contratos (CONFIG.CONTRATOS_CC_EMAIL o, si no esta definido,
+//       CONFIG.CONTACT_EMAIL).
+//   From: la cuenta propietaria del despliegue de Apps Script. Si se
+//       configura CONFIG.CONTRATO_FROM_EMAIL con un alias verificado en
+//       Gmail ("Enviar como"), se usa ese remitente; si Google lo rechaza,
+//       se reenvia sin `from` para no perder el correo.
+//
+// Nunca se aceptan direcciones arbitrarias: solo emails del propio contrato,
+// el buzon de la entidad y el usuario autenticado.
 function sendContratoEmail(body, user) {
   var contratoId = body && body.contrato_id;
   if (!contratoId) return { status: 'error', error: 'Falta contrato_id' };
@@ -814,34 +835,74 @@ function sendContratoEmail(body, user) {
 
   var permitidos = [];
   var addPerm = function (e) {
-    var v = String(e || '').trim().replace(/[\r\n]/g, '');
+    var v = _emailLimpio(e);
     if (v && permitidos.indexOf(v) === -1) permitidos.push(v);
   };
   addPerm(c.f1_email);
   addPerm(c.f2_email);
   addPerm(CONFIG.CONTACT_EMAIL);
+  addPerm(CONFIG.CONTRATOS_CC_EMAIL);
   if (user && user.email) addPerm(user.email);
 
+  var adoptante = _emailLimpio(c.f1_email);
+  var ccFijo = _emailLimpio(CONFIG.CONTRATOS_CC_EMAIL || CONFIG.CONTACT_EMAIL);
+
+  // Destinatarios elegidos en el modal del panel (checkbox). Se validan
+  // contra la lista permitida; lo que no pertenezca al contrato se ignora.
   var pedidos = (body && body.to) || [];
   if (!Array.isArray(pedidos)) pedidos = [pedidos];
-  var destinos = [];
+  var elegidos = [];
   for (var j = 0; j < pedidos.length; j++) {
-    var e = String(pedidos[j] || '').trim().replace(/[\r\n]/g, '');
-    if (!e || destinos.indexOf(e) !== -1) continue;
+    var e = _emailLimpio(pedidos[j]);
+    if (!e || elegidos.indexOf(e) !== -1) continue;
     if (permitidos.indexOf(e) === -1) continue;
-    destinos.push(e);
+    elegidos.push(e);
   }
-  if (!destinos.length) return { status: 'warning', error: 'No hay destinatarios validos para este contrato' };
+  // Si el cliente no manda destinatarios, se envia al adoptante (si lo hay).
+  if (!elegidos.length && adoptante && permitidos.indexOf(adoptante) !== -1) elegidos.push(adoptante);
+  if (!elegidos.length) return { status: 'warning', error: 'No hay destinatarios validos para este contrato' };
+
+  // To: el adoptante cuando este entre los elegidos; si no, el primero pedido.
+  var to = [];
+  if (adoptante && elegidos.indexOf(adoptante) !== -1) to.push(adoptante);
+  else to.push(elegidos[0]);
+
+  // CC: el resto de elegidos (normalmente el tutor) + el buzon de contratos,
+  // que va siempre en copia para poder clasificar los contratos en la entidad.
+  var cc = [];
+  var addCc = function (email) {
+    var v = _emailLimpio(email);
+    if (!v) return;
+    if (to.indexOf(v) !== -1 || cc.indexOf(v) !== -1) return;
+    if (permitidos.indexOf(v) === -1) return;
+    cc.push(v);
+  };
+  for (var k = 0; k < elegidos.length; k++) addCc(elegidos[k]);
+  addCc(ccFijo);
 
   var asunto = 'Contrato de adopcion y terminos · ' + (c.animal || 'Grupo Nebak');
-  MailApp.sendEmail({
-    to: destinos.join(','),
+  var opciones = {
+    to: to.join(','),
     subject: asunto,
     htmlBody: construirEmailContrato(c),
     name: 'Grupo Nebak',
-    replyTo: CONFIG.CONTACT_EMAIL || (user && user.email) || undefined
-  });
-  return { status: 'success', data: { to: destinos } };
+    replyTo: _emailLimpio(CONFIG.CONTACT_EMAIL) || (user && user.email) || undefined
+  };
+  if (cc.length) opciones.cc = cc.join(',');
+  var from = _emailLimpio(CONFIG.CONTRATO_FROM_EMAIL);
+  if (from) opciones.from = from;
+
+  try {
+    MailApp.sendEmail(opciones);
+  } catch (err) {
+    if (!opciones.from) throw err;
+    // El alias no esta verificado en la cuenta: se envia igualmente desde la
+    // cuenta del despliegue (sin `from`) y se deja constancia en el log.
+    Logger.log('Contrato: remitente ' + opciones.from + ' rechazado (' + err.message + '); se envia sin alias.');
+    delete opciones.from;
+    MailApp.sendEmail(opciones);
+  }
+  return { status: 'success', data: { to: to, cc: cc } };
 }
 
 function _escEmail(v) {
@@ -1035,17 +1096,21 @@ function isOriginAllowed(origin) {
   var allowed = (typeof CONFIG !== 'undefined' && CONFIG.ALLOWED_ORIGINS) ? CONFIG.ALLOWED_ORIGINS : [];
   var isLocal = origin.indexOf('http://localhost') === 0 || origin.indexOf('http://127.0.0.1') === 0;
 
+  // Apps Script no siempre expone la cabecera Origin (p. ej. llamadas desde
+  // algunos clientes), por lo que el vacio se permite o no segun
+  // ALLOW_ORIGIN_EMPTY. Con ALLOW_ORIGIN_EMPTY=false solo pasan origenes
+  // exactos de ALLOWED_ORIGINS.
   if (!origin || origin === 'null' || origin === 'undefined') {
-    if (typeof CONFIG !== 'undefined' && CONFIG.ALLOW_ORIGIN_EMPTY === false) {
-      Logger.log('Origen vacío recibido con ALLOW_ORIGIN_EMPTY=false; permitido por compatibilidad GAS.');
-    }
-    return true;
+    var vacioPermitido = !(typeof CONFIG !== 'undefined' && CONFIG.ALLOW_ORIGIN_EMPTY === false);
+    if (!vacioPermitido) Logger.log('Origen vacio rechazado (ALLOW_ORIGIN_EMPTY=false)');
+    return vacioPermitido;
   }
 
   for (var i = 0; i < allowed.length; i++) {
     var a = String(allowed[i] || '').trim();
     if (!a) continue;
     if (a === origin) return true;
+    // En desarrollo se acepta cualquier puerto local si hay alguno declarado.
     if (isLocal && (a.indexOf('http://localhost') === 0 || a.indexOf('http://127.0.0.1') === 0)) return true;
   }
   return false;

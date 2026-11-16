@@ -339,6 +339,33 @@ a:hover { color: var(--pub-primary-dark); }
 }
 .pub-videos a:hover { background: var(--pub-primary-softer); border-color: #bfe8cf; color: var(--pub-primary-dark); }
 
+/* Vídeo con click-to-load: sin peticiones al proveedor hasta pulsar. */
+.pub-embed {
+  position: relative; overflow: hidden;
+  aspect-ratio: 16 / 9; width: 100%;
+  border-radius: 16px; border: 1px solid var(--pub-border);
+  background: linear-gradient(135deg, #10331f 0%, #1d5a33 55%, #0f5f31 100%);
+}
+.pub-embed-play {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .55rem;
+  padding: 1rem; border: 0; background: transparent; color: #fff; cursor: pointer;
+  font: inherit; text-align: center;
+  transition: background var(--pub-ease);
+}
+.pub-embed-play:hover, .pub-embed-play:focus-visible { background: rgba(0, 0, 0, .18); }
+.pub-embed-icon {
+  display: grid; place-items: center;
+  width: 62px; height: 62px; border-radius: 50%;
+  background: rgba(255, 255, 255, .94); color: var(--pub-primary-dark);
+  font-size: 1.4rem; line-height: 1; padding-left: .25rem;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .28);
+}
+.pub-embed-copy { display: grid; gap: .12rem; max-width: 32ch; }
+.pub-embed-copy strong { font-size: .95rem; line-height: 1.3; }
+.pub-embed-copy small { font-size: .76rem; opacity: .82; text-transform: uppercase; letter-spacing: .08em; }
+.pub-embed-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
 .pub-bloque {
   margin: 0; padding: 1rem 1.1rem;
   background: var(--pub-white); border: 1px solid var(--pub-border); border-radius: 18px;

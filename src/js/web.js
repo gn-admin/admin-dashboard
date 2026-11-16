@@ -798,10 +798,20 @@ const Web = {
     const norm = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(cfg) : cfg;
     if (!norm) return undefined;
     const base = FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(previa) : previa;
-    const out = { plantilla: norm.plantilla, bloques: norm.bloques, mostrarLectura: norm.mostrarLectura };
+    const out = {
+      plantilla: norm.plantilla,
+      bloques: norm.bloques,
+      orden: norm.orden,
+      videoModo: norm.videoModo === 'embed' ? 'embed' : 'enlace',
+      mostrarLectura: norm.mostrarLectura
+    };
     ['icons', 'gallery', 'videos', 'cta'].forEach(k => { if (base && base[k]) out[k] = base[k]; });
-    const porDefecto = out.plantilla === 'ficha' && out.mostrarLectura &&
-      Object.keys(out.bloques || {}).every(k => out.bloques[k] === true);
+    // Etiquetas propias: vacío = heredar las de la publicación (no se envía).
+    if (Array.isArray(norm.tags) && norm.tags.length) out.tags = norm.tags;
+    const ordenDef = (FC && FC.ORDEN_DEF ? FC.ORDEN_DEF : ['datos', 'etiquetas', 'contenido', 'galeria', 'videos', 'fichaAnimal', 'cta']).join(',');
+    const porDefecto = out.plantilla === 'ficha' && out.mostrarLectura && out.videoModo === 'enlace' &&
+      Object.keys(out.bloques || {}).every(k => out.bloques[k] === true) &&
+      out.orden.join(',') === ordenDef && !out.tags;
     if (!base && porDefecto) return undefined;
     return out;
   },
@@ -809,37 +819,99 @@ const Web = {
   _leerFichaPresentacion(prefijo) {
     const el = id => document.getElementById(prefijo + id);
     const bloques = {};
-    [['datos', 'bloque-datos'], ['galeria', 'bloque-galeria'], ['videos', 'bloque-videos'],
-      ['fichaAnimal', 'bloque-animal'], ['etiquetas', 'bloque-etiquetas'], ['cta', 'bloque-cta']]
+    [['datos', 'bloque-datos'], ['etiquetas', 'bloque-etiquetas'], ['contenido', 'bloque-contenido'],
+      ['galeria', 'bloque-galeria'], ['videos', 'bloque-videos'], ['fichaAnimal', 'bloque-animal'],
+      ['cta', 'bloque-cta']]
       .forEach(([clave, id]) => { const c = el(id); bloques[clave] = c ? !!c.checked : true; });
     const sel = el('ficha-plantilla');
     const lectura = el('ficha-lectura');
+    const modo = el('ficha-video-modo');
+    const tagsInput = el('ficha-tags');
+    const ordenInput = el('ficha-orden');
+    let orden;
+    if (ordenInput && ordenInput.value) {
+      try { orden = JSON.parse(ordenInput.value); } catch (e) { orden = undefined; }
+    }
     return this._fichaPresentacion(this._webFichaForm, {
       plantilla: sel && sel.value === 'historia' ? 'historia' : 'ficha',
       bloques: bloques,
-      mostrarLectura: lectura ? !!lectura.checked : true
+      orden: orden,
+      videoModo: modo && modo.value === 'embed' ? 'embed' : 'enlace',
+      mostrarLectura: lectura ? !!lectura.checked : true,
+      tags: tagsInput ? this.parseLista(tagsInput.value) : []
     });
   },
 
-  /** Controles de presentación de la ficha (plantilla, bloques y lectura). */
+  /** Sube/baja un bloque en el orden de la ficha (botones ↑/↓ del gestor). */
+  moverFichaBloque(el, dir) {
+    const prefijo = (el && el.getAttribute && el.getAttribute('data-prefijo')) || 'web-';
+    const lista = document.getElementById(prefijo + 'ficha-orden-lista');
+    const input = document.getElementById(prefijo + 'ficha-orden');
+    if (!lista || !input) return;
+    const filas = Array.from(lista.querySelectorAll('[data-bloque]'));
+    const fila = el && el.closest ? el.closest('[data-bloque]') : null;
+    const idx = filas.indexOf(fila);
+    const nuevo = idx + Number(dir || 0);
+    if (idx < 0 || nuevo < 0 || nuevo >= filas.length) return;
+    if (nuevo > idx) filas[nuevo].after(fila); else filas[nuevo].before(fila);
+    const orden = Array.from(lista.querySelectorAll('[data-bloque]')).map(f => f.getAttribute('data-bloque'));
+    input.value = JSON.stringify(orden);
+    Array.from(lista.querySelectorAll('[data-bloque]')).forEach((f, i) => {
+      const arriba = f.querySelector('[data-mover="-1"]');
+      const abajo = f.querySelector('[data-mover="1"]');
+      if (arriba) arriba.disabled = i === 0;
+      if (abajo) abajo.disabled = i === lista.querySelectorAll('[data-bloque]').length - 1;
+    });
+  },
+
+  /** Controles de presentación de la ficha (plantilla, bloques, orden, vídeo y lectura). */
   _fichaPresentacionHtml(prefijo, ficha, incluirAnimal) {
     const FC = typeof FichaConfig !== 'undefined' ? FichaConfig : null;
     const cfg = (FC && typeof FC.normalizarFicha === 'function' ? FC.normalizarFicha(ficha) : ficha) || {};
-    const def = { datos: true, galeria: true, videos: true, fichaAnimal: true, etiquetas: true, cta: true };
+    const def = (FC && FC.BLOQUES_DEF) || { datos: true, etiquetas: true, contenido: true, galeria: true, videos: true, fichaAnimal: true, cta: true };
     const b = Object.assign({}, def, cfg.bloques || {});
-    const bloques = [['datos', 'datos', 'Datos destacados'], ['galeria', 'galeria', 'Galería'], ['videos', 'videos', 'Vídeos'],
-      ['fichaAnimal', 'animal', 'Ficha del animal'], ['etiquetas', 'etiquetas', 'Etiquetas'], ['cta', 'cta', 'Botones CTA']]
-      .filter(b => incluirAnimal !== false || b[0] !== 'fichaAnimal');
+    const orden = (FC && typeof FC.normalizarOrden === 'function' ? FC.normalizarOrden(cfg.orden) : (FC && FC.ORDEN_DEF) || Object.keys(def));
+    const labels = {
+      datos: 'Datos destacados',
+      etiquetas: 'Etiquetas',
+      contenido: 'Sobre este caso',
+      galeria: 'Galería',
+      videos: 'Vídeos',
+      fichaAnimal: 'Ficha del animal',
+      cta: 'Botones CTA'
+    };
+    const ids = { datos: 'datos', etiquetas: 'etiquetas', contenido: 'contenido', galeria: 'galeria', videos: 'videos', fichaAnimal: 'animal', cta: 'cta' };
+    const bloques = orden.filter(k => incluirAnimal !== false || k !== 'fichaAnimal');
+    const videoModo = cfg.videoModo === 'embed' ? 'embed' : 'enlace';
+    const tags = Array.isArray(cfg.tags) ? cfg.tags.join(', ') : '';
     return `<div class="form-group"><label for="${prefijo}ficha-plantilla">Plantilla de la ficha</label>
         <select id="${prefijo}ficha-plantilla" class="form-input">
           <option value="ficha" ${cfg.plantilla !== 'historia' ? 'selected' : ''}>Ficha (datos y animal)</option>
           <option value="historia" ${cfg.plantilla === 'historia' ? 'selected' : ''}>Historia (sin ficha de animal)</option>
         </select></div>
-      <div class="web-bloques">
-        ${bloques.map(([clave, id, label]) => `<div class="form-group"><label><input type="checkbox" id="${prefijo}bloque-${id}" ${b[clave] !== false ? 'checked' : ''}> ${label}</label></div>`).join('')}
+      <div class="form-group"><label>Bloques y orden</label>
+        <div class="web-bloques-orden" id="${prefijo}ficha-orden-lista">
+          ${bloques.map((k, i) => `<div class="web-bloque-fila" data-bloque="${this._esc(k)}">
+            <label class="web-bloque-check"><input type="checkbox" id="${prefijo}bloque-${ids[k] || k}" ${b[k] !== false ? 'checked' : ''}> ${labels[k] || k}</label>
+            <span class="web-bloque-controles">
+              <button type="button" class="btn btn-outline-green btn-sm" data-action="moverFichaBloque" data-pass="el" data-arg0="-1" data-prefijo="${this._esc(prefijo)}" data-mover="-1" aria-label="Subir ${labels[k] || k}" ${i === 0 ? 'disabled' : ''}>↑</button>
+              <button type="button" class="btn btn-outline-green btn-sm" data-action="moverFichaBloque" data-pass="el" data-arg0="1" data-prefijo="${this._esc(prefijo)}" data-mover="1" aria-label="Bajar ${labels[k] || k}" ${i === bloques.length - 1 ? 'disabled' : ''}>↓</button>
+            </span>
+          </div>`).join('')}
+        </div>
+        <input type="hidden" id="${prefijo}ficha-orden" value="${this._esc(JSON.stringify(orden))}">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="${prefijo}ficha-video-modo">Vídeos</label>
+          <select id="${prefijo}ficha-video-modo" class="form-input">
+            <option value="enlace" ${videoModo !== 'embed' ? 'selected' : ''}>Enlace externo (sin cookies)</option>
+            <option value="embed" ${videoModo === 'embed' ? 'selected' : ''}>Reproductor integrado (click-to-load)</option>
+          </select></div>
+        <div class="form-group"><label for="${prefijo}ficha-tags">Etiquetas de la ficha (vacío = heredar)</label>
+          <input type="text" id="${prefijo}ficha-tags" class="form-input" value="${this._esc(tags)}" placeholder="perro, adopcion"></div>
       </div>
       <div class="form-group"><label><input type="checkbox" id="${prefijo}ficha-lectura" ${cfg.mostrarLectura !== false ? 'checked' : ''}> Mostrar tiempo de lectura</label></div>
-      <p class="web-slug-hint">Se aplica en la ficha y en el prerender; los listados no la cargan. Si no tocas nada se mantiene el comportamiento actual.</p>`;
+      <p class="web-slug-hint">El orden manda en la ficha y en el prerender; los listados no cargan la ficha. Si no tocas nada se mantiene el comportamiento actual.</p>`;
   },
 
   _leerArchivoBase64(file) {

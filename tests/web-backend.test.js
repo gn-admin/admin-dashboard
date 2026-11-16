@@ -408,8 +408,43 @@ describe('ficha configurable (C3)', () => {
     assert.equal(lista.data[0].ficha, undefined, 'los listados no cargan la ficha');
     const detalle = b.ctx.webPublicacionPublica('luna');
     assert.equal(detalle.data.ficha.plantilla, 'historia');
+    assert.equal(detalle.data.ficha.videoModo, 'enlace');
+    assert.equal(detalle.data.ficha.orden.length, 7);
+    assert.equal(detalle.data.ficha.bloques.contenido, true);
     assert.equal(detalle.data.cta.kind, 'adopcion');
     assert.equal(b.ctx.webPreviewAnimal('ani_1').data.ficha.plantilla, 'historia');
+  });
+
+  it('normaliza orden, videoModo y etiquetas propias', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const r = alta(b, {
+      orden: ['cta', 'datos', 'raro', 'cta'],
+      videoModo: 'embed',
+      tags: ['perro', ' perro ', 'x'.repeat(60), 'gato']
+    });
+    assert.equal(r.status, 'success');
+    const f = JSON.parse(b.estado.publicaciones[0].ficha_json);
+    assert.deepEqual(f.orden.slice(0, 3), ['cta', 'datos', 'etiquetas']);
+    assert.equal(f.orden.length, 7);
+    assert.equal(f.videoModo, 'embed');
+    assert.deepEqual(f.tags, ['perro', 'x'.repeat(40), 'gato']);
+    const detalle = b.ctx.webPublicacionPublica('luna').data;
+    assert.equal(detalle.ficha.videoModo, 'embed');
+    assert.deepEqual(plano(detalle.ficha.tags), ['perro', 'x'.repeat(40), 'gato']);
+  });
+
+  it('webFichaSegura completa fichas antiguas y descarta vídeos inseguros', () => {
+    const b = crearBackend();
+    const legacy = b.ctx.webFichaSegura({
+      plantilla: 'ficha',
+      videos: [{ url: 'javascript:alert(1)' }, { url: 'https://youtu.be/abc123XYZ' }]
+    });
+    assert.equal(legacy.orden.length, 7);
+    assert.equal(legacy.videoModo, 'enlace');
+    assert.equal(legacy.bloques.contenido, true);
+    assert.equal(legacy.videos.length, 1);
+    assert.equal(legacy.videos[0].url, 'https://youtu.be/abc123XYZ');
   });
 
   it('cierra valores no válidos y rechaza fichas que no son objeto', () => {

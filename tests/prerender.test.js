@@ -75,9 +75,11 @@ test('paginaEstatica prerenderiza el contenido y resuelve la imagen OG', () => {
   assert.match(html, /<meta property="og:image" content="https:\/\/gn-admin\.github\.io\/admin-dashboard\/publicaciones\/assets\/fotos\/laia\.jpg">/);
 });
 
-test('paginaEstatica no arrastra scripts ni enlaces de hash', () => {
+test('paginaEstatica solo carga el runtime de vídeo y no enlaces de hash', () => {
   const html = prerender.paginaEstatica(muestra, BASE);
-  assert.equal(/<script src=/.test(html), false);
+  assert.equal(/<script src="\.\.\/js\/publico-embed\.js"><\/script>/.test(html), true);
+  assert.equal(/js\/publico\.js/.test(html), false);
+  assert.equal(/<script>(?![^]*application\/ld\+json)/.test(html), false);
   assert.equal(/href="#\//.test(html), false);
   assert.match(html, /href="\.\.\/publico\.html"/);
 });
@@ -131,7 +133,7 @@ test('anotacion produce comandos de GitHub Actions escapados', () => {
   assert.equal(prerender.anotacion('error', 'sin salto'), '::error::sin salto');
 });
 
-test('fixture ficha normal: HTML completo sin JavaScript', async () => {
+test('fixture ficha normal: HTML estático con solo el runtime de vídeo', async () => {
   const { out } = await generar('ficha-normal.json');
   try {
     const html = fs.readFileSync(path.join(out, 'publicaciones', 'laia.html'), 'utf8');
@@ -144,7 +146,9 @@ test('fixture ficha normal: HTML completo sin JavaScript', async () => {
     assert.match(html, /Border collie de 4 años/);
     assert.match(html, /alt="Laia jugando en el parque"/);
     assert.match(html, /<figcaption>Laia en el parque<\/figcaption>/);
-    assert.doesNotMatch(html, /<script src=/);
+    // Las páginas estáticas no cargan el visor (SPA); solo el runtime de vídeo.
+    assert.match(html, /<script src="\.\.\/js\/publico-embed\.js"><\/script>/);
+    assert.doesNotMatch(html, /js\/publico\.js/);
     const sitemap = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8');
     assert.equal((sitemap.match(/<url>/g) || []).length, 2);
   } finally {
