@@ -368,6 +368,33 @@ const PdfExport = {
       return `<div class="clausula">${parrafos}${lista}</div>`;
     }).join('');
 
+    // Cláusula especial de mayores de 65: página propia y solo si se marcó.
+    const r65 = (typeof Dashboard !== 'undefined' && Dashboard._contratoResponsable65)
+      ? Dashboard._contratoResponsable65(c)
+      : ((c.adoptante_mayor_65 && /^(1|si|sí|true|on|x)$/i.test(String(c.adoptante_mayor_65))) || c.responsable_nombre ? c : null);
+    const k65 = T && T.clausula65;
+    const clausula65 = (r65 && k65) ? `
+      <div class="page-break"></div>
+      <h2>${this._esc(k65.titulo)}</h2>
+      ${k65.parrafos.map(p => `<p>${this._esc(p)}</p>`).join('')}
+      <h2>Datos de la persona responsable designada</h2>
+      <div class="grid">
+        ${field('Nombre completo', r65.responsable_nombre)}
+        ${field('DNI/NIE', r65.responsable_dni)}
+        ${field('Teléfono de contacto', r65.responsable_telefono)}
+        ${field('Correo electrónico', r65.responsable_email)}
+        ${field('Dirección', r65.responsable_direccion, 'grid-full')}
+      </div>
+      <p>En <b>${this._esc(c.ciudad || 'Irún')}</b>, a <b>${fecha}</b>.</p>
+      <div class="signatures">
+        ${firmaAdoptante}
+        <div class="signature">
+          <div class="sig-label">Firma de la persona responsable</div>
+          <div class="firma-fila"></div>
+          <div class="sig-line">${this._esc(r65.responsable_nombre || '—')}${r65.responsable_dni ? ' &middot; DNI/NIE ' + this._esc(r65.responsable_dni) : ''}</div>
+        </div>
+      </div>` : '';
+
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
       <title>Contrato de adopción</title>
       <style>
@@ -450,6 +477,8 @@ const PdfExport = {
         ${firmaEntidad}
       </div>
 
+      ${clausula65}
+
       <div class="footer">Generado por Grupo Nebak · ${this._hoy()}</div>
     </body></html>`;
   },
@@ -459,133 +488,134 @@ const PdfExport = {
     return this._printAsync(`Contrato-Acogida-${id}.pdf`, (logo) => this._buildContratoAcogida(c, logo));
   },
 
-  // Documento opcional de acogida temporal. Se construye con los datos que ya
-  // existen en el caso, sin guardar nada nuevo ni condicionar las fases.
+  // Contrato de acogida temporal: replica el documento de la asociación
+  // (`contratoacogida EN BLANCO.doc`), con su texto literal y su maqueta de
+  // formulario. Sigue siendo opcional: no condiciona las fases de la acogida.
   _contratoAcogidaBody(c, logo) {
+    const T = (typeof module !== 'undefined' && module.exports)
+      ? require('./acogida-textos.js')
+      : (typeof AcogidaTextos !== 'undefined' ? AcogidaTextos : null);
     const caso = c || {};
     const animal = caso.animal || {};
     const familia = caso.familia || {};
     const fecha = this._fmtFecha(caso.fecha || this._hoy());
-    const inicio = caso.inicio ? this._fmtFecha(caso.inicio) : '—';
-    const fase = ({ entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' })[caso.fase] || caso.fase || 'Acogida';
-    const ciudad = caso.ciudad || familia.ubicacion || '[ciudad]';
-    const nombre = familia.nombre || '[familia acogedora]';
-    const field = (label, value) => `<div><span class="label">${this._esc(label)}</span>${this._esc(value || '—')}</div>`;
     const siNo = v => (v === true || /^(si|sí|true|1)$/i.test(String(v)))
-      ? 'Si'
+      ? 'Sí'
       : ((v === false || /^(no|false|0)$/i.test(String(v))) ? 'No' : '—');
+    const box = on => (on ? '☒' : '☐');
+    // El material puede llegar como lista guardada o como texto separado.
+    const material = (Array.isArray(caso.material) ? caso.material : String(caso.material || '').split(/[|,;]/))
+      .map(x => String(x).trim())
+      .filter(Boolean);
+    const tiene = nombre => material.some(m => m.toLowerCase() === String(nombre).toLowerCase());
     let foto = animal.foto || '';
     if (foto && !/^(data:|https?:|blob:)/i.test(foto) && typeof document !== 'undefined') {
       try { foto = new URL(foto, document.baseURI).href; } catch { /* ruta no valida: se deja tal cual */ }
     }
     const fotoHtml = foto
       ? `<img src="${this._esc(foto)}" alt="${this._esc(animal.nombre || 'Animal')}">`
-      : '<div class="contrato-doc-foto-vacia">Sin foto</div>';
+      : '<span class="acogida-foto-vacia">FOTO ANIMAL</span>';
+    const titulo = T ? T.titulo : 'Contrato de acogida temporal de un animal de compañía';
+    const condiciones = (T ? T.condiciones : []).map((texto, i) =>
+      `<div class="acogida-cond"><b>${i + 1}-</b> ${this._esc(texto)}</div>`).join('');
+    const materialHtml = (T ? T.material : []).map(nombre =>
+      `<div class="acogida-material-item">${box(tiene(nombre))} ${this._esc(nombre)}</div>`).join('');
+    const field = (label, value, cls) => `<div${cls ? ` class="${cls}"` : ''}><div class="label">${this._esc(label)}</div>${this._esc(value || '—')}</div>`;
+    const poblacion = familia.poblacion || familia.ubicacion || '';
     return `
-      <div class="contrato-doc-header">
-        <img src="${this._esc(logo || 'assets/icons/logo-nebak.jpg')}" alt="Grupo Nebak">
-        <div><div class="contrato-doc-title">Contrato de acogida temporal</div><div class="contrato-doc-sub">Asociación Grupo Nebak · Expediente ${this._esc(caso.id || '—')}</div></div>
+      <div class="acogida-header">
+        <img src="${this._esc(logo || 'assets/contratos/logo-nebak-horizontal.jpg')}" alt="Grupo Nebak">
+        <h1 class="acogida-title">${this._esc(titulo)}</h1>
       </div>
-      <div class="contrato-doc-meta">
-        <div><span class="label">Familia acogedora</span><b>${this._esc(nombre)}</b></div>
-        <div><span class="label">Animal</span><b>${this._esc(animal.nombre || '—')}</b></div>
-        <div><span class="label">Inicio</span>${this._esc(inicio)}</div>
-        <div><span class="label">Fase</span>${this._esc(fase)}</div>
-      </div>
-      <p>En <b>${this._esc(ciudad)}</b>, a <b>${this._esc(fecha)}</b>, entre la <b>Asociación Grupo Nebak</b> (en adelante, "la entidad") y <b>${this._esc(nombre)}</b>, con DNI/NIE <b>${this._esc(familia.dni || '—')}</b>, se formaliza el presente <b>contrato de acogida temporal</b> del animal:</p>
 
-      <h3>1. Datos del animal</h3>
-      <div class="contrato-doc-animal">
-        <div class="contrato-doc-foto">${fotoHtml}</div>
-        <div class="contrato-doc-datos contrato-doc-grid">
-          ${field('Nombre', animal.nombre)}
-          ${field('Especie', animal.especie)}
-          ${field('Raza', animal.raza)}
-          ${field('Sexo', animal.sexo)}
-          ${field('Edad', animal.edad)}
-          ${field('Fecha de nacimiento', animal.fecha_nacimiento ? this._fmtFecha(animal.fecha_nacimiento) : '')}
-          ${field('Microchip', animal.microchip)}
-          ${field('Peso', animal.peso)}
-          ${field('Esterilización', siNo(animal.esterilizada))}
+      <div class="acogida-top">
+        <div class="acogida-foto">${fotoHtml}</div>
+        <div class="acogida-partes">
+          <p>D./Dña. <b>${this._esc(familia.nombre || '[casa de acogida]')}</b>, con DNI/NIF <b>${this._esc(familia.nif || familia.dni || '')}</b>, con domicilio en <b>${this._esc(familia.direccion || '')}</b>.</p>
+          <p>Población <b>${this._esc(poblacion)}</b> &middot; Provincia <b>${this._esc(familia.provincia || '')}</b> &middot; Cód. Postal <b>${this._esc(familia.codigo_postal || '')}</b></p>
+          <p>Teléfonos <b>${this._esc(familia.telefono || '')}</b>${familia.email ? ` &middot; Email <b>${this._esc(familia.email)}</b>` : ''}</p>
+          <p>Con fecha <b>${this._esc(fecha)}</b> acojo temporalmente al siguiente animal:</p>
         </div>
       </div>
-      ${animal.descripcion ? `<p><b>Descripción:</b> ${this._esc(animal.descripcion)}</p>` : ''}
 
-      <h3>2. Datos de la familia acogedora</h3>
-      <div class="contrato-doc-grid">
-        ${field('Nombre y apellidos', nombre)}
-        ${field('DNI/NIE', familia.dni)}
-        ${field('Domicilio', familia.direccion)}
-        ${field('Email', familia.email)}
-        ${field('Teléfono', familia.telefono)}
-        ${field('Ubicación', familia.ubicacion)}
+      <div class="acogida-animal">
+        ${field('Nombre', animal.nombre)}
+        ${field('Sexo', animal.sexo)}
+        ${field('Edad', animal.edad)}
+        ${field('Capa', animal.capa)}
+        ${field('Marcas', animal.marcas || animal.color)}
+        <div><div class="label">Esterilizado</div>${box(siNo(animal.esterilizada) === 'Sí')} SÍ &nbsp;&nbsp; ${box(siNo(animal.esterilizada) === 'No')} NO</div>
+        ${field('Microchip n.º', animal.microchip)}
+        ${field('Pasaporte n.º', animal.pasaporte)}
+        ${field('Otros rasgos distintivos', animal.otros_rasgos || animal.descripcion, 'acogida-full')}
       </div>
 
-      <h3>3. Datos de la acogida</h3>
-      <div class="contrato-doc-grid">
-        ${field('Fecha de inicio', inicio)}
-        ${field('Fase actual', fase)}
-        ${field('Carácter', 'Temporal')}
-        ${field('Expediente', caso.id)}
+      <div class="acogida-condiciones">${condiciones}</div>
+
+      <div class="acogida-material">
+        <p>${this._esc(T ? T.materialIntro : '')}</p>
+        <div class="acogida-material-grid">${materialHtml}</div>
+        <p class="acogida-material-otros">${this._esc(T ? T.materialOtros : 'Otros (detallar):')} ______________________________</p>
       </div>
-      <p>La acogida se mantiene hasta que la entidad y la familia acuerden el retorno del animal o su paso a adopción.</p>
 
-      <h3>4. Condiciones</h3>
-      <p><b>1. Carácter temporal.</b> El animal permanece bajo la titularidad de la entidad. La familia acogedora lo tiene en custodia temporal y no adquiere derechos de propiedad sobre él.</p>
-      <p><b>2. Cuidados.</b> La familia se compromete a proporcionarle alimentación, agua, higiene, refugio, ejercicio, compañía y un trato responsable, adaptados a su especie y necesidades.</p>
-      <p><b>3. Salud y veterinario.</b> Seguirá las indicaciones de la entidad y las pautas veterinarias, y comunicará sin demora cualquier problema de salud, accidente o urgencia.</p>
-      <p><b>4. Prohibiciones.</b> No podrá vender, regalar, ceder, criar ni abandonar al animal, ni utilizarlo para fines lucrativos, de guarda o espectáculos.</p>
-      <p><b>5. Devolución.</b> Si no puede continuar con la acogida, deberá avisar a la entidad y devolverle el animal. Nunca lo abandonará ni lo entregará a terceros sin autorización.</p>
-      <p><b>6. Seguimiento.</b> La familia facilitará el contacto y las visitas de seguimiento de la entidad e informará de cualquier cambio de domicilio o teléfono, pérdida, robo, desaparición o fallecimiento del animal.</p>
-      <p><b>7. Gastos.</b> Los gastos ordinarios y extraordinarios se acordarán previamente con la entidad. La familia conservará los justificantes y los pondrá a disposición de la entidad.</p>
-      <p><b>8. Incumplimiento.</b> El incumplimiento de estas condiciones facultará a la entidad para recuperar al animal y ejercer las acciones que correspondan.</p>
+      <p class="acogida-acepta">${this._esc(T ? T.aceptacion : '')}</p>
 
-      <h3>5. Firmas</h3>
-      <div class="contrato-doc-firmas">
-        <div class="contrato-doc-firma">
-          <div class="contrato-doc-firma-label">Familia acogedora</div>
-          <div class="contrato-doc-firma-espacio"></div>
-          <b>${this._esc(nombre)}</b><small>DNI/NIE ${this._esc(familia.dni || '—')}</small>
+      <div class="acogida-firmas">
+        <div class="acogida-firma">
+          <div class="acogida-firma-linea"></div>
+          <div class="acogida-firma-label">${this._esc(T ? T.firmas.entidad : 'Firma o sello Asociación Grupo Nebak')}</div>
         </div>
-        <div class="contrato-doc-firma">
-          <div class="contrato-doc-firma-label">Por Grupo Nebak</div>
-          <div class="contrato-doc-firma-espacio"></div>
-          <b>Asociación Grupo Nebak</b><small>Entidad</small>
+        <div class="acogida-firma">
+          <div class="acogida-firma-linea"></div>
+          <div class="acogida-firma-label">${this._esc(T ? T.firmas.familia : 'Firma Casa de Acogida')}</div>
+          <b>${this._esc(familia.nombre || '')}</b>
+          <small>DNI/NIF ${this._esc(familia.nif || familia.dni || '—')}</small>
         </div>
       </div>
-      <div class="contrato-doc-nota"><b>Documento opcional.</b> Es un apoyo para el expediente y para firmar en papel. No es obligatorio y no bloquea el avance de la acogida.</div>`;
+
+      <div class="acogida-pie">
+        ${(T ? T.pie : []).map(l => `<span>${this._esc(l)}</span>`).join('')}
+        <span class="acogida-modelo">Modelo v${this._esc(T ? T.version : '1.0')} · ${this._esc(T ? T.fecha : '')} · Expediente ${this._esc(caso.id || '—')}</span>
+      </div>`;
   },
 
   _buildContratoAcogida(c, logo) {
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>Contrato de Acogida</title>
+      <title>Contrato de acogida temporal</title>
       <style>
-        @page{size:A4;margin:2cm}
-        body{font:11pt/1.6 Arial,sans-serif;color:#191919;padding:0;margin:0}
-        .contrato-doc{font-size:10.5pt;line-height:1.55}
-        .contrato-doc-header{display:flex;align-items:center;gap:16px;padding-bottom:16px;margin-bottom:20px;border-bottom:3px solid #1FC95B}
-        .contrato-doc-header img{width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid #1FC95B;flex-shrink:0}
-        .contrato-doc-title{font-size:16pt;font-weight:800;color:#191919}
-        .contrato-doc-sub{font-size:9pt;color:#757575}
-        .contrato-doc-meta{display:flex;flex-wrap:wrap;gap:8px 28px;padding:12px 14px;margin-bottom:18px;background:#f9fafb;border:1px solid #e8eaed;border-radius:8px;font-size:9.5pt}
-        .contrato-doc-meta .label{display:block;font-size:7.5pt;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#9aa0a6}
-        .contrato-doc h3{font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e8eaed;break-after:avoid}
-        .contrato-doc p{margin:0 0 9px;text-align:justify}
-        .contrato-doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;font-size:10pt}
-        .contrato-doc-grid .label{display:block;font-size:7.5pt;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:#9aa0a6}
-        .contrato-doc-animal{display:flex;gap:16px;align-items:flex-start;margin-bottom:12px;break-inside:avoid}
-        .contrato-doc-foto{flex:0 0 120px;width:120px;height:120px;overflow:hidden;border:1px solid #e8eaed;border-radius:8px;background:#f4f5f7}
-        .contrato-doc-foto img{display:block;width:100%;height:100%;object-fit:cover}
-        .contrato-doc-foto-vacia{height:100%;display:flex;align-items:center;justify-content:center;padding:8px;color:#9aa0a6;font-size:8pt;text-align:center}
-        .contrato-doc-datos{flex:1;min-width:0}
-        .contrato-doc-firmas{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:32px;margin-top:30px;break-inside:avoid}
-        .contrato-doc-firma{padding-top:6px;border-top:1px solid #191919;font-size:9pt;color:#4b5563}
-        .contrato-doc-firma-label{font-size:7.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#6b7280}
-        .contrato-doc-firma-espacio{height:54px;border-bottom:1px solid #9ca3af}
-        .contrato-doc-firma b{display:block;margin-top:4px}
-        .contrato-doc-firma small{display:block;margin-top:2px;color:#6b7280}
-        .contrato-doc-nota{margin-top:18px;padding:10px 12px;border-radius:8px;background:#ebf5fb;color:#374151;font-size:8pt}
-      </style></head><body><div class="contrato-doc">${this._contratoAcogidaBody(c, logo)}</div></body></html>`;
+        @page{size:A4;margin:1.8cm 2cm}
+        body{font:10pt/1.45 Arial,sans-serif;color:#191919;padding:0;margin:0}
+        .acogida-header{display:flex;align-items:center;gap:14px;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1FC95B}
+        .acogida-header img{width:150px;max-height:52px;object-fit:contain;flex-shrink:0}
+        .acogida-title{font-size:13pt;font-weight:800;text-transform:uppercase;letter-spacing:.4px;line-height:1.2;margin:0}
+        .acogida-top{display:flex;gap:16px;align-items:flex-start;margin-bottom:12px}
+        .acogida-foto{flex:0 0 120px;width:120px;height:140px;border:1px solid #9ca3af;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f4f5f7}
+        .acogida-foto img{display:block;width:100%;height:100%;object-fit:cover}
+        .acogida-foto-vacia{font-size:7.5pt;color:#9aa0a6;letter-spacing:.5px}
+        .acogida-partes{flex:1;min-width:0}
+        .acogida-partes p{margin:0 0 5px}
+        .acogida-partes b{font-weight:600}
+        .acogida-animal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 18px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:12px;font-size:9.5pt;break-inside:avoid}
+        .acogida-animal .label{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#9aa0a6}
+        .acogida-full{grid-column:1 / -1}
+        .acogida-condiciones{margin-bottom:10px}
+        .acogida-cond{margin:0 0 5px;font-size:9.5pt;text-align:justify}
+        .acogida-cond b{font-weight:700}
+        .acogida-material{margin:0 0 10px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;break-inside:avoid}
+        .acogida-material p{margin:0 0 6px;font-size:9pt}
+        .acogida-material-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 18px;font-size:9pt}
+        .acogida-material-item{white-space:nowrap}
+        .acogida-material-otros{margin:6px 0 0!important}
+        .acogida-acepta{font-size:9.5pt;text-align:justify;margin:0 0 14px}
+        .acogida-firmas{display:flex;gap:40px;margin:10px 0 18px;break-inside:avoid}
+        .acogida-firma{flex:1;min-width:0;font-size:9pt}
+        .acogida-firma-linea{height:54px;border-bottom:1px solid #191919}
+        .acogida-firma-label{margin-top:4px;font-size:8pt;color:#4b5563}
+        .acogida-firma b{display:block;margin-top:2px}
+        .acogida-firma small{display:block;color:#6b7280}
+        .acogida-pie{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 14px;border-top:1px solid #e5e7eb;padding-top:8px;font-size:8pt;color:#6b7280;text-align:center}
+        .acogida-pie .acogida-modelo{flex-basis:100%;font-size:7pt;color:#9aa0a6}
+      </style></head><body><div class="acogida-doc">${this._contratoAcogidaBody(c, logo)}</div></body></html>`;
   },
 
   exportMemoria(m) {

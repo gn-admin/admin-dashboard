@@ -1315,6 +1315,36 @@ describe('_contratoTutor: tutor real vs entidad', () => {
   });
 });
 
+describe('_contratoResponsable65: cláusula de mayores de 65', () => {
+  it('solo existe si se marca la edad o hay datos de la persona', () => {
+    assert.equal(Dashboard._contratoResponsable65({}), null);
+    assert.equal(Dashboard._contratoResponsable65({ adoptante_mayor_65: '' }), null);
+    assert.ok(Dashboard._contratoResponsable65({ adoptante_mayor_65: '1' }));
+    assert.ok(Dashboard._contratoResponsable65({ responsable_nombre: 'Luis' }));
+  });
+
+  it('el contrato muestra el texto literal, los datos y las dos firmas', () => {
+    const c = {
+      f1_nombre: 'Ana', f1_dni: '1', adoptante_mayor_65: '1',
+      responsable_nombre: 'Luis', responsable_dni: '2', responsable_telefono: '600',
+      responsable_email: 'l@x.es', responsable_direccion: 'Calle 1'
+    };
+    const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana', animal: 'Luna' }, c);
+    assert.match(html, /adoptantes mayores de 65 años/);
+    assert.match(html, /48 horas/);
+    assert.match(html, /recuperar al animal/);
+    assert.match(html, /Luis/);
+    assert.match(html, /DNI\/NIE 2/);
+    assert.match(html, /Firma de la persona responsable/);
+  });
+
+  it('sin marca no aparece, ni en el contrato ni en la hoja', () => {
+    const c = { f1_nombre: 'Ana', f1_dni: '1' };
+    assert.doesNotMatch(Dashboard._contratoTerminosHtml({ adoptante: 'Ana' }, c), /mayores de 65 años/);
+    assert.doesNotMatch(Dashboard._terminosAdopcionHtml({ adoptante: 'Ana' }, c), /mayores de 65 años/);
+  });
+});
+
 describe('_contratoAcogidaDatos: documento opcional de acogida', () => {
   it('mezcla caso, animal, familia y datos de la solicitud', () => {
     const prev = { animales: Dashboard.animales, familias: Dashboard.familias, responses: Dashboard.responses };
@@ -1336,6 +1366,9 @@ describe('_contratoAcogidaDatos: documento opcional de acogida', () => {
       assert.equal(d.ciudad, 'Irun');
       assert.equal(d.inicio, '2026-01-02');
       assert.equal(d.fase, 'en_casa');
+      assert.equal(d.familia.nif, '12345678A');
+      assert.equal(d.familia.poblacion, 'Irun');
+      assert.deepEqual(d.material, []);
       assert.match(d.fecha, /^\d{4}-\d{2}-\d{2}$/);
     } finally {
       Dashboard.animales = prev.animales;

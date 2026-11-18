@@ -3410,6 +3410,210 @@ select.form-input {
   font-size: var(--text-xs);
 }
 
+/* Cláusula especial de mayores de 65: cierra el contrato en su propia hoja
+   (el PDF la manda a una página nueva con `.page-break`). */
+.contrato-doc-clausula65 {
+  margin-top: 26px;
+}
+
+/* Contrato de acogida: misma maqueta que el PDF, para la vista previa del
+   modal. Es el formulario de una cara de la asociación: foto, partes,
+   parrilla del animal, condiciones, material, aceptación y firmas. */
+.acogida-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+  border-bottom: 3px solid var(--primary);
+}
+
+.acogida-header img {
+  width: 150px;
+  max-height: 52px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.acogida-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.acogida-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.acogida-foto {
+  flex: 0 0 120px;
+  width: 120px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--gray-50);
+}
+
+.acogida-foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.acogida-foto-vacia {
+  font-size: var(--text-2xs);
+  letter-spacing: 0.5px;
+  color: var(--gray-400);
+}
+
+.acogida-partes {
+  flex: 1;
+  min-width: 0;
+}
+
+.acogida-partes p {
+  margin: 0 0 6px;
+  text-align: justify;
+}
+
+.acogida-animal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 18px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--gray-100);
+  border-radius: 10px;
+  background: var(--gray-50);
+  font-size: var(--text-sm);
+}
+
+.acogida-animal .label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
+.acogida-full {
+  grid-column: 1 / -1;
+}
+
+.acogida-condiciones {
+  margin-bottom: 14px;
+}
+
+.acogida-cond {
+  margin: 0 0 8px;
+  font-size: var(--text-sm);
+  text-align: justify;
+}
+
+.acogida-material {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--gray-100);
+  border-radius: 10px;
+  background: var(--gray-50);
+}
+
+.acogida-material p {
+  margin: 0 0 8px;
+  font-size: var(--text-sm);
+}
+
+.acogida-material-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 18px;
+  font-size: var(--text-sm);
+}
+
+.acogida-material-item {
+  overflow-wrap: anywhere;
+}
+
+.acogida-material p.acogida-material-otros {
+  margin: 8px 0 0;
+}
+
+.acogida-acepta {
+  font-size: var(--text-sm);
+  text-align: justify;
+}
+
+.acogida-firmas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin: 22px 0;
+}
+
+.acogida-firma {
+  font-size: var(--text-xs);
+}
+
+.acogida-firma-linea {
+  height: 54px;
+  border-bottom: 1px solid var(--gray-400);
+}
+
+.acogida-firma-label {
+  margin-top: 6px;
+  color: var(--gray-500);
+}
+
+.acogida-firma b {
+  display: block;
+  margin-top: 2px;
+}
+
+.acogida-firma small {
+  display: block;
+  color: var(--gray-500);
+}
+
+.acogida-pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  border-top: 1px solid var(--gray-100);
+  padding-top: 10px;
+  font-size: var(--text-2xs);
+  color: var(--gray-500);
+  text-align: center;
+}
+
+.acogida-modelo {
+  flex-basis: 100%;
+  color: var(--gray-400);
+}
+
+@media (max-width: 640px) {
+  .acogida-top {
+    flex-direction: column;
+  }
+
+  .acogida-animal,
+  .acogida-material-grid,
+  .acogida-firmas {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Contrato de acogida: se abre en el modal de informacion para revisarlo
    antes de imprimir. El documento es opcional y no se guarda como estado. */
 .acuerdo-preview-actions {

@@ -5692,6 +5692,7 @@ const Dashboard = {
     const fam = caso.familia_id ? this._byId(this.familias || [], caso.familia_id) : null;
     const sol = this._contratoSolicitudDatos({ solicitud_id: caso.solicitud_id });
     const animal = this._contratoAnimalDatos(null, caso);
+    const aViva = caso.animal_id ? this._byId(this.animales || [], caso.animal_id) : null;
     const val = (...xs) => {
       for (const x of xs) {
         if (x !== undefined && x !== null && String(x).trim() !== '') return x;
@@ -5704,15 +5705,29 @@ const Dashboard = {
       id: caso.id || '',
       animal_id: caso.animal_id || '',
       familia_id: caso.familia_id || '',
-      animal: { ...animal, nombre: val(animal && animal.nombre, caso.animal) },
+      animal: {
+        ...animal,
+        nombre: val(animal && animal.nombre, caso.animal),
+        // Campos que solo usa el documento de acogida (el de adopción no los pide).
+        marcas: val(animal && animal.marcas, aViva && aViva.marcas),
+        pasaporte: val(animal && animal.pasaporte, aViva && aViva.pasaporte),
+        otros_rasgos: val(animal && animal.otros_rasgos, aViva && aViva.otros_rasgos)
+      },
       familia: {
         nombre: val(fam && fam.nombre, caso.familia),
         dni: val(fam && fam.dni, sol.dni),
+        nif: val(fam && fam.nif, fam && fam.dni, sol.dni),
         direccion: val(fam && fam.direccion, sol.direccion, sol.domicilio),
         email: val(fam && fam.email, sol.email),
         telefono: val(fam && fam.telefono, sol.telefono),
-        ubicacion: val(fam && fam.ubicacion, sol.ciudad)
+        ubicacion: val(fam && fam.ubicacion, sol.ciudad),
+        poblacion: val(fam && fam.poblacion, fam && fam.ubicacion, sol.ciudad),
+        provincia: val(fam && fam.provincia),
+        codigo_postal: val(fam && fam.codigo_postal)
       },
+      // Material prestado: se guarda con la copia del contrato para poder
+      // reclamar la devolución; sin marcar, el documento sale con casillas.
+      material: Array.isArray(caso.material) ? caso.material : String(caso.material || '').split(/[|,;]/).map(x => x.trim()).filter(Boolean),
       inicio: caso.inicio || '',
       fase: caso.fase || '',
       ciudad: val(sol.ciudad, fam && fam.ubicacion),
@@ -5877,7 +5892,7 @@ const Dashboard = {
       foto: (datos.animal && datos.animal.foto) || live.animal.foto || ''
     });
     const datosContrato = Object.assign({}, datos, { animal: animalContrato });
-    const body = PdfExport._contratoAcogidaBody(datosContrato, 'assets/icons/logo-nebak.jpg');
+    const body = PdfExport._contratoAcogidaBody(datosContrato, 'assets/contratos/logo-nebak-horizontal.jpg');
     const fechaGuardado = snapshot ? this._fmtFecha(guardado.guardado_en || guardado.fecha) : '';
     const hint = snapshot
       ? `Copia guardada${fechaGuardado && fechaGuardado !== '—' ? ' el ' + this._esc(fechaGuardado) : ''}. El PDF se genera con estos datos aunque cambie la ficha; usa Actualizar copia para reemplazarlos.`
@@ -6778,6 +6793,47 @@ const Dashboard = {
     return c;
   },
 
+  // Persona responsable de la cláusula 65 (adoptantes mayores de 65 años).
+  // Solo hay cláusula si se marca la edad o si ya hay datos guardados.
+  _contratoResponsable65(c) {
+    const x = c || {};
+    const marcado = /^(1|si|sí|true|on|x)$/i.test(String(x.adoptante_mayor_65 == null ? '' : x.adoptante_mayor_65));
+    const datos = ['responsable_nombre', 'responsable_dni', 'responsable_telefono', 'responsable_email', 'responsable_direccion']
+      .some(k => String(x[k] == null ? '' : x[k]).trim());
+    return (marcado || datos) ? x : null;
+  },
+
+  // Bloque de la cláusula 65 en el documento del modal, con las mismas clases
+  // que el resto del contrato. Devuelve '' si el adoptante no es mayor de 65.
+  _contratoClausula65Html(c, T) {
+    const r65 = this._contratoResponsable65(c);
+    if (!r65 || !T || !T.clausula65) return '';
+    const k = T.clausula65;
+    const field = (label, value) => `<div><div class="label">${this._esc(label)}</div>${this._esc(value || '—')}</div>`;
+    return `<div class="contrato-doc-tutor-page contrato-doc-clausula65">
+        <h3>${this._esc(k.titulo)}</h3>
+        ${k.parrafos.map(p => `<p>${this._esc(p)}</p>`).join('')}
+        <h3>Datos de la persona responsable designada</h3>
+        <div class="contrato-doc-grid">
+          ${field('Nombre completo', r65.responsable_nombre)}
+          ${field('DNI/NIE', r65.responsable_dni)}
+          ${field('Teléfono de contacto', r65.responsable_telefono)}
+          ${field('Correo electrónico', r65.responsable_email)}
+          ${field('Dirección', r65.responsable_direccion)}
+        </div>
+        <div class="contrato-doc-firmas">
+          <div class="contrato-doc-firma">
+            <div class="contrato-doc-firma-label">Firma del adoptante</div>
+            <b>${this._esc(c.f1_nombre || '[adoptante]')}</b><small>DNI ${this._esc(c.f1_dni || '—')}</small>
+          </div>
+          <div class="contrato-doc-firma">
+            <div class="contrato-doc-firma-label">Firma de la persona responsable</div>
+            <b>${this._esc(r65.responsable_nombre || '—')}</b><small>DNI/NIE ${this._esc(r65.responsable_dni || '—')}</small>
+          </div>
+        </div>
+      </div>`;
+  },
+
   // Sello de la entidad: si el usuario ha subido una imagen de sello (o la
   // config la aporta) se usa esa; si no, se pinta el sello generico con el
   // logo. Asi el documento refleja el sello real de la asociacion.
@@ -6885,6 +6941,7 @@ const Dashboard = {
       <h3>Estipulaciones</h3>
       ${estipulaciones}
       ${tutorHtml}
+      ${this._contratoClausula65Html(c, T)}
       <div class="contrato-doc-firmas">
         ${f1Block}
         ${tutorBlock}
@@ -7695,6 +7752,15 @@ const Dashboard = {
               <div class="form-row"><div class="form-group"><label for="f2-email">Email</label><input type="email" id="f2-email"></div><div class="form-group"><label for="f2-telefono">Telefono</label><input type="text" id="f2-telefono"></div></div>
             </div>
 
+            <label class="contrato-acepta contrato-acepta--tutor"><input type="checkbox" id="ct-mayor-65" data-change="_toggleClausula65" data-cpass="checked"><span>El adoptante es mayor de 65 años. Se añadirá la cláusula especial con la persona responsable.</span></label>
+
+            <div class="detail-section" id="contrato-clausula65-section" style="display:none"><div class="detail-section-title">Persona responsable (cláusula 65)</div>
+              <div class="detail-section-note">Indica quién asume la custodia del animal si el adoptante fallece. Sus datos aparecen en una página propia del contrato, con la cláusula que obliga a avisar a la entidad en 48 horas.</div>
+              <div class="form-row"><div class="form-group"><label for="r65-nombre">Nombre completo</label><input type="text" id="r65-nombre" placeholder="Nombre y apellidos"></div><div class="form-group"><label for="r65-dni">DNI/NIE</label><input type="text" id="r65-dni"></div></div>
+              <div class="form-row"><div class="form-group"><label for="r65-telefono">Teléfono de contacto</label><input type="text" id="r65-telefono"></div><div class="form-group"><label for="r65-email">Correo electrónico</label><input type="email" id="r65-email"></div></div>
+              <div class="form-group"><label for="r65-direccion">Dirección</label><input type="text" id="r65-direccion"></div>
+            </div>
+
             <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto la <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">hoja de estipulaciones</a> del contrato de adopción.</span></label>
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
               <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
@@ -7811,6 +7877,11 @@ const Dashboard = {
     }
   },
 
+  _toggleClausula65(show) {
+    const sec = document.getElementById('contrato-clausula65-section');
+    if (sec) sec.style.display = show ? '' : 'none';
+  },
+
   closeContratoForm() {
     const el = document.getElementById('contrato-modal');
     if (!el) return;
@@ -7878,6 +7949,12 @@ const Dashboard = {
       f2_rol: tutorActivo ? 'Tutor' : '',
       f2_firma: tutorActivo ? await firma('f2-firma') : '',
       entidad_firma: firmaEntidadActiva ? await firma('entidad-firma') : '',
+      adoptante_mayor_65: (document.getElementById('ct-mayor-65') || {}).checked ? '1' : '',
+      responsable_nombre: (document.getElementById('r65-nombre') || {}).value ? document.getElementById('r65-nombre').value.trim() : '',
+      responsable_dni: (document.getElementById('r65-dni') || {}).value ? document.getElementById('r65-dni').value.trim() : '',
+      responsable_telefono: (document.getElementById('r65-telefono') || {}).value ? document.getElementById('r65-telefono').value.trim() : '',
+      responsable_email: (document.getElementById('r65-email') || {}).value ? document.getElementById('r65-email').value.trim() : '',
+      responsable_direccion: (document.getElementById('r65-direccion') || {}).value ? document.getElementById('r65-direccion').value.trim() : '',
       terminos_aceptados: true,
       terminos_version: (this._contratoTextos() || {}).version || '2.0',
       terminos_fecha: new Date().toISOString(),

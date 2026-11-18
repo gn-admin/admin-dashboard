@@ -152,41 +152,90 @@ describe('_buildTerminosAdopcion: anexo independiente', () => {
   });
 });
 
-describe('_buildContratoAcogida: documento opcional', () => {
+describe('_buildContratoAcogida: documento real de la asociación', () => {
   const c = {
     id: 'acg1', ciudad: 'Irun', fecha: '2026-11-10', inicio: '2026-10-01', fase: 'en_casa',
     animal: {
       nombre: 'Luna', foto: 'data:image/jpeg;base64,FOTO', especie: 'Perro', raza: 'Mestiza',
-      sexo: 'Hembra', edad: '2 años', microchip: 'CHIP-123', fecha_nacimiento: '2024-01-02',
-      peso: '12', esterilizada: true, descripcion: 'Muy sociable'
+      sexo: 'Hembra', edad: '2 años', microchip: 'CHIP-123', pasaporte: 'PAS-9',
+      capa: 'Atigrada', marcas: 'Mancha blanca en el pecho',
+      esterilizada: true, descripcion: 'Muy sociable'
     },
     familia: {
-      nombre: 'Ana <b>X</b>', dni: '12345678A', direccion: 'Calle Mayor 1',
-      email: 'ana@x.es', telefono: '600123123', ubicacion: 'Irun'
+      nombre: 'Ana <b>X</b>', dni: '12345678A', nif: '12345678A', direccion: 'Calle Mayor 1',
+      email: 'ana@x.es', telefono: '600123123', ubicacion: 'Irun', provincia: 'Gipuzkoa', codigo_postal: '20300'
     }
   };
   const html = PdfExport._buildContratoAcogida(c, LOGO);
 
-  it('incluye datos del animal, familia, condiciones y firmas', () => {
-    assert.match(html, /Contrato de acogida temporal/);
+  it('reproduce la maqueta: título, foto, partes y parrilla del animal', () => {
+    assert.match(html, /Contrato de acogida temporal de un animal de compañía/);
     assert.match(html, /data:image\/jpeg;base64,FOTO/);
     assert.match(html, /Calle Mayor 1/);
-    assert.match(html, /CHIP-123/);
+    assert.match(html, /20300/);
     assert.match(html, /2026\/11\/10/);
-    assert.match(html, /2026\/10\/01/);
-    assert.match(html, /Firmas/);
-    assert.match(html, /contrato-doc-firma-espacio/);
+    assert.match(html, /CHIP-123/);
+    assert.match(html, /PAS-9/);
+    assert.match(html, /Atigrada/);
+    assert.match(html, /Mancha blanca en el pecho/);
   });
 
-  it('deja claro que es opcional y no bloquea la acogida', () => {
-    assert.match(html, /Documento opcional/);
-    assert.match(html, /No es obligatorio/);
-    assert.match(html, /no bloquea el avance de la acogida/);
+  it('lleva las ocho condiciones literales del documento', () => {
+    assert.equal((html.match(/class="acogida-cond"/g) || []).length, 8);
+    assert.match(html, /responsable de cualquier accidente/);
+    assert.match(html, /nunca utilizaré este animal con ánimo de lucro/);
+    assert.match(html, /con dos días de antelación/);
+  });
+
+  it('incluye el material con casillas, la renuncia y las firmas', () => {
+    assert.match(html, /Jaula varikennel/);
+    assert.match(html, /Cartilla de identificación y vacunación/);
+    assert.match(html, /renuncio al derecho de denunciar/);
+    assert.match(html, /Firma o sello Asociación Grupo Nebak/);
+    assert.match(html, /Firma Casa de Acogida/);
+    assert.ok((html.match(/☐/g) || []).length >= 8);
+  });
+
+  it('marca el material que ya está prestado', () => {
+    const con = PdfExport._buildContratoAcogida({ ...c, material: ['Collar', 'Correa'] }, LOGO);
+    assert.match(con, /☒ Collar/);
+    assert.match(con, /☒ Correa/);
+    assert.match(con, /☐ Bozal/);
+  });
+
+  it('firma al pie con los datos reales de la asociación', () => {
+    assert.match(html, /C\/ Santiago 27/);
+    assert.match(html, /625 14 05 88/);
+    assert.match(html, /Modelo v1\.0/);
   });
 
   it('escapa los datos personales', () => {
     assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>X<\/b>/);
+  });
+});
+
+describe('_buildContracto: cláusula de mayores de 65', () => {
+  const base = { adopcion_id: 'adp65', ciudad: 'Irun', fecha: '2026-11-18', animal: 'Luna', f1_nombre: 'Ana', f1_dni: '1' };
+  const con = PdfExport._buildContracto({
+    ...base, adoptante_mayor_65: '1', responsable_nombre: 'Luis', responsable_dni: '2',
+    responsable_telefono: '600000000', responsable_email: 'luis@x.es', responsable_direccion: 'Calle 1'
+  }, LOGO);
+  const sin = PdfExport._buildContracto(base, LOGO);
+
+  it('solo sale cuando se marca o hay persona responsable', () => {
+    assert.match(con, /adoptantes mayores de 65 años/);
+    assert.doesNotMatch(sin, /adoptantes mayores de 65 años/);
+    assert.doesNotMatch(sin, /Firma de la persona responsable/);
+  });
+
+  it('lleva el texto literal, los datos y las dos firmas', () => {
+    assert.match(con, /48 horas/);
+    assert.match(con, /recuperar al animal para asegurar su protección y reubicación/);
+    assert.match(con, /Luis/);
+    assert.match(con, /DNI\/NIE 2/);
+    assert.match(con, /Firma de la persona responsable/);
+    assert.match(con, /page-break/);
   });
 });
 

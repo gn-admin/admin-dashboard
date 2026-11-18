@@ -128,6 +128,19 @@ const ContratoTextos = {
    * Párrafos y lista de una estipulación con los importes del contrato ya
    * sustituidos. `datos` acepta `donacion` e `indemnizacion`.
    */
+  // Cláusula especial del documento de adopción: solo se imprime cuando el
+  // adoptante es mayor de 65 años y designa a una persona responsable.
+  clausula65: {
+    titulo: 'Cláusula especial · adoptantes mayores de 65 años',
+    parrafos: [
+      'En caso de fallecimiento del titular de la adopción, la persona designada como responsable en el presente contrato se compromete a asumir la custodia, cuidado y bienestar del animal adoptado, garantizando que se mantengan las condiciones adecuadas de alimentación, salud y alojamiento.',
+      'El adoptante deberá indicar previamente, por escrito, el nombre completo, documento de identidad y datos de contacto de la persona que asumirá dicha responsabilidad. Asimismo, dicha persona estará obligada a informar a la entidad protectora en un plazo máximo de 48 horas desde el fallecimiento del adoptante y la asunción de la custodia, para coordinar cualquier seguimiento o apoyo necesario.',
+      'En ausencia de designación expresa, la entidad protectora se reserva el derecho de recuperar al animal para asegurar su protección y reubicación.'
+    ],
+    campos: ['Nombre completo', 'DNI/NIE', 'Teléfono de contacto', 'Correo electrónico', 'Dirección'],
+    nota: 'Cláusula aplicable solo si el adoptante es mayor de 65 años. La firma de la persona responsable se recoge en el contrato.'
+  },
+
   texto(estipulacion, datos) {
     const d = datos || {};
     const rep = (t) => String(t)
