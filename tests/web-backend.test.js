@@ -1645,10 +1645,10 @@ describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', 
     const grupo = plano(b.ctx.webGetAnimal('ani_1').grupo);
     assert.equal(grupo.id, 'grp_1');
     assert.equal(grupo.nombre, 'Camada Luna');
-    assert.equal(grupo.grupo_obligatorio, true);
+    assert.deepEqual(Object.keys(grupo).sort(), ['estado_publicacion', 'id', 'nombre']);
     assert.equal(grupo.estado_publicacion, 'publicado');
-    assert.equal(grupo.publicacion_id, 'web_g1');
-    assert.equal(grupo.slug, 'camada-luna');
+    assert.equal(grupo.publicacion_id, undefined);
+    assert.equal(grupo.slug, undefined);
     assert.equal(b.ctx.webGetAnimal('ani_2').grupo, null);
   });
 
@@ -1659,8 +1659,8 @@ describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', 
     const grupo = plano(b.ctx.webGetAnimal('ani_1').grupo);
     assert.equal(grupo.nombre, 'Camada Luna');
     assert.equal(grupo.estado_publicacion, 'sin_publicar');
-    assert.equal(grupo.publicacion_id, '');
-    assert.equal(grupo.slug, '');
+    assert.equal(grupo.publicacion_id, undefined);
+    assert.equal(grupo.slug, undefined);
   });
 
   it('un slug histórico de la ficha superada también redirige al grupo', () => {

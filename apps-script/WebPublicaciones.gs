@@ -740,10 +740,7 @@ function webGrupoResumenDeAnimal(animal) {
   return {
     id: String(gid),
     nombre: webTexto(g && g.nombre) || webTexto(a.grupo) || String(gid),
-    grupo_obligatorio: !!(g && g.grupo_obligatorio),
-    estado_publicacion: pub ? pub.estado_publicacion : 'sin_publicar',
-    publicacion_id: pub ? pub.id : '',
-    slug: pub ? pub.slug : ''
+    estado_publicacion: (pub && pub.estado_publicacion) || 'sin_publicar'
   };
 }
 

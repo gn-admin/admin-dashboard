@@ -145,7 +145,7 @@ publicado_en | actualizado_en | creado_en | slug_historial | ficha_json
 | Endpoint/acción | Método | Función | Estado |
 |---|---|---|---|
 | `GET ?endpoint=web-animales` | GET | Listar animales con estado/configuración web (filtros `estado_publicacion`, `q`, `publicado`, paginación; flags de completitud) | [x] |
-| `GET ?endpoint=web-animales&id={animal_id}` | GET | Configuración pública + metadatos SEO + datos de origen + completitud + `grupo` (H-3: `{id,nombre,grupo_obligatorio,estado_publicacion,publicacion_id,slug}` o `null` si el animal no va en grupo) | [x] |
+| `GET ?endpoint=web-animales&id={animal_id}` | GET | Configuración pública + metadatos SEO + datos de origen + completitud + `grupo` (H-3: `{id,nombre,estado_publicacion}` o `null` si el animal no va en grupo) | [x] |
 | `POST web-animales` (upsert) | POST | Crear/actualizar configuración pública | [x] |
 | `POST web-animales-estado` | POST | Publicar/ocultar/despublicar | [x] |
 | `GET ?endpoint=web-animales-preview&id={animal_id}` | GET | Previsualizar payload público (`Publicacion`) | [x] |

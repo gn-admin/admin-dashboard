@@ -1647,9 +1647,9 @@ describe('_webEstadoChipHtml: estado del grupo en la ficha (H-3)', () => {
   });
 
   it('si el grupo ya publica, avisa y no ofrece ficha individual', () => {
-    const html = Dashboard._webEstadoChipHtml({ id: '', origen_id: 'ani_1' }, null, grupo);
+    const html = Dashboard._webEstadoChipHtml({ id: '', origen_id: 'ani_1', estado_publicacion: 'borrador' }, { faltan: ['publicacion', 'capa'] }, grupo, true);
     assert.match(html, /Publicado con el grupo/);
-    assert.doesNotMatch(html, /abrirPublicacionWebAnimal/);
+    assert.doesNotMatch(html, /abrirPublicacionWebAnimal|Para publicar/);
     assert.match(html, /abrirGrupoWeb/);
   });
 
@@ -1660,10 +1660,8 @@ describe('_webEstadoChipHtml: estado del grupo en la ficha (H-3)', () => {
     assert.match(html, /pendiente">Borrador/);
   });
 
-  it('traduce los estados del grupo y tolera el vacio', () => {
-    assert.deepEqual(Dashboard._webGrupoEstado({ estado_publicacion: 'publicado' }), { estado: 'publicado', texto: 'Publicado', cls: 'aprobada' });
-    assert.equal(Dashboard._webGrupoEstado({ estado_publicacion: 'retirado' }).texto, 'Retirado');
-    assert.equal(Dashboard._webGrupoEstado(null).texto, 'Sin publicar');
-    assert.equal(Dashboard._webGrupoEstado({}).cls, '');
+  it('un grupo retirado se pinta como retirado', () => {
+    const html = Dashboard._webEstadoChipHtml({ id: 'web_1', origen_id: 'ani_1', estado_publicacion: 'publicado' }, null, Object.assign({}, grupo, { estado_publicacion: 'retirado' }));
+    assert.match(html, /descartada">Retirado/);
   });
 });

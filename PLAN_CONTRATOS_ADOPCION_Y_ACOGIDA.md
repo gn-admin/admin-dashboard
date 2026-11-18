@@ -107,7 +107,15 @@ El `.docx` contiene **dos JPEG** en base64:
 
 El fichero que tenemos es **texto extraído**; para reutilizarlas hay que sacarlas del `.docx` original (`word/media/`) y confirmar con la asociación cuál es el logo, cuál la firma y cuál el sello, en qué resolución y si autorizan su uso en el PDF. No deben incrustarse como base64 en el código: van a `assets/` (o Drive, como el logo actual).
 
-**Ya extraídas del `.doc` de acogida** (ver §6.2): `src/assets/contratos/logo-nebak.jpg` (450×147) y `src/assets/contratos/sello-nebak.jpg` (197×196). El logo a 3 cm sale a ~380 dpi (suficiente); el sello a 2,5 cm queda en ~200 dpi (aceptable, pero conviene pedir original vectorial o a 600 px si se va a imprimir más grande).
+**Ya extraídas a `src/assets/contratos/`** (ver §6.2):
+
+| Fichero | Origen | Tamaño | Uso |
+|---|---|---|---|
+| `logo-nebak-horizontal.jpg` | `.doc` de acogida (`logo nebak pequeño`) | 450×147, 300 dpi | Cabecera del contrato (4 cm → ~286 dpi) |
+| `sello-nebak.jpg` | `.doc` de acogida (`SELO NEBAK MODIFICADO`) | 197×196, 300 dpi | Sello del pie (≤2,5 cm → ~200 dpi) |
+| `emblema-nebak.jpg` | cabecera del `.docx` de adopción | 1344×1300, 300 dpi | Emblema en alta para imprimir grande (mismo motivo, otra versión) |
+
+El `.docx` de adopción trae además una **firma manuscrita** (`word/media/image2.jpeg`, 247×123) junto al logo en el bloque de firmas. No se copia al repo: el repositorio es público y una firma personal no debe versionarse; si el PDF la necesita, va a Drive o a un secreto, no a `git` (ver D-C2).
 
 ### 1.8 Erratas y decisiones de redacción detectadas
 
@@ -259,8 +267,8 @@ Con impresión HTML, el objetivo realista es **«3 caras si el contenido cabe; 4
 
 ### 5.3 Imágenes
 
-- **Logo**: `src/assets/icons/logo-nebak.jpg` (192×192) y `src/assets/contratos/logo-nebak.jpg` (450×147, extraído del `.doc` de acogida).
-- **Sello**: `src/assets/contratos/sello-nebak.jpg` (197×196, extraído del mismo `.doc`).
+- **Logo**: `src/assets/icons/logo-nebak.jpg` (192×192, emblema redondo de la web) y `src/assets/contratos/logo-nebak-horizontal.jpg` (450×147, logotipo horizontal del `.doc` de acogida).
+- **Sello**: `src/assets/contratos/sello-nebak.jpg` (197×196, idéntico al emblema de la web) y `src/assets/contratos/emblema-nebak.jpg` (1344×1300, versión de la cabecera del `.docx` de adopción).
 - **Fotografía del animal**: thumbnail de Drive (ya).
 - **Firma del adoptante** y de la persona responsable: canvas (ya).
 - **Firma/sello de la Asociación**: decidir entre (a) imagen del documento, (b) sello generado actual, (c) firma dibujada por quien firma. Hoy conviven las tres.
@@ -298,7 +306,7 @@ Documento Word de **una cara**, maquetado como formulario con espacios en blanco
 7. Aceptación de todos los términos y **renuncia a denunciar el contrato por mala interpretación** (ver D-C16).
 8. Firmas: «Firma o sello Asociación Grupo Nebak» y «Firma Casa de Acogida».
 9. Pie: C/ Santiago 27 1º izq., 20300 Irun (Guipúzcoa), 625 14 05 88 / 600 04 25 94.
-10. Imágenes incrustadas: `logo nebak pequeño` y `SELO NEBAK MODIFICADO` (Adobe Photoshop 7.0) → ya extraídas a `src/assets/contratos/logo-nebak.jpg` (450×147) y `src/assets/contratos/sello-nebak.jpg` (197×196).
+10. Imágenes incrustadas: `logo nebak pequeño` y `SELO NEBAK MODIFICADO` (Adobe Photoshop 7.0) → ya extraídas a `src/assets/contratos/logo-nebak-horizontal.jpg` (450×147) y `src/assets/contratos/sello-nebak.jpg` (197×196); el emblema de la cabecera del documento de adopción, en alta, está en `emblema-nebak.jpg` (1344×1300).
 
 ### 6.3 Material entregado (checklist del documento)
 
@@ -364,7 +372,7 @@ Cada fase es independiente y se puede parar entre ellas; F-C1 no cambia el PDF y
 | ID | Decisión | Opciones | Recomendación |
 |---|---|---|---|
 | **D-C1** | ¿Un documento con las estipulaciones dentro, o contrato + anexo firmado? | (a) todo dentro; (b) dentro + hoja aparte firmada | (b), como el documento: contrato con estipulaciones + hoja de estipulaciones firmada, generadas del **mismo** texto |
-| **D-C2** | Firma de la Asociación | (a) imagen del documento; (b) sello generado; (c) firma dibujada | (a) + (c) si firma una persona concreta |
+| **D-C2** | Firma de la Asociación | (a) emblema del documento; (b) sello generado; (c) firma manuscrita del `.docx` (fuera del repo) | (a) como sello + (c) si firma una persona; la manuscrita va a Drive, no a `git` |
 | **D-C3** | Importes | 100 € / 900 € fijos o editables | Editables con esos valores por defecto |
 | **D-C4** | Persona responsable >65 | (a) bloque nuevo; (b) reutilizar tutor | (a), son figuras distintas |
 | **D-C5** | Cláusulas actuales ausentes en el documento | mantener / mover al anexo / retirar | Mantener en el anexo (periodo de prueba, seguimiento, microchip, RGPD) |
