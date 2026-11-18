@@ -1624,3 +1624,46 @@ describe('módulos delegados de Dashboard', () => {
     });
   });
 });
+
+describe('_webEstadoChipHtml: estado del grupo en la ficha (H-3)', () => {
+  const G = globalThis;
+  G.Icons = Object.assign({ chevronDown: '<svg></svg>', eye: '', pencil: '' }, G.Icons || {});
+  if (!G.Web) G.Web = require('../src/js/web.js');
+
+  const grupo = { id: 'grp_1', nombre: 'Camada Luna', grupo_obligatorio: true, estado_publicacion: 'publicado', slug: 'camada-luna' };
+
+  it('muestra el grupo y su estado web junto al del animal', () => {
+    const html = Dashboard._webEstadoChipHtml({ id: 'web_1', origen_id: 'ani_1', estado_publicacion: 'borrador' }, { faltan: [] }, grupo);
+    assert.match(html, /animal-web-grupo/);
+    assert.match(html, /Camada Luna/);
+    assert.match(html, /aprobada">Publicado/);
+    assert.match(html, /data-action="abrirGrupoWeb"/);
+    assert.match(html, /abrirPublicacionWebAnimal/);
+  });
+
+  it('sin grupo no pinta la linea de grupo', () => {
+    const html = Dashboard._webEstadoChipHtml({ id: 'web_1', origen_id: 'ani_1', estado_publicacion: 'publicado' }, null, null);
+    assert.doesNotMatch(html, /animal-web-grupo/);
+  });
+
+  it('si el grupo ya publica, avisa y no ofrece ficha individual', () => {
+    const html = Dashboard._webEstadoChipHtml({ id: '', origen_id: 'ani_1' }, null, grupo);
+    assert.match(html, /Publicado con el grupo/);
+    assert.doesNotMatch(html, /abrirPublicacionWebAnimal/);
+    assert.match(html, /abrirGrupoWeb/);
+  });
+
+  it('si el grupo no esta publicado, sigue ofreciendo la ficha individual', () => {
+    const html = Dashboard._webEstadoChipHtml({ id: '', origen_id: 'ani_1' }, null, Object.assign({}, grupo, { estado_publicacion: 'borrador' }));
+    assert.match(html, /Sin publicar/);
+    assert.match(html, /abrirPublicacionWebAnimal/);
+    assert.match(html, /pendiente">Borrador/);
+  });
+
+  it('traduce los estados del grupo y tolera el vacio', () => {
+    assert.deepEqual(Dashboard._webGrupoEstado({ estado_publicacion: 'publicado' }), { estado: 'publicado', texto: 'Publicado', cls: 'aprobada' });
+    assert.equal(Dashboard._webGrupoEstado({ estado_publicacion: 'retirado' }).texto, 'Retirado');
+    assert.equal(Dashboard._webGrupoEstado(null).texto, 'Sin publicar');
+    assert.equal(Dashboard._webGrupoEstado({}).cls, '');
+  });
+});

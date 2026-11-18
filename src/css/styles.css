@@ -8261,6 +8261,10 @@ body.modal-open { overflow: hidden; }
 .animal-web-chip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 8px; font-size: var(--text-sm, 0.875rem); }
 .animal-web-chip-titulo { font-weight: 600; color: var(--gray-700, #374151); }
 .animal-web-chip .web-sub { flex-basis: 100%; margin: 0; }
+.animal-web-grupo {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--gray-200, #e5e7eb);
+}
 .web-deploy-estado { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
 .web-deploy-estado:empty {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; border: 0;

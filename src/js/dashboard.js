@@ -500,7 +500,7 @@ const Dashboard = {
         showAddBlacklist: 'blacklist', showEditBlacklistItem: 'blacklist', saveBlacklist: 'blacklist', removeBlacklistItem: 'blacklist',
         showDonacionForm: 'donaciones', saveDonacion: 'donaciones', deleteDonacion: 'donaciones',
         abrirAnimalWeb: 'web', abrirEventoWeb: 'web', saveWebAnimal: 'web', saveWebEvento: 'web',
-        cambiarEstadoWeb: 'web', archivarWeb: 'web', recargarWeb: 'web', abrirPublicacionWebAnimal: 'web',
+        cambiarEstadoWeb: 'web', archivarWeb: 'web', recargarWeb: 'web', abrirPublicacionWebAnimal: 'web', abrirGrupoWeb: 'web',
         nuevaPublicacionWeb: 'web', cerrarPickerWeb: 'web', crearPublicacionWeb: 'web',
         showInventarioForm: 'almacen', saveInventario: 'almacen', deleteInventario: 'almacen',
         showRecordatorioForm: 'reportes', saveRecordatorio: 'reportes', deleteRecordatorio: 'reportes',
@@ -5113,14 +5113,18 @@ const Dashboard = {
   /**
    * Estado web del animal en su ficha interna (F2). Solo para roles con acceso
    * al gestor web; si no hay publicación se muestra como «Sin publicar».
+   * Si el animal va en un grupo se añade el estado del grupo (H-3): cuando ese
+   * grupo ya se publica, la ficha lo dice en vez de ofrecer una ficha individual
+   * que el backend rechazaría.
    */
-  _webEstadoChipHtml(pub, comp) {
+  _webEstadoChipHtml(pub, comp, grupo) {
     const p = pub || {};
     const faltan = (comp && comp.faltan) || [];
     const estado = String(p.estado_publicacion || '');
     const esRetirado = estado === 'retirado';
-    const cls = esRetirado ? 'descartada' : (estado === 'publicado' ? 'aprobada' : (estado === 'borrador' ? 'pendiente' : ''));
-    const etiqueta = esRetirado ? 'Retirada' : (estado ? Web.estadoLabel(estado) : 'Sin publicar');
+    const cubierto = this._webCubiertoPorGrupo(p, grupo);
+    const cls = cubierto ? 'aprobada' : (esRetirado ? 'descartada' : (estado === 'publicado' ? 'aprobada' : (estado === 'borrador' ? 'pendiente' : '')));
+    const etiqueta = cubierto ? 'Publicado con el grupo' : (esRetirado ? 'Retirada' : (estado ? Web.estadoLabel(estado) : 'Sin publicar'));
     const publico = p.estado_publico_efectivo || p.estado_publico_derivado || '';
     const pendiente = faltan.filter(f => f !== 'publicacion');
     const partePendiente = pendiente.length ? `<div class="web-sub">Para publicar: ${this._esc(pendiente.join(', '))}</div>` : '';
@@ -5129,12 +5133,45 @@ const Dashboard = {
       : (p.estado_publico_modo === 'manual'
         ? `<div class="web-sub">Estado manual fijado: ${this._esc(Web._estadoPublicoLabel(publico))}</div>`
         : '');
+    const boton = cubierto ? '' : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${this._esc(p.origen_id || '')}">${Icons.pencil} Abrir publicación web</button>`;
     return `<div class="animal-web-chip">
       <span class="animal-web-chip-titulo">${Icons.eye} Web:</span>
       <span class="estado-badge ${cls}">${this._esc(etiqueta)}</span>
-      ${publico ? `<span class="chip-neutral">${this._esc(Web._estadoPublicoLabel(publico))}</span>` : ''}
-      ${partePendiente}${aviso}
-      <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${this._esc(p.origen_id || '')}">${Icons.pencil} Abrir publicación web</button>
+      ${publico && !cubierto ? `<span class="chip-neutral">${this._esc(Web._estadoPublicoLabel(publico))}</span>` : ''}
+      ${partePendiente}${aviso}${boton}
+      ${this._webGrupoLineaHtml(grupo)}
+    </div>`;
+  },
+
+  /** El animal no tiene ficha propia, pero su grupo ya está publicado. */
+  _webCubiertoPorGrupo(pub, grupo) {
+    const p = pub || {};
+    const estado = String(p.estado_publicacion || '');
+    return !p.id && !estado && !!grupo && String(grupo.estado_publicacion || '') === 'publicado';
+  },
+
+  /** Texto y clase del estado web de un grupo (mismo vocabulario que el animal). */
+  _webGrupoEstado(grupo) {
+    const estado = String((grupo && grupo.estado_publicacion) || 'sin_publicar');
+    const mapa = {
+      publicado: ['Publicado', 'aprobada'],
+      borrador: ['Borrador', 'pendiente'],
+      oculto: ['Oculto', 'descartada'],
+      retirado: ['Retirado', 'descartada']
+    };
+    const par = mapa[estado] || ['Sin publicar', ''];
+    return { estado, texto: par[0], cls: par[1] };
+  },
+
+  /** Línea con el grupo del animal en la ficha interna (H-3). */
+  _webGrupoLineaHtml(grupo) {
+    if (!grupo || !grupo.id) return '';
+    const e = this._webGrupoEstado(grupo);
+    return `<div class="animal-web-grupo">
+      <span class="animal-web-chip-titulo">Grupo:</span>
+      <span class="chip-neutral">${this._esc(grupo.nombre || '')}</span>
+      <span class="estado-badge ${e.cls}">${this._esc(e.texto)}</span>
+      <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirGrupoWeb" data-arg0="${this._esc(grupo.id)}">${Icons.pencil} Abrir publicación del grupo</button>
     </div>`;
   },
 
@@ -5147,7 +5184,7 @@ const Dashboard = {
       const res = await API.getWebAnimal(id);
       const pub = (res && res.data) || {};
       pub.origen_id = pub.origen_id || id;
-      cont.innerHTML = this._webEstadoChipHtml(pub, res && res.completitud);
+      cont.innerHTML = this._webEstadoChipHtml(pub, res && res.completitud, res && res.grupo);
     } catch (err) {
       // Sin gestor web o sin permisos no se muestra nada: no es un error de la ficha.
       cont.innerHTML = '';

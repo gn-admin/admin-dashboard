@@ -1637,6 +1637,32 @@ describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', 
     assert.equal(b.ctx.webSitemap().data.length, 1);
   });
 
+  it('la ficha del animal recibe el estado web de su grupo (H-3)', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), animal({ id: 'ani_2', nombre: 'Milo', grupo_id: '', grupo: '' }));
+    b.estado.publicaciones.push(filaGrupo());
+
+    const grupo = plano(b.ctx.webGetAnimal('ani_1').grupo);
+    assert.equal(grupo.id, 'grp_1');
+    assert.equal(grupo.nombre, 'Camada Luna');
+    assert.equal(grupo.grupo_obligatorio, true);
+    assert.equal(grupo.estado_publicacion, 'publicado');
+    assert.equal(grupo.publicacion_id, 'web_g1');
+    assert.equal(grupo.slug, 'camada-luna');
+    assert.equal(b.ctx.webGetAnimal('ani_2').grupo, null);
+  });
+
+  it('sin publicación de grupo la ficha lo marca como sin_publicar', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }));
+
+    const grupo = plano(b.ctx.webGetAnimal('ani_1').grupo);
+    assert.equal(grupo.nombre, 'Camada Luna');
+    assert.equal(grupo.estado_publicacion, 'sin_publicar');
+    assert.equal(grupo.publicacion_id, '');
+    assert.equal(grupo.slug, '');
+  });
+
   it('un slug histórico de la ficha superada también redirige al grupo', () => {
     const b = crearBackend();
     b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';

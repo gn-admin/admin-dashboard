@@ -516,6 +516,15 @@ function webHistorialDeCambio(previa, slugNuevo) {
   return hist.filter(function (h) { return h.slug && h.slug !== slugNuevo; });
 }
 
+/** ¿El slug pedido es el actual de la publicación o uno de su historial? */
+function webSlugCoincide(pub, slug) {
+  if (!pub) return false;
+  if (pub.slug === slug) return true;
+  var hist = pub.slug_historial || [];
+  for (var i = 0; i < hist.length; i++) if (hist[i].slug === slug) return true;
+  return false;
+}
+
 /** Booleano estricto de la ficha: solo `true`/`false` (mismas reglas que el gestor). */
 function webFichaBool(valor, porDefecto) {
   if (valor === true || valor === false) return valor;
@@ -716,6 +725,26 @@ function webGrupoVigenteDeAnimal(animal, filas) {
     };
   }
   return null;
+}
+
+/**
+ * Grupo del animal con el estado de su publicación web, para la ficha interna
+ * (H-3). Sin grupo devuelve `null`.
+ */
+function webGrupoResumenDeAnimal(animal) {
+  var a = animal || null;
+  var gid = a ? webTexto(a.grupo_id || a.grupo) : '';
+  if (!gid) return null;
+  var g = webGrupoInfo(gid);
+  var pub = webPublicacionDeOrigen('animal_grupo', gid);
+  return {
+    id: String(gid),
+    nombre: webTexto(g && g.nombre) || webTexto(a.grupo) || String(gid),
+    grupo_obligatorio: !!(g && g.grupo_obligatorio),
+    estado_publicacion: pub ? pub.estado_publicacion : 'sin_publicar',
+    publicacion_id: pub ? pub.id : '',
+    slug: pub ? pub.slug : ''
+  };
 }
 
 /** Mensaje único del conflicto de exclusividad, con la salida posible. */
@@ -1244,6 +1273,7 @@ function webGetAnimal(animalId) {
       videos: webParseJson(a.videos, []),
       documentos_internos: webParseJson(a.documentos_internos, [])
     },
+    grupo: webGrupoResumenDeAnimal(a),
     completitud: webValidarPublicacion(pub, a)
   };
 }
@@ -2473,21 +2503,14 @@ function webPublicacionPublica(slug) {
   for (var d = 0; d < todas.length; d++) {
     var indiv = todas[d];
     if (indiv.tipo !== 'animal' || indiv.estado_publicacion !== 'publicado') continue;
-    // Vale el slug actual y los históricos: si no, los enlaces viejos de una
-    // ficha que pasó a publicarse en grupo acabarían en 404.
-    var coincideIndiv = indiv.slug === s;
-    if (!coincideIndiv) {
-      var histIndiv = indiv.slug_historial || [];
-      for (var hi = 0; hi < histIndiv.length; hi++) {
-        if (histIndiv[hi].slug === s) { coincideIndiv = true; break; }
-      }
-    }
-    if (!coincideIndiv) continue;
-    var grupoConf = webGrupoVigenteDeAnimal(mapa[String(indiv.origen_id)], todas);
-    if (!grupoConf) continue;
+    if (!webSlugCoincide(indiv, s)) continue;
+    // El grupo servido (`pubs`) es el que manda; si no está, la individual sigue viva.
+    var animalIndiv = mapa[String(indiv.origen_id)];
+    var gidIndiv = animalIndiv ? webTexto(animalIndiv.grupo_id || animalIndiv.grupo) : '';
+    if (!gidIndiv) continue;
     var grupoServido = null;
     for (var gs = 0; gs < pubs.length; gs++) {
-      if (pubs[gs].tipo === 'animal_grupo' && String(pubs[gs].origen_id) === String(grupoConf.grupo_id)) { grupoServido = pubs[gs]; break; }
+      if (pubs[gs].tipo === 'animal_grupo' && String(pubs[gs].origen_id) === String(gidIndiv)) { grupoServido = pubs[gs]; break; }
     }
     if (!grupoServido) continue;
     return {
@@ -2506,22 +2529,13 @@ function webPublicacionPublica(slug) {
   // Lapida: el slug existio y se retiro. Se responde `gone` (410 logico) en
   // lugar de un 404, para que la web y los buscadores lo traten como retirado.
   for (var r = 0; r < todas.length; r++) {
-    if (todas[r].estado_publicacion !== 'retirado') continue;
-    var coincide = todas[r].slug === s;
-    if (!coincide) {
-      var histRetirada = todas[r].slug_historial || [];
-      for (var hr = 0; hr < histRetirada.length; hr++) {
-        if (histRetirada[hr].slug === s) { coincide = true; break; }
-      }
-    }
-    if (coincide) {
-      return {
-        status: 'gone',
-        code: 'gone',
-        error: 'Esta publicación se ha retirado',
-        data: { slug: todas[r].slug, tipo: todas[r].tipo, retirado_en: todas[r].actualizado_en || '' }
-      };
-    }
+    if (todas[r].estado_publicacion !== 'retirado' || !webSlugCoincide(todas[r], s)) continue;
+    return {
+      status: 'gone',
+      code: 'gone',
+      error: 'Esta publicación se ha retirado',
+      data: { slug: todas[r].slug, tipo: todas[r].tipo, retirado_en: todas[r].actualizado_en || '' }
+    };
   }
   return { status: 'error', error: 'Publicación no encontrada' };
 }
@@ -2562,21 +2576,19 @@ function webRedirects() {
       var pa = individuales[String(a.id)];
       if (!pa || pa.estado_publicacion !== 'publicado' || !pa.slug || pa.slug === g.slug) return;
       // El slug actual y los históricos de la ficha superada apuntan al grupo.
-      var pares = [{ slug: pa.slug, fecha: pa.actualizado_en || '' }].concat(pa.slug_historial || []);
-      pares.forEach(function (par) {
-        var slugViejo = par && par.slug;
-        if (!slugViejo || slugViejo === g.slug) return;
-        if (vistos[String(slugViejo)]) return;
-        vistos[String(slugViejo)] = true;
+      var slugs = [{ slug: pa.slug, fecha: pa.actualizado_en }].concat(pa.slug_historial || []);
+      slugs.forEach(function (x) {
+        if (!x.slug || x.slug === g.slug || vistos[String(x.slug)]) return;
+        vistos[String(x.slug)] = true;
         out.push({
-          from: (base || '') + webRutaPublica('animal', slugViejo),
+          from: (base || '') + webRutaPublica('animal', x.slug),
           to: (base || '') + webRutaPublica('animal_grupo', g.slug),
           status: 301,
           type: 'animal',
-          slug: slugViejo,
+          slug: x.slug,
           currentSlug: g.slug,
           motivo: 'ficha_en_grupo',
-          changedAt: (par && par.fecha) || pa.actualizado_en || ''
+          changedAt: x.fecha || ''
         });
       });
     });

@@ -11,7 +11,7 @@
 - **Producción estaba desactualizada:** antes del push servía `sw` **v267** (16 versiones por detrás). Tras el push, `v283` y `js/web.js` **idéntico byte a byte** al local.
 - **Backend al día:** el gestor de producción consulta grupos y recibe agregados (`Cachorros de Oreo`, 4 miembros, estado derivado `en_adopcion`), así que el `.gs` desplegado incluye F4.
 - **F0–F5 cumplen**; la exclusividad 1:1 ↔ grupo se aplica ya en **las dos direcciones** (H-1 cerrado el 2026-11-18).
-- **Huecos funcionales:** 5 al auditar, **3 abiertos** (indicador de grupo en el miembro, refresco/importar, deploy al cambiar miembros); cerrados H-1 y H-2. Siguen abiertas 2 decisiones (D7 y orden de publicaciones).
+- **Huecos funcionales:** 5 al auditar, **2 abiertos** (refresco/importar y deploy al cambiar miembros); cerrados H-1, H-2 y H-3. Siguen abiertas 2 decisiones (D7 y orden de publicaciones).
 
 ## 1. Producción verificada (2026-11-18)
 
@@ -392,7 +392,7 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 
 | Requisito | Dónde | Estado |
 |---|---|---|
-| Estado web visible en la ficha interna | `_webEstadoChipHtml` (dashboard.js 5116) | ✅ (solo animal) |
+| Estado web visible en la ficha interna | `_webEstadoChipHtml` + `_webGrupoLineaHtml` (dashboard.js); `webGrupoResumenDeAnimal` en `webGetAnimal` | ✅ animal y grupo (H-3) |
 | Retirar/restaurar en los tres tipos | `webEstado*`, `webRestaurar*` + UI | ✅ |
 | Ficha C3 con orden y precedencia `ficha > base` | `webNormalizarFicha` (560), `_fichaPresentacion` (924), `moverFichaBloque` (974) | ✅ |
 | Precedencia visible en UI | — | ⚠️ solo «Heredado: …» en selects |
@@ -438,7 +438,7 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 |---|---|---|---|---|
 | **H-1** | **Exclusividad 1:1 ↔ grupo invertida**: se puede publicar un individuo cuyo grupo ya está publicado | `webEstadoAnimal` y `webUpsertAnimal` no miran el grupo; `webPublicables` no deduplicaba; única guarda en `webEstadoGrupoPub` | Dos fichas vivas del mismo animal en feed, sitemap y estática | **✅ cerrado** (v284): guardas en las dos direcciones, dedupe en `webPublicables`, detalle con **301 al grupo desde el slug actual y los históricos**, sitemap desde `webPublicables` y `?endpoint=redirects` con una entrada por cada slug |
 | **H-2** | El selector de animales ofrece miembros de grupo obligatorio y no avisa | `animalesSinPublicacion` (web.js 185); 0 apariciones de «exclusiv» en `web.js` | Empuja al error de H-1 | **✅ cerrado** (v284) |
-| **H-3** | Sin indicador del estado web del grupo en la ficha del miembro | `_webEstadoChipHtml` (dashboard.js 5116) solo pinta el del animal | Incertidumbre al editar miembros | S |
+| **H-3** | Sin indicador del estado web del grupo en la ficha del miembro | `_webEstadoChipHtml` solo pintaba el del animal | Incertidumbre al editar miembros | **✅ cerrado** (v285) |
 | **H-4** | No hay «importar desde ficha» ni refresco manual de la publicación | propagación solo publicación → ficha (`_propagarMediaAFicha` 1341) | Retrabajo si cambia la ficha interna | M |
 | **H-5** | Cambiar un miembro no regenera la estática | el deploy se decide en `_webAnotarDeploy` a partir de las rutas del gestor | Web desfasada hasta el cron (30 min), sin aviso | M |
 | **H-6** | D7 sin cerrar (`author`/`contact`) | `autor` se guarda; contacto cae al de la asociación | Política pública sin documentar | S |
@@ -454,11 +454,11 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 
 ## 8. Conclusión y orden recomendado
 
-El gestor está **implementado y coherente con el contrato**. H-1 y H-2 están cerrados (2026-11-18); lo que falta no es rehacer nada, sino añadir dos avisos/acciones (H-3, H-4), decidir dos cosas (D7 y orden) y terminar la verificación en producción con escrituras reales.
+El gestor está **implementado y coherente con el contrato**. H-1, H-2 y H-3 están cerrados (2026-11-18); lo que falta no es rehacer nada, sino añadir un aviso/acción (H-4), decidir dos cosas (D7 y orden) y terminar la verificación en producción con escrituras reales.
 
 1. ~~**H-1 + H-2** (exclusividad bidireccional y aviso en el selector)~~ — **hecho** (v284); falta subir `WebPublicaciones.gs` a GAS.
 2. **H-5** (aviso de «publicación desactualizada» y acción de refresco/deploy).
-3. **H-4 + H-3** (importar desde ficha e indicador de grupo en el miembro).
+3. ~~**H-3** (indicador de grupo en el miembro)~~ — **hecho** (v285); falta **H-4** (importar desde ficha).
 4. **D7** y orden de publicaciones (H-7).
 5. Actualizar `memory.md` y el plan (H-8).
 6. Verificación en producción con escrituras y el checklist F0–F5.
