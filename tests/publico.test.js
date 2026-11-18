@@ -4,6 +4,8 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const Publico = require('../src/js/publico.js');
 
@@ -133,6 +135,38 @@ describe('Publico.urlCompartir: enlace canónico para compartir', () => {
   it('sin slug no ofrece enlace', () => {
     assert.equal(Publico.urlCompartir({}), '');
     assert.equal(Publico.urlCompartir(null), '');
+  });
+});
+
+describe('Publico.htmlDetalle: aviso de compartir accesible', () => {
+  const conLocation = fn => {
+    const previo = global.location;
+    global.location = { origin: 'https://gn-admin.github.io', pathname: '/admin-dashboard/publico.html' };
+    try { return fn(); } finally { global.location = previo; }
+  };
+  const pub = { slug: 'laia', title: 'Laia', seo: {} };
+  const CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'css', 'publico.css'), 'utf8').replace(/\r/g, '');
+  const regla = selector => {
+    const m = CSS.match(new RegExp(selector + '\\s*\\{([^}]*)\\}'));
+    assert.ok(m, 'No existe la regla ' + selector);
+    return m[1];
+  };
+
+  it('pinta la región viva vacía y atómica junto al botón Compartir', () => {
+    const html = conLocation(() => Publico.htmlDetalle(pub));
+    assert.match(html, /data-compartir[^>]*>Compartir<\/button>/);
+    assert.match(html, /<span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"><\/span>/);
+  });
+
+  // Regresión: con display:none el aviso vacío sale del árbol de accesibilidad y
+  // el lector deja de anunciarlo. Vacío debe seguir renderizado y sin ocupar sitio.
+  it('la región viva nunca se oculta con display:none', () => {
+    assert.doesNotMatch(regla('\\.pub-compartir-aviso'), /display:\s*none/);
+    const vacia = regla('\\.pub-compartir-aviso:empty');
+    assert.doesNotMatch(vacia, /display:\s*none/);
+    assert.match(vacia, /position:\s*absolute/);
+    assert.match(vacia, /clip-path/);
+    assert.match(vacia, /pointer-events:\s*none/);
   });
 });
 
