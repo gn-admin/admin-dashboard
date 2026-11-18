@@ -188,19 +188,20 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
   "data": [ /* Publicacion[] */ ]
 }
 ```
-- **Reglas:** [x] solo contenido en estado publicable; [x] paginación acotada; [x] proyección ligera (`fields=card`); [x] `filters` devuelve los valores disponibles para construir la UI.
+- **Reglas:** [x] solo contenido en estado publicable; [x] paginación acotada; [x] proyección ligera (`fields=card`); [x] `filters` devuelve los valores disponibles para construir la UI; [x] **una ficha por animal**: si el grupo está publicado, el feed sirve la del grupo (`animal_grupo`) y descarta la individual del miembro, aunque la hoja tenga las dos (`webPublicables`).
 
 ### 5.2 Detalle de publicación — implementado
 - [x] **`GET /api/publicaciones/:slug`** → `?endpoint=publicaciones/{slug}` o `?endpoint=publicacion&slug=...`: publicación completa (`icons`, `gallery`, `videos[]/video`, `contentHtml`, `animal`/`event`, `seo`).
 - [x] **404 lógico** (`status: "error"`) cuando no está disponible/publicada (Apps Script responde 200; el `status` es el contrato real del proyecto).
 - [x] **410 lógico** (`status: "gone"`, `code: "gone"`) cuando la publicación está `retirado`: feed, sitemap, redirects y gestor la excluyen, pero el slug queda bloqueado y la ficha muestra “Publicación retirada” con `noindex,nofollow`.
 - [x] **Slug antiguo → 301:** si el slug no es el actual pero figura en `slug_historial`, responde `status:"success"` con `redirect:{from,to,slug,permanent:true}` y el `data` de la ficha vigente.
+- [x] **Ficha individual superada por su grupo → 301:** si el slug —**el actual o cualquiera de su historial**— pertenece a una publicación `animal` en estado `publicado` cuyo grupo tiene publicación publicada y servida, el detalle **no devuelve esa ficha**: responde `status:"success"` con `redirect:{from,to,slug,permanent:true,motivo:"ficha_en_grupo"}` apuntando a la ruta del grupo (`/animales/<slug del grupo>`) y el `data` de esa ficha de grupo. Así un enlace antiguo del animal nunca acaba en 404 y el canal no sirve al mismo animal dos veces. La lápida manda: una publicación `retirado` sigue respondiendo `gone`.
 
 ### 5.3 Compatibilidad y endpoints adicionales (`/v1/*`) — implementado
 - [x] `GET /v1/publicaciones` y `GET /v1/publicaciones/:slug` como alias.
 - [x] Alias por tipo: `GET /v1/animales`, `GET /v1/eventos`, `GET /v1/blog|historias`.
 - [x] Soporte: `GET /v1/config`, `GET /v1/taxonomias`, `GET /v1/sitemap` (URLs + `lastmod`; también `sitemap.xml`).
-- [x] `GET /v1/redirects` (o `?endpoint=redirects`): mapa 301 `{from,to,status,type,slug,currentSlug,changedAt}` para generar redirecciones en el hosting.
+- [x] `GET /v1/redirects` (o `?endpoint=redirects`): mapa 301 `{from,to,status,type,slug,currentSlug,changedAt}` para generar redirecciones en el hosting. Cubre dos casos: slugs antiguos por `slug_historial` y, con `motivo:"ficha_en_grupo"`, el **slug actual y cada slug histórico** de una ficha individual superada por la publicación de su grupo, con `to` en la ruta del grupo y `changedAt` tomado del cambio de slug que corresponda.
 - [x] `?endpoint=retiradas` (público): slugs retirados y sus slugs históricos (`{slug,tipo,retiradoEn}`), para que la web publique una página de retirada `noindex` en la canónica antigua en vez de un 404.
 - [x] **Estrategia:** un único handler/payload normalizado con alias `/api/publicaciones` ↔ `/v1/*`.
 
@@ -516,3 +517,4 @@ Reglas:
 | 2026-11-16 | C3 | Vídeo click-to-load: fachada sin peticiones, iframe solo al pulsar, `youtube-nocookie`/`player.vimeo.com`, CSP `frame-src` acotada y runtime en estáticas | `v267` | `src/js/publico-embed.js`, `src/css/publico.css`, `src/publico.html`, `scripts/prerender-publico.js`, `tests/publico-embed.test.js`, `tests/prerender.test.js` |
 | 2026-11-16 | C3 | Gestor: orden ↑/↓ por bloque, selector de `videoModo`, etiquetas propias y conservación de extras del JSON; acción `moverFichaBloque` | — | `src/js/web.js`, `src/js/dashboard-web.js`, `src/css/styles.css`, `tests/web.test.js` |
 | 2026-11-16 | C3 | QA visual local: ficha, historia, embed y ficha mínima a 360/1280 sin desbordes; fachada→iframe correcta; `moverFichaBloque` y lectura del formulario probados en navegador | — | verificación manual (sin cambios de código) |
+| 2026-11-18 | 5 | Exclusividad 1:1 cerrada en las dos direcciones: no se publica el individuo si su grupo ya está publicado, el canal deduplica quedándose con el grupo y el detalle responde 301 al grupo desde el slug actual y los históricos; el sitemap sale de `webPublicables` | `v284` | `apps-script/WebPublicaciones.gs`, `src/js/web.js`, `tests/web-backend.test.js`, `tests/web.test.js` |

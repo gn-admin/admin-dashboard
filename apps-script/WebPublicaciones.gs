@@ -2472,7 +2472,17 @@ function webPublicacionPublica(slug) {
   var todas = webFilasWeb();
   for (var d = 0; d < todas.length; d++) {
     var indiv = todas[d];
-    if (indiv.tipo !== 'animal' || indiv.estado_publicacion !== 'publicado' || indiv.slug !== s) continue;
+    if (indiv.tipo !== 'animal' || indiv.estado_publicacion !== 'publicado') continue;
+    // Vale el slug actual y los históricos: si no, los enlaces viejos de una
+    // ficha que pasó a publicarse en grupo acabarían en 404.
+    var coincideIndiv = indiv.slug === s;
+    if (!coincideIndiv) {
+      var histIndiv = indiv.slug_historial || [];
+      for (var hi = 0; hi < histIndiv.length; hi++) {
+        if (histIndiv[hi].slug === s) { coincideIndiv = true; break; }
+      }
+    }
+    if (!coincideIndiv) continue;
     var grupoConf = webGrupoVigenteDeAnimal(mapa[String(indiv.origen_id)], todas);
     if (!grupoConf) continue;
     var grupoServido = null;
@@ -2543,25 +2553,31 @@ function webRedirects() {
   // conserva el enlace con una 301 al grupo (mismo tratamiento que un slug
   // antiguo) en lugar de servir al animal dos veces.
   var filas = webFilasWeb();
+  var mapaAnimales = webMapaAnimales();
+  var individuales = {};
+  filas.forEach(function (p) { if (p.tipo === 'animal') individuales[String(p.origen_id)] = p; });
   servidas.forEach(function (g) {
     if (g.tipo !== 'animal_grupo') return;
-    webMiembrosDeGrupo(g.origen_id, null).forEach(function (a) {
-      var pa = null;
-      for (var i = 0; i < filas.length; i++) {
-        if (filas[i].tipo === 'animal' && String(filas[i].origen_id) === String(a.id)) { pa = filas[i]; break; }
-      }
+    webMiembrosDeGrupo(g.origen_id, mapaAnimales).forEach(function (a) {
+      var pa = individuales[String(a.id)];
       if (!pa || pa.estado_publicacion !== 'publicado' || !pa.slug || pa.slug === g.slug) return;
-      if (vistos[String(pa.slug)]) return;
-      vistos[String(pa.slug)] = true;
-      out.push({
-        from: (base || '') + webRutaPublica('animal', pa.slug),
-        to: (base || '') + webRutaPublica('animal_grupo', g.slug),
-        status: 301,
-        type: 'animal',
-        slug: pa.slug,
-        currentSlug: g.slug,
-        motivo: 'ficha_en_grupo',
-        changedAt: pa.actualizado_en || ''
+      // El slug actual y los históricos de la ficha superada apuntan al grupo.
+      var pares = [{ slug: pa.slug, fecha: pa.actualizado_en || '' }].concat(pa.slug_historial || []);
+      pares.forEach(function (par) {
+        var slugViejo = par && par.slug;
+        if (!slugViejo || slugViejo === g.slug) return;
+        if (vistos[String(slugViejo)]) return;
+        vistos[String(slugViejo)] = true;
+        out.push({
+          from: (base || '') + webRutaPublica('animal', slugViejo),
+          to: (base || '') + webRutaPublica('animal_grupo', g.slug),
+          status: 301,
+          type: 'animal',
+          slug: slugViejo,
+          currentSlug: g.slug,
+          motivo: 'ficha_en_grupo',
+          changedAt: (par && par.fecha) || pa.actualizado_en || ''
+        });
       });
     });
   });

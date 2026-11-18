@@ -1636,4 +1636,55 @@ describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', 
     assert.deepEqual(plano(b.ctx.webRedirects().data), []);
     assert.equal(b.ctx.webSitemap().data.length, 1);
   });
+
+  it('un slug histórico de la ficha superada también redirige al grupo', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(
+      fila({ id: 'web_ani1', slug_historial: JSON.stringify([{ slug: 'luna-vieja', fecha: '2026-10-01T10:00:00.000Z' }]) }),
+      filaGrupo()
+    );
+
+    const r = b.ctx.webPublicacionPublica('luna-vieja');
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.ok(r.redirect, 'el slug histórico debe redirigir, no dar 404');
+    assert.equal(r.redirect.from, '/animales/luna-vieja');
+    assert.equal(r.redirect.to, '/animales/camada-luna');
+    assert.equal(r.redirect.motivo, 'ficha_en_grupo');
+    assert.equal(r.data.slug, 'camada-luna');
+  });
+
+  it('las redirecciones cubren el slug actual y los históricos de la ficha superada', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(
+      fila({ id: 'web_ani1', slug_historial: JSON.stringify(['luna-vieja', 'luna-2025']) }),
+      filaGrupo()
+    );
+
+    const entradas = plano(b.ctx.webRedirects().data).filter(e => e.motivo === 'ficha_en_grupo');
+    assert.deepEqual(entradas.map(e => e.slug).sort(), ['luna', 'luna-2025', 'luna-vieja']);
+    entradas.forEach(e => {
+      assert.equal(e.status, 301);
+      assert.equal(e.currentSlug, 'camada-luna');
+      assert.equal(e.from, 'https://gruponebak.net/animales/' + e.slug);
+      assert.equal(e.to, 'https://gruponebak.net/animales/camada-luna');
+    });
+  });
+
+  it('sin grupo publicado el slug histórico sigue yendo a la ficha individual', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }));
+    b.estado.publicaciones.push(
+      fila({ id: 'web_ani1', slug_historial: JSON.stringify(['luna-vieja']) }),
+      filaGrupo({ estado_publicacion: 'borrador' })
+    );
+
+    const r = b.ctx.webPublicacionPublica('luna-vieja');
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(r.redirect.to, '/animales/luna');
+    assert.equal(r.redirect.motivo, undefined);
+  });
 });
