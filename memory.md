@@ -1,11 +1,11 @@
 ﻿# memory.md — Qué se ha hecho
 
 > Registro de trabajo del gestor web y del visor público (`publico.html`, simulación de la web real de Grupo Nebak).
-> Última actualización: 2026-11-16. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
+> Última actualización: 2026-11-18. Contratos y detalles: [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md). Reglas de trabajo: [`AGENTS.md`](AGENTS.md).
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`, con SEO prerenderizado, canónica única, retiradas con 410 lógico (`gone`/lápida) y despliegue/prerender disparado por el backend (cron como red de seguridad). **Track A cerrado para este proyecto de gestión** (dominio/indexación del sitio publicado se gestiona en `main`; aquí se usa `github.io`). **`.gs` actualizados**. **Track E cerrado** (E1–E5). **D5 (reCAPTCHA servidor): verificado** (token válido `ok:true`, inválidos 403; gate de login desactivado por decisión). **C3 (ficha configurable): v1.1 desarrollada en local, pendiente de desplegar** (contrato aditivo `ficha_json` normalizado/saneado, solo detalle/preview; orden de bloques, `contenido`, `videoModo`, `tags` propias y precedencia `ficha > base`; gestor con orden ↑/↓; visor/prerender y vídeo click-to-load; tests incluidos). QA visual 360/1280 verificada en local (sin desbordes, orden/precedencia y fachada de vídeo correctos). Pendiente en este repo: desplegar `.gs`/Pages; port a `main` externo. Suite: **646/646** en local (**636** en CI sin `Roles.gs`).
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`. **Replanificación con grupos integrada:** **F0–F4 cerradas en código local** (contrato unificado 1:1+grupos, UX/flujos, composición/whitelist y esquema aditivo; implementación end-to-end de grupos `animal_grupo`/G1: backend `apps-script/WebPublicaciones.gs`+`Code.gs`, API `src/js/api.js`, gestor `src/js/web.js`+`src/js/dashboard-web.js`, visor/prerender `src/js/publico.js`). **F5** (endurecimiento y QA 1:1+grupos) queda posterior. Base 1:1 conservada. `npm test` **659/659, 164 suites, 0 fallos** (2026-11-18), `CACHE_NAME` **v274**. **Pendiente operativo/manual:** re-subir `.gs` a GAS y verificar en producción 1:1 (F2/F3) y grupos (F4) de punta a punta; asegurar columnas aditivas en `WebPublicaciones` (`documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`) si faltan. Contracto público de grupos en `main`: coordinar vía `TRANSFERIR_A_MAIN.md` (sin cambios en `main` desde este repo).
 
 ## Entregado
 
@@ -90,7 +90,13 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v267` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js`, controles con orden de bloques y `publico-embed.js` con vídeo click-to-load).
 - `npm test`: **646/646** en local (**636** en CI, donde `roles-auth` se omite) (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`, `tests/publico-embed.test.js`; contrato C3 v1.1 y vídeo click-to-load).
 
-## Decisiones cerradas
+### F2 — ficha interna como fuente y “qué enseñar” (2026-11-17, código local)
+
+- **Backend (`apps-script/WebPublicaciones.gs`, `Code.gs`)**: mapeo interno→público D1 (`disponible→en_adopcion`, `en_acogida→en_acogida`, `en_adopcion→reservado`, `adoptado→adoptado`, `fallecido→cerrado`) con vocabulario público de 5 valores y modo `auto|manual` (`estado_publico_modo`); `urgente` pasa a ser solo bandera `urgent` en payload/listado/card (nunca estado). Whitelist estricta al componer (animal/evento/media/tags/iconos sin claves internas; sin documentos privados en payload) y contacto público por defecto desde `CONFIG.CONTACT_EMAIL` (D7). Validación: no publicar si el animal está `fallecido`. Retirar/restaurar publicación de animal con lápida 410 y slug reservado (D3), enrutado con `_webAnotarDeploy`.
+- **Frontend**: gestor con estado público automático/override (sin `urgente` en select), bloque de datos heredados de solo lectura, portada heredada visible, acciones Retirar/Restaurar para animales y chip de estado web en la ficha interna (`_cargarEstadoWebAnimal`); al guardar un animal `fallecido` se propone retirar su publicación (confirmación). Visor/prerender muestran badge “Urgente” desde la bandera.
+- **Despliegue backend**: ✅ **Hecho por el usuario (2026-11-18).** `apps-script/WebPublicaciones.gs`, `apps-script/Code.gs` y `Config.gs` están subidos a Google Apps Script. Queda la verificación funcional en producción (preview/feed, publicar/ocultar/retirar/restaurar, animal fallecido, ficha interna y ciclo de grupos). D6–D8 se aplicaron como propuesta por defecto donde aplica (coherencia de estado, contacto de asociación, privacidad de documentos ya garantizada al no emitirlos).
+
+
 
 - La ficha canónica es la página **estática**; el SPA apunta a ella.
 - El 410 se modela como `status:'gone'` porque el canal (JSONP) no puede devolver códigos HTTP; la lápida conserva el slug.
@@ -106,23 +112,76 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - **D3 cerrado:** instrumentación en código/tests y flujos auditados operativos (restaurar/retirar/estado web y `web-media-subir` con permisos correctos, mejora desplegada).
 
 **Pendiente operativo/manual (no cerrable desde este repo):**
-1. **C3 (despliegue):** subir `WebPublicaciones.gs` y las líneas nuevas de `Config.gs` cuando se decida desplegar; después, probar en producción un vídeo real en modo `embed` (fachada → iframe). La QA visual 360/1280 (con y sin `ficha`), el orden/precedencia y la fachada ya están verificados en local, y el código y los tests están listos.
-2. **D5 (condicional):** verificación servidor OK; gate de login desactivado. Si se reactiva, añadir `RECAPTCHA_SITE_KEY` como secreto de GitHub y redeplegar.
+1. **C3 (despliegue):** ✅ **Hecho.** `WebPublicaciones.gs`, `Code.gs` y `Config.gs` subidos a GAS con nueva versión. Frontend v267 desplegado en Pages y verificado con Playwright contra producción (orden, precedencia, embed click-to-load, 410). Vídeo real en modo `embed` pendiente de probar con un vídeo de producción real cuando se decida.
+2. **D5 (condicional):** servidor OK y `RECAPTCHA_SITE_KEY` configurada (`.env` local + `config.js` regenerada; ya añadida como secreto de GitHub por el usuario). Gate de login desactivado por decisión; para reactivar solo hace falta hacer push a `main` (Pages regenera `config.js` con el secreto).
 3. **D3 (opcional):** inspección visual en la hoja de auditoría/fases.
 4. **D4 (acción periódica):** rotación del token cuando proceda (Secrets + config GAS + redespliegue).
 5. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
 
+## Análisis y planes añadidos (2026-11-16 / 2026-11-17)
 
-## Análisis y planes añadidos (2026-11-16)
-
-- **[`PLAN_GESTOR_FICHAS_PUBLICACIONES.md`](PLAN_GESTOR_FICHAS_PUBLICACIONES.md):** análisis profundo y plan por fases (F0–F4, sin implementación) para separar ficha interna y publicación (animal derivada vs evento/historia autónoma), definir ficha como fuente de verdad + capa de “qué mostrar” (whitelist/precedencia/C3), y evitar conflictos futuros (modelo, UI/UX responsive y lógica). Incluye QA estática C3 ejecutada (con/sin `ficha`, viewport/reglas responsive) y observaciones.
+- **[`PLAN_GESTOR_FICHAS_PUBLICACIONES.md`](PLAN_GESTOR_FICHAS_PUBLICACIONES.md):** plan por fases (replanificado 2026-11-17) para ficha interna como fuente y publicación como capa de presentación/visibilidad. **Integra grupos/camadas en todas las fases:** F0–F3 **reabiertas** para revisión/ajuste con grupos (base 1:1 conservada), **F4** implementación end-to-end de grupos (adopción conjunta, G1) y **F5** endurecimiento/QA 1:1+grupos (posterior). Cierre progresivo hasta F4.
+- **[`F4_GRUPOS_MINIPROPUESTA.md`](F4_GRUPOS_MINIPROPUESTA.md):** minipropuesta de grupos/camadas. Recomienda **G1** (publicación de grupo para `grupo_obligatorio`, exclusiva y compuesta desde miembros; 1:1 para no obligatorios). Define casos, contrato borrador (origen, agregación, estado/urgente, ciclo de vida, UI/canal), impacto técnico y decisiones **G-D1…G-D7**.
+- **[`F0_MAPA_CAMPOS_Y_CONTRATO.md`](F0_MAPA_CAMPOS_Y_CONTRATO.md):** contrato 1:1 (D1–D8) **reabierto** con extensión de grupos (§11, borrador G-D1…G-D7, composición agregada y matriz de acciones). F0 se cierra al unificar contrato 1:1+grupos sin bloqueos.
 - **Análisis global encargado (en curso, fuera de publicaciones):** auditoría exhaustiva de **seguridad** y de **UI/UX** del proyecto (inconsistencias, accesibilidad, responsive, flujos y endurecimiento en todos los módulos). Resultados pendientes de consolidar e incorporar.
+
+## F3 — 1:1 implementada, reabierta para revisión con grupos (2026-11-17)
+
+**Hecho (1:1, código local):**
+- **D8 documentos privados:** `documents_json` separado (sin duplicar en `media_json` en nuevas escrituras), compatibilidad de lectura, nunca en payload público.
+- **Columnas aditivas:** `documents_json`, `media_folder_id` y `origen` ampliado (portada/galería/vídeos/documentos internos); `webFotoOrigen` prioriza `portada_url`.
+- **D4 media interna:** editable en la ficha de animal (portada URL/alt, galería, vídeos, documentos internos privados) y pre-relleno al crear la publicación.
+- **D5 propagación opt-in:** checkbox apagado por defecto al guardar la publicación; reutiliza URLs/fileIds hacia la ficha interna.
+- **Persistencia/duplicados:** `animal_json` solo con overrides significativos; para animales, `especie` se toma de la ficha y la `categoría` se autoderiva si falta. Completitud usa estado/portada heredados o derivados cuando aplica.
+
+**Reapertura (plan integrado):** verificar/adaptar esquema y persistencia para origen de grupo (G-D1/G-D2), media/carpeta de publicación de grupo, reglas de refresco (G-D4) y compatibilidad aditiva. **Pendiente operativo 1:1:** subir `apps-script/WebPublicaciones.gs` actualizado a GAS y verificar F2/F3 en producción. `CACHE_NAME` v273.
+
+
+
+- **[`F0_MAPA_CAMPOS_Y_CONTRATO.md`](F0_MAPA_CAMPOS_Y_CONTRATO.md):** entregable de F0. Inventario real de campos de `Animales` y `WebPublicaciones` (extraído del código), whitelist pública, precedencia por campo, 12 contradicciones con referencia y decisiones D1–D8 (estados, `urgente`, retirada, media interna, propagación, obligatorios, contacto/autor, documentos privados).
+- **Hallazgos críticos:** `disponible` y `fallecido` no existen en `estado_publico` (el select cae en `en_adopcion`); `urgente` tiene tres representaciones; la media vive en tres capas; documentos privados comparten `media_json` con media pública; animal no tiene Retirar/Restaurar.
+- **Siguiente:** D1–D5 cerradas (mapeo recomendado, lápida 410, media interna, opt-in desactivado). D6–D8 quedan como propuesta por defecto y se confirman en F2/F3.
+
+## Cierre progresivo de fases (2026-11-17/18, F0–F5)
+
+- **F0 ✅ Contrato unificado (1:1+grupos):** D1–D8 confirmadas y G-D1…G-D7 resueltas. Decisiones: `tipo=animal_grupo`/`origen_tipo=grupo`/`origen_id=grupo_id` (estable, 1 pub por grupo), derivación agregada (todos disponible→en_adopcion; disp+acogida→en_acogida; algún reservado→reservado; todos adoptado→adoptado; parcial/fallecido/inválido→cerrado no publicable, revisión), `urgent` si algún miembro prioritario, refresco por recálculo en lectura/composición, exclusividad (no individuales publicadas con grupo vigente; al activar grupo resolver conflictos), whitelist de miembros resumidos sin IDs internos, y categoría/slug/SEO/JSON-LD/canónica aditivos compatibles con `main`. Documentado en `F0_MAPA_CAMPOS_Y_CONTRATO.md` §10–§11 y `F4_GRUPOS_MINIPROPUESTA.md`.
+- **F1 ✅ UX y flujos:** especificación 1:1+grupo y **UI de grupos implementada** en gestor: pestaña «Grupos», listado/selector de grupos `grupo_obligatorio`, formulario con miembros y agregados heredados en solo lectura + editorial/SEO/estado/visibilidad, acciones (crear/editar/preview/publicar/ocultar/retirar/restaurar/eliminar), avisos de conflicto individual y completitud; 1:1 compatible.
+- **F2 ✅ Composición/whitelist:** modelo unificado `override > herencia(simple|agregada) > default`, derivación G-D3, `urgent` agregado, refresco en lectura/composición G-D4, exclusividad G-D5, whitelist estricta y compositor extensible por tipo/origen (`animal`, `animal_grupo`, evento/historia).
+- **F3 ✅ Modelo de datos/persistencia/media (diseño aditivo aplicado):** `origen_tipo`/`animal_grupo` con `origen_id=grupo_id`, reutilización de columnas JSON existentes para editorial/overrides, persistencia de agregados recalculada (no dependiente de caché), pre-relleno de portada/galería desde miembros al crear. Compatibilidad con 1:1 y empezar de cero.
+- **F4 ✅ Implementación end-to-end de grupos (código local, 2026-11-18):**
+  - **Backend:** `apps-script/WebPublicaciones.gs` (tipo `animal_grupo`, origen grupo/miembros, derivación/validez/urgente/portada/categoría agregados, bloque `group`+`animal` whitelisted, feed/detalle/sitemap/resumen/origen genérico, `web-grupos` CRUD+estado+preview con exclusividad y completitud) y `apps-script/Code.gs` (rutas GET/POST `web-grupos`, `web-grupos-preview`, `web-grupos-estado`, disparo de deploy vía `_webAnotarDeploy`).
+  - **Frontend:** `src/js/api.js` (métodos `get/save/setEstado/delete/retirar/restaurar/preview` de grupos), `src/js/web.js` + `src/js/dashboard-web.js` (gestión y acciones), `src/js/publico.js` (render de grupo/miembros y JSON-LD compatible), `scripts/prerender-publico.js` reutiliza `Publico` para estáticas. `src/sw.js` → `v274`.
+  - **Verificación:** `npm test` 659/659, 164 suites, 0 fallos. Temporales de parche eliminados.
+  - **Pendiente operativo:** desplegar `apps-script/WebPublicaciones.gs` y `apps-script/Code.gs` en GAS y verificar en producción el ciclo completo de grupos (crear/preview/publicar/ocultar/retirar/restaurar, exclusividad con individuales, canal/estática/SEO) y la base 1:1 (F2/F3).
+- **F5 ✅ Endurecimiento y QA 1:1+grupos (2026-11-18):**
+  - **Tests de contrato de grupo:** derivación agregada (disponible/acogida/reservado/adoptado/parcial/fallecido/inconsistente), `urgent` agregado, validez para publicar, portada/especie/categoría, `preview == feed == detalle`, whitelist de miembros (sin IDs, microchip ni documentos), salud agregada, exclusividad G-D5, completitud, modo manual, listado con conflicto/sin publicar, retirada 410 + restauración por `grupo_id`, no eliminar publicadas/retiradas y una sola publicación por grupo. En frontend: selector de grupos, fila/listado, pestaña vacía y carpeta de media.
+  - **Correcciones de QA:** `src/js/web.js` no tenía `_filaGrupo` ni las acciones/formulario que ya delegaba `dashboard-web.js` (la pestaña «Grupos» rompía); se completaron formulario, lectura, guardado, preview y ciclo de vida. `webRestaurarGrupo` acepta `grupo_id` (lo que envía `api.js`) y el listado incluye grupos no obligatorios que ya tienen publicación. Se corrigió la codificación de cadenas del bloque de grupos en `WebPublicaciones.gs` (comparación `sí`, categorías y mensajes).
+  - **Documentación:** contrato público de grupo para `main` en `TRANSFERIR_A_MAIN.md` §A.2.1 (`animal_grupo`, `isGroup`, bloque `group`, miembros whitelisted, derivación, urgencia, exclusividad, SEO/JSON-LD).
+  - **Verificación:** `npm test` **693/693, 168 suites, 0 fallos**. `CACHE_NAME` → `v275`.
+  - **Pendiente operativo:** verificación funcional en producción (backend ya subido a GAS) del ciclo 1:1 y grupos: crear/preview/publicar/ocultar/retirar/restaurar, exclusividad con individuales, canal/estática/SEO y aspecto en 360/768/1280.
+
+## F1 ejecutada (1:1, 2026-11-17) — reabierta revisión UX con grupos
+
+- **Separación UX del gestor web (`src/js/web.js` + `src/css/styles.css`):**
+  - Contador por pestaña en «Animales» y «Eventos e historias» (`_contadoresTab`), incluyendo lectores de pantalla con singular/plural.
+  - CTA explícito «Publicar animal» (antes «Nueva publicación»); vacío de eventos con su propio botón.
+  - Búsqueda contextual por pestaña y `role="tabpanel"` + `aria-labelledby`.
+  - Al cambiar de pestaña, el foco se queda en la pestaña activa (teclado/lectores).
+  - Responsive: tabs en una línea a 360 px, sin desbordes (`web-tab-count`).
+- **QA:** Playwright 1280 y 360 sobre la app local (login real): contadores 1/1, CTA y placeholders correctos, foco `web-tab-animal`→`web-tab-evento`, `overflow 0`, sin errores de consola.
+- **Tests:** 649/649 en 162 suites (3 pruebas nuevas de `_contadoresTab`). `CACHE_NAME` → `v268`.
+- **Reapertura (plan integrado):** revisar IA/UX para publicar/gestionar grupos (`grupo_obligatorio`), contadores/formularios/acciones e indicadores de estado web de grupo en miembros (según contrato F0/F1).
 
 ## Pendiente de desarrollo (otros tracks)
 
-- **Track B / formularios en `main`:** planificación trasladada a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (ejecución en el proyecto `main`, fuera de este repo).
+- **Track B / formularios en `main`:** planificación trasladada a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md) (ejecución en el proyecto `main`, fuera de este repo). Incluye **Parte A: EmailJS + reCAPTCHA v3** (enfoque inicial para formularios en `main`) y **Parte B: C4 `forms/submit` en GAS** (migración futura si volumen crece).
 - **Track E:** ✅ Completado (E1–E5: homogeneización UI/estados, mejoras de primitivas/CSS, modularización progresiva de `dashboard.js`, rendimiento percibido/SW y auditoría a11y en código; QA manual en dispositivos/orientaciones y por rol recomendada en entorno real).
-- **Track C (C3 v1.1 desarrollada en local):** C1/C2 hechos. **C3 v1.1 completa en código:** modelo (`orden`, `contenido`, `videoModo`, `tags`, precedencia), backend normalizado, gestor con orden ↑/↓, visor/prerender por orden y vídeo click-to-load, y pruebas de contrato. **Pendiente:** desplegar `.gs`/Pages y port a `main`; QA visual 360/1280 ya verificada en local. **C4** sigue con nota de viabilidad/restricciones (CORS/preflight en POST, prototipo de transporte, cuotas/antiabuso).
+- **Track C (C3 v1.1 desarrollada en local):** C1/C2 hechos. **C3 v1.1 completa en código:** modelo (`orden`, `contenido`, `videoModo`, `tags`, precedencia), backend normalizado, gestor con orden ↑/↓, visor/prerender por orden y vídeo click-to-load, y pruebas de contrato. **Pendiente:** desplegar `.gs`/Pages y port a `main`; QA visual 360/1280 ya verificada en local. **C4** pospuesto a futura evaluación: para `main` se usará inicialmente **EmailJS + reCAPTCHA v3** desde el frontend (planificación en [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)); si el volumen crece, se migrará a backend en Apps Script (`forms/submit` con `MailApp`, validación server-side de reCAPTCHA y resolución de CORS/preflight).
+
+## Estado listo para ejecutar mañana (este repo)
+- Desarrollo de código en este repositorio: **cerrado** (no hay pendientes de implementación).
+- Queda operativo/manual: verificar `.gs` desplegado en producción, probar vídeo embed real, rotación de token D4, inspección D3 opcional, reactivar D5 solo si se decide.
+- Todo lo relacionado con `main` está en `TRANSFERIR_A_MAIN.md` (fuera de este repo).
 
 ## Mapa rápido
 

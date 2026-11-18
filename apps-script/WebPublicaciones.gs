@@ -13,8 +13,19 @@
  * Estados de publicación: borrador | publicado | oculto
  */
 
-var WEB_TIPOS = ['animal', 'evento', 'historia'];
+var WEB_TIPOS = ['animal', 'animal_grupo', 'evento', 'historia'];
 var WEB_ESTADOS = ['borrador', 'publicado', 'oculto', 'retirado'];
+// Vocabulario público de estado del animal (D1). `urgente` no es un estado:
+// viaja como bandera booleana (`urgent`) y se pinta como badge/orden.
+var WEB_ESTADOS_PUBLICOS = ['en_adopcion', 'en_acogida', 'reservado', 'adoptado', 'cerrado'];
+var WEB_ESTADO_PUBLICO_POR_INTERNO = {
+  disponible: 'en_adopcion',
+  en_acogida: 'en_acogida',
+  en_adopcion: 'reservado',
+  reservado: 'reservado',
+  adoptado: 'adoptado',
+  fallecido: 'cerrado'
+};
 var WEB_PAGE_SIZE_DEF = 12;
 var WEB_PAGE_SIZE_MAX = 50;      // canal publico
 var WEB_ADMIN_PAGE_SIZE_MAX = 500; // listado del gestor (admin)
@@ -86,6 +97,82 @@ function webTexto(valor) {
   return String(valor == null ? '' : valor).trim();
 }
 
+/** Estado público derivado del estado interno del animal (D1). */
+function webEstadoPublicoDerivado(estadoInterno) {
+  var e = webTexto(estadoInterno).toLowerCase();
+  return WEB_ESTADO_PUBLICO_POR_INTERNO[e] || '';
+}
+
+/** Derivado según origen: animal individual o grupo (agregado, G-D3). */
+function webEstadoPublicoDerivadoOrigen(publicacion, origen) {
+  var p = publicacion || {};
+  if (p.tipo === 'animal_grupo' || (origen && Array.isArray(origen.miembros))) {
+    return webEstadoGrupoDerivado((origen && origen.miembros) || []);
+  }
+  return webEstadoPublicoDerivado(origen && origen.estado);
+}
+
+/**
+ * Modo del estado público: `auto` (manda el origen) o `manual` (override explícito).
+ * Compatibilidad filas antiguas: auto si vacío/`urgente`/coincide con derivado.
+ * Sin origen derivable (evento/historia) es manual.
+ */
+function webModoEstadoPublico(publicacion, origen) {
+  var p = publicacion || {};
+  var modo = webTexto(p.estado_publico_modo).toLowerCase();
+  if (modo === 'auto' || modo === 'manual') {
+    if (modo === 'manual' && WEB_ESTADOS_PUBLICOS.indexOf(webTexto(p.estado_publico)) === -1) return 'auto';
+    return modo;
+  }
+  if (!origen || (p.tipo !== 'animal' && p.tipo !== 'animal_grupo')) return 'manual';
+  var guardado = webTexto(p.estado_publico);
+  var derivado = webEstadoPublicoDerivadoOrigen(p, origen);
+  if (!guardado || guardado === 'urgente' || guardado === derivado) return 'auto';
+  return 'manual';
+}
+
+/** Estado público efectivo: override manual válido > derivado del origen. */
+function webEstadoPublicoEfectivo(publicacion, origen) {
+  var p = publicacion || {};
+  var guardado = webTexto(p.estado_publico);
+  if (!origen || (p.tipo !== 'animal' && p.tipo !== 'animal_grupo')) return guardado;
+  if (webModoEstadoPublico(p, origen) === 'manual' && WEB_ESTADOS_PUBLICOS.indexOf(guardado) !== -1) return guardado;
+  return webEstadoPublicoDerivadoOrigen(p, origen);
+}
+
+/** `urgente` es solo una bandera y solo si el animal sigue necesitando hogar. */
+function webAnimalUrgente(origen) {
+  if (!origen || !webBool(origen.urgente, false)) return false;
+  var estado = webTexto(origen.estado).toLowerCase();
+  return estado === 'disponible' || estado === 'en_acogida';
+}
+
+function webUrgenteEfectivo(publicacion, origen) {
+  var p = publicacion || {};
+  if (p.tipo === 'animal_grupo' || (origen && Array.isArray(origen.miembros))) {
+    return webGrupoUrgente((origen && origen.miembros) || []);
+  }
+  return webAnimalUrgente(origen);
+}
+
+
+/** Copia solo las claves permitidas de un objeto plano (whitelist pública). */
+function webObjetoCampos(obj, campos) {
+  var out = {};
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  (campos || []).forEach(function (k) {
+    if (obj[k] !== undefined && obj[k] !== null) out[k] = obj[k];
+  });
+  return out;
+}
+
+/** Lista de textos acotada: sin objetos colados desde la hoja o el cliente. */
+function webListaTextos(valor, max, longitud) {
+  return webArray(valor).map(function (x) {
+    return webTexto(x).slice(0, longitud || 80);
+  }).filter(function (x) { return !!x; }).slice(0, max || 30);
+}
+
 function webIsoFecha(valor) {
   if (!valor) return '';
   if (valor instanceof Date) {
@@ -148,38 +235,67 @@ function webClonarPlano(obj) {
   return copia;
 }
 
-/** Galería con URL segura: descarta las entradas sin `src` utilizable. */
+/** Galería con URL segura y solo las claves públicas de cada imagen. */
 function webGaleriaSegura(lista) {
   var out = [];
-  (Array.isArray(lista) ? lista : []).forEach(function (g) {
+  (Array.isArray(lista) ? lista : []).forEach(function (g, idx) {
     if (typeof g === 'string') {
       var directa = webUrlSegura(g);
-      if (directa) out.push(directa);
+      if (directa) out.push({ src: directa, alt: '', caption: '', order: idx });
       return;
     }
     if (!g || typeof g !== 'object') return;
     var src = webUrlSegura(g.src || g.url);
     if (!src) return;
-    var copia = webClonarPlano(g);
-    delete copia.url; // `src` es la forma canónica que lee el visor
-    copia.src = src;
-    out.push(copia);
+    var pedido = Number(g.order);
+    out.push({
+      src: src,
+      alt: webTexto(g.alt).slice(0, 160),
+      caption: webTexto(g.caption || g.pie).slice(0, 240),
+      order: (g.order !== undefined && g.order !== null && g.order !== '' && !isNaN(pedido)) ? pedido : idx
+    });
   });
   return out;
 }
 
-/** Vídeos con URL segura (`javascript:`/`data:` fuera). */
+/** Vídeos con URL segura y solo las claves públicas de cada vídeo. */
 function webVideosSeguros(lista) {
   var out = [];
   (Array.isArray(lista) ? lista : []).forEach(function (v) {
     if (!v || typeof v !== 'object') return;
     var url = webUrlSegura(v.url);
     if (!url) return;
-    var copia = webClonarPlano(v);
-    copia.url = url;
-    out.push(copia);
+    out.push({
+      title: webTexto(v.title || v.titulo).slice(0, 120),
+      url: url,
+      provider: webTexto(v.provider).slice(0, 40),
+      note: webTexto(v.note || v.nota).slice(0, 240)
+    });
   });
   return out;
+}
+
+/** Iconos públicos: `icon`, `label`, `value`; nada más sale al payload. */
+function webIconosSeguros(lista) {
+  var out = [];
+  (Array.isArray(lista) ? lista : []).forEach(function (i) {
+    if (!i || typeof i !== 'object') return;
+    var icon = webTexto(i.icon).slice(0, 40);
+    var label = webTexto(i.label).slice(0, 80);
+    var value = webTexto(i.value).slice(0, 120);
+    if (icon || label || value) out.push({ icon: icon, label: label, value: value });
+  });
+  return out.slice(0, 30);
+}
+
+/** Etiquetas públicas acotadas y sin duplicados. */
+function webTagsSeguras(tags) {
+  var out = [];
+  (Array.isArray(tags) ? tags : []).forEach(function (t) {
+    var v = webTexto(t).slice(0, 40);
+    if (v && out.indexOf(v) === -1) out.push(v);
+  });
+  return out.slice(0, 20);
 }
 
 /** Ficha configurable con galería, vídeos y CTA saneados (sin tocar el resto). */
@@ -336,10 +452,16 @@ function webFilasWeb() {
 
 function webFilaAPublicacion(fila) {
   var f = fila || {};
+  var media = webParseJson(f.media_json, {});
+  if (media && typeof media === 'object' && !Array.isArray(media)) {
+    var docsCol = webParseJson(f.documents_json, null);
+    if ((!media.documents || !media.documents.length) && Array.isArray(docsCol)) media.documents = docsCol;
+  }
   return {
     _row: f._row,
     id: webTexto(f.id),
     tipo: webTexto(f.tipo) || 'animal',
+    origen_tipo: webTexto(f.origen_tipo) || (webTexto(f.tipo) === 'animal_grupo' ? 'grupo' : ''),
     origen_id: webTexto(f.origen_id),
     slug: webNormalizarSlug(f.slug),
     estado_publicacion: WEB_ESTADOS.indexOf(webTexto(f.estado_publicacion)) !== -1 ? webTexto(f.estado_publicacion) : 'borrador',
@@ -352,10 +474,12 @@ function webFilaAPublicacion(fila) {
     contenido_html: String(f.contenido_html || ''),
     categoria: webTexto(f.categoria),
     estado_publico: webTexto(f.estado_publico),
+    estado_publico_modo: webTexto(f.estado_publico_modo).toLowerCase(),
     especie: webTexto(f.especie),
     autor: webTexto(f.autor),
     tags: webArray(webParseJson(f.tags_json, [])),
-    media: webParseJson(f.media_json, {}),
+    media: media || {},
+    media_folder_id: webTexto(f.media_folder_id),
     seo: webParseJson(f.seo_json, {}),
     cta: webParseJson(f.cta_json, null),
     animal: webParseJson(f.animal_json, null),
@@ -512,7 +636,8 @@ function webMapaAnimales() {
 /** Foto del animal como cover por defecto (misma normalización que el panel). */
 function webFotoOrigen(animal) {
   if (!animal) return '';
-  var directa = webTexto(animal.foto_url || animal.foto);
+  // D4: portada interna propia si existe; si no, foto heredada histórica.
+  var directa = webTexto(animal.portada_url || animal.foto_url || animal.foto);
   if (directa) {
     var m = directa.match(/\/d\/([A-Za-z0-9_-]{10,})/) || directa.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
     if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1200';
@@ -523,10 +648,186 @@ function webFotoOrigen(animal) {
   return '';
 }
 
-function webOrigen(publicacion, mapa) {
-  if (!publicacion || publicacion.tipo !== 'animal') return null;
-  var m = mapa || webMapaAnimales();
-  return m[String(publicacion.origen_id)] || null;
+// ==================== GRUPOS / CAMADAS (adopción conjunta, G1) ====================
+
+function webMapaGrupos() {
+  var grupos = {};
+  readSheet(CONFIG.sheets.animales).forEach(function (a) {
+    if (!a || a.id === undefined || a.id === null) return;
+    var gid = webTexto(a.grupo_id || a.grupo);
+    if (!gid) return;
+    var key = String(gid);
+    if (!grupos[key]) {
+      grupos[key] = {
+        id: key,
+        nombre: webTexto(a.grupo) || key,
+        grupo_obligatorio: webBool(a.grupo_obligatorio, false),
+        miembros: []
+      };
+    }
+    if (!grupos[key].grupo_obligatorio && webBool(a.grupo_obligatorio, false)) grupos[key].grupo_obligatorio = true;
+    if (webTexto(a.grupo)) grupos[key].nombre = webTexto(a.grupo);
+    grupos[key].miembros.push(a);
+  });
+  return grupos;
+}
+
+function webMiembrosDeGrupo(grupoId, mapaAnimales) {
+  var gid = String(grupoId || '');
+  if (!gid) return [];
+  var out = [];
+  var src = mapaAnimales ? Object.keys(mapaAnimales).map(function (k) { return mapaAnimales[k]; }) : readSheet(CONFIG.sheets.animales);
+  src.forEach(function (a) {
+    if (!a) return;
+    var ag = webTexto(a.grupo_id || a.grupo);
+    if (ag && String(ag) === gid) out.push(a);
+  });
+  return out;
+}
+
+function webGrupoInfo(grupoId) {
+  var g = webMapaGrupos()[String(grupoId)];
+  return g || null;
+}
+
+function webEstadoGrupoDerivado(miembros) {
+  var ms = Array.isArray(miembros) ? miembros : [];
+  if (!ms.length) return 'cerrado';
+  var estados = ms.map(function (a) { return webTexto(a.estado).toLowerCase(); });
+  var algunoFallecido = estados.some(function (e) { return e === 'fallecido'; });
+  var algunoAdoptado = estados.some(function (e) { return e === 'adoptado'; });
+  var todosAdoptado = estados.every(function (e) { return e === 'adoptado'; });
+  var algunoReservado = estados.some(function (e) { return e === 'en_adopcion' || e === 'reservado'; });
+  var todosAcogidaODisp = estados.every(function (e) { return e === 'disponible' || e === 'en_acogida'; });
+  var todosAcogida = estados.every(function (e) { return e === 'en_acogida'; });
+  var todosDisponible = estados.every(function (e) { return e === 'disponible'; });
+
+  if (algunoFallecido) return 'cerrado';
+  if (algunoAdoptado && !todosAdoptado) return 'cerrado'; // adopción parcial: conjunto inválido
+  if (todosAdoptado) return 'adoptado';
+  if (algunoReservado) return 'reservado';
+  if (todosAcogida) return 'en_acogida';
+  if (todosDisponible) return 'en_adopcion';
+  if (todosAcogidaODisp) return 'en_acogida';
+  return 'cerrado';
+}
+
+function webGrupoValidoParaPublicar(miembros) {
+  var ms = Array.isArray(miembros) ? miembros : [];
+  if (!ms.length) return false;
+  var der = webEstadoGrupoDerivado(ms);
+  if (der === 'cerrado') {
+    // cerrado derivado por fallecido/parcial/vacío/inconsistente => no publicable
+    return false;
+  }
+  return true;
+}
+
+function webGrupoUrgente(miembros) {
+  var ms = Array.isArray(miembros) ? miembros : [];
+  for (var i = 0; i < ms.length; i++) {
+    if (webAnimalUrgente(ms[i])) return true;
+  }
+  return false;
+}
+
+function webPortadaGrupo(miembros) {
+  var ms = Array.isArray(miembros) ? miembros : [];
+  for (var i = 0; i < ms.length; i++) {
+    var f = webFotoOrigen(ms[i]);
+    if (f) return f;
+  }
+  return '';
+}
+
+function webMiembrosResumen(miembros) {
+  return (Array.isArray(miembros) ? miembros : []).map(function (a) {
+    return {
+      nombre: webTexto(a.nombre),
+      especie: webTexto(a.especie),
+      raza: webTexto(a.raza),
+      sexo: webTexto(a.sexo),
+      edad: webTexto(a.edad),
+      size: webTexto(a.tamano || a['tamano'] || ''),
+      foto: webUrlSegura(webFotoOrigen(a)) || ''
+    };
+  }).filter(function (m) { return !!m.nombre; });
+}
+
+function webEspecieGrupo(miembros) {
+  var set = {};
+  (Array.isArray(miembros) ? miembros : []).forEach(function (a) {
+    var e = webTexto(a.especie);
+    if (e) set[e] = true;
+  });
+  var arr = Object.keys(set);
+  return arr.length === 1 ? arr[0] : (arr.join(', ') || '');
+}
+
+function webCategoriaGrupoDerivada(estadoEf, miembros) {
+  if (estadoEf === 'en_acogida') return 'Acogidas';
+  if (estadoEf === 'adoptado') return 'Adoptados';
+  if (estadoEf === 'cerrado') return 'Cerrados';
+  var esp = webEspecieGrupo(miembros).toLowerCase();
+  if (esp.indexOf('perr') !== -1) return 'Perros en adopción';
+  if (esp.indexOf('gat') !== -1) return 'Gatos en adopción';
+  return 'En adopción';
+}
+
+function webBloqueGrupo(curado, grupo, miembros) {
+  var c = curado || {};
+  var ms = Array.isArray(miembros) ? miembros : [];
+  var resumen = webMiembrosResumen(ms);
+  var anySpecial = ms.some(function (a) { return webTexto(a.necesidades_especiales); });
+  var healthAgg = {
+    vaccinated: ms.length ? ms.every(function (a) { return webTexto(a.vacunas).toLowerCase() === 'sí' || webTexto(a.vacunas).toLowerCase() === 'si' || webBool(a.vacunas, false); }) : false,
+    dewormed: ms.length ? ms.every(function (a) { return webTexto(a.desparasitado).toLowerCase() === 'sí' || webTexto(a.desparasitado).toLowerCase() === 'si' || webBool(a.desparasitado, false); }) : false,
+    neutered: ms.length ? ms.every(function (a) { return webBool(a.esterilizada, false); }) : false,
+    microchipped: ms.length ? ms.every(function (a) { return !!webTexto(a.microchip); }) : false,
+    specialNeeds: anySpecial
+  };
+  var sexoSet = {};
+  ms.forEach(function (a) { var s = webTexto(a.sexo); if (s) sexoSet[s] = true; });
+  var edadParts = [];
+  ms.forEach(function (a) { var e = webTexto(a.edad); if (e) edadParts.push(e); });
+  var edadLabel = edadParts.length ? (Array.from ? Array.from(new Set(edadParts)) : edadParts.filter(function(v,i,arr){return arr.indexOf(v)===i;})).join(', ') : '';
+  return {
+    groupName: webTexto(grupo && grupo.nombre),
+    count: ms.length,
+    members: resumen,
+    species: webEspecieGrupo(ms),
+    sex: Object.keys(sexoSet),
+    age: { value: '', unit: '', label: edadLabel },
+    size: '',
+    color: '',
+    health: healthAgg,
+    temperament: webListaTextos(c.temperament, 10, 40),
+    compatibility: webObjetoCampos(c.compatibility, ['dogs', 'cats', 'kids']),
+    adoption: webObjetoCampos(c.adoption, ['mode', 'feeEur', 'includes', 'requirements']),
+    foster: webObjetoCampos(c.foster, ['temporary', 'reason', 'durationLabel', 'expensesPolicy']),
+    location: webObjetoCampos(c.location, ['name', 'city', 'province', 'shelter']),
+    contact: webObjetoCampos(c.contact, ['email', 'phone'])
+  };
+}
+
+function webOrigenDePublicacion(publicacion, mapaAnimales, mapaGrupos) {
+  if (!publicacion) return null;
+  if (publicacion.tipo === 'animal') {
+    var m = mapaAnimales || webMapaAnimales();
+    return m[String(publicacion.origen_id)] || null;
+  }
+  if (publicacion.tipo === 'animal_grupo') {
+    var mg = mapaGrupos || webMapaGrupos();
+    var g = mg[String(publicacion.origen_id)] || null;
+    if (!g) return null;
+    var miembros = (Array.isArray(g.miembros) && g.miembros.length) ? g.miembros : webMiembrosDeGrupo(publicacion.origen_id, mapaAnimales);
+    return Object.assign({}, g, { miembros: miembros });
+  }
+  return null;
+}
+
+function webOrigen(publicacion, mapaAnimales, mapaGrupos) {
+  return webOrigenDePublicacion(publicacion, mapaAnimales, mapaGrupos);
 }
 
 function webPublicacionPorId(id) {
@@ -572,18 +873,34 @@ function webValidarPublicacion(publicacion, origen) {
   var faltan = [];
   var p = publicacion || {};
   var o = origen || null;
+  var esGrupo = p.tipo === 'animal_grupo' || (o && Array.isArray(o.miembros));
+  var estadoPublico = (p.tipo === 'animal' || p.tipo === 'animal_grupo' || o) ? webEstadoPublicoEfectivo(p, o) : webTexto(p.estado_publico);
   if (!webTexto(p.titulo)) faltan.push({ campo: 'titulo', mensaje: 'Falta el título público' });
   if (!webTexto(p.slug) || !webSlugValido(p.slug)) faltan.push({ campo: 'slug', mensaje: 'El slug no es válido' });
   if (!webTexto(p.categoria)) faltan.push({ campo: 'categoria', mensaje: 'Falta la categoría pública' });
-  if (!webTexto(p.estado_publico)) faltan.push({ campo: 'estado_publico', mensaje: 'Falta el estado público' });
+  if (!webTexto(estadoPublico)) faltan.push({ campo: 'estado_publico', mensaje: 'Falta el estado público' });
   var contenido = webTexto(p.contenido_html);
   if (!contenido || contenido.length < 40) faltan.push({ campo: 'contenido_html', mensaje: 'La descripción pública es demasiado corta' });
-  var cover = (p.media && p.media.coverImage && p.media.coverImage.src) || webFotoOrigen(o);
+  var cover = (p.media && p.media.coverImage && p.media.coverImage.src) || (esGrupo ? webPortadaGrupo((o && o.miembros) || []) : webFotoOrigen(o));
   if (!cover) faltan.push({ campo: 'coverImage', mensaje: 'Falta la imagen de portada' });
   var seo = p.seo || {};
   if (!webTexto(seo.metaDescription) && !webTexto(p.extracto)) faltan.push({ campo: 'seo.metaDescription', mensaje: 'Falta la meta descripción (o un extracto)' });
+
+  if (p.tipo === 'animal_grupo' || esGrupo) {
+    var miembros = (o && o.miembros) || [];
+    if (!miembros.length) faltan.push({ campo: 'miembros', mensaje: 'El grupo no tiene miembros' });
+    if (!webGrupoValidoParaPublicar(miembros)) {
+      if (webTexto(p.estado_publicacion).toLowerCase() === 'publicado') {
+        faltan.push({ campo: 'estado_publicacion', mensaje: 'El grupo no es válido para publicar (miembros fallecidos, adopción parcial o conjunto inválido): revisa el grupo u oculta/retira la publicación' });
+      }
+    }
+  } else if (o && webTexto(o.estado).toLowerCase() === 'fallecido' && webTexto(p.estado_publicacion).toLowerCase() === 'publicado') {
+    // D6: un animal fallecido no puede seguir publicado.
+    faltan.push({ campo: 'estado_publicacion', mensaje: 'El animal está fallecido: oculta o retira su publicación web' });
+  }
   return { ok: faltan.length === 0, faltan: faltan };
 }
+
 
 function webBloqueAnimal(curado, origen) {
   var c = curado || {};
@@ -592,19 +909,30 @@ function webBloqueAnimal(curado, origen) {
   var edad = c.age || {};
   var vacunas = webTexto(o.vacunas);
   var sexo = webTexto(o.sexo).toLowerCase();
-  var sexos = webArray(c.sex);
+  var sexos = webListaTextos(c.sex, 5, 30);
   if (!sexos.length && sexo) sexos = [sexo === 'm' || sexo === 'macho' ? 'macho' : (sexo === 'h' || sexo === 'hembra' ? 'hembra' : sexo)];
-  var nombres = webArray(c.names);
-  if (!nombres.length && o.nombre) nombres = [webTexto(o.nombre)];
+  var nombres = webListaTextos(c.names, 10, 80);
+  if (!nombres.length && o.nombre) nombres = [webTexto(o.nombre).slice(0, 80)];
+  var compat = webObjetoCampos(c.compatibility, ['dogs', 'cats', 'kids']);
+  var adopcion = webObjetoCampos(c.adoption, ['mode', 'feeEur', 'requirements']);
+  var acogida = webObjetoCampos(c.foster, ['temporary', 'durationLabel']);
+  var ubicacion = webObjetoCampos(c.location, ['city', 'province']);
+  var contacto = webObjetoCampos(c.contact, ['email', 'phone']);
+  // D7: si la publicación no fija contacto, se usa el de la asociación; nunca
+  // se rellena con datos internos del animal.
+  if (!webTexto(contacto.email) && !webTexto(contacto.phone)) {
+    var emailAsoc = webTexto(typeof CONFIG !== 'undefined' ? CONFIG.CONTACT_EMAIL : '');
+    if (emailAsoc) contacto.email = emailAsoc;
+  }
   return {
     names: nombres,
     species: webTexto(c.species) || webTexto(o.especie),
     breed: webTexto(c.breed) || webTexto(o.raza),
     sex: sexos,
     age: {
-      value: (edad.value !== undefined && edad.value !== null && edad.value !== '') ? edad.value : webTexto(o.edad),
-      unit: webTexto(edad.unit),
-      label: webTexto(edad.label) || webTexto(o.edad)
+      value: (edad.value !== undefined && edad.value !== null && edad.value !== '') ? webTexto(edad.value).slice(0, 40) : webTexto(o.edad),
+      unit: webTexto(edad.unit).slice(0, 20),
+      label: webTexto(edad.label).slice(0, 80) || webTexto(o.edad)
     },
     size: webTexto(c.size),
     color: webTexto(c.color),
@@ -615,28 +943,33 @@ function webBloqueAnimal(curado, origen) {
       microchipped: salud.microchipped !== undefined ? webBool(salud.microchipped, false) : !!webTexto(o.microchip),
       specialNeeds: webBool(salud.specialNeeds, false)
     },
-    temperament: webArray(c.temperament),
-    compatibility: c.compatibility || {},
-    adoption: c.adoption || {},
-    foster: c.foster || {},
-    location: c.location || {},
-    contact: c.contact || {}
+    temperament: webListaTextos(c.temperament, 20, 60),
+    compatibility: compat,
+    adoption: adopcion,
+    foster: acogida,
+    location: ubicacion,
+    contact: contacto
   };
 }
 
 function webBloqueEvento(curado) {
   var c = curado || {};
+  var agenda = Array.isArray(c.agenda) ? c.agenda.map(function (item) {
+    if (!item || typeof item !== 'object') return null;
+    var salida = webObjetoCampos(item, ['time', 'title', 'description']);
+    return (webTexto(salida.time) || webTexto(salida.title) || webTexto(salida.description)) ? salida : null;
+  }).filter(function (x) { return !!x; }).slice(0, 50) : [];
   return {
     kind: webTexto(c.kind),
     startDate: webIsoFecha(c.startDate),
     endDate: webIsoFecha(c.endDate),
     timezone: webTexto(c.timezone) || 'Europe/Madrid',
-    location: c.location || {},
-    organizer: c.organizer || {},
-    audience: webArray(c.audience),
-    agenda: Array.isArray(c.agenda) ? c.agenda : [],
-    registration: c.registration || {},
-    milestone: c.milestone || null
+    location: webObjetoCampos(c.location, ['name', 'address', 'city', 'onlineUrl']),
+    organizer: webObjetoCampos(c.organizer, ['name', 'contactEmail', 'phone']),
+    audience: webListaTextos(c.audience, 20, 80),
+    agenda: agenda,
+    registration: webObjetoCampos(c.registration, ['required', 'url', 'label']),
+    milestone: webObjetoCampos(c.milestone, ['title', 'date', 'description'])
   };
 }
 
@@ -650,11 +983,13 @@ function webConstruirPublicacion(publicacion, origen, opts) {
   var p = publicacion || {};
   var media = p.media || {};
   var seoIn = p.seo || {};
+  var esGrupo = p.tipo === 'animal_grupo';
   var cover = media.coverImage || {};
   // Las URLs de portada, galería, vídeos y CTA pasan por la misma lista blanca
   // que el HTML: si no son seguras se descartan (la ficha se pinta sin ellas).
-  var src = webUrlSegura(webTexto(cover.src)) || webUrlSegura(webFotoOrigen(origen));
-  var alt = webTexto(cover.alt) || webTexto(p.titulo) || webTexto(origen && origen.nombre);
+  var srcFallback = esGrupo ? webUrlSegura(webPortadaGrupo((origen && origen.miembros) || [])) : webUrlSegura(webFotoOrigen(origen));
+  var src = webUrlSegura(webTexto(cover.src)) || srcFallback;
+  var alt = webTexto(cover.alt) || webTexto(p.titulo) || webTexto(origen && (origen.nombre || origen.groupName));
   var gallery = webGaleriaSegura(media.gallery);
   var videos = webVideosSeguros(media.videos);
   var icons = Array.isArray(media.icons) ? media.icons : [];
@@ -662,12 +997,13 @@ function webConstruirPublicacion(publicacion, origen, opts) {
   var ruta = webRutaPublica(p.tipo, p.slug);
   var canonical = webTexto(seoIn.canonical) || (dominio ? dominio + ruta : '');
 
+
   var out = {
     id: p.id || '',
     slug: p.slug || '',
     type: p.tipo || 'animal',
     category: p.categoria || '',
-    status: p.estado_publico || '',
+    status: webEstadoPublicoEfectivo(p, origen),
     title: p.titulo || '',
     excerpt: p.extracto || '',
     publishedAt: p.publicado_en || '',
@@ -675,14 +1011,18 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     coverImage: { src: src, alt: alt },
     contentHtml: webSanearHtml(p.contenido_html || ''),
     author: p.autor || '',
-    tags: Array.isArray(p.tags) ? p.tags : [],
-    icons: icons,
+    tags: webTagsSeguras(p.tags),
+    icons: webIconosSeguros(icons),
     gallery: gallery,
     videos: videos,
     featured: !!p.featured,
     listed: p.listed !== false,
     url: ruta,
     canonical: canonical,
+    // `urgente` es solo una bandera (D2), derivada del origen (animal o grupo).
+    urgent: webUrgenteEfectivo(p, origen),
+    isGroup: !!esGrupo,
+
     seo: {
       metaTitle: webTexto(seoIn.metaTitle) || webTexto(p.titulo),
       metaDescription: webTexto(seoIn.metaDescription) || webTexto(p.extracto),
@@ -706,9 +1046,16 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     if (WEB_FICHA_CTA_KINDS.indexOf(kindCta) !== -1) out.cta.kind = kindCta;
   }
   if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
+  if (p.tipo === 'animal_grupo') {
+    var miembros = (origen && origen.miembros) || [];
+    var gInfo = origen || {};
+    out.group = webBloqueGrupo(p.animal || {}, gInfo, miembros);
+    out.animal = out.group; // compatibilidad de consumidores que leen bloque animal
+  }
   if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
   if (incluirFicha && p.ficha && typeof p.ficha === 'object') out.ficha = webFichaSegura(p.ficha);
   return out;
+
 }
 
 function webPublicacionBaseUrl() {
@@ -729,7 +1076,7 @@ function webDominioPublico() {
 
 function webRutaPublica(tipo, slug) {
   if (!slug) return '';
-  if (tipo === 'animal') return '/animales/' + slug;
+  if (tipo === 'animal' || tipo === 'animal_grupo') return '/animales/' + slug;
   if (tipo === 'evento') return '/eventos/' + slug;
   return '/historias/' + slug;
 }
@@ -758,6 +1105,9 @@ function webListarAnimales(params) {
       nombre: webTexto(a.nombre),
       especie: webTexto(a.especie),
       estado_animal: webTexto(a.estado),
+      estado_publico: pub ? webEstadoPublicoEfectivo(pub, a) : webEstadoPublicoDerivado(a.estado),
+      estado_publico_modo: pub ? webModoEstadoPublico(pub, a) : 'auto',
+      urgente: webAnimalUrgente(a),
       slug: pub ? pub.slug : '',
       titulo: pub ? pub.titulo : '',
       categoria: pub ? pub.categoria : '',
@@ -800,23 +1150,54 @@ function webGetAnimal(animalId) {
   var a = webMapaAnimales()[String(animalId)];
   if (!a) return { status: 'error', error: 'Animal no encontrado' };
   var pub = webPublicacionDeOrigen('animal', animalId);
+  var esVirtual = false;
   if (!pub) {
+    esVirtual = true;
+    var galeriaInt = webParseJson(a.galeria, []);
+    var videosInt = webParseJson(a.videos, []);
+    var portadaInt = webTexto(a.portada_url || a.foto_url || a.foto || webFotoOrigen(a));
     pub = {
       id: '', tipo: 'animal', origen_id: String(animalId), slug: webNormalizarSlug(a.nombre),
       estado_publicacion: 'borrador', indexable: true, listed: true, featured: false, orden: 0,
       titulo: webTexto(a.nombre), extracto: '', contenido_html: webTexto(a.descripcion),
-      categoria: '', estado_publico: webTexto(a.estado), especie: webTexto(a.especie),
-      autor: '', tags: [], media: {}, seo: {}, cta: null, animal: {}, evento: null, ficha: null,
+      categoria: '', estado_publico: webEstadoPublicoDerivado(a.estado), estado_publico_modo: 'auto',
+      especie: webTexto(a.especie),
+      autor: '', tags: [],
+      media: {
+        coverImage: portadaInt ? { src: portadaInt, alt: webTexto(a.portada_alt) || webTexto(a.nombre) } : {},
+        gallery: Array.isArray(galeriaInt) ? galeriaInt : [],
+        videos: Array.isArray(videosInt) ? videosInt : [],
+        icons: []
+      },
+      seo: {}, cta: null, animal: {}, evento: null, ficha: null,
       publicado_en: '', actualizado_en: '', creado_en: ''
     };
   }
+  var modo = webModoEstadoPublico(pub, a);
+  var efectivo = webEstadoPublicoEfectivo(pub, a);
+  var data = Object.assign({}, pub, {
+    estado_publico_modo: modo,
+    estado_publico_efectivo: efectivo,
+    estado_publico_derivado: webEstadoPublicoDerivado(a.estado),
+    urgente: webAnimalUrgente(a)
+  });
   return {
     status: 'success',
-    data: pub,
+    data: data,
+    virtual: esVirtual,
     origen: {
       id: String(a.id), nombre: webTexto(a.nombre), especie: webTexto(a.especie),
       raza: webTexto(a.raza), sexo: webTexto(a.sexo), edad: webTexto(a.edad),
-      estado: webTexto(a.estado), descripcion: webTexto(a.descripcion), foto: webFotoOrigen(a)
+      estado: webTexto(a.estado), estado_publico_derivado: webEstadoPublicoDerivado(a.estado),
+      urgente: webAnimalUrgente(a), descripcion: webTexto(a.descripcion), foto: webFotoOrigen(a),
+      portada_url: webTexto(a.portada_url || a.foto_url || a.foto),
+      portada_alt: webTexto(a.portada_alt),
+      vacunas: webTexto(a.vacunas), esterilizada: webBool(a.esterilizada, false),
+      microchip: webTexto(a.microchip), desparasitado: webTexto(a.desparasitado),
+      necesidades_especiales: webTexto(a.necesidades_especiales),
+      galeria: webParseJson(a.galeria, []),
+      videos: webParseJson(a.videos, []),
+      documentos_internos: webParseJson(a.documentos_internos, [])
     },
     completitud: webValidarPublicacion(pub, a)
   };
@@ -845,6 +1226,23 @@ function webUpsertAnimal(body) {
   if (fichaNorm && JSON.stringify(fichaNorm).length > WEB_FICHA_MAX_CHARS) {
     return { status: 'error', error: 'La ficha configurable supera el máximo de ' + WEB_FICHA_MAX_CHARS + ' caracteres' };
   }
+  function webLimpio(obj, raiz) {
+    if (Array.isArray(obj)) return obj.length ? obj : undefined;
+    if (!obj || typeof obj !== 'object') return (obj === '' || obj === null || obj === undefined) ? undefined : obj;
+    var out = {};
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v === undefined || v === null) return;
+      if (typeof v === 'string') { var t = webTexto(v); if (t !== '') out[k] = v; return; }
+      if (typeof v === 'boolean' || typeof v === 'number') { out[k] = v; return; }
+      if (Array.isArray(v)) { if (v.length) out[k] = v; return; }
+      if (typeof v === 'object') { var limpio = webLimpio(v, false); if (limpio && Object.keys(limpio).length) out[k] = limpio; return; }
+    });
+    return Object.keys(out).length ? out : undefined;
+  }
+  var animalCurado = webLimpio(body.animal || {}, true) || {};
+  // No persistir contacto vacío si solo caerá al de la asociación (se inyecta al componer).
+  if (animalCurado.contact && !webTexto(animalCurado.contact.email) && !webTexto(animalCurado.contact.phone)) delete animalCurado.contact;
   var registro = {
     id: (previa && previa.id) || ('web_' + webUuid()),
     tipo: 'animal',
@@ -859,20 +1257,47 @@ function webUpsertAnimal(body) {
     extracto: webTexto(body.extracto),
     contenido_html: String(body.contenido_html || ''),
     categoria: webTexto(body.categoria),
-    estado_publico: webTexto(body.estado_publico) || webTexto(a.estado),
-    especie: webTexto(body.especie) || webTexto(a.especie),
+    estado_publico: '',
+    estado_publico_modo: 'auto',
+    especie: webTexto(a.especie),
     autor: webTexto(body.autor),
-    tags_json: JSON.stringify(webArray(body.tags)),
-    media_json: JSON.stringify(body.media || {}),
+    tags_json: JSON.stringify(webTagsSeguras(webArray(body.tags))),
+    media_json: JSON.stringify((function (m) { var x = (m && typeof m === 'object' && !Array.isArray(m)) ? JSON.parse(JSON.stringify(m)) : {}; delete x.documents; delete x.folderId; return x; })(body.media || {})),
+    documents_json: JSON.stringify((body.media && body.media.documents) || webParseJson(body.documents_json, body.documents || [])),
+    media_folder_id: webTexto((body.media && body.media.folderId) || body.media_folder_id || ''),
     seo_json: JSON.stringify(body.seo || {}),
     cta_json: JSON.stringify(body.cta || null),
-    animal_json: JSON.stringify(body.animal || {}),
+    animal_json: JSON.stringify(animalCurado),
     evento_json: '',
     ficha_json: fichaNorm ? JSON.stringify(fichaNorm) : '',
     publicado_en: previa && previa.publicado_en ? previa.publicado_en : '',
     actualizado_en: webAhora(),
     creado_en: (previa && previa.creado_en) || webAhora()
   };
+  // Estado público: `auto` lo deriva de la ficha interna; un valor del
+  // vocabulario público es un override manual explícito (D1).
+  var estadoIn = webTexto(body.estado_publico);
+  var modoIn = webTexto(body.estado_publico_modo).toLowerCase();
+  if (modoIn === 'manual' && WEB_ESTADOS_PUBLICOS.indexOf(estadoIn) === -1) modoIn = 'auto';
+  if (estadoIn === 'auto' || estadoIn === 'urgente') modoIn = 'auto';
+  if (modoIn !== 'manual' && modoIn !== 'auto') {
+    modoIn = WEB_ESTADOS_PUBLICOS.indexOf(estadoIn) !== -1 ? 'manual' : 'auto';
+  }
+  var estadoEf = (modoIn === 'manual') ? estadoIn : webEstadoPublicoDerivado(a.estado);
+  var categoria = webTexto(body.categoria);
+  if (!categoria) {
+    var esp = webTexto(a.especie).toLowerCase();
+    if (estadoEf === 'en_acogida') categoria = 'Acogidas';
+    else if (estadoEf === 'adoptado') categoria = 'Adoptados';
+    else if (estadoEf === 'cerrado') categoria = 'Cerrados';
+    else if (esp.indexOf('perr') !== -1) categoria = 'Perros en adopción';
+    else if (esp.indexOf('gat') !== -1) categoria = 'Gatos en adopción';
+    else categoria = 'En adopción';
+  }
+  registro.estado_publico_modo = modoIn;
+  registro.estado_publico = estadoEf;
+  registro.categoria = categoria;
+  registro.especie = webTexto(a.especie);
   if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
   registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
 
@@ -913,7 +1338,7 @@ function webEstadoAnimal(body, user) {
   if (!previa) return { status: 'error', error: 'Este animal aún no tiene publicación web. Abre "Publicación web" para configurarla.' };
   var a = webMapaAnimales()[animalId];
   if (estado === 'publicado') {
-    var check = webValidarPublicacion(previa, a);
+    var check = webValidarPublicacion(Object.assign({}, previa, { estado_publicacion: 'publicado' }), a);
     if (!check.ok) {
       return {
         status: 'warning',
@@ -953,6 +1378,35 @@ function webEliminarAnimal(body, user) {
   return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, eliminado: true } };
 }
 
+function webArchivarAnimal(body, user) {
+  var animalId = webTexto(body && body.animal_id);
+  if (!animalId) return { status: 'error', error: 'Falta animal_id' };
+  var previa = webPublicacionDeOrigen('animal', animalId);
+  if (!previa) return { status: 'error', error: 'Este animal aún no tiene publicación web' };
+  if (previa.estado_publicacion === 'retirado') {
+    return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: 'retirado', slug: previa.slug } };
+  }
+  // Lápida 410: se conserva la fila y el slug para que el enlace no vuelva a usarse.
+  var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
+  if (!updateSheetRow(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
+  try { registrarAuditoria('retirar_publicacion', 'web_animal', previa.id, user, { slug: previa.slug, animal_id: animalId }); } catch (e) {}
+  return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: 'retirado', slug: previa.slug } };
+}
+
+function webRestaurarAnimal(body, user) {
+  var animalId = webTexto(body && body.animal_id);
+  if (!animalId) return { status: 'error', error: 'Falta animal_id' };
+  var previa = webPublicacionDeOrigen('animal', animalId);
+  if (!previa) return { status: 'error', error: 'Este animal no tiene publicación web que restaurar' };
+  if (previa.estado_publicacion !== 'retirado') {
+    return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: previa.estado_publicacion, slug: previa.slug } };
+  }
+  var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
+  if (!updateSheetRow(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
+  try { registrarAuditoria('restaurar_publicacion', 'web_animal', previa.id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
+  return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: 'borrador', slug: previa.slug } };
+}
+
 function webPreviewAnimal(animalId) {
   var cfg = webSheetConfig();
   if (!cfg) return webDiagnostico();
@@ -960,6 +1414,222 @@ function webPreviewAnimal(animalId) {
   if (!pub) return { status: 'error', error: 'Este animal aún no tiene configuración web' };
   var a = webMapaAnimales()[String(animalId)] || null;
   return { status: 'success', data: webConstruirPublicacion(pub, a, { ficha: true }) };
+}
+
+// ==================== GESTOR — GRUPOS (adopción conjunta) ====================
+
+function webListarGrupos(params) {
+  params = params || {};
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var mapaGrupos = webMapaGrupos();
+  var filasPubs = webFilasWeb();
+  var mapaPub = {};
+  filasPubs.forEach(function (p) { if (p.tipo === 'animal_grupo') mapaPub[String(p.origen_id)] = p; });
+  var mapaPubAnimal = {};
+  filasPubs.forEach(function (p) { if (p.tipo === 'animal') mapaPubAnimal[String(p.origen_id)] = p; });
+  var q = webTexto(params.q).toLowerCase();
+  var soloObligatorios = (params.todos === '1' || params.todos === true) ? false : true;
+  var grupos = Object.keys(mapaGrupos).map(function (id) {
+    var g = mapaGrupos[id];
+    var pub = mapaPub[String(id)] || null;
+    // Por defecto solo los grupos obligatorios y los que ya tienen publicación:
+    // un grupo no obligatorio sin publicar no es candidato del gestor web.
+    if (soloObligatorios && !g.grupo_obligatorio && !pub) return null;
+    var miembros = g.miembros || [];
+    var origen = Object.assign({}, g, { miembros: miembros });
+    var valida = pub ? webValidarPublicacion(pub, origen) : { ok: false, faltan: [{ campo: 'publicacion', mensaje: 'Sin publicación web' }] };
+    var conflictoIndividual = miembros.some(function (a) {
+      var pa = mapaPubAnimal[String(a.id)];
+      return pa && pa.estado_publicacion === 'publicado';
+    });
+    return {
+      grupo_id: String(id), nombre: webTexto(g.nombre) || String(id), grupo_obligatorio: !!g.grupo_obligatorio,
+      miembros_count: miembros.length, miembros_nombres: miembros.map(function (a) { return webTexto(a.nombre); }).filter(Boolean),
+      publicacion_id: pub ? pub.id : '', slug: pub ? pub.slug : '', titulo: pub ? pub.titulo : '', categoria: pub ? pub.categoria : '',
+      estado_publicacion: pub ? pub.estado_publicacion : 'sin_publicar',
+      estado_publico: pub ? webEstadoPublicoEfectivo(pub, origen) : webEstadoGrupoDerivado(miembros),
+      estado_publico_modo: pub ? webModoEstadoPublico(pub, origen) : 'auto',
+      urgente: webGrupoUrgente(miembros),
+      indexable: pub ? pub.indexable : false, listed: pub ? pub.listed : false, featured: pub ? pub.featured : false,
+      actualizado_en: pub ? pub.actualizado_en : '', conflicto_individual_publicado: conflictoIndividual,
+      completitud: { ok: valida.ok, faltan: valida.faltan.map(function (f) { return f.campo; }) }
+    };
+  }).filter(function (x) { return !!x; });
+  if (q) grupos = grupos.filter(function (g) { return (g.nombre + ' ' + g.titulo + ' ' + g.slug + ' ' + (g.miembros_nombres || []).join(' ')).toLowerCase().indexOf(q) !== -1; });
+  var estadoFiltro = webTexto(params.estado_publicacion);
+  if (estadoFiltro) grupos = grupos.filter(function (g) { return g.estado_publicacion === estadoFiltro; });
+  grupos.sort(function (a, b) { return String(a.nombre).localeCompare(String(b.nombre)); });
+  return { status: 'success', data: grupos, pagination: { page: 1, pageSize: grupos.length || 1, total: grupos.length, totalPages: 1 } };
+}
+
+function webGetGrupo(grupoId) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var g = webGrupoInfo(grupoId);
+  if (!g) return { status: 'error', error: 'Grupo no encontrado' };
+  var miembros = g.miembros || [];
+  var origen = Object.assign({}, g, { miembros: miembros });
+  var pub = webPublicacionDeOrigen('animal_grupo', grupoId);
+  var esVirtual = false;
+  if (!pub) {
+    esVirtual = true;
+    var portada = webPortadaGrupo(miembros);
+    var gal = [];
+    miembros.forEach(function (a) { var ga = webParseJson(a.galeria, []); if (Array.isArray(ga)) gal = gal.concat(ga); });
+    pub = {
+      id: '', tipo: 'animal_grupo', origen_tipo: 'grupo', origen_id: String(grupoId), slug: webNormalizarSlug(g.nombre),
+      estado_publicacion: 'borrador', indexable: true, listed: true, featured: false, orden: 0,
+      titulo: webTexto(g.nombre), extracto: '', contenido_html: '',
+      categoria: webCategoriaGrupoDerivada(webEstadoGrupoDerivado(miembros), miembros),
+      estado_publico: webEstadoGrupoDerivado(miembros), estado_publico_modo: 'auto',
+      especie: webEspecieGrupo(miembros), autor: '', tags: [],
+      media: { coverImage: portada ? { src: portada, alt: webTexto(g.nombre) } : {}, gallery: gal.slice(0, 20), videos: [], icons: [] },
+      seo: {}, cta: null, animal: {}, evento: null, ficha: null, publicado_en: '', actualizado_en: '', creado_en: ''
+    };
+  }
+  var modo = webModoEstadoPublico(pub, origen);
+  var efectivo = webEstadoPublicoEfectivo(pub, origen);
+  var data = Object.assign({}, pub, { estado_publico_modo: modo, estado_publico_efectivo: efectivo, estado_publico_derivado: webEstadoGrupoDerivado(miembros), urgente: webGrupoUrgente(miembros) });
+  return { status: 'success', data: data, virtual: esVirtual, origen: { id: String(g.id), nombre: webTexto(g.nombre), grupo_obligatorio: !!g.grupo_obligatorio, estado_publico_derivado: webEstadoGrupoDerivado(miembros), urgente: webGrupoUrgente(miembros), miembros: webMiembrosResumen(miembros), miembros_count: miembros.length }, completitud: webValidarPublicacion(pub, origen) };
+}
+
+function webUpsertGrupo(body) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var grupoId = webTexto(body && (body.grupo_id || body.origen_id));
+  if (!grupoId) return { status: 'error', error: 'Falta grupo_id' };
+  var g = webGrupoInfo(grupoId);
+  if (!g) return { status: 'error', error: 'Grupo no encontrado' };
+  var miembros = g.miembros || [];
+  var origen = Object.assign({}, g, { miembros: miembros });
+  var previa = webPublicacionDeOrigen('animal_grupo', grupoId);
+  var slug = webNormalizarSlug(body.slug || body.titulo || g.nombre);
+  if (!webSlugValido(slug)) return { status: 'error', error: 'Slug no válido' };
+  if (webSlugOcupado('animal_grupo', slug, previa && previa.id)) return { status: 'error', error: 'El slug "' + slug + '" ya está en uso por otra publicación' };
+  var fichaVal = (body && (body.ficha !== undefined || body.ficha_json !== undefined)) ? (body.ficha !== undefined ? body.ficha : body.ficha_json) : (previa ? previa.ficha : null);
+  var fichaNorm = webNormalizarFicha(fichaVal);
+  if (fichaVal && !fichaNorm) return { status: 'error', error: 'La ficha configurable debe ser un objeto JSON' };
+  if (fichaNorm && JSON.stringify(fichaNorm).length > WEB_FICHA_MAX_CHARS) return { status: 'error', error: 'La ficha configurable supera el máximo de ' + WEB_FICHA_MAX_CHARS + ' caracteres' };
+  function webLimpioG(obj) {
+    if (Array.isArray(obj)) return obj.length ? obj : undefined;
+    if (!obj || typeof obj !== 'object') return (obj === '' || obj === null || obj === undefined) ? undefined : obj;
+    var out = {};
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k];
+      if (v === undefined || v === null) return;
+      if (typeof v === 'string') { if (webTexto(v) !== '') out[k] = v; return; }
+      if (typeof v === 'boolean' || typeof v === 'number') { out[k] = v; return; }
+      if (Array.isArray(v)) { if (v.length) out[k] = v; return; }
+      if (typeof v === 'object') { var limpio = webLimpioG(v); if (limpio && Object.keys(limpio).length) out[k] = limpio; return; }
+    });
+    return Object.keys(out).length ? out : undefined;
+  }
+  var curado = webLimpioG(body.animal || body.grupo || {}) || {};
+  var registro = {
+    id: (previa && previa.id) || ('web_' + webUuid()), tipo: 'animal_grupo', origen_tipo: 'grupo', origen_id: String(grupoId), slug: slug,
+    estado_publicacion: WEB_ESTADOS.indexOf(webTexto(body.estado_publicacion)) !== -1 ? webTexto(body.estado_publicacion) : 'borrador',
+    indexable: webBool(body.indexable, true), listed: webBool(body.listed, true), featured: webBool(body.featured, false), orden: Number(body.orden || 0) || 0,
+    titulo: webTexto(body.titulo) || webTexto(g.nombre), extracto: webTexto(body.extracto), contenido_html: String(body.contenido_html || ''),
+    categoria: webTexto(body.categoria), estado_publico: '', estado_publico_modo: 'auto', especie: webEspecieGrupo(miembros), autor: webTexto(body.autor),
+    tags_json: JSON.stringify(webTagsSeguras(webArray(body.tags))),
+    media_json: JSON.stringify((function (m) { var x = (m && typeof m === 'object' && !Array.isArray(m)) ? JSON.parse(JSON.stringify(m)) : {}; delete x.documents; delete x.folderId; return x; })(body.media || {})),
+    documents_json: JSON.stringify((body.media && body.media.documents) || webParseJson(body.documents_json, body.documents || [])),
+    media_folder_id: webTexto((body.media && body.media.folderId) || body.media_folder_id || ''),
+    seo_json: JSON.stringify(body.seo || {}), cta_json: JSON.stringify(body.cta || null),
+    animal_json: JSON.stringify(curado), evento_json: '', ficha_json: fichaNorm ? JSON.stringify(fichaNorm) : '',
+    publicado_en: previa && previa.publicado_en ? previa.publicado_en : '', actualizado_en: webAhora(), creado_en: (previa && previa.creado_en) || webAhora()
+  };
+  var estadoIn = webTexto(body.estado_publico);
+  var modoIn = webTexto(body.estado_publico_modo).toLowerCase();
+  if (modoIn === 'manual' && WEB_ESTADOS_PUBLICOS.indexOf(estadoIn) === -1) modoIn = 'auto';
+  if (estadoIn === 'auto' || estadoIn === 'urgente') modoIn = 'auto';
+  if (modoIn !== 'manual' && modoIn !== 'auto') { modoIn = WEB_ESTADOS_PUBLICOS.indexOf(estadoIn) !== -1 ? 'manual' : 'auto'; }
+  var estadoEf = (modoIn === 'manual') ? estadoIn : webEstadoGrupoDerivado(miembros);
+  var categoria = webTexto(body.categoria);
+  if (!categoria) categoria = webCategoriaGrupoDerivada(estadoEf, miembros);
+  registro.estado_publico_modo = modoIn; registro.estado_publico = estadoEf; registro.categoria = categoria; registro.especie = webEspecieGrupo(miembros);
+  if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
+  registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
+
+  var estPub = registro.estado_publicacion;
+  if (estPub === 'publicado' || estPub === 'oculto') {
+    var pubs = webFilasWeb();
+    var conflicto = [];
+    miembros.forEach(function (a) {
+      for (var i = 0; i < pubs.length; i++) {
+        if (pubs[i].tipo === 'animal' && String(pubs[i].origen_id) === String(a.id) && pubs[i].estado_publicacion === 'publicado') conflicto.push(webTexto(a.nombre) || String(a.id));
+      }
+    });
+    if (conflicto.length) return { status: 'warning', error: 'No se puede activar la publicación del grupo: hay publicaciones individuales publicadas de miembros (' + conflicto.join(', ') + '). Ocúltalas o retíralas primero.' };
+  }
+  if (registro.estado_publicacion === 'publicado') {
+    var check = webValidarPublicacion(webFilaAPublicacion(registro), origen);
+    if (!check.ok) return { status: 'warning', error: 'No se puede publicar: completa los campos obligatorios', detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '), data: check.faltan };
+  }
+  var guardado;
+  try {
+    if (previa && previa.id) { guardado = updateSheetRow(cfg, previa.id, registro); if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' }; }
+    else { guardado = appendToSheet(cfg, registro); }
+  } catch (err) { return { status: 'error', error: 'No se pudo guardar la publicación: ' + String(err && err.message || err) }; }
+  return { status: 'success', data: guardado, completitud: webValidarPublicacion(webFilaAPublicacion(guardado), origen) };
+}
+
+function webEstadoGrupoPub(body, user) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var grupoId = webTexto(body && (body.grupo_id || body.origen_id));
+  var estado = webTexto(body && body.estado_publicacion).toLowerCase();
+  if (!grupoId) return { status: 'error', error: 'Falta grupo_id' };
+  if (WEB_ESTADOS.indexOf(estado) === -1) return { status: 'error', error: 'Estado de publicación no válido' };
+  var previa = webPublicacionDeOrigen('animal_grupo', grupoId);
+  if (!previa) return { status: 'error', error: 'El grupo no tiene publicación web. Guárdala primero.' };
+  var g = webGrupoInfo(grupoId);
+  if (!g) return { status: 'error', error: 'Grupo no encontrado' };
+  var origen = Object.assign({}, g, { miembros: g.miembros || [] });
+  if (estado === 'publicado' || estado === 'oculto') {
+    var pubs = webFilasWeb();
+    var conflicto = [];
+    (g.miembros || []).forEach(function (a) { for (var i = 0; i < pubs.length; i++) { if (pubs[i].tipo === 'animal' && String(pubs[i].origen_id) === String(a.id) && pubs[i].estado_publicacion === 'publicado') conflicto.push(webTexto(a.nombre) || String(a.id)); } });
+    if (conflicto.length) return { status: 'warning', error: 'Conflicto con publicaciones individuales publicadas: ' + conflicto.join(', ') + '. Resuélvelas primero.' };
+  }
+  if (estado === 'publicado') {
+    var check = webValidarPublicacion(previa, origen);
+    if (!check.ok) return { status: 'warning', error: 'No se puede publicar: completa los campos obligatorios', detail: check.faltan.map(function (f) { return f.mensaje; }).join(' · '), data: check.faltan };
+  }
+  var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
+  if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
+  return { status: 'success', data: updateSheetRow(cfg, previa.id, cambios) };
+}
+function webArchivarGrupo(body, user) { return webEstadoGrupoPub(Object.assign({}, body || {}, { estado_publicacion: 'retirado' }), user); }
+function webRestaurarGrupo(body, user) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var id = webTexto(body && body.id);
+  var grupoId = webTexto(body && (body.grupo_id || body.origen_id));
+  var previa = id ? webPublicacionPorId(id) : (grupoId ? webPublicacionDeOrigen('animal_grupo', grupoId) : null);
+  if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
+  if (previa.tipo !== 'animal_grupo') return { status: 'error', error: 'Solo las publicaciones de grupo se restauran desde aquí' };
+  if (previa.estado_publicacion !== 'retirado') return { status: 'error', error: 'Solo se puede restaurar una publicación retirada' };
+  var guardado = updateSheetRow(cfg, previa.id, { estado_publicacion: 'borrador', actualizado_en: webAhora() });
+  return { status: 'success', success: true, data: { id: previa.id, estado_publicacion: 'borrador', slug: previa.slug } };
+}
+function webEliminarGrupo(body, user) {
+  var cfg = webSheetConfig();
+  if (!cfg) return webDiagnostico();
+  var grupoId = webTexto(body && (body.grupo_id || body.origen_id));
+  var previa = webPublicacionDeOrigen('animal_grupo', grupoId);
+  if (!previa) return { status: 'error', error: 'El grupo no tiene publicación web' };
+  if (previa.estado_publicacion === 'publicado' || previa.estado_publicacion === 'retirado') return { status: 'error', error: 'No se puede eliminar una publicación publicada o retirada' };
+  try { deleteSheetRow(cfg, previa.id); } catch (e) { return { status: 'error', error: 'No se pudo eliminar' }; }
+  return { status: 'success', success: true };
+}
+function webPreviewGrupo(grupoId) {
+  var res = webGetGrupo(grupoId);
+  if (res.status !== 'success') return res;
+  var g = webGrupoInfo(grupoId);
+  var origen = g ? Object.assign({}, g, { miembros: g.miembros || [] }) : null;
+  return { status: 'success', data: webConstruirPublicacion(res.data, origen, { ficha: true }) };
 }
 
 // ==================== GESTOR · EVENTOS E HISTORIAS ====================
@@ -1058,8 +1728,10 @@ function webUpsertEvento(body, user) {
     estado_publico: webTexto(body.estado_publico) || (tipo === 'evento' ? 'programado' : 'publicado'),
     especie: '',
     autor: webTexto(body.autor),
-    tags_json: JSON.stringify(webArray(body.tags)),
-    media_json: JSON.stringify(body.media || {}),
+    tags_json: JSON.stringify(webTagsSeguras(webArray(body.tags))),
+    media_json: JSON.stringify((function (m) { var x = (m && typeof m === 'object' && !Array.isArray(m)) ? JSON.parse(JSON.stringify(m)) : {}; delete x.documents; delete x.folderId; return x; })(body.media || {})),
+    documents_json: JSON.stringify((body.media && body.media.documents) || webParseJson(body.documents_json, body.documents || [])),
+    media_folder_id: webTexto((body.media && body.media.folderId) || body.media_folder_id || ''),
     seo_json: JSON.stringify(body.seo || {}),
     cta_json: JSON.stringify(body.cta || null),
     animal_json: '',
@@ -1192,7 +1864,13 @@ function webResumen() {
   if (!cfg) return webDiagnostico();
   var filas = webFilasWeb();
   var mapa = webMapaAnimales();
-  var resumen = { animal: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0, sin_publicar: 0 }, evento: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 }, historia: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 } };
+  var mapaGruposAll = webMapaGrupos();
+  var resumen = {
+    animal: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0, sin_publicar: 0 },
+    animal_grupo: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0, sin_publicar: 0 },
+    evento: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 },
+    historia: { total: 0, publicados: 0, borradores: 0, ocultos: 0, retirados: 0 }
+  };
 
   Object.keys(mapa).forEach(function (id) {
     var pub = null;
@@ -1204,8 +1882,20 @@ function webResumen() {
     else if (pub.estado_publicacion === 'retirado') resumen.animal.retirados++;
     else resumen.animal.borradores++;
   });
+  Object.keys(mapaGruposAll).forEach(function (id) {
+    var g = mapaGruposAll[id];
+    if (!g || !g.grupo_obligatorio) return;
+    var pub = null;
+    for (var j = 0; j < filas.length; j++) if (filas[j].tipo === 'animal_grupo' && String(filas[j].origen_id) === String(id)) { pub = filas[j]; break; }
+    resumen.animal_grupo.total++;
+    if (!pub) resumen.animal_grupo.sin_publicar++;
+    else if (pub.estado_publicacion === 'publicado') resumen.animal_grupo.publicados++;
+    else if (pub.estado_publicacion === 'oculto') resumen.animal_grupo.ocultos++;
+    else if (pub.estado_publicacion === 'retirado') resumen.animal_grupo.retirados++;
+    else resumen.animal_grupo.borradores++;
+  });
   filas.forEach(function (p) {
-    if (p.tipo === 'animal') return;
+    if (p.tipo === 'animal' || p.tipo === 'animal_grupo') return;
     var r = resumen[p.tipo] || resumen.historia;
     r.total++;
     if (p.estado_publicacion === 'publicado') r.publicados++;
@@ -1219,8 +1909,9 @@ function webResumen() {
   filas.forEach(function (p) {
     // Una retirada no se puede completar: no debe engordar los pendientes.
     if (p.estado_publicacion === 'retirado') return;
-    var origen = p.tipo === 'animal' ? mapa[String(p.origen_id)] : null;
+    var origen = webOrigenDePublicacion(p, mapa, webMapaGrupos());
     if (!webValidarPublicacion(p, origen).ok) incompletas++;
+
     if (!webTexto((p.seo || {}).metaDescription) && !p.extracto) sinSeo++;
   });
 
@@ -1229,11 +1920,11 @@ function webResumen() {
     data: {
       resumen: resumen,
       totales: {
-        publicados: resumen.animal.publicados + resumen.evento.publicados + resumen.historia.publicados,
-        borradores: resumen.animal.borradores + resumen.evento.borradores + resumen.historia.borradores,
-        ocultos: resumen.animal.ocultos + resumen.evento.ocultos + resumen.historia.ocultos,
-        retirados: resumen.animal.retirados + resumen.evento.retirados + resumen.historia.retirados,
-        sin_publicar: resumen.animal.sin_publicar,
+        publicados: resumen.animal.publicados + resumen.animal_grupo.publicados + resumen.evento.publicados + resumen.historia.publicados,
+        borradores: resumen.animal.borradores + resumen.animal_grupo.borradores + resumen.evento.borradores + resumen.historia.borradores,
+        ocultos: resumen.animal.ocultos + resumen.animal_grupo.ocultos + resumen.evento.ocultos + resumen.historia.ocultos,
+        retirados: resumen.animal.retirados + resumen.animal_grupo.retirados + resumen.evento.retirados + resumen.historia.retirados,
+        sin_publicar: resumen.animal.sin_publicar + resumen.animal_grupo.sin_publicar,
         incompletas: incompletas,
         sin_seo: sinSeo
       },
@@ -1262,7 +1953,7 @@ function webRaizMedia() {
   try { return DriveApp.getFolderById(id); } catch (err) { return null; }
 }
 
-var WEB_CARPETAS_TIPO = { animal: 'animales', evento: 'eventos', historia: 'historias' };
+var WEB_CARPETAS_TIPO = { animal: 'animales', animal_grupo: 'animales', evento: 'eventos', historia: 'historias' };
 
 /** Carpeta de tipo dentro de la raíz (animales, eventos, historias). */
 function webCarpetaTipo(raiz, tipo) {
@@ -1587,10 +2278,12 @@ function webListarPublicas(params) {
   if (diag) return diag;
   params = params || {};
   var mapa = webMapaAnimales();
+  var mapaGrupos = webMapaGrupos();
   var pubs = webPublicables();
   var todas = pubs.map(function (p) {
-    return webConstruirPublicacion(p, p.tipo === 'animal' ? mapa[String(p.origen_id)] : null);
+    return webConstruirPublicacion(p, webOrigenDePublicacion(p, mapa, mapaGrupos));
   });
+
 
   var disponibles = {
     type: [], category: [], status: [], species: []
@@ -1626,6 +2319,10 @@ function webListarPublicas(params) {
   var campo = orden.charAt(0) === '-' ? orden.slice(1) : orden;
   var desc = orden.charAt(0) === '-';
   data.sort(function (a, b) {
+    // Los urgentes van primero (D2); después se aplica el criterio pedido.
+    var ua = a.urgent ? 1 : 0;
+    var ub = b.urgent ? 1 : 0;
+    if (ua !== ub) return ub - ua;
     var va = campo === 'title' ? a.title : (campo === 'updatedAt' ? a.updatedAt : a.publishedAt);
     var vb = campo === 'title' ? b.title : (campo === 'updatedAt' ? b.updatedAt : b.publishedAt);
     var r = String(va || '').localeCompare(String(vb || ''));
@@ -1661,7 +2358,8 @@ function webProyeccionCard(p) {
     id: p.id, slug: p.slug, type: p.type, category: p.category, status: p.status,
     title: p.title, excerpt: p.excerpt, publishedAt: p.publishedAt, updatedAt: p.updatedAt,
     coverImage: p.coverImage, image: p.image, imageAlt: p.imageAlt,
-    url: p.url, featured: p.featured, animal: p.animal ? { species: p.animal.species, age: p.animal.age, sex: p.animal.sex } : undefined
+    url: p.url, featured: p.featured, urgent: !!p.urgent,
+    animal: p.animal ? { species: p.animal.species, age: p.animal.age, sex: p.animal.sex } : undefined
   };
 }
 
@@ -1671,10 +2369,11 @@ function webPublicacionPublica(slug) {
   var s = webNormalizarSlug(slug);
   if (!s) return { status: 'error', error: 'Falta slug' };
   var mapa = webMapaAnimales();
+  var mapaGrupos = webMapaGrupos();
   var pubs = webPublicables();
   for (var i = 0; i < pubs.length; i++) {
     if (pubs[i].slug === s) {
-      return { status: 'success', data: webConstruirPublicacion(pubs[i], pubs[i].tipo === 'animal' ? mapa[String(pubs[i].origen_id)] : null, { ficha: true }) };
+      return { status: 'success', data: webConstruirPublicacion(pubs[i], webOrigenDePublicacion(pubs[i], mapa, mapaGrupos), { ficha: true }) };
     }
   }
   // Slug antiguo: se devuelve la ficha actual con la redireccion permanente.
@@ -1690,10 +2389,11 @@ function webPublicacionPublica(slug) {
           slug: pubs[j].slug,
           permanent: true
         },
-        data: webConstruirPublicacion(pubs[j], pubs[j].tipo === 'animal' ? mapa[String(pubs[j].origen_id)] : null, { ficha: true })
+        data: webConstruirPublicacion(pubs[j], webOrigenDePublicacion(pubs[j], mapa, mapaGrupos), { ficha: true })
       };
     }
   }
+
   // Lapida: el slug existio y se retiro. Se responde `gone` (410 logico) en
   // lugar de un 404, para que la web y los buscadores lo traten como retirado.
   var todas = webFilasWeb();
@@ -1789,7 +2489,8 @@ function webSitemap() {
       return {
         loc: base ? base + ruta : ruta,
         lastmod: p.actualizado_en || p.publicado_en || '',
-        changefreq: p.tipo === 'animal' ? 'weekly' : 'monthly',
+        changefreq: (p.tipo === 'animal' || p.tipo === 'animal_grupo') ? 'weekly' : 'monthly',
+
         priority: p.featured ? 0.9 : 0.7,
         type: p.tipo,
         slug: p.slug,

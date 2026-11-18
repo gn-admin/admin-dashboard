@@ -215,6 +215,27 @@ function fila(extra) {
   }, extra || {});
 }
 
+function miembro(extra) {
+  return animal(Object.assign({ grupo_id: 'grp_1', grupo: 'Camada Luna', grupo_obligatorio: true }, extra || {}));
+}
+
+function filaGrupo(extra) {
+  return fila(Object.assign({
+    id: 'web_g1',
+    tipo: 'animal_grupo',
+    origen_tipo: 'grupo',
+    origen_id: 'grp_1',
+    slug: 'camada-luna',
+    titulo: 'Camada Luna',
+    extracto: 'Dos cachorros buscan familia juntos',
+    contenido_html: '<p>Luna y Sol son dos cachorros que buscan una familia juntos.</p>',
+    categoria: 'Perros en adopción',
+    estado_publico: 'en_adopcion',
+    estado_publico_modo: 'auto',
+    animal_json: '{}'
+  }, extra || {}));
+}
+
 describe('slug: normalización, formato y unicidad', () => {
   let b;
   beforeEach(() => {
@@ -1086,5 +1107,376 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
     // Marcador para detectar implementaciones antiguas desde el panel.
     assert.equal(con.data.version, '2026-11-15.6');
+  });
+});
+
+describe('F2: ficha interna como fuente, estado público y whitelist', () => {
+  it('deriva el estado público del interno y respeta el override manual', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    assert.equal(b.ctx.webEstadoPublicoDerivado('disponible'), 'en_adopcion');
+    assert.equal(b.ctx.webEstadoPublicoDerivado('en_acogida'), 'en_acogida');
+    assert.equal(b.ctx.webEstadoPublicoDerivado('en_adopcion'), 'reservado');
+    assert.equal(b.ctx.webEstadoPublicoDerivado('adoptado'), 'adoptado');
+    assert.equal(b.ctx.webEstadoPublicoDerivado('fallecido'), 'cerrado');
+    const base = b.ctx.webFilaAPublicacion(fila());
+    assert.equal(b.ctx.webEstadoPublicoEfectivo(base, b.estado.animales[0]), 'en_adopcion');
+    const manual = b.ctx.webFilaAPublicacion(fila({ estado_publico_modo: 'manual', estado_publico: 'reservado' }));
+    assert.equal(b.ctx.webEstadoPublicoEfectivo(manual, b.estado.animales[0]), 'reservado');
+    // Valor legado: `urgente` no es estado; se trata como automático.
+    const legado = b.ctx.webFilaAPublicacion(fila({ estado_publico: 'urgente' }));
+    assert.equal(b.ctx.webEstadoPublicoEfectivo(legado, b.estado.animales[0]), 'en_adopcion');
+  });
+
+  it('urgente viaja como bandera y solo si el animal sigue necesitando hogar', () => {
+    const b = crearBackend();
+    assert.equal(b.ctx.webAnimalUrgente(animal({ urgente: true })), true);
+    assert.equal(b.ctx.webAnimalUrgente(animal({ urgente: true, estado: 'en_adopcion' })), false);
+    assert.equal(b.ctx.webAnimalUrgente(animal({ urgente: true, estado: 'adoptado' })), false);
+    assert.equal(b.ctx.webAnimalUrgente(animal()), false);
+    const p = b.ctx.webConstruirPublicacion(b.ctx.webFilaAPublicacion(fila()), animal({ urgente: true }));
+    assert.equal(p.urgent, true);
+    assert.equal(p.status, 'en_adopcion');
+  });
+
+  it('aplica whitelist estricta: no emite campos internos ni documentos privados', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const filaMala = fila({
+      animal_json: JSON.stringify({
+        names: ['Luna', 'Nube'], species: 'Perro', breed: 'Mestiza', sex: ['hembra'],
+        age: { value: '2', unit: 'años', label: '2 años', interno: 'secreto' },
+        size: 'mediano', color: 'negro', temperament: ['sociable', 'dormilón'],
+        health: { vaccinated: true, dewormed: false, neutered: true, microchipped: true, specialNeeds: false, interno: 'secreto' },
+        compatibility: { dogs: 'Sí', cats: '', kids: 'No', interno: 'secreto' },
+        adoption: { mode: 'presencial', feeEur: '20', requirements: 'X', interno: 'secreto' },
+        foster: { temporary: true, durationLabel: '3 meses', interno: 'secreto' },
+        location: { city: 'Madrid', province: 'Madrid', interno: 'secreto' },
+        contact: { email: 'a@b.es', phone: '600', interno: 'secreto' },
+        interno: 'secreto'
+      }),
+      media_json: JSON.stringify({
+        coverImage: { src: 'https://x.test/portada.jpg', alt: '' },
+        gallery: [{ src: 'https://x.test/1.jpg', alt: 'a', caption: 'c', interno: 'secreto' }],
+        videos: [{ title: 'v', url: 'https://x.test/v.mp4', provider: 'youtube', note: 'n', interno: 'secreto' }],
+        icons: [{ icon: 'edad', label: 'Edad', value: '2', interno: 'secreto' }],
+        documents: [{ name: 'cartilla-privada', url: 'https://x.test/cartilla.pdf' }]
+      })
+    });
+    const p = b.ctx.webConstruirPublicacion(b.ctx.webFilaAPublicacion(filaMala), b.estado.animales[0]);
+    assert.equal(p.animal.age.interno, undefined);
+    assert.equal(p.animal.health.interno, undefined);
+    assert.equal(p.animal.compatibility.interno, undefined);
+    assert.equal(p.animal.adoption.interno, undefined);
+    assert.equal(p.animal.foster.interno, undefined);
+    assert.equal(p.animal.location.interno, undefined);
+    assert.equal(p.animal.contact.interno, undefined);
+    assert.equal(p.gallery[0].interno, undefined);
+    assert.equal(p.videos[0].interno, undefined);
+    assert.equal(p.icons[0].interno, undefined);
+    assert.equal(p.documents, undefined);
+    assert.equal(JSON.stringify(p).indexOf('cartilla-privada'), -1);
+    assert.equal(JSON.stringify(p).indexOf('secreto'), -1);
+  });
+
+  it('el contacto vacío usa el de la asociación y nunca datos internos', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const p = b.ctx.webConstruirPublicacion(b.ctx.webFilaAPublicacion(fila()), b.estado.animales[0]);
+    assert.equal(p.animal.contact.email, 'hola@test.es');
+  });
+
+  it('no permite publicar un animal fallecido', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal({ estado: 'fallecido' }));
+    b.estado.publicaciones.push(fila());
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, { email: 'x@y.es' });
+    assert.equal(r.status, 'warning');
+    assert.ok(r.data.some(f => f.campo === 'estado_publicacion'));
+  });
+
+  it('guarda el modo automático o manual al crear la publicación', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    const base = { animal_id: 'ani_1', titulo: 'Luna', slug: 'luna', categoria: 'Perros en adopción', contenido_html: '<p>Texto suficientemente largo para publicar la ficha.</p>', seo: { metaDescription: 'Luna en adopción' } };
+    const auto = b.ctx.webUpsertAnimal(Object.assign({}, base, { estado_publicacion: 'publicado', estado_publico: 'auto' }));
+    assert.equal(auto.status, 'success', JSON.stringify(auto));
+    assert.equal(b.estado.publicaciones[0].estado_publico_modo, 'auto');
+    assert.equal(b.estado.publicaciones[0].estado_publico, 'en_adopcion');
+    const manual = b.ctx.webUpsertAnimal(Object.assign({}, base, { estado_publico: 'reservado', estado_publico_modo: 'manual' }));
+    assert.equal(manual.status, 'success', JSON.stringify(manual));
+    assert.equal(b.estado.publicaciones[0].estado_publico_modo, 'manual');
+    assert.equal(b.estado.publicaciones[0].estado_publico, 'reservado');
+    const p = b.ctx.webConstruirPublicacion(b.ctx.webFilaAPublicacion(b.estado.publicaciones[0]), b.estado.animales[0]);
+    assert.equal(p.status, 'reservado');
+  });
+
+  it('retira y restaura una publicación de animal conservando el slug (410)', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const retirada = b.ctx.webArchivarAnimal({ animal_id: 'ani_1' }, { email: 'x@y.es' });
+    assert.equal(retirada.status, 'success');
+    assert.equal(retirada.data.estado_publicacion, 'retirado');
+    assert.equal(b.estado.publicaciones.length, 1);
+    assert.equal(b.ctx.webPublicacionPublica('luna').status, 'gone');
+    const restaurada = b.ctx.webRestaurarAnimal({ animal_id: 'ani_1' }, { email: 'x@y.es' });
+    assert.equal(restaurada.status, 'success');
+    assert.equal(restaurada.data.estado_publicacion, 'borrador');
+    assert.equal(b.estado.publicaciones[0].slug, 'luna');
+  });
+});
+
+describe('grupos · derivación agregada del estado público (G-D3)', () => {
+  const casos = [
+    { nombre: 'todos disponibles', estados: ['disponible', 'disponible'], esperado: 'en_adopcion' },
+    { nombre: 'todos en acogida', estados: ['en_acogida', 'en_acogida'], esperado: 'en_acogida' },
+    { nombre: 'disponible y acogida', estados: ['disponible', 'en_acogida'], esperado: 'en_acogida' },
+    { nombre: 'algún reservado', estados: ['disponible', 'en_adopcion'], esperado: 'reservado' },
+    { nombre: 'todos adoptados', estados: ['adoptado', 'adoptado'], esperado: 'adoptado' },
+    { nombre: 'adopción parcial', estados: ['adoptado', 'disponible'], esperado: 'cerrado' },
+    { nombre: 'algún fallecido', estados: ['fallecido', 'disponible'], esperado: 'cerrado' },
+    { nombre: 'estado inconsistente', estados: ['desconocido', 'disponible'], esperado: 'cerrado' }
+  ];
+
+  casos.forEach(caso => {
+    it(`deriva "${caso.esperado}" con ${caso.nombre}`, () => {
+      const b = crearBackend();
+      assert.equal(b.ctx.webEstadoGrupoDerivado(caso.estados.map(estado => ({ estado }))), caso.esperado);
+    });
+  });
+
+  it('un grupo vacío queda cerrado y no es publicable', () => {
+    const b = crearBackend();
+    assert.equal(b.ctx.webEstadoGrupoDerivado([]), 'cerrado');
+    assert.equal(b.ctx.webGrupoValidoParaPublicar([]), false);
+  });
+
+  it('fallecido, adopción parcial o conjunto inválido no son publicables', () => {
+    const b = crearBackend();
+    assert.equal(b.ctx.webGrupoValidoParaPublicar([{ estado: 'fallecido' }]), false);
+    assert.equal(b.ctx.webGrupoValidoParaPublicar([{ estado: 'adoptado' }, { estado: 'disponible' }]), false);
+    assert.equal(b.ctx.webGrupoValidoParaPublicar([{ estado: 'desconocido' }]), false);
+    assert.equal(b.ctx.webGrupoValidoParaPublicar([{ estado: 'disponible' }, { estado: 'en_acogida' }]), true);
+  });
+
+  it('la urgencia se agrega: basta un miembro prioritario', () => {
+    const b = crearBackend();
+    assert.equal(b.ctx.webGrupoUrgente([{ estado: 'disponible' }, { estado: 'disponible' }]), false);
+    assert.equal(b.ctx.webGrupoUrgente([{ estado: 'disponible' }, { estado: 'disponible', urgente: true }]), true);
+  });
+
+  it('la portada y la especie se heredan de los miembros', () => {
+    const b = crearBackend();
+    const miembros = [animal({ id: 'ani_1', foto_drive_id: 'FOTO_A', especie: 'perro' }), animal({ id: 'ani_2', foto_drive_id: '', especie: 'perro' })];
+    assert.equal(b.ctx.webPortadaGrupo(miembros), 'https://drive.google.com/thumbnail?id=FOTO_A&sz=w1200');
+    assert.equal(b.ctx.webEspecieGrupo(miembros), 'perro');
+    assert.equal(b.ctx.webCategoriaGrupoDerivada('en_adopcion', miembros), 'Perros en adopción');
+    assert.equal(b.ctx.webCategoriaGrupoDerivada('en_acogida', miembros), 'Acogidas');
+  });
+});
+
+describe('grupos · preview == feed y whitelist del payload (G-D6)', () => {
+  let b;
+  beforeEach(() => {
+    b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1', nombre: 'Luna', estado: 'disponible', urgente: true }));
+    b.estado.animales.push(miembro({ id: 'ani_2', nombre: 'Sol', estado: 'disponible', urgente: false }));
+    b.estado.publicaciones.push(filaGrupo({ documents_json: '[{"name":"cartilla-privada"}]' }));
+  });
+
+  it('preview, feed y detalle público devuelven el mismo objeto', () => {
+    const feed = b.ctx.webListarPublicas({ type: 'animal_grupo' });
+    const preview = b.ctx.webPreviewGrupo('grp_1');
+    const detalle = b.ctx.webPublicacionPublica('camada-luna');
+    assert.equal(feed.status, 'success');
+    assert.equal(preview.status, 'success');
+    assert.equal(detalle.status, 'success');
+    assert.equal(feed.data.length, 1);
+    assert.deepEqual(plano(preview.data), plano(feed.data[0]));
+    assert.deepEqual(plano(detalle.data), plano(feed.data[0]));
+  });
+
+  it('el payload de grupo es aditivo y compatible con `animal`', () => {
+    const p = b.ctx.webPreviewGrupo('grp_1').data;
+    assert.equal(p.isGroup, true);
+    assert.equal(p.type, 'animal_grupo');
+    assert.equal(p.group.groupName, 'Camada Luna');
+    assert.equal(p.group.count, 2);
+    assert.deepEqual(plano(p.animal), plano(p.group));
+    assert.equal(p.urgent, true);
+    assert.equal(p.status, 'en_adopcion');
+    assert.equal(p.url, '/animales/camada-luna');
+  });
+
+  it('los miembros resumen no exponen IDs ni datos internos', () => {
+    const p = b.ctx.webPreviewGrupo('grp_1').data;
+    assert.deepEqual(Object.keys(p.group.members[0]).sort(), ['edad', 'especie', 'foto', 'nombre', 'raza', 'sexo', 'size']);
+    assert.equal(p.group.members[0].nombre, 'Luna');
+    assert.equal(p.group.members[0].id, undefined);
+    assert.equal(p.origen_id, undefined);
+    assert.equal(p.grupo_id, undefined);
+    assert.equal(JSON.stringify(p).indexOf('941000000000001'), -1);
+    assert.equal(JSON.stringify(p).indexOf('cartilla-privada'), -1);
+  });
+
+  it('la salud agregada exige que todos los miembros cumplan', () => {
+    b.estado.animales[1] = miembro({ id: 'ani_2', nombre: 'Sol', estado: 'disponible', vacunas: 'No', microchip: '' });
+    const p = b.ctx.webPreviewGrupo('grp_1').data;
+    assert.equal(p.group.health.vaccinated, false);
+    assert.equal(p.group.health.microchipped, false);
+    assert.equal(p.group.members.length, 2);
+  });
+});
+
+describe('grupos · gestor, exclusividad y ciclo de vida (G-D5, G1)', () => {
+  it('crea una única publicación por grupo con estado derivado y slug normalizado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    const base = {
+      grupo_id: 'grp_1',
+      titulo: 'Camada Luna',
+      slug: 'Camada Luna',
+      extracto: 'Dos cachorros buscan familia juntos',
+      contenido_html: '<p>Luna y Sol son dos cachorros que buscan una familia juntos.</p>',
+      estado_publicacion: 'borrador'
+    };
+    const alta = b.ctx.webUpsertGrupo(base);
+    assert.equal(alta.status, 'success', JSON.stringify(alta));
+    assert.equal(alta.data.tipo, 'animal_grupo');
+    assert.equal(alta.data.origen_tipo, 'grupo');
+    assert.equal(alta.data.origen_id, 'grp_1');
+    assert.equal(alta.data.slug, 'camada-luna');
+    assert.equal(alta.data.estado_publico, 'en_adopcion');
+    assert.equal(alta.data.categoria, 'Perros en adopción');
+    assert.equal(alta.completitud.ok, true);
+
+    const editada = b.ctx.webUpsertGrupo(Object.assign({}, base, { slug: 'camada-luna-2026' }));
+    assert.equal(editada.status, 'success', JSON.stringify(editada));
+    assert.equal(b.estado.publicaciones.filter(p => p.tipo === 'animal_grupo').length, 1);
+    assert.deepEqual(plano(b.ctx.webHistorial(b.estado.publicaciones[0].slug_historial).map(h => h.slug)), ['camada-luna']);
+  });
+
+  it('el modo manual fija el estado público sin cambiarlo por derivación', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    const r = b.ctx.webUpsertGrupo({
+      grupo_id: 'grp_1',
+      titulo: 'Camada Luna',
+      slug: 'camada-luna',
+      extracto: 'Dos cachorros buscan familia juntos',
+      contenido_html: '<p>Luna y Sol son dos cachorros que buscan una familia juntos.</p>',
+      estado_publicacion: 'borrador',
+      estado_publico: 'reservado',
+      estado_publico_modo: 'manual'
+    });
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(r.data.estado_publico_modo, 'manual');
+    assert.equal(r.data.estado_publico, 'reservado');
+  });
+
+  it('no publica un grupo con fallecidos, adopción parcial o miembros vacíos', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1', estado: 'fallecido' }), miembro({ id: 'ani_2', nombre: 'Sol', estado: 'disponible' }));
+    const r = b.ctx.webUpsertGrupo({
+      grupo_id: 'grp_1',
+      titulo: 'Camada Luna',
+      slug: 'camada-luna',
+      extracto: 'Dos cachorros buscan familia juntos',
+      contenido_html: '<p>Luna y Sol son dos cachorros que buscan una familia juntos.</p>',
+      estado_publicacion: 'publicado'
+    });
+    assert.equal(r.status, 'warning');
+    assert.ok(r.data.some(f => f.campo === 'estado_publicacion'));
+  });
+
+  it('exige completitud para publicar (título, slug, categoría, contenido, portada y meta)', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    const r = b.ctx.webUpsertGrupo({ grupo_id: 'grp_1', slug: 'camada-luna', estado_publicacion: 'publicado' });
+    assert.equal(r.status, 'warning');
+    const campos = r.data.map(f => f.campo);
+    assert.ok(campos.includes('contenido_html'));
+    assert.ok(campos.includes('seo.metaDescription'));
+  });
+
+  it('impide publicar el grupo mientras un miembro tiene publicación individual publicada', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1', tipo: 'animal', origen_id: 'ani_1', slug: 'luna' }));
+    const base = {
+      grupo_id: 'grp_1',
+      titulo: 'Camada Luna',
+      slug: 'camada-luna',
+      extracto: 'Dos cachorros buscan familia juntos',
+      contenido_html: '<p>Luna y Sol son dos cachorros que buscan una familia juntos.</p>'
+    };
+    const borrador = b.ctx.webUpsertGrupo(Object.assign({}, base, { estado_publicacion: 'borrador' }));
+    assert.equal(borrador.status, 'success', JSON.stringify(borrador));
+    const guardado = b.ctx.webPublicacionDeOrigen('animal_grupo', 'grp_1');
+    assert.equal(b.ctx.webEstadoGrupoPub({ grupo_id: 'grp_1', estado_publicacion: 'publicado' }).status, 'warning');
+    b.estado.publicaciones.find(p => p.id === 'web_ani1').estado_publicacion = 'oculto';
+    const publicado = b.ctx.webEstadoGrupoPub({ grupo_id: 'grp_1', estado_publicacion: 'publicado' });
+    assert.equal(publicado.status, 'success', JSON.stringify(publicado));
+    assert.equal(b.ctx.webPublicacionPorId(guardado.id).estado_publicacion, 'publicado');
+  });
+
+  it('el listado de grupos marca conflicto, sin publicar y completitud', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.animales.push(miembro({ id: 'ani_3', grupo_id: 'grp_2', grupo: 'Camada Sol', grupo_obligatorio: false }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1', tipo: 'animal', origen_id: 'ani_1', slug: 'luna' }));
+
+    const porDefecto = b.ctx.webListarGrupos({});
+    assert.equal(porDefecto.data.length, 1);
+    assert.equal(porDefecto.data[0].grupo_id, 'grp_1');
+    assert.equal(porDefecto.data[0].estado_publicacion, 'sin_publicar');
+    assert.equal(porDefecto.data[0].conflicto_individual_publicado, true);
+    assert.deepEqual(plano(porDefecto.data[0].completitud.faltan), ['publicacion']);
+
+    const todos = b.ctx.webListarGrupos({ todos: '1' });
+    assert.equal(todos.data.length, 2);
+
+    // Un grupo no obligatorio que ya tiene publicación sí aparece en el listado normal.
+    b.estado.publicaciones.push(filaGrupo({ id: 'web_g2', origen_id: 'grp_2', slug: 'camada-sol', titulo: 'Camada Sol', categoria: 'Perros en adopción' }));
+    const conPublicacion = b.ctx.webListarGrupos({});
+    assert.ok(conPublicacion.data.some(g => g.grupo_id === 'grp_2' && g.publicacion_id === 'web_g2'), JSON.stringify(conPublicacion.data));
+  });
+
+  it('retira con lápida 410 y restaura conservando el slug', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(filaGrupo());
+    assert.equal(b.ctx.webListarPublicas({ type: 'animal_grupo' }).data.length, 1);
+
+    const retirada = b.ctx.webArchivarGrupo({ grupo_id: 'grp_1' }, { email: 'x@y.es' });
+    assert.equal(retirada.status, 'success', JSON.stringify(retirada));
+    assert.equal(retirada.data.estado_publicacion, 'retirado');
+    assert.equal(b.ctx.webListarPublicas({ type: 'animal_grupo' }).data.length, 0);
+    assert.equal(b.ctx.webPublicacionPublica('camada-luna').status, 'gone');
+
+    const restaurada = b.ctx.webRestaurarGrupo({ grupo_id: 'grp_1' }, { email: 'x@y.es' });
+    assert.equal(restaurada.status, 'success', JSON.stringify(restaurada));
+    assert.equal(restaurada.data.estado_publicacion, 'borrador');
+    assert.equal(b.estado.publicaciones[0].slug, 'camada-luna');
+    assert.equal(b.estado.publicaciones.length, 1);
+  });
+
+  it('solo restaura publicaciones de grupo desde el endpoint de grupos', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila({ estado_publicacion: 'retirado' }));
+    const r = b.ctx.webRestaurarGrupo({ id: 'web_1' }, {});
+    assert.equal(r.status, 'error');
+  });
+
+  it('no permite eliminar una publicación de grupo publicada o retirada', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(filaGrupo());
+    assert.equal(b.ctx.webEliminarGrupo({ grupo_id: 'grp_1' }, {}).status, 'error');
+    b.estado.publicaciones[0].estado_publicacion = 'borrador';
+    assert.equal(b.ctx.webEliminarGrupo({ grupo_id: 'grp_1' }, {}).status, 'success');
+    assert.equal(b.estado.publicaciones.length, 0);
   });
 });

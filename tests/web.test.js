@@ -434,6 +434,60 @@ describe('Web: publicar solo fichas completas', () => {
   });
 });
 
+describe('Web: ficha interna como fuente (F2)', () => {
+  it('traduce el vocabulario público y nunca trata urgente como estado', () => {
+    assert.equal(Web._estadoPublicoLabel('en_adopcion'), 'En adopción');
+    assert.equal(Web._estadoPublicoLabel('cerrado'), 'Cerrado');
+    assert.equal(Web._estadoPublicoLabel('urgente'), 'urgente');
+  });
+
+  it('la fila retirada de un animal permite restaurar y no publicar directo', () => {
+    const ctx = Object.assign({}, Web);
+    const html = ctx._filaAnimal({
+      animal_id: 'a1', nombre: 'Luna', especie: 'perro', publicacion_id: 'web_1',
+      slug: 'luna', estado_publicacion: 'retirado', estado_publico_efectivo: 'cerrado',
+      completitud: { faltan: [] }
+    });
+    assert.match(html, /Retirado/);
+    assert.match(html, /slug sigue reservado/);
+    assert.match(html, /data-action="restaurarWebAnimal"/);
+    assert.doesNotMatch(html, /data-action="retirarWebAnimal"/);
+    assert.doesNotMatch(html, /data-action="cambiarEstadoWeb"[^>]*data-arg2="publicado"/);
+  });
+
+  it('el formulario deriva el estado, elimina urgente del select y muestra los heredados', () => {
+    const prevD = global.Dashboard;
+    const prevI = global.Icons;
+    const prevDoc = global.document;
+    global.Dashboard = { showFormModal: (titulo, contenido) => { global.Dashboard._ultimoHtml = contenido; }, _esc: x => String(x == null ? '' : x) };
+    global.Icons = { fileText: 'i', paw: 'i', search: 'i', settings: 'i', eye: 'i', pencil: 'i', trash: 'i', plus: 'i', refresh: 'i', clipboard: 'i' };
+    global.document = { getElementById: () => null };
+    let html = '';
+    try {
+      Web._mostrarFormAnimal({
+        id: '', tipo: 'animal', origen_id: 'a1', slug: '', titulo: '', estado_publicacion: 'borrador',
+        estado_publico_modo: 'auto', estado_publico: 'en_adopcion', estado_publico_derivado: 'en_adopcion',
+        categoria: '', media: {}, animal: {}, seo: {}, cta: null, tags: [], indexable: true, listed: true, featured: false, orden: 0
+      }, {
+        id: 'a1', nombre: 'Luna', especie: 'Perro', raza: 'Mestiza', sexo: 'Hembra', edad: '2 años',
+        estado: 'disponible', estado_publico_derivado: 'en_adopcion', urgente: true, vacunas: 'Sí',
+        esterilizada: true, microchip: '941000000000001', foto: ''
+      }, []);
+      html = global.Dashboard._ultimoHtml || '';
+    } finally {
+      if (prevD === undefined) delete global.Dashboard; else global.Dashboard = prevD;
+      if (prevI === undefined) delete global.Icons; else global.Icons = prevI;
+      if (prevDoc === undefined) delete global.document; else global.document = prevDoc;
+    }
+    assert.match(html, /value="auto"/);
+    assert.match(html, /Automático · En adopción/);
+    assert.doesNotMatch(html, /value="urgente"/);
+    assert.match(html, /Datos heredados de la ficha interna/);
+    assert.match(html, /Estado web automático/);
+    assert.match(html, /Heredado: Sí/);
+  });
+});
+
 describe('Web: helpers de escape', () => {
   it('escapa HTML cuando no hay Dashboard cargado', () => {
     assert.equal(Web._esc('<b>"x"</b>'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt;');
@@ -543,5 +597,174 @@ describe('Web: media de Drive enlazada en el formulario', () => {
     const limpio = Web.quitarMediaDeTexto(texto, a);
     assert.equal(limpio, 'https://drive.google.com/thumbnail?id=' + b + '&sz=w1200|Dos');
     assert.equal(Web.quitarMediaDeTexto('', a), '');
+  });
+});
+
+describe('Web: contadores por pestaña', () => {
+  it('cuenta solo lo que lista cada pestaña', () => {
+    const ctx = Object.assign({}, Web, {
+      animales: [
+        { animal_id: '1', publicacion_id: 'w1', estado_publicacion: 'publicado' },
+        { animal_id: '2', publicacion_id: 'w2', estado_publicacion: 'borrador' },
+        { animal_id: '3', publicacion_id: '', estado_publicacion: 'publicado' }
+      ],
+      eventos: [
+        { id: 'w3', estado_publicacion: 'publicado' },
+        { id: 'w4', estado_publicacion: 'retirado' },
+        { id: 'w5', estado_publicacion: 'oculto' }
+      ]
+    });
+    const c = ctx._contadoresTab();
+    assert.deepEqual(c.animal, { total: 2, publicado: 1, borrador: 1, oculto: 0, retirado: 0 });
+    assert.deepEqual(c.evento, { total: 3, publicado: 1, borrador: 0, oculto: 1, retirado: 1 });
+  });
+
+  it('sin estado cuenta como borrador y tolera listas nulas', () => {
+    const ctx = Object.assign({}, Web, {
+      animales: [{ animal_id: '1', publicacion_id: 'w1' }],
+      eventos: null
+    });
+    const c = ctx._contadoresTab();
+    assert.equal(c.animal.total, 1);
+    assert.equal(c.animal.borrador, 1);
+    assert.equal(c.evento.total, 0);
+  });
+
+  it('los textos de la pestaña activa cambian por tipo', () => {
+    const previo = global.Icons;
+    global.Icons = { plus: 'i', refresh: 'i', eye: 'i', trash: 'i', checkCircle: 'i', fileText: 'i', alertTriangle: 'i' };
+    try {
+      const base = { animales: [], eventos: [], _filtros: { q: '', estado: '' }, resumen: null };
+      const htmlAnimal = Object.assign({}, Web, base, { tab: 'animal' })._html();
+      const htmlEvento = Object.assign({}, Web, base, { tab: 'evento' })._html();
+      assert.match(htmlAnimal, /Publicar animal/);
+      assert.match(htmlEvento, /Nuevo evento\/historia/);
+      assert.match(htmlAnimal, /Buscar por nombre/);
+      assert.match(htmlEvento, /Buscar por título, slug o categoría/);
+    } finally {
+      if (previo === undefined) delete global.Icons;
+      else global.Icons = previo;
+    }
+  });
+});
+
+describe('Web: enlace público para compartir', () => {
+  it('construye la URL de la página estática canónica', () => {
+    const previo = global.location;
+    global.location = { href: 'https://gn-admin.github.io/admin-dashboard/index.html#web' };
+    try {
+      assert.equal(Web.urlPublicaEstatica('laia'),
+        'https://gn-admin.github.io/admin-dashboard/publicaciones/laia.html');
+      assert.equal(Web.urlPublicaEstatica(''), '');
+    } finally {
+      global.location = previo;
+    }
+  });
+});
+
+describe('Web: grupos de adopción conjunta (gestor)', () => {
+  const conIconos = fn => {
+    const previo = global.Icons;
+    global.Icons = { plus: 'i', refresh: 'i', eye: 'i', trash: 'i', pencil: 'i', checkCircle: 'i', fileText: 'i', alertTriangle: 'i', users: 'i', paw: 'i', search: 'i', settings: 'i', clipboard: 'i' };
+    try { return fn(); } finally {
+      if (previo === undefined) delete global.Icons;
+      else global.Icons = previo;
+    }
+  };
+
+  const grupo = extra => Object.assign({
+    grupo_id: 'grp_1',
+    nombre: 'Camada Luna',
+    grupo_obligatorio: true,
+    miembros_count: 2,
+    miembros_nombres: ['Luna', 'Sol'],
+    publicacion_id: 'web_g1',
+    slug: 'camada-luna',
+    titulo: 'Camada Luna',
+    estado_publicacion: 'publicado',
+    estado_publico: 'en_adopcion',
+    urgente: false,
+    completitud: { ok: true, faltan: [] }
+  }, extra || {});
+
+  it('la carpeta de media de un grupo vive con los animales', () => {
+    assert.equal(Web._carpetaFicha('animal_grupo', 'camada-luna'), 'animales/camada-luna');
+  });
+
+  it('el selector solo ofrece grupos sin publicación', () => {
+    const html = conIconos(() => Web._pickerGrupoHtml([
+      grupo({ publicacion_id: '' }),
+      grupo({ grupo_id: 'grp_2', nombre: 'Camada Sol', publicacion_id: 'web_g2' })
+    ]));
+    assert.match(html, /Camada Luna/);
+    assert.doesNotMatch(html, /Camada Sol/);
+    assert.match(html, /abrirGrupoWeb/);
+  });
+
+  it('sin grupos candidatos explica cómo se crean', () => {
+    const html = Web._pickerGrupoHtml([]);
+    assert.match(html, /No quedan grupos sin publicación web/);
+    assert.match(html, /Grupo \/ Camada/);
+  });
+
+  it('la fila de grupo muestra miembros, estado y acciones', () => {
+    const html = conIconos(() => Web._filaGrupo(grupo()));
+    assert.match(html, /Camada Luna/);
+    assert.match(html, /Luna, Sol/);
+    assert.match(html, /En adopción/);
+    assert.match(html, /camada-luna/);
+    assert.match(html, /previewWebGrupo/);
+    assert.match(html, /ocultarWebGrupo/);
+    assert.match(html, /Ver ficha/);
+    assert.match(html, /copiarEnlaceWeb/);
+    assert.match(html, /data-arg0="camada-luna"/);
+  });
+
+  it('un grupo sin publicar se configura desde la fila', () => {
+    const html = conIconos(() => Web._filaGrupo(grupo({ publicacion_id: '', estado_publicacion: 'sin_publicar', slug: '', completitud: { ok: false, faltan: ['publicacion'] } })));
+    assert.match(html, /Configurar/);
+    assert.match(html, /Sin configurar/);
+    assert.doesNotMatch(html, /previewWebGrupo/);
+  });
+
+  it('un grupo retirado ofrece restaurar y no publicar', () => {
+    const html = conIconos(() => Web._filaGrupo(grupo({ estado_publicacion: 'retirado' })));
+    assert.match(html, /restaurarWebGrupo/);
+    assert.match(html, /Enlace retirado \(410\)/);
+    assert.doesNotMatch(html, /ocultarWebGrupo/);
+  });
+
+  it('avisa del conflicto con publicaciones individuales', () => {
+    const html = conIconos(() => Web._filaGrupo(grupo({ conflicto_individual_publicado: true })));
+    assert.match(html, /publicaciones individuales publicadas/);
+  });
+
+  it('la pestaña de grupos pinta su botón y su vacío', () => {
+    const html = conIconos(() => Object.assign({}, Web, {
+      tab: 'grupo', grupos: [], animales: [], eventos: [], resumen: null, _filtros: { q: '', estado: '' }
+    })._html());
+    assert.match(html, /Publicar grupo/);
+    assert.match(html, /Buscar por grupo/);
+    assert.match(html, /No hay grupos de adopción conjunta/);
+  });
+
+  it('todas las acciones delegadas de grupo existen en Web', () => {
+    const DashboardWeb = require('../src/js/dashboard-web.js');
+    const acciones = {
+      nuevaPublicacionGrupoWeb: 'nuevaPublicacionGrupo',
+      abrirGrupoWeb: 'abrirGrupo',
+      editarWebGrupo: 'abrirGrupo',
+      guardarGrupoWeb: 'guardarGrupo',
+      previewWebGrupo: 'previewGrupo',
+      publicarWebGrupo: 'publicarGrupo',
+      ocultarWebGrupo: 'ocultarGrupo',
+      retirarWebGrupo: 'retirarGrupo',
+      restaurarWebGrupo: 'restaurarGrupo',
+      eliminarWebGrupo: 'eliminarGrupo'
+    };
+    Object.keys(acciones).forEach(accion => {
+      assert.equal(typeof DashboardWeb[accion], 'function', 'falta la acción delegada ' + accion);
+      assert.equal(typeof Web[acciones[accion]], 'function', 'falta Web.' + acciones[accion]);
+    });
   });
 });

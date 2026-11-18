@@ -128,6 +128,16 @@ const Publico = {
   },
 
   /**
+   * URL que se comparte: la canónica de la ficha (página estática en este
+   * visor). Si el payload aún no trae canónica, se deriva del slug.
+   */
+  urlCompartir(pub) {
+    const canonica = this.urlSegura((pub && pub.seo && pub.seo.canonical) || (pub && pub.canonical) || '');
+    if (canonica) return canonica;
+    return this.urlEstatica(pub && pub.slug);
+  },
+
+  /**
    * Carga el índice que publica el prerender (`publicaciones/index.json`).
    * Si falla, `_indice` queda a null y se mantiene la canónica estática: es
    * preferible a un canonical inestable.
@@ -185,7 +195,16 @@ const Publico = {
       }
       if (org.name) base.organizer = { '@type': 'Organization', name: org.name };
     }
-    if (pub.type === 'animal' && pub.animal) {
+    const esGrupo = !!(pub && (pub.isGroup || pub.type === 'animal_grupo'));
+    if (esGrupo && (pub.group || pub.animal)) {
+      const g = pub.group || pub.animal || {};
+      const miembros = Array.isArray(g.members) ? g.members.map(m => m && m.nombre).filter(Boolean) : [];
+      base.about = {
+        '@type': 'Thing',
+        name: g.groupName || pub.title || 'Grupo',
+        description: [g.species, (miembros.length ? ('Miembros: ' + miembros.join(', ')) : '')].filter(Boolean).join(' · ')
+      };
+    } else if (pub.type === 'animal' && pub.animal) {
       base.about = {
         '@type': 'Thing',
         name: (pub.animal.names || []).join(', '),
@@ -455,12 +474,17 @@ const Publico = {
   _card(p) {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
-    const animal = p.animal ? [p.animal.species, p.animal.age && p.animal.age.label].filter(Boolean).join(' · ') : '';
+    const esGrupo = !!(p && (p.isGroup || p.type === 'animal_grupo'));
+    const g = p.group || (esGrupo ? p.animal : null) || {};
+    const animal = esGrupo
+      ? [g.species, (g.count ? (g.count + ' miembros') : ''), (g.age && g.age.label)].filter(Boolean).join(' · ')
+      : (p.animal ? [p.animal.species, p.animal.age && p.animal.age.label].filter(Boolean).join(' · ') : '');
     const meta = [this.fecha(p.publishedAt), animal].filter(Boolean).join(' · ');
+    const urgente = p.urgent ? `<span class="pub-tag pub-tag--urgente">Urgente</span>` : '';
     return `<a class="pub-card" href="#/publicacion/${encodeURIComponent(p.slug || '')}">
       <div class="pub-card-media${img ? '' : ' pub-card-media--vacia'}">${img ? `<img src="${this.esc(img)}" alt="${this.esc(alt)}" loading="lazy">` : '<span>Sin imagen</span>'}</div>
       <div class="pub-card-body">
-        ${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
+        ${urgente}${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
         ${meta ? `<p class="pub-card-meta">${this.esc(meta)}</p>` : ''}
         <h2>${this.esc(p.title)}</h2>
         ${p.excerpt ? `<p class="pub-card-excerpt">${this.esc(p.excerpt)}</p>` : ''}
@@ -560,6 +584,7 @@ const Publico = {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const estado = p.status ? `<span class="pub-tag pub-tag--estado">${this.esc(this.estadoTexto(p.status))}</span>` : '';
+    const urgente = p.urgent ? `<span class="pub-tag pub-tag--urgente">Urgente</span>` : '';
     const ctaObj = (ctaFuente && this.urlSegura(ctaFuente.url)) ? ctaFuente : null;
     const cta = (b.cta && ctaObj)
       ? `<a class="pub-btn" href="${this.esc(this.urlSegura(ctaObj.url))}" rel="noopener">${this.esc(ctaObj.label || 'Ver más')}</a>`
@@ -595,10 +620,15 @@ const Publico = {
       </a>`;
     }).filter(Boolean).join('') : '';
 
-    const acciones = cta
-      ? `<div class="pub-acciones">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
+    const compartirUrl = this.urlCompartir(p);
+    const compartir = compartirUrl
+      ? `<button type="button" class="pub-btn pub-btn--ghost" data-compartir data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}">Compartir</button><span class="pub-compartir-aviso" role="status" aria-live="polite"></span>`
+      : '';
+    const acciones = (cta || compartir)
+      ? `<div class="pub-acciones">${cta}${compartir}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
       : '';
     const metaLinea = [
+      urgente,
       estado,
       p.publishedAt ? `<span>${this.esc(this.fecha(p.publishedAt))}</span>` : '',
       (mostrarLectura && p.readTime) ? `<span>${this.esc(String(p.readTime))} min de lectura</span>` : '',
@@ -614,7 +644,7 @@ const Publico = {
         </section>` : '',
       galeria: galeria ? `<section class="pub-section" aria-label="Galería de imágenes"><div class="pub-section-head"><h2>Galería</h2></div><div class="pub-galeria">${galeria}</div></section>` : '',
       videos: videosHtml ? `<section class="pub-section" aria-label="Vídeos"><div class="pub-section-head"><h2>Vídeo</h2></div><div class="pub-videos">${videosHtml}</div></section>` : '',
-      fichaAnimal: (b.fichaAnimal && p.animal) ? this._bloqueAnimal(p.animal) : '',
+      fichaAnimal: (b.fichaAnimal && (p.animal || p.group)) ? ((p.isGroup || p.type === 'animal_grupo') ? this._bloqueGrupo(p.group || p.animal) : this._bloqueAnimal(p.animal)) : '',
       cta: ''
     };
 
@@ -715,6 +745,59 @@ const Publico = {
       <h2>Ficha del animal</h2>
       <dl class="pub-dl">${filas.join('')}</dl>
       <h3 class="pub-subtitulo">Salud</h3>
+      <div class="pub-chips">${chipsSalud}</div>
+      ${temperamento ? `<h3 class="pub-subtitulo">Temperamento</h3><div class="pub-chips">${temperamento}</div>` : ''}
+    </section>`;
+  },
+
+  _bloqueGrupo(g) {
+    if (!g) return '';
+    const salud = g.health || {};
+    const chipsSalud = [
+      ['vaccinated', 'Vacunado'], ['dewormed', 'Desparasitado'], ['neutered', 'Esterilizado'],
+      ['microchipped', 'Microchip'], ['specialNeeds', 'Necesidades especiales']
+    ].map(([k, label]) => `<span class="pub-chip${salud[k] ? '' : ' pub-chip--off'}">${label}</span>`).join('');
+    const temperamento = (g.temperament || []).map(t => `<span class="pub-chip">${this.esc(t)}</span>`).join('');
+    const compat = g.compatibility || {};
+    const adop = g.adoption || {};
+    const acogida = g.foster || {};
+    const loc = g.location || {};
+    const contacto = g.contact || {};
+    const filas = [];
+    const push = (label, valor, html) => { if (valor || html) filas.push(`<dt>${label}</dt><dd>${html || this.esc(valor)}</dd>`); };
+    const miembros = Array.isArray(g.members) ? g.members : [];
+
+    push('Grupo', g.groupName || '');
+    push('Miembros', miembros.length ? String(miembros.length) : '');
+    push('Especie', g.species || '');
+    push('Sexo', (g.sex || []).join(', '));
+    push('Edad', (g.age && g.age.label) || '');
+    const compatTexto = [
+      compat.dogs ? 'Perros: ' + compat.dogs : '',
+      compat.cats ? 'Gatos: ' + compat.cats : '',
+      compat.kids ? 'Niños: ' + compat.kids : ''
+    ].filter(Boolean).join(' · ');
+    push('Compatibilidad', compatTexto);
+    push('Adopción', [adop.mode, adop.feeEur ? adop.feeEur + ' €' : ''].filter(Boolean).join(' · '));
+    push('Requisitos', adop.requirements);
+    push('Acogida temporal', acogida.temporary ? ('Sí' + (acogida.durationLabel ? ' · ' + acogida.durationLabel : '')) : '');
+    push('Ubicación', [loc.city, loc.province, loc.name].filter(Boolean).join(', '));
+    push('Contacto', '', [
+      contacto.email ? `<a href="mailto:${this.esc(contacto.email)}">${this.esc(contacto.email)}</a>` : '',
+      contacto.phone ? `<a href="tel:${this.esc(String(contacto.phone).replace(/\s+/g, ''))}">${this.esc(contacto.phone)}</a>` : ''
+    ].filter(Boolean).join(' · '));
+
+    const listaMiembros = miembros.map(m => {
+      const foto = this.urlSegura(m && m.foto);
+      const info = [m && m.especie, m && m.raza, m && m.sexo, m && m.edad].filter(Boolean).join(' · ');
+      return `<li class="pub-miembro">${foto ? `<img src="${this.esc(foto)}" alt="${this.esc((m && m.nombre) || '')}" loading="lazy" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-right:8px;vertical-align:middle">` : ''}<div style="display:inline-block;vertical-align:middle"><b>${this.esc((m && m.nombre) || '')}</b>${info ? `<div class="pub-sub">${this.esc(info)}</div>` : ''}</div></li>`;
+    }).join('');
+
+    return `<section class="pub-bloque">
+      <h2>Ficha del grupo (adopción conjunta)</h2>
+      <dl class="pub-dl">${filas.join('')}</dl>
+      ${listaMiembros ? `<h3 class="pub-subtitulo">Miembros</h3><ul style="list-style:none;padding:0;margin:0;display:grid;gap:8px">${listaMiembros}</ul>` : ''}
+      <h3 class="pub-subtitulo">Salud del conjunto</h3>
       <div class="pub-chips">${chipsSalud}</div>
       ${temperamento ? `<h3 class="pub-subtitulo">Temperamento</h3><div class="pub-chips">${temperamento}</div>` : ''}
     </section>`;

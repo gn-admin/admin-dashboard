@@ -111,6 +111,31 @@ describe('Publico.urlEstatica', () => {
   });
 });
 
+describe('Publico.urlCompartir: enlace canónico para compartir', () => {
+  const conLocation = fn => {
+    const previo = global.location;
+    global.location = { origin: 'https://gn-admin.github.io', pathname: '/admin-dashboard/publico.html' };
+    try { return fn(); } finally { global.location = previo; }
+  };
+
+  it('prefiere la canónica del payload', () => {
+    assert.equal(Publico.urlCompartir({
+      slug: 'laia',
+      seo: { canonical: 'https://gruponebak.net/animales/laia' }
+    }), 'https://gruponebak.net/animales/laia');
+  });
+
+  it('sin canónica usa la página estática del visor', () => {
+    conLocation(() => assert.equal(Publico.urlCompartir({ slug: 'laia', seo: {} }),
+      'https://gn-admin.github.io/admin-dashboard/publicaciones/laia.html'));
+  });
+
+  it('sin slug no ofrece enlace', () => {
+    assert.equal(Publico.urlCompartir({}), '');
+    assert.equal(Publico.urlCompartir(null), '');
+  });
+});
+
 describe('Publico.canonicaFicha: solo cuando la estática existe', () => {
   const conLocation = fn => {
     const previo = global.location;

@@ -214,6 +214,15 @@ function handleGet(endpoint, user, e) {
       }));
     case 'web-animales-preview':
       return jsonResponse(webPreviewAnimal(e.parameter.id));
+    case 'web-grupos':
+      if (e.parameter.id) return jsonResponse(webGetGrupo(e.parameter.id));
+      return jsonResponse(webListarGrupos({
+        q: e.parameter.q,
+        estado_publicacion: e.parameter.estado_publicacion,
+        todos: e.parameter.todos
+      }));
+    case 'web-grupos-preview':
+      return jsonResponse(webPreviewGrupo(e.parameter.id));
     case 'web-eventos-preview':
       return jsonResponse(webPreviewEvento(e.parameter.id));
     case 'web-slug-check':
@@ -363,9 +372,18 @@ function handlePost(endpoint, user, e) {
     // ==================== GESTOR WEB (admin) ====================
     case 'web-animales':
       if (body && body.accion === 'eliminar') return jsonResponse(webEliminarAnimal(body, user));
+      if (body && body.accion === 'retirar') return jsonResponse(_webAnotarDeploy(webArchivarAnimal(body, user)));
+      if (body && body.accion === 'restaurar') return jsonResponse(_webAnotarDeploy(webRestaurarAnimal(body, user), true));
       return jsonResponse(_webAnotarDeploy(webUpsertAnimal(body, user)));
     case 'web-animales-estado':
       return jsonResponse(_webAnotarDeploy(webEstadoAnimal(body, user)));
+    case 'web-grupos':
+      if (body && body.accion === 'eliminar') return jsonResponse(webEliminarGrupo(body, user));
+      if (body && body.accion === 'retirar') return jsonResponse(_webAnotarDeploy(webArchivarGrupo(body, user)));
+      if (body && body.accion === 'restaurar') return jsonResponse(_webAnotarDeploy(webRestaurarGrupo(body, user), true));
+      return jsonResponse(_webAnotarDeploy(webUpsertGrupo(body, user)));
+    case 'web-grupos-estado':
+      return jsonResponse(_webAnotarDeploy(webEstadoGrupoPub(body, user)));
     case 'web-eventos':
       if (body && body.accion === 'archivar')       return jsonResponse(_webAnotarDeploy(webArchivarEvento(body, user)));
       if (body && body.accion === 'restaurar')       return jsonResponse(_webAnotarDeploy(webRestaurarEvento(body, user), true));

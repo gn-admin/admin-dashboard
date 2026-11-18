@@ -4815,6 +4815,49 @@ const Dashboard = {
     return ['Perro', 'Gato', 'Conejo', 'Hámster', 'Pájaro', 'Tortuga', 'Hurón', 'Cobaya', 'Erizo', 'Pez'];
   },
 
+  _mediaLineas(valor, tipo) {
+    let arr = valor;
+    if (typeof arr === 'string') {
+      try { arr = JSON.parse(arr); } catch (e) { arr = []; }
+    }
+    if (!Array.isArray(arr)) return '';
+    return arr.map(x => {
+      if (!x) return '';
+      if (tipo === 'video') return [x.title || x.titulo || '', x.url || ''].filter(Boolean).join('|');
+      if (tipo === 'doc') return [x.name || x.nombre || '', x.url || ''].filter(Boolean).join('|');
+      if (typeof x === 'string') return x;
+      return [x.src || x.url || '', x.alt || '', x.caption || x.pie || ''].filter(Boolean).join('|');
+    }).filter(Boolean).join('\n');
+  },
+
+  _parseMediaLineas(texto, tipo, previo) {
+    const t = String(texto || '').trim();
+    if (!t) return [];
+    const lineas = t.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (tipo === 'video') {
+      return lineas.map(l => {
+        const [a, b] = l.split('|');
+        const url = (b || a || '').trim();
+        if (!url) return null;
+        return { title: b ? (a || '').trim() : '', url };
+      }).filter(Boolean);
+    }
+    if (tipo === 'doc') {
+      return lineas.map(l => {
+        const [a, b] = l.split('|');
+        const url = (b || a || '').trim();
+        if (!url) return null;
+        return { name: b ? (a || '').trim() : '', url };
+      }).filter(Boolean);
+    }
+    return lineas.map((l, idx) => {
+      const [src, alt, caption] = l.split('|');
+      const s = String(src || '').trim();
+      if (!s) return null;
+      return { src: s, alt: String(alt || '').trim(), caption: String(caption || '').trim(), order: idx };
+    }).filter(Boolean);
+  },
+
   showAnimalForm(data) {
     const isEdit = !!data;
     const especies = this._especiesDomesticas();
@@ -4837,6 +4880,15 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label for="an-foto">Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="an-foto-preview"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:var(--text-xs);color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label for="an-foto-url">Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
       <div class="form-row"><div class="form-group"><label for="an-estado">Estado *</label><select id="an-estado" required><option value="disponible" ${data?.estado==='disponible'?'selected':''}>Disponible</option><option value="en_acogida" ${data?.estado==='en_acogida'?'selected':''}>En acogida</option><option value="en_adopcion" ${data?.estado==='en_adopcion'?'selected':''} ${!data?'disabled':''}>Reservado</option><option value="adoptado" ${data?.estado==='adoptado'?'selected':''}>Adoptado</option><option value="fallecido" ${data?.estado==='fallecido'?'selected':''}>Fallecido (baja)</option></select></div><div class="form-group"><label for="an-microchip">Microchip</label><input type="text" id="an-microchip" value="${this._esc(data?.microchip||'')}"></div></div>
       <div class="form-group"><label for="an-descripcion">Descripcion</label><textarea id="an-descripcion" rows="2">${this._esc(data?.descripcion||'')}</textarea></div>
+      <details class="detail-collapse" style="margin-top:8px"><summary>Media interna (para publicación web)</summary>
+        <div class="detail-collapse-body">
+          <p class="web-nota" style="margin-top:0">Opcional. Se guarda en la ficha del animal y se usa como pre-relleno al crear su publicación web. Los documentos internos son privados y no se publican.</p>
+          <div class="form-row"><div class="form-group"><label for="an-portada-url">Portada interna (URL)</label><input type="text" id="an-portada-url" value="${this._esc(data?.portada_url||'')}" placeholder="https://..."></div><div class="form-group"><label for="an-portada-alt">Texto alternativo portada</label><input type="text" id="an-portada-alt" value="${this._esc(data?.portada_alt||'')}"></div></div>
+          <div class="form-group"><label for="an-galeria-int">Galería interna (url|alt|pie por línea)</label><textarea id="an-galeria-int" class="form-input" rows="3">${this._esc(this._mediaLineas(data?.galeria))}</textarea></div>
+          <div class="form-group"><label for="an-videos-int">Vídeos internos (título|url por línea)</label><textarea id="an-videos-int" class="form-input" rows="2">${this._esc(this._mediaLineas(data?.videos, 'video'))}</textarea></div>
+          <div class="form-group"><label for="an-docs-int">Documentos internos privados (nombre|url por línea)</label><textarea id="an-docs-int" class="form-input" rows="2">${this._esc(this._mediaLineas(data?.documentos_internos, 'doc'))}</textarea></div>
+        </div>
+      </details>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form>`);
   },
@@ -4960,7 +5012,12 @@ const Dashboard = {
       fecha_ingreso: existing?.fecha_ingreso || new Date().toISOString().slice(0,10),
       foto_drive_id: existing?.foto_drive_id || '',
       foto_url: existing?.foto_url || '',
-      foto: existing?.foto || ''
+      foto: existing?.foto || '',
+      portada_url: (document.getElementById('an-portada-url') ? document.getElementById('an-portada-url').value.trim() : '') || existing?.portada_url || '',
+      portada_alt: (document.getElementById('an-portada-alt') ? document.getElementById('an-portada-alt').value.trim() : '') || existing?.portada_alt || '',
+      galeria: this._parseMediaLineas(document.getElementById('an-galeria-int') ? document.getElementById('an-galeria-int').value : '', 'gallery', existing?.galeria),
+      videos: this._parseMediaLineas(document.getElementById('an-videos-int') ? document.getElementById('an-videos-int').value : '', 'video', existing?.videos),
+      documentos_internos: this._parseMediaLineas(document.getElementById('an-docs-int') ? document.getElementById('an-docs-int').value : '', 'doc', existing?.documentos_internos)
     };
     const fotoUrlInput = document.getElementById('an-foto-url');
     const fotoInput = document.getElementById('an-foto');
@@ -4998,7 +5055,7 @@ const Dashboard = {
         const item = this._byId(this.animales, id); if (item) Object.assign(item, data);
       } else {
         const res = await API.createAnimal(data);
-        if (res.data) this.animales.push(res.data);
+        if (res.data) { this.animales.push(res.data); id = res.data.id || id; }
       }
     } catch (err) {
       this._snackErr(err, 'No se pudo guardar: ' + this._errMsg(err));
@@ -5010,6 +5067,19 @@ const Dashboard = {
     if (isEdit) this.viewAnimal(id);
     else this.renderAnimales(document.getElementById('page-animales'));
     this.showSnackbar(isEdit ? 'Animal actualizado' : 'Animal creado', 'success');
+    // D3: un animal fallecido propone retirar su publicación (con confirmación).
+    if (data.estado === 'fallecido' && typeof API.retirarWebAnimal === 'function'
+        && (typeof this.puedeAccederPagina !== 'function' || this.puedeAccederPagina('web'))) {
+      const quiere = await this._confirm(
+        'El animal está marcado como fallecido. ¿Quieres retirar también su publicación web (410)? El slug quedará reservado y podrás restaurarla.',
+        'Sí, retirar',
+        'Retirar publicación web'
+      );
+      if (quiere) {
+        try { await API.retirarWebAnimal(id); }
+        catch (err) { /* sin publicación web: no hay nada que retirar */ }
+      }
+    }
   },
 
   // Apadrinable = check activo Y estado disponible/en_acogida.
@@ -5038,6 +5108,50 @@ const Dashboard = {
   // Solo cuenta lo que sigue necesitando hogar (ver _esPrioritario).
   _ordenaUrgentes(lista) {
     return (lista || []).slice().sort((x, y) => (this._esPrioritario(y) ? 1 : 0) - (this._esPrioritario(x) ? 1 : 0));
+  },
+
+  /**
+   * Estado web del animal en su ficha interna (F2). Solo para roles con acceso
+   * al gestor web; si no hay publicación se muestra como «Sin publicar».
+   */
+  _webEstadoChipHtml(pub, comp) {
+    const p = pub || {};
+    const faltan = (comp && comp.faltan) || [];
+    const estado = String(p.estado_publicacion || '');
+    const esRetirado = estado === 'retirado';
+    const cls = esRetirado ? 'descartada' : (estado === 'publicado' ? 'aprobada' : (estado === 'borrador' ? 'pendiente' : ''));
+    const etiqueta = esRetirado ? 'Retirada' : (estado ? Web.estadoLabel(estado) : 'Sin publicar');
+    const publico = p.estado_publico_efectivo || p.estado_publico_derivado || '';
+    const pendiente = faltan.filter(f => f !== 'publicacion');
+    const partePendiente = pendiente.length ? `<div class="web-sub">Para publicar: ${this._esc(pendiente.join(', '))}</div>` : '';
+    const aviso = esRetirado
+      ? `<div class="web-sub">Enlace retirado (410); el slug sigue reservado.</div>`
+      : (p.estado_publico_modo === 'manual'
+        ? `<div class="web-sub">Estado manual fijado: ${this._esc(Web._estadoPublicoLabel(publico))}</div>`
+        : '');
+    return `<div class="animal-web-chip">
+      <span class="animal-web-chip-titulo">${Icons.eye} Web:</span>
+      <span class="estado-badge ${cls}">${this._esc(etiqueta)}</span>
+      ${publico ? `<span class="chip-neutral">${this._esc(Web._estadoPublicoLabel(publico))}</span>` : ''}
+      ${partePendiente}${aviso}
+      <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${this._esc(p.origen_id || '')}">${Icons.pencil} Abrir publicación web</button>
+    </div>`;
+  },
+
+  async _cargarEstadoWebAnimal(id) {
+    if (typeof API === 'undefined' || typeof API.getWebAnimal !== 'function') return;
+    if (typeof this.puedeAccederPagina === 'function' && !this.puedeAccederPagina('web')) return;
+    const cont = document.getElementById('animal-web-estado');
+    if (!cont) return;
+    try {
+      const res = await API.getWebAnimal(id);
+      const pub = (res && res.data) || {};
+      pub.origen_id = pub.origen_id || id;
+      cont.innerHTML = this._webEstadoChipHtml(pub, res && res.completitud);
+    } catch (err) {
+      // Sin gestor web o sin permisos no se muestra nada: no es un error de la ficha.
+      cont.innerHTML = '';
+    }
   },
 
   _apadrinamientosDe(animalId) {
@@ -5094,6 +5208,7 @@ const Dashboard = {
         </div>
       </div>
       ${estadoBanner}
+      <div id="animal-web-estado" class="animal-web-estado" aria-live="polite"></div>
       <div class="detail-actions-wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showAnimalFormById" data-arg0="${a.id}">${Icons.pencil} Editar</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${a.id}">${Icons.eye} Publicación web</button>
@@ -5130,6 +5245,7 @@ const Dashboard = {
           </div>`:''}
         </div>
       </details>`, detailKey);
+    this._cargarEstadoWebAnimal(a.id);
   },
 
   // El backend devuelve {success:false} si la fila no existe (p. ej. id no
