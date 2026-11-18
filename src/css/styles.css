@@ -7101,8 +7101,10 @@ body {
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Las acciones del formulario son sticky: un poco de aire bajo el último
+     control evita que quede pegado a la barra al llegar al final. */
   .modal-body--form {
-    padding-bottom: 0;
+    padding-bottom: 16px;
     scroll-padding-bottom: 96px;
   }
 
@@ -8386,6 +8388,12 @@ body.web-picker-abierto { overflow: hidden; }
   }
   .card .data-table.web-tabla td.table-actions .web-sub {
     grid-column: 1 / -1;
+  }
+
+  /* El JSON del preview obligaba a scroll horizontal en móvil. */
+  .web-preview-json {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 }
 
