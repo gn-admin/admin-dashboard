@@ -6488,6 +6488,7 @@ const Dashboard = {
     };
     return {
       nombre: val(c && c.animal, a && a.nombre) || (p && p.animal) || '',
+      nombre_definitivo: (c && c.nombre_definitivo) || '',
       foto: val(c && c.animal_foto, a ? this._fotoSrc(a, 'w800') : ''),
       especie: val(c && c.especie, a && a.especie),
       raza: val(c && c.raza, a && a.raza),
@@ -7672,6 +7673,7 @@ const Dashboard = {
           <form class="contrato-form-pane" data-submit="guardarContrato" data-sarg0="${adopcionId}">
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
             ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
+            <div class="form-row"><div class="form-group"><label for="ct-nombre-definitivo">Nombre definitivo</label><input type="text" id="ct-nombre-definitivo" placeholder="Nombre con el que se adopta (opcional)"><div class="form-hint">Si el adoptante ya le ha puesto nombre, se usara en el contrato. En blanco, se mantiene el nombre de la ficha.</div></div></div>
             <div class="form-row"><div class="form-group"><label for="ct-fecha">Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label for="ct-ciudad">Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
             <div class="form-row"><div class="form-group"><label for="ct-donacion">Donacion del adoptante (€)</label><input type="text" id="ct-donacion" value="50" inputmode="decimal" placeholder="50"><div class="form-hint">Cantidad que el adoptante entrega a Grupo Nebak con la adopcion. Editable; por defecto 50 €.</div></div></div>
 
@@ -7855,6 +7857,7 @@ const Dashboard = {
       adopcion_id: adopcionId,
       animal: p.animal,
       animal_id: p.animal_id || null,
+      nombre_definitivo: ((document.getElementById('ct-nombre-definitivo') || {}).value || '').trim(),
       fecha: document.getElementById('ct-fecha').value || new Date().toISOString().slice(0, 10),
       ciudad: document.getElementById('ct-ciudad').value.trim(),
       donacion_adoptante: parseFloat(String((document.getElementById('ct-donacion')?.value || '50').replace(',', '.'))) || 50,

@@ -1698,3 +1698,14 @@ describe('F-C1: capa, color y tamano del animal', () => {
     assert.match(html, /<option value="Grande" selected>Grande<\/option>/);
   });
 });
+
+
+describe('F-C1: nombre definitivo del contrato', () => {
+  it('sale del contrato, no de la ficha, y vacio si no se rellena', () => {
+    const conNombre = Dashboard._contratoAnimalDatos({ animal_id: 'a1' }, { animal: 'Luna', nombre_definitivo: 'Nala' });
+    assert.equal(conNombre.nombre, 'Luna');
+    assert.equal(conNombre.nombre_definitivo, 'Nala');
+    const sinNombre = Dashboard._contratoAnimalDatos({ animal_id: 'a1' }, { animal: 'Luna' });
+    assert.equal(sinNombre.nombre_definitivo, '');
+  });
+});
