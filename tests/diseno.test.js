@@ -201,6 +201,33 @@ describe('integridad estatica: clases, ids e iconos', () => {
   });
 });
 
+describe('regiones vivas del gestor: ocultas sin salir del arbol de accesibilidad', () => {
+  const VIVAS = ['.animal-web-estado', '.web-deploy-estado', '.web-media-lista'];
+
+  VIVAS.forEach(sel => {
+    it(sel + ' vacio sigue renderizado', () => {
+      const vacia = declaraciones(sel + ':empty');
+      assert.equal(vacia.display, undefined, sel + ':empty no debe usar display:none');
+      assert.equal(vacia.position, 'absolute');
+      assert.match(vacia['clip-path'] || '', /inset\(50%\)/);
+      assert.equal(vacia['pointer-events'], 'none');
+    });
+  });
+
+  it('la capa de carga no se oculta con visibility ni display:none', () => {
+    assert.match(leer('index.html'), /id="loading"[^>]*role="status"[^>]*aria-live="polite"/);
+    const base = declaraciones('.loading-overlay');
+    assert.equal(base.display, 'flex');
+    assert.equal(base.visibility, undefined, '.loading-overlay no debe usar visibility:hidden');
+    assert.equal(base.opacity, '0');
+    assert.equal(base['pointer-events'], 'none');
+    const activo = declaraciones('.loading-overlay.active');
+    assert.equal(activo.opacity, '1');
+    assert.equal(activo['pointer-events'], 'auto');
+    assert.equal(activo.visibility, undefined);
+  });
+});
+
 describe('snackbar del gestor: region viva siempre disponible', () => {
   it('el contenedor es una region viva atomica en el HTML inicial', () => {
     assert.match(leer('index.html'),
