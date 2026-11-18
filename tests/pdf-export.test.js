@@ -58,8 +58,51 @@ describe('_buildContracto: logo y firmas', () => {
 
   it('usa logo inyectado y muestra firma', () => {
     assert.match(html, /data:image\/png;base64,AAA/);
-    assert.match(html, /Contrato de Adopcion/);
+    assert.match(html, /Contrato de adopción/);
     assert.match(html, /break-inside:avoid/);
+  });
+});
+
+describe('_buildContracto: 20 estipulaciones y datos del contrato', () => {
+  const c = {
+    adopcion_id: 'adp4', ciudad: 'Irun', fecha: '2026-11-18',
+    animal: 'Luna', nombre_definitivo: 'Nala',
+    animal_capa: 'Atigrada', animal_color: 'Gris', animal_tamano: 'Mediano',
+    especie: 'Gato', raza: 'Comun europeo', animal_sexo: 'Hembra', animal_microchip: 'CHIP-9',
+    animal_esterilizada: true, animal_descripcion: 'Muy sociable', animal_fecha_nacimiento: '2022-01-02',
+    donacion_adoptante: 120, indemnizacion_importe: 750,
+    f1_nombre: 'Ana', f1_dni: '1', f1_firma: 'data:image/png;base64,AAA'
+  };
+  const html = PdfExport._buildContracto(c, LOGO);
+
+  it('pinta las 20 estipulaciones con los importes del contrato', () => {
+    assert.equal((html.match(/class="clausula"/g) || []).length, 20);
+    assert.match(html, /1ª\./);
+    assert.match(html, /20ª\./);
+    assert.match(html, /tres folios a doble cara/);
+    assert.match(html, /120 €/);
+    assert.match(html, /750 €/);
+  });
+
+  it('incluye nombre definitivo, capa, color y tamaño', () => {
+    assert.match(html, /Nombre definitivo/);
+    assert.match(html, /Nala/);
+    assert.match(html, /Atigrada/);
+    assert.match(html, /Gris/);
+    assert.match(html, /Mediano/);
+    assert.match(html, /Datos de adopción/);
+    assert.doesNotMatch(html, /Peso/);
+  });
+
+  it('mantiene las prohibiciones de la estipulación 3', () => {
+    assert.match(html, /Caza de cualquier tipo/);
+    assert.match(html, /Perro policía o fines militares/);
+  });
+
+  it('sin importes guardados usa los del documento (100 y 900)', () => {
+    const sin = PdfExport._buildContracto({ animal: 'Luna', f1_nombre: 'Ana' }, LOGO);
+    assert.match(sin, /100 €/);
+    assert.match(sin, /900 €/);
   });
 });
 
@@ -84,7 +127,7 @@ describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
     assert.match(html, /Ana &amp; Luis/);
     assert.doesNotMatch(html, /Ana &amp;amp; Luis/);
     assert.match(html, /Tutor \/ persona de apoyo/);
-    assert.match(html, /ANEXO I\. Datos del tutor/);
+    assert.match(html, /Anexo I\. Datos del tutor/);
     assert.match(html, /page-break/);
     assert.match(html, /Calle Menor 2/);
     assert.match(html, /data:image\/png;base64,TUTOR/);

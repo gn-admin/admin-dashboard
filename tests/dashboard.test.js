@@ -1227,8 +1227,9 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
 
   it('_contratoTerminosHtml incluye clausulas y escapa los nombres', () => {
     const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana <b>X</b>', animal: 'Luna' });
-    assert.match(html, /Contrato de adopcion responsable/);
-    assert.match(html, /seguimiento posterior a la adopcion/);
+    assert.match(html, /Contrato de adopción/);
+    assert.match(html, /hasta que dicho animal muera/);
+    assert.equal((html.match(/contrato-doc-estipulacion/g) || []).length, 20);
     assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>X<\/b>/);
   });
@@ -1247,8 +1248,9 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
     const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana', animal: 'Luna' });
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
     assert.match(html, /SELLO DE LA ENTIDAD/);
-    assert.match(html, /REUNIDOS/);
-    assert.match(html, /EXPONEN/);
+    assert.match(html, /Estipulaciones/);
+    assert.match(html, /la Asociación/);
+    assert.match(html, /el Adoptante/);
   });
 
   it('_contratoTerminosHtml pone los datos del tutor en una pagina propia', () => {

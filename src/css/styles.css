@@ -2672,6 +2672,27 @@ select.form-input {
   text-align: justify;
 }
 
+.contrato-doc-estipulacion {
+  margin: 0 0 10px;
+  font-size: var(--text-sm);
+  text-align: justify;
+  break-inside: avoid;
+}
+
+.contrato-doc-estipulacion p {
+  margin: 0 0 6px;
+}
+
+.contrato-doc-lista {
+  margin: 2px 0 6px;
+  padding-left: 22px;
+  font-size: var(--text-sm);
+}
+
+.contrato-doc-lista li {
+  margin-bottom: 2px;
+}
+
 .contrato-doc-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2811,6 +2832,7 @@ select.form-input {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  max-width: 78px;
   padding: 6px;
 }
 
@@ -2822,7 +2844,8 @@ select.form-input {
 }
 
 .contrato-doc-sello span {
-  font-size: var(--text-2xs);
+  padding: 0 6px;
+  font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.15;
   text-transform: uppercase;
@@ -2836,6 +2859,16 @@ select.form-input {
 
 .contrato-doc-sello--firma {
   margin-top: 6px;
+}
+
+/* El sello va sobre la linea de firma de la entidad: se le deja aire para que
+   no pise el nombre y quede centrado en la columna. */
+.contrato-doc-firma .contrato-doc-sello {
+  margin: 8px 0 12px;
+}
+
+.contrato-doc-firma .contrato-doc-sello small {
+  font-size: 0.46rem;
 }
 
 .contrato-doc-firmas--aceptacion {
@@ -3334,6 +3367,7 @@ select.form-input {
 .contrato-doc-firmas {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: end;
   gap: 24px;
   margin-top: 28px;
 }

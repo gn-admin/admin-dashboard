@@ -3005,7 +3005,7 @@ const Dashboard = {
 
   _contratoEjemploHtml() {
     if (typeof PdfExport === 'undefined') return '';
-    const demo = { adopcion_id: 'EJEMPLO', animal: 'Max (Labrador)', especie: 'Perro', raza: 'Labrador', edad: '2 años', ciudad: 'Irun', fecha: new Date().toISOString().slice(0, 10), f1_nombre: 'Nombre Apellido', f1_dni: '12345678A', f1_email: 'ejemplo@email.com', f1_telefono: '600123123', f1_firma: '', f2_nombre: '', f2_rol: '', f2_firma: '' };
+    const demo = { adopcion_id: 'EJEMPLO', animal: 'Max (Labrador)', nombre_definitivo: 'Max', especie: 'Perro', raza: 'Labrador', edad: '2 años', animal_capa: 'Amarilla', animal_color: 'Crema', animal_tamano: 'Grande', donacion_adoptante: 100, indemnizacion_importe: 900, ciudad: 'Irun', fecha: new Date().toISOString().slice(0, 10), f1_nombre: 'Nombre Apellido', f1_dni: '12345678A', f1_email: 'ejemplo@email.com', f1_telefono: '600123123', f1_firma: '', f2_nombre: '', f2_rol: '', f2_firma: '' };
     const html = PdfExport._buildContracto(demo, PdfExport._logoFallback);
     return `<iframe title="Ejemplo de contrato" srcdoc="${html.replace(/"/g, '&quot;')}" style="width:100%;height:420px;border:1px solid var(--gray-200);border-radius:8px;background:#fff;margin-top:8px"></iframe>`;
   },
@@ -6510,7 +6510,7 @@ const Dashboard = {
     const siNo = v => (v === true || /^(si|sí|true|1)$/i.test(String(v)))
       ? 'Si'
       : ((v === false || /^(no|false|0)$/i.test(String(v))) ? 'No' : '—');
-    const field = (label, value) => `<div><span class="label">${label}</span>${this._esc(value || '—')}</div>`;
+    const field = (label, value) => `<div><div class="label">${label}</div>${this._esc(value || '—')}</div>`;
     const foto = a.foto
       ? `<img src="${this._esc(a.foto)}" alt="${this._esc(a.nombre || 'Animal')}" loading="lazy" decoding="async">`
       : `<div class="contrato-doc-foto-vacia">${Icons.paw}<span>Sin foto</span></div>`;
@@ -6518,13 +6518,15 @@ const Dashboard = {
       <div class="contrato-doc-foto">${foto}</div>
       <div class="contrato-doc-datos contrato-doc-grid">
         ${field('Nombre', a.nombre)}
+        ${field('Nombre definitivo', a.nombre_definitivo)}
         ${field('Especie', a.especie)}
+        ${field('N.º microchip', a.microchip)}
         ${field('Raza', a.raza)}
         ${field('Sexo', a.sexo)}
-        ${field('Edad', a.edad)}
         ${field('Fecha de nacimiento', a.fecha_nacimiento ? this._fmtFecha(a.fecha_nacimiento) : '')}
-        ${field('Microchip', a.microchip)}
-        ${field('Peso', a.peso)}
+        ${field('Capa', a.capa)}
+        ${field('Color', a.color)}
+        ${field('Tamaño', a.tamano)}
         ${field('Esterilización', siNo(a.esterilizada))}
         ${field('Otras reseñas', a.descripcion)}
       </div>
@@ -6790,17 +6792,29 @@ const Dashboard = {
     </div>`;
   },
 
-  // Documento base que se muestra en el modal de contrato (terminos y
-  // condiciones). El PDF definitivo lo genera PdfExport al firmar.
+  // Documento que se muestra en el modal de contrato. El PDF definitivo lo
+  // genera PdfExport con el mismo texto de ContratoTextos: aqui solo cambia
+  // el envoltorio (clases del modal), nunca las estipulaciones.
   _contratoTerminosHtml(p, contrato) {
     const c = contrato || {};
+    const T = (typeof module !== 'undefined' && module.exports)
+      ? require('./contrato-textos.js')
+      : (typeof ContratoTextos !== 'undefined' ? ContratoTextos : null);
     const a = this._contratoAnimalDatos(p, c);
     const nombre = c.f1_nombre || (p && p.adoptante) || '[adoptante]';
-    const animal = a.nombre || '[animal]';
     const fecha = c.fecha ? this._fmtFecha(c.fecha) : '[fecha]';
-    const ciudad = c.ciudad || '[ciudad]';
-    const tutor = this._contratoTutor(c);
+    const ciudad = c.ciudad || 'Irún';
     const ent = this._contratoEntidadDatos(c);
+    const def = this._contratoImportesPorDefecto ? this._contratoImportesPorDefecto() : { donacion: 100, indemnizacion: 900 };
+    // Misma regla que el PDF y el formulario: con vacio o texto, el valor del documento.
+    const importe = (v, porDefecto) => this._contratoImporte
+      ? this._contratoImporte(v, porDefecto)
+      : (v != null && v !== '' ? v : porDefecto);
+    const importes = {
+      donacion: importe(c.donacion_adoptante, def.donacion),
+      indemnizacion: importe(c.indemnizacion_importe, def.indemnizacion)
+    };
+    const tutor = this._contratoTutor(c);
     const firmaImg = (f, alt) => f && String(f).indexOf('data:') === 0
       ? `<img class="contrato-doc-firma-img" src="${this._esc(f)}" alt="${alt}">`
       : '';
@@ -6814,88 +6828,51 @@ const Dashboard = {
       ${firmaImg(c.f2_firma, 'Firma del tutor')}
       <b>${this._esc(c.f2_nombre)}</b><small>DNI ${this._esc(c.f2_dni || '—')}</small>
     </div>` : '';
-    const entidadFirma = !tutor
-      ? (c.entidad_firma ? firmaImg(c.entidad_firma, 'Firma de la entidad') : firmaImg(c.f2_firma, 'Firma de la entidad'))
-      : '';
+    const entidadFirma = firmaImg(c.entidad_firma, 'Firma de la entidad')
+      || (!tutor ? firmaImg(c.f2_firma, 'Firma de la entidad') : '');
     const entidadBlock = `<div class="contrato-doc-firma">
-      <div class="contrato-doc-firma-label">Por la entidad (firma y sello)</div>
+      <div class="contrato-doc-firma-label">Firma Asociación</div>
       ${entidadFirma}
       ${this._selloHtml(ent, 'assets/icons/logo-nebak.jpg')}
       <b>${this._esc(ent.nombre)}</b><small>Entidad</small>
     </div>`;
-    let n = 1;
-    const h = title => `<h3>${n++}. ${title}</h3>`;
-    const field = (label, value) => `<div><span class="label">${label}</span>${this._esc(value || '—')}</div>`;
     const tutorHtml = tutor ? `
       <div class="contrato-doc-tutor-page">
         <h3>Anexo I. Datos del tutor o persona de apoyo</h3>
         <div class="contrato-doc-grid contrato-doc-tutor">
-          ${field('Nombre', c.f2_nombre)}
-          ${field('DNI', c.f2_dni)}
-          ${field('Relación con el adoptante', c.f2_relacion || c.f2_rol)}
-          ${field('Domicilio', c.f2_direccion)}
-          ${field('Email', c.f2_email)}
-          ${field('Teléfono', c.f2_telefono)}
+          <div><div class="label">Nombre</div>${this._esc(c.f2_nombre)}</div>
+          <div><div class="label">DNI</div>${this._esc(c.f2_dni || '—')}</div>
+          <div><div class="label">Relación con el adoptante</div>${this._esc(c.f2_relacion || c.f2_rol || '—')}</div>
+          <div><div class="label">Domicilio</div>${this._esc(c.f2_direccion || '—')}</div>
+          <div><div class="label">Email</div>${this._esc(c.f2_email || '—')}</div>
+          <div><div class="label">Teléfono</div>${this._esc(c.f2_telefono || '—')}</div>
         </div>
         <p>La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.</p>
       </div>` : '';
+    const estipulaciones = (T ? T.estipulaciones : []).map(est => {
+      const x = T.texto(est, importes);
+      // El numero va dentro del primer parrafo: si no, queda solo en su linea.
+      const parrafos = x.parrafos.map((t, i) => `<p>${i === 0 ? `<b>${est.n}ª.</b> ` : ''}${this._esc(t)}</p>`).join('');
+      const lista = x.lista.length
+        ? `<ol class="contrato-doc-lista">${x.lista.map(t => `<li>${this._esc(t)}</li>`).join('')}</ol>`
+        : '';
+      return `<div class="contrato-doc-estipulacion">${parrafos}${lista}</div>`;
+    }).join('');
     return `<div class="contrato-doc">
       <div class="contrato-doc-header">
         <img src="assets/icons/logo-nebak.jpg" alt="Grupo Nebak">
-        <div><div class="contrato-doc-title">Contrato de adopcion responsable</div><div class="contrato-doc-sub">${this._esc(ent.nombre)} · Documento de ${this._esc(fecha)}</div></div>
+        <div><div class="contrato-doc-title">${this._esc(T ? T.titulo : 'Contrato de adopción')}</div><div class="contrato-doc-sub">${this._esc(ent.nombre)} · Documento de ${this._esc(fecha)}</div></div>
       </div>
-      <div class="contrato-doc-meta">
-        <div><span class="label">Adoptante</span><b>${this._esc(nombre)}</b></div>
-        <div><span class="label">Animal</span><b>${this._esc(animal)}</b></div>
-        <div><span class="label">Ciudad</span>${this._esc(ciudad)}</div>
-        <div><span class="label">Fecha</span>${this._esc(fecha)}</div>
-      </div>
-      ${this._contratoEntidadHtml(c)}
-      <p>En <b>${this._esc(ciudad)}</b>, a <b>${this._esc(fecha)}</b>, <b>REUNIDOS</b>.</p>
-      <p>De una parte, <b>${this._esc(ent.nombre)}</b>${ent.cif ? `, con CIF <b>${this._esc(ent.cif)}</b>` : ''}${ent.domicilio ? `, con domicilio en <b>${this._esc(ent.domicilio)}</b>` : ''}, en adelante, <b>la Entidad</b>. De otra parte, <b>${this._esc(nombre)}</b>, con DNI <b>${this._esc(c.f1_dni || '[DNI]')}</b>${c.f1_direccion ? ` y domicilio en <b>${this._esc(c.f1_direccion)}</b>` : ''}, en adelante, <b>el Adoptante</b>${tutor ? `, con la intervención de <b>${this._esc(tutor.f2_nombre)}</b>, en adelante, <b>el Tutor</b>` : ''}.</p>
-      <p><b>EXPONEN</b></p>
-      <p>I. Que la Entidad es una asociación de protección animal sin ánimo de lucro que se dedica a la acogida, cuidado y adopción responsable de animales.</p>
-      <p>II. Que el Adoptante desea adoptar al animal <b>${this._esc(animal)}</b> y se compromete a asumir su cuidado y bienestar durante toda su vida.</p>
-      <p>III. Que ambas partes reconocen tener capacidad suficiente para formalizar este contrato y, a tal efecto, acuerdan las siguientes <b>CLÁUSULAS</b>.</p>
-      ${h('Datos del animal')}
+      <p>En <b>${this._esc(ciudad)}</b>, a <b>${this._esc(fecha)}</b>.</p>
+      <p>De una parte, <b>${this._esc(ent.nombre)}</b>${ent.cif ? `, con CIF <b>${this._esc(ent.cif)}</b>` : ''}${ent.domicilio ? `, con domicilio en <b>${this._esc(ent.domicilio)}</b>` : ''}${ent.telefono ? `, con teléfonos de contacto <b>${this._esc(ent.telefono)}</b>` : ''}, en adelante, <b>la Asociación</b>.</p>
+      <p>De otra parte, <b>${this._esc(nombre)}</b>, mayor de edad, que actúa en su propio nombre y derecho, con DNI <b>${this._esc(c.f1_dni || '[DNI]')}</b>${c.f1_direccion ? `, con domicilio en <b>${this._esc(c.f1_direccion)}</b>` : ''}${c.f1_telefono ? `, teléfono <b>${this._esc(c.f1_telefono)}</b>` : ''}${c.f1_email ? `, y correo electrónico <b>${this._esc(c.f1_email)}</b>` : ''}, en adelante, <b>el Adoptante</b>.</p>
+      <p>Ambas partes acuerdan celebrar el presente contrato, de acuerdo con los siguientes <b>datos de adopción</b>.</p>
+      <h3>Datos de adopción</h3>
       ${this._contratoAnimalFichaHtml(p, c)}
-      ${h('Datos del adoptante')}
-      <div class="contrato-doc-grid">
-        ${field('Nombre y apellidos', nombre)}
-        ${field('DNI', c.f1_dni)}
-        ${field('Domicilio', c.f1_direccion)}
-        ${field('Email', c.f1_email)}
-        ${field('Teléfono', c.f1_telefono)}
-      </div>
+      <div class="contrato-doc-nota">${this._esc(T ? T.notaEstipulaciones : '')}</div>
+      <h3>Estipulaciones</h3>
+      ${estipulaciones}
       ${tutorHtml}
-      ${h('Objeto')}
-      <p>La entidad entrega al animal en adopcion como animal de compania, para que viva con el adoptante durante toda su vida y reciba los cuidados propios de su especie.</p>
-      ${h('Cuidados y responsabilidad')}
-      <p>El adoptante se compromete a proporcionar alimentacion, atencion veterinaria, refugio seguro, ejercicio y trato responsable durante toda la vida del animal.</p>
-      ${h('Prohibiciones')}
-      <p>El animal no se utilizara para cria, caza, peleas, experimentacion, guarda de propiedades ni espectaculos. No permanecera atado ni encerrado en jaulas, terrazas, patios o garajes.</p>
-      ${h('Prohibicion de cesion')}
-      <p>No se podra vender, regalar ni ceder el animal a terceros sin autorizacion expresa de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak.</p>
-      ${h('Identificacion y salud')}
-      <p>Mantendra el microchip actualizado, las vacunas y desparasitaciones al dia, y facilitara el acceso a la cartilla sanitaria. Si procede, se compromete a esterilizar al animal y a aportar el informe veterinario.</p>
-      ${h('Microchip y titularidad')}
-      <p>Durante el periodo de adaptacion (15-30 dias) el microchip podra permanecer a nombre de la entidad, lo que permite a la protectora reclamar al animal en caso de incumplimiento. Tras ese periodo se transferira la titularidad al adoptante.</p>
-      ${h('Prohibicion de cesion')}
-      <p>No podra vender, regalar, ceder ni prestar el animal a terceros sin autorizacion expresa y por escrito de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak para su devolucion.</p>
-      ${h('Informacion veterinaria')}
-      <p>Informara a la entidad si el veterinario le indica que el animal padece alguna enfermedad o le recomienda la eutanasia, para que la entidad pueda dar su opinion al respecto.</p>
-      ${h('Seguimiento')}
-      <p>El adoptante acepta el seguimiento posterior a la adopcion: periodo de prueba de 15-30 dias y contactos de seguimiento a 1, 3, 6 y 12 meses. Facilitara las comprobaciones necesarias para verificar el bienestar del animal.</p>
-      ${h('Gastos')}
-      <p>Los gastos derivados del cuidado del animal (alimentacion, veterinario, seguro, etc.) corren a cargo del adoptante.</p>
-      ${h('Incumplimiento')}
-      <p>El incumplimiento de estas obligaciones facultara a la entidad para recuperar el animal y ejercer las acciones legales que correspondan.</p>
-      ${h('Devolucion')}
-      <p>En caso de no poder atender adecuadamente al animal, se compromete a informar a la entidad y a devolverlo, nunca a abandonarlo.</p>
-      ${h('Proteccion de datos')}
-      <p>Los datos personales del adoptante y, en su caso, del tutor se utilizan para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.</p>
-      ${h('Aceptacion')}
-      <p>El Adoptante declara haber leído y comprendido los cláusulas anexas, que forman parte de este contrato, y acepta expresamente todas las obligaciones que en él se recogen.</p>
       <div class="contrato-doc-firmas">
         ${f1Block}
         ${tutorBlock}

@@ -365,6 +365,8 @@ En cualquier caso, el texto debe validarlo la asociación antes de publicarlo.
 
 **Estado (2026-11-18):** F-C1 hecha para `capa`, `color` y `tamano` (formulario de animal, hoja `Animales`, ficha interna y copia congelada en `contratos` con `animal_capa`, `animal_color` y `animal_tamano`) y para `nombre_definitivo` (campo «Nombre definitivo» en el formulario de firma y columna `nombre_definitivo` en `contratos`, que es dato del contrato y no de la ficha). Sin migración: las columnas las crea el backend al primer guardado. F-C1 queda cerrada con los importes: `donacion_adoptante` por defecto 100 € (antes 50) e `indemnizacion_importe` por defecto 900 €, editables en el formulario de firma y con columna aditiva en `contratos`.
 
+**F-C2 hecha (2026-11-18):** el contrato de adopción se maqueta con las 20 estipulaciones del documento en `src/js/contrato-textos.js` (`ContratoTextos`, versión 2.0), que es la fuente única del modal (`_contratoTerminosHtml`) y del PDF (`_buildContracto`): los dos renderizadores solo cambian el envoltorio y rellenan los marcadores `{donacion}`/`{indemnizacion}`. El documento gana partes intervinientes, tabla de datos de adopción con nombre definitivo, capa, color y tamaño (sin peso), nota de hoja de estipulaciones y firmas de adoptante, tutor y asociación con sello; los contratos antiguos sin copia congelada caen a la ficha viva y, sin importes guardados, a 100 € y 900 €. Las erratas del `.docx` quedan corregidas al pasar al PDF. La acogida no se toca: `_buildContratoAcogida` y `_terminosAdopcionCuerpo` siguen en su versión anterior hasta F-C3/F-C4.
+
 Cada fase es independiente y se puede parar entre ellas; F-C1 no cambia el PDF y F-C2 no necesita la acogida.
 
 ---
