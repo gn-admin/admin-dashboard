@@ -220,6 +220,12 @@ describe('_buildContratoAcogida: documento real de la asociación', () => {
     assert.match(html, /\.acogida-full \.acogida-val\{[^}]*-webkit-line-clamp:3/);
   });
 
+  it('avisa cuando el recuadro de otros rasgos se recorta', () => {
+    assert.match(html, /acogida-truncado/);
+    assert.match(html, /texto completo en la ficha del animal/);
+    assert.match(html, /beforeprint/);
+  });
+
   it('se imprime en una cara A4 sin partir firmas ni material', () => {
     assert.match(html, /@page\{size:A4;margin:1\.8cm 2cm\}/);
     assert.doesNotMatch(html, /page-break-before:always/);

@@ -547,7 +547,7 @@ const PdfExport = {
         <div><div class="label">Esterilizado</div>${box(siNo(animal.esterilizada) === 'Sí')} SÍ &nbsp;&nbsp; ${box(siNo(animal.esterilizada) === 'No')} NO</div>
         ${field('Microchip n.º', animal.microchip)}
         ${field('Pasaporte n.º', animal.pasaporte)}
-        ${field('Otros rasgos distintivos', animal.otros_rasgos || animal.descripcion, 'acogida-full')}
+        <div class="acogida-full"><div class="label">Otros rasgos distintivos</div><div class="acogida-val">${this._esc(animal.otros_rasgos || animal.descripcion || '—')}</div><div class="acogida-truncado">… (texto completo en la ficha del animal)</div></div>
       </div>
 
       <div class="acogida-condiciones">${condiciones}</div>
@@ -602,6 +602,7 @@ const PdfExport = {
            en las tres líneas del recuadro del formulario para no empujar el
            contrato a una segunda cara. */
         .acogida-full .acogida-val{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+        .acogida-truncado{display:none;margin-top:1px;font-size:7pt;font-style:italic;color:#9aa0a6}
         .acogida-condiciones{margin-bottom:4px}
         .acogida-cond{margin:0 0 1px;font-size:8.5pt;line-height:1.25;text-align:justify;break-inside:avoid}
         .acogida-cond b{font-weight:700}
@@ -619,7 +620,7 @@ const PdfExport = {
         .acogida-firma small{display:block;color:#6b7280;font-size:7.6pt}
         .acogida-pie{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 14px;border-top:1px solid #e5e7eb;padding-top:4px;font-size:7.2pt;color:#6b7280;text-align:center;break-inside:avoid}
         .acogida-pie .acogida-modelo{flex-basis:100%;font-size:7pt;color:#9aa0a6}
-      </style></head><body><div class="acogida-doc">${this._contratoAcogidaBody(c, logo)}</div></body></html>`;
+      </style></head><body><div class="acogida-doc">${this._contratoAcogidaBody(c, logo)}</div><script>(function(){function check(){document.querySelectorAll('.acogida-full .acogida-val').forEach(function(el){var n=el.nextElementSibling;if(n&&n.classList.contains('acogida-truncado')){n.style.display=(el.scrollHeight>el.clientHeight+1)?'block':'none';}});}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',check);else check();window.addEventListener('load',check);window.addEventListener('beforeprint',check);})();</script></body></html>`;
   },
 
   exportMemoria(m) {
