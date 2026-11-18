@@ -117,6 +117,14 @@ const API = {
   async updateContrato(id, data) { const r = await this._post('update-contrato', { id, ...data }); if (!r.data) throw new Error('El backend no devolvió el registro (id sin sincronizar)'); return r; },
   async deleteContrato(id) { return this._post('delete-contrato', { id }); },
   async sendContratoEmail(data) { return this._post('send-contrato-email', data); },
+  // PDF escaneado del contrato firmado: el backend lo guarda privado en Drive.
+  async uploadContratoPdf(base64, nombre, mimeType) {
+    // 10 MB de PDF ~ 14.000.000 caracteres en base64 (se valida tambien atras).
+    if (base64 && base64.length > 14000000) {
+      throw new Error('El PDF supera el tamano maximo permitido (10MB)');
+    }
+    return this._post('upload-contrato-pdf', { archivo_base64: base64, nombre, mime_type: mimeType || 'application/pdf' });
+  },
 
   // Gastos veterinarios (CRUD)
   async getGastos() { return this._get('gastos'); },

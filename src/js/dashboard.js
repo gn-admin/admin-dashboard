@@ -4881,6 +4881,7 @@ const Dashboard = {
       <div class="form-row"><div class="form-group"><label for="an-raza">Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label for="an-edad">Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label for="an-peso">Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label for="an-sexo">Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
       <div class="form-row"><div class="form-group"><label for="an-capa">Capa</label><input type="text" id="an-capa" value="${this._esc(data?.capa||'')}" placeholder="Ej: atigrada"></div><div class="form-group"><label for="an-color">Color</label><input type="text" id="an-color" value="${this._esc(data?.color||'')}" placeholder="Ej: negro y blanco"></div><div class="form-group"><label for="an-tamano">Tamaño</label><select id="an-tamano">${tamOpts}</select></div></div>
+      <div class="form-row"><div class="form-group"><label for="an-marcas">Marcas / señas</label><input type="text" id="an-marcas" value="${this._esc(data?.marcas||'')}" placeholder="Ej: mancha blanca en el pecho"><div class="form-hint">Rasgos que identifican al animal. Salen en el contrato de acogida.</div></div><div class="form-group"><label for="an-pasaporte">Pasaporte n.º</label><input type="text" id="an-pasaporte" value="${this._esc(data?.pasaporte||'')}" placeholder="N.º del pasaporte europeo"></div></div>
       <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" data-change="_onChangeGrupo" data-cpass="value" data-carg0="${isEdit?'true':'false'}">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" data-change="_onChangeGrupoNuevo" data-carg0="${isEdit?'true':'false'}"><p style="font-size:var(--text-xs);color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-urgente" ${this._esUrgente(data)?'checked':''}> Necesita acogida/adopcion urgente</label></div></div>
       <div class="form-row"><div class="form-group"><label for="an-foto">Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="an-foto-preview"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:var(--text-xs);color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label for="an-foto-url">Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
@@ -5007,6 +5008,8 @@ const Dashboard = {
       capa: ((document.getElementById('an-capa') || {}).value || '').trim(),
       color: ((document.getElementById('an-color') || {}).value || '').trim(),
       tamano: (document.getElementById('an-tamano') || {}).value || '',
+      marcas: ((document.getElementById('an-marcas') || {}).value || '').trim(),
+      pasaporte: ((document.getElementById('an-pasaporte') || {}).value || '').trim(),
       sexo: document.getElementById('an-sexo').value,
       estado: document.getElementById('an-estado').value,
       microchip: document.getElementById('an-microchip').value.trim(),
@@ -5251,6 +5254,8 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Tamaño</div><div class="detail-answer">${this._esc(a.tamano)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${this._fmtFecha(a.fecha_ingreso)}</div></div>
         <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${this._esc(a.microchip)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Pasaporte n.º</div><div class="detail-answer">${this._esc(a.pasaporte)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Marcas / señas</div><div class="detail-answer">${this._esc(a.marcas)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Esterilizado/a</div><div class="detail-answer">${a.esterilizada?'Si':'No'}</div></div>
         <div class="detail-field"><div class="detail-question">Vacunas</div><div class="detail-answer">${this._esc(a.vacunas)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Prioridad</div><div class="detail-answer">${this._esPrioritario(a)?'<span class="urgente-badge">Urgente</span>':'Normal'}</div></div>
@@ -5684,6 +5689,100 @@ const Dashboard = {
     }
   },
 
+  // Lista de material a partir de las casillas marcadas y del texto de
+  // "Otros". Se guarda como lista de nombres; "Otros" solo entra si hay texto.
+  _materialAcogidaLista(marcados, otros) {
+    const lista = (marcados || []).map(x => String(x == null ? '' : x).trim()).filter(Boolean);
+    const o = String(otros == null ? '' : otros).trim();
+    if (o && !lista.some(x => x.toLowerCase() === 'otros')) lista.push('Otros');
+    return lista;
+  },
+
+  // Material vigente del caso: manda lo guardado en la fila de `acogidas`;
+  // si no hay nada, lo que quedó en la copia del contrato.
+  _acogidaMaterialDatos(caso, guardado) {
+    const snap = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+    const crudo = (caso && caso.material !== undefined && caso.material !== '')
+      ? caso.material
+      : (snap && snap.material);
+    // La hoja guarda listas como JSON o como texto separado: se aceptan ambas.
+    const lista = Array.isArray(crudo)
+      ? crudo
+      : String(crudo || '').split(/[|,;]/).map(x => x.trim()).filter(Boolean);
+    const texto = caso && caso.material_otros !== undefined && caso.material_otros !== ''
+      ? caso.material_otros
+      : (snap && snap.material_otros) || '';
+    return {
+      material: lista.map(x => String(x)),
+      otros: String(texto || ''),
+      devuelto: !!(caso && (caso.material_devuelto === true || /^(1|si|sí|true|x)$/i.test(String(caso.material_devuelto || '')))),
+      devueltoEn: (caso && caso.material_devuelto_en) || '',
+      finPrevisto: (caso && caso.fecha_fin_prevista) || (snap && snap.fecha_fin_prevista) || ''
+    };
+  },
+
+  // Casillas del material prestado dentro del contrato de acogida. Lo que se
+  // marca aquí se guarda en el caso y en la copia del contrato, así que el PDF
+  // y la ficha no pueden contar cosas distintas.
+  _acogidaMaterialEditorHtml(caso, guardado) {
+    const T = (typeof AcogidaTextos !== 'undefined') ? AcogidaTextos : null;
+    if (!T) return '';
+    const m = this._acogidaMaterialDatos(caso, guardado);
+    const tiene = n => m.material.some(x => x.toLowerCase() === String(n).toLowerCase());
+    const items = (T.material || []).filter(n => n.toLowerCase() !== 'otros');
+    const casillas = items.map(n => `<label style="display:flex;align-items:flex-start;gap:6px"><input type="checkbox" value="${this._esc(n)}" ${tiene(n) ? 'checked' : ''}><span>${this._esc(n)}</span></label>`).join('');
+    return `<div class="detail-section" style="margin-top:10px">
+      <div class="detail-section-title">Material prestado</div>
+      <div class="detail-section-note">Marca lo que se entrega con el animal. Sale en el contrato de acogida y sirve para reclamarlo al finalizar.</div>
+      <div id="acogida-material-list" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:var(--text-sm)">${casillas}</div>
+      <div class="form-row" style="margin-top:10px"><div class="form-group"><label for="mat-otros">Otros (detallar)</label><input type="text" id="mat-otros" value="${this._esc(m.otros)}" placeholder="Ej: cama, arnés"></div><div class="form-group"><label for="mat-fin">Devolución prevista</label><input type="date" id="mat-fin" value="${this._esc(m.finPrevisto)}"></div></div>
+      <label class="contrato-acepta"><input type="checkbox" id="mat-devuelto" ${m.devuelto ? 'checked' : ''}><span>Material devuelto</span></label>
+      <div class="form-row"><div class="form-group"><label for="mat-devuelto-en">Fecha de devolución</label><input type="date" id="mat-devuelto-en" value="${this._esc(m.devueltoEn)}"></div></div>
+      <div class="acuerdo-preview-tools">
+        <button type="button" class="btn btn-primary btn-sm" data-action="guardarMaterialAcogida" data-arg0="${this._esc(caso.id)}">${Icons.checkCircle} Guardar material</button>
+        <span class="acuerdo-preview-hint">Se guarda en el caso y en la copia del contrato.</span>
+      </div>
+    </div>`;
+  },
+
+  async guardarMaterialAcogida(id) {
+    const c = this._byId(this.acogidas, id);
+    if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+    const marcados = [...document.querySelectorAll('#acogida-material-list input[type="checkbox"]:checked')].map(el => el.value);
+    const otros = ((this._el('mat-otros') || {}).value || '').trim();
+    const devuelto = !!(this._el('mat-devuelto') || {}).checked;
+    const devueltoEn = ((this._el('mat-devuelto-en') || {}).value || '').trim();
+    const finPrevisto = ((this._el('mat-fin') || {}).value || '').trim();
+    const lista = this._materialAcogidaLista(marcados, otros);
+    c.material = lista;
+    c.material_otros = otros;
+    c.material_devuelto = devuelto;
+    c.material_devuelto_en = devuelto ? (devueltoEn || new Date().toISOString().slice(0, 10)) : '';
+    c.fecha_fin_prevista = finPrevisto;
+    const key = 'material-acogida:' + id;
+    if (!this._busyStart(key)) return;
+    try {
+      await this._updateLocalYApi('acogidas', c);
+      // La copia guardada del contrato lleva el material: se actualiza para
+      // que el PDF reimprimible muestre lo mismo que la ficha.
+      const guardado = this._contratoAcogidaDe(id);
+      const snapshot = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+      if (snapshot) {
+        snapshot.material = lista;
+        snapshot.material_otros = otros;
+        snapshot.fecha_fin_prevista = finPrevisto;
+        await this._guardarContratoAcogida(c, snapshot);
+      }
+      this.showSnackbar(devuelto && devueltoEn ? 'Material devuelto guardado' : 'Material de la acogida guardado', 'success');
+      this._regLog('acogida', 'Material de acogida actualizado (' + lista.length + ' ítems)', 'acogida', id);
+      await this.showContratoAcogida(id);
+    } catch (err) {
+      this._snackErr(err, 'No se pudo guardar el material: ' + this._errMsg(err));
+    } finally {
+      this._busyEnd(key);
+    }
+  },
+
   // Documento de apoyo para la acogida temporal. Es opcional: no condiciona
   // `avanzarFaseAcogida`. Se genera con los datos actuales y se puede guardar
   // una copia (snapshot) para reimprimirlo mas adelante.
@@ -5728,6 +5827,8 @@ const Dashboard = {
       // Material prestado: se guarda con la copia del contrato para poder
       // reclamar la devolución; sin marcar, el documento sale con casillas.
       material: Array.isArray(caso.material) ? caso.material : String(caso.material || '').split(/[|,;]/).map(x => x.trim()).filter(Boolean),
+      material_otros: caso.material_otros || '',
+      fecha_fin_prevista: caso.fecha_fin_prevista || '',
       inicio: caso.inicio || '',
       fase: caso.fase || '',
       ciudad: val(sol.ciudad, fam && fam.ubicacion),
@@ -5763,6 +5864,9 @@ const Dashboard = {
       fase: (datos && datos.fase) || caso.fase || '',
       ciudad: (datos && datos.ciudad) || '',
       fecha: (datos && datos.fecha) || '',
+      // El PDF escaneado no depende del snapshot: se conserva al reguardar.
+      pdf_url: (existente && existente.pdf_url) || '',
+      pdf_file_id: (existente && existente.pdf_file_id) || '',
       guardado_en: new Date().toISOString(),
       estado: 'guardado',
       datos_json: JSON.stringify(datos || {})
@@ -5902,6 +6006,11 @@ const Dashboard = {
          <button type="button" class="btn btn-primary btn-sm" data-action="descargarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.download} Descargar PDF</button>`
       : `<button type="button" class="btn btn-primary btn-sm" data-action="guardarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Guardar contrato</button>
          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.download} Descargar PDF</button>`;
+    const pdfFirmado = snapshot ? `<div class="detail-field" style="margin:10px 0"><div class="detail-question">PDF firmado</div><div class="detail-answer"><span class="acuerdo-preview-hint">Escanea el papel firmado y adjúntalo: se guarda privado en Drive.</span>
+        <div class="acuerdo-preview-btns">
+          ${guardado.pdf_url ? `<a class="btn btn-outline-green btn-sm" href="${this._esc(guardado.pdf_url)}" target="_blank" rel="noopener noreferrer">${Icons.eye} Abrir PDF firmado</a>` : ''}
+          <label class="btn btn-outline-green btn-sm">${Icons.fileText} ${guardado.pdf_url ? 'Cambiar PDF firmado' : 'Adjuntar PDF firmado'}<input type="file" accept="application/pdf" data-change="subirPdfFirmado" data-cpass="el" data-carg0="${this._esc(guardado.id)}" hidden></label>
+        </div></div></div>` : '';
     this.showInfoModal('Contrato de acogida · ' + (c.animal || 'animal'), `
       <div class="acuerdo-preview-actions">
         <span class="acuerdo-preview-chip">Opcional</span>
@@ -5909,11 +6018,13 @@ const Dashboard = {
         <span class="acuerdo-preview-hint">${hint}</span>
         <div class="acuerdo-preview-btns">${acciones}</div>
       </div>
+      ${pdfFirmado}
       ${this._contratoAnimalEditorHtml({ prefix: 'ac-animal', nombre: animalContrato.nombre, foto: animalContrato.foto, raza: animalContrato.raza || '', edad: animalContrato.edad || '', sexo: animalContrato.sexo || '', microchip: animalContrato.microchip || '' })}
       <div class="acuerdo-preview-tools">
         <button type="button" class="btn btn-primary btn-sm" data-action="guardarIdentidadContratoAcogida" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Guardar foto y nombre</button>
         <span class="acuerdo-preview-hint">Se guardan en la ficha del animal y en la copia del contrato.</span>
       </div>
+      ${this._acogidaMaterialEditorHtml(c, guardado)}
       <div class="acuerdo-preview"><div class="contrato-doc">${body}</div></div>`);
   },
 
@@ -6406,6 +6517,14 @@ const Dashboard = {
     const adelantado = this._faseIdx(p.fase) < this._faseIdx('Contrato');
     const cerrado = !!o.cerrado;
     const emails = firmado ? this._contratoEmails(p) : [];
+    const pdfUrl = firmado ? String(contrato.pdf_url || '') : '';
+    const pdfFirmado = firmado ? `<div class="detail-actions-inline">
+          ${pdfUrl
+            ? `<a class="btn btn-outline-green btn-sm" href="${this._esc(pdfUrl)}" target="_blank" rel="noopener noreferrer">${Icons.eye} Abrir PDF firmado</a>`
+            : '<span class="chip-pending">Sin PDF escaneado</span>'}
+          <label class="btn btn-outline-green btn-sm">${Icons.fileText} ${pdfUrl ? 'Cambiar PDF firmado' : 'Adjuntar PDF firmado'}<input type="file" accept="application/pdf" data-change="subirPdfFirmado" data-cpass="el" data-carg0="${this._esc(contrato.id)}" hidden></label>
+          <span class="detail-section-note" style="margin:0">El papel firmado se guarda privado en Drive; solo se enlaza desde aquí.</span>
+        </div>` : '';
     const accionesFirmado = cerrado ? `
         <div class="detail-actions-inline">
           <button type="button" class="btn btn-primary btn-sm" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} Descargar contrato</button>
@@ -6428,6 +6547,7 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Adoptante</div><div class="detail-answer">${this._esc(contrato.f1_nombre) || '—'}${contrato.f1_email ? ` · ${this._esc(contrato.f1_email)}` : ''}</div></div>
         ${this._contratoTutor(contrato) ? `<div class="detail-field"><div class="detail-question">Tutor / persona de apoyo</div><div class="detail-answer">${this._esc(contrato.f2_nombre)}${contrato.f2_email ? ` · ${this._esc(contrato.f2_email)}` : ''}</div></div>` : ''}
         ${emails.length ? `<div class="detail-field"><div class="detail-question">Email del contrato</div><div class="detail-answer">${emails.map(e => this._esc(e.label)).join(' · ')}</div></div>` : ''}
+        <div class="detail-field"><div class="detail-question">PDF firmado (escaneado)</div><div class="detail-answer">${pdfFirmado}</div></div>
         ${accionesFirmado}`
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Contrato pendiente de firma.${adelantado ? ' Se firma en la fase Contrato (puede adelantarse si ya está todo revisado), pero es obligatorio antes de Entrega.' : ' Es obligatorio firmarlo para pasar a Entrega.'}</div></div>
         ${cerrado ? '' : `<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showContratoForm" data-arg0="${p.id}">${Icons.pencil} Firmar contrato</button></div>`}`}
@@ -6515,6 +6635,8 @@ const Dashboard = {
       capa: val(c && c.animal_capa, a && a.capa),
       color: val(c && c.animal_color, a && a.color),
       tamano: val(c && c.animal_tamano, a && a.tamano),
+      marcas: val(c && c.animal_marcas, a && a.marcas),
+      pasaporte: val(c && c.animal_pasaporte, a && a.pasaporte),
       esterilizada: c && c.animal_esterilizada !== undefined && c.animal_esterilizada !== '' ? c.animal_esterilizada : (a ? a.esterilizada : ''),
       descripcion: val(c && c.animal_descripcion, a && a.descripcion)
     };
@@ -6755,6 +6877,12 @@ const Dashboard = {
         : '';
       return `<div class="contrato-doc-estipulacion">${parrafos}${lista}</div>`;
     }).join('');
+    // Anexo de condiciones complementarias (D-C5): periodo de prueba,
+    // seguimiento, microchip y datos personales. Va al final de la hoja para
+    // que el adoptante lo firme junto a las estipulaciones.
+    const anexo = (T && T.anexo) ? `<h3>${this._esc(T.anexo.titulo)}</h3>
+      <p class="contrato-doc-nota">${this._esc(T.anexo.intro)}</p>
+      ${(T.anexo.clausulas || []).map(cl => `<div class="contrato-doc-estipulacion">${cl.parrafos.map((t, i) => `<p>${i === 0 ? `<b>${this._esc(cl.titulo)}.</b> ` : ''}${this._esc(t)}</p>`).join('')}</div>`).join('')}` : '';
     return `<div class="contrato-doc-header">
         <img src="${this._esc(logoSrc)}" alt="${this._esc(ent.nombre)}">
         <div><div class="contrato-doc-title">Hoja de estipulaciones</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión ${this._esc(version)} (${this._esc(versionFecha)})</div></div>
@@ -6768,6 +6896,7 @@ const Dashboard = {
       <p class="contrato-doc-intro">El Adoptante declara haber leído y aceptado las estipulaciones que se recogen a continuación, que forman parte del contrato de adopción firmado con la Asociación y que se adjuntan a él revisadas y firmadas.</p>
       ${this._contratoEntidadHtml(cc, logo)}
       ${estipulaciones}
+      ${anexo}
       <div class="contrato-doc-firmas contrato-doc-firmas--aceptacion">
         <div class="contrato-doc-firma">
           <div class="contrato-doc-firma-label">Aceptado por el adoptante</div>
@@ -6835,8 +6964,9 @@ const Dashboard = {
   },
 
   // Sello de la entidad: si el usuario ha subido una imagen de sello (o la
-  // config la aporta) se usa esa; si no, se pinta el sello generico con el
-  // logo. Asi el documento refleja el sello real de la asociacion.
+  // config la aporta) se usa esa; si no, se pinta el sello real de la
+  // asociación que viaja con la app. Asi el documento y el PDF llevan el mismo
+  // sello que el papel de la entidad (no un sello dibujado con CSS).
   _selloUrl() {
     try {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.contrato && CONFIG.contrato.sello_url) || '';
@@ -6844,14 +6974,14 @@ const Dashboard = {
     } catch (e) { return ''; }
   },
   _selloHtml(ent, logo) {
-    const url = this._selloUrl();
-    const nombre = (ent && ent.nombre) || 'la entidad';
-    if (url) {
-      return `<div class="contrato-doc-sello contrato-doc-sello--img" aria-label="Sello de la entidad"><img src="${this._esc(url)}" alt="Sello de ${this._esc(nombre)}"></div>`;
+    let url = this._selloUrl() || 'assets/contratos/sello-nebak.jpg';
+    // El mismo markup se usa en el modal y en el PDF (ventana de impresion):
+    // se resuelve a URL absoluta para que la ruta relativa tambien cargue ahi.
+    if (!/^(data:|https?:|blob:)/i.test(url) && typeof document !== 'undefined' && document.baseURI) {
+      try { url = new URL(url, document.baseURI).href; } catch (e) { /* se deja tal cual */ }
     }
-    return `<div class="contrato-doc-sello" aria-label="Sello de la entidad">
-      <div class="contrato-doc-sello-inner"><img src="${this._esc(logo || 'assets/icons/logo-nebak.jpg')}" alt=""><span>${this._esc(nombre)}</span><small>SELLO DE LA ENTIDAD</small></div>
-    </div>`;
+    const nombre = (ent && ent.nombre) || 'la entidad';
+    return `<div class="contrato-doc-sello contrato-doc-sello--img" aria-label="Sello de la entidad"><img src="${this._esc(url)}" alt="Sello de ${this._esc(nombre)}"></div>`;
   },
 
   // Textos legales compartidos (contrato y hoja de estipulaciones). Se pide
@@ -7763,7 +7893,7 @@ const Dashboard = {
 
             <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto la <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">hoja de estipulaciones</a> del contrato de adopción.</span></label>
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
-              <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
+              <div class="detail-section-note">El documento se firma con el sello real de la asociación. Puedes sustituirlo por otra imagen o firmar como persona en su lugar.</div>
               <div class="form-row"><div class="form-group"><label for="ct-sello">Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" data-change="_previewSelloContrato" data-cpass="el"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_limpiarSelloContrato">Quitar sello</button></div>
               <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" data-change="_toggleEntidadFirma" data-cpass="checked"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px" aria-label="Firma de la entidad"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" data-action="_clearFirmaCanvas" data-arg0="entidad-firma">Limpiar firma</button></div></div>
             </div>
@@ -8065,6 +8195,46 @@ const Dashboard = {
       return;
     }
     PdfExport.exportContracto(c);
+  },
+
+  // PDF escaneado del contrato firmado a mano (D-C10). Va a Drive como archivo
+  // privado (lleva DNI y firmas, no puede quedar compartido) y el enlace se
+  // guarda en la misma fila del contrato.
+  async subirPdfFirmado(input, contratoId) {
+    const file = (input && input.files && input.files[0]) || null;
+    if (input) input.value = '';
+    if (!file) return;
+    const contrato = this._byId(this.contratos, contratoId);
+    if (!contrato) { this.showSnackbar('Contrato no encontrado. Recarga la lista.', 'warning'); return; }
+    const esPdf = /application\/pdf/i.test(file.type || '') || /\.pdf$/i.test(file.name || '');
+    if (!esPdf) { this.showSnackbar('Adjunta el contrato escaneado en PDF', 'warning'); return; }
+    if (file.size > 10 * 1024 * 1024) { this.showSnackbar('El PDF supera el máximo de 10 MB', 'warning'); return; }
+    const key = 'pdf-firmado:' + contratoId;
+    if (!this._busyStart(key)) return;
+    this.showLoading();
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || '').replace(/^data:[^,]*,/, ''));
+        r.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        r.readAsDataURL(file);
+      });
+      const nombre = 'contrato_firmado_' + String(contratoId).replace(/[^a-z0-9_-]+/gi, '_') + '.pdf';
+      const res = await API.uploadContratoPdf(base64, nombre);
+      const datos = (res && res.data) || {};
+      if (!datos.fileId) throw new Error(datos.error || 'Drive no devolvió el archivo');
+      contrato.pdf_url = datos.webViewLink || '';
+      contrato.pdf_file_id = datos.fileId;
+      await this._updateLocalYApi('contratos', contrato);
+      this.showSnackbar('PDF firmado guardado en el contrato', 'success');
+      if (contrato.tipo === 'acogida') await this.showContratoAcogida(contrato.acogida_id);
+      else if (contrato.adopcion_id) await this.viewAdopcion(contrato.adopcion_id, { ready: true });
+    } catch (err) {
+      this._snackErr(err, 'No se pudo subir el PDF firmado: ' + this._errMsg(err));
+    } finally {
+      this.hideLoading();
+      this._busyEnd(key);
+    }
   },
 
   async descargarTerminosAdopcion(adopcionId) {

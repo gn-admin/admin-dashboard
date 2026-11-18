@@ -35,6 +35,18 @@ const PdfExport = {
     }
   },
 
+  // Ruta de un asset local como URL absoluta: la ventana de impresion se abre
+  // en blanco y alli las rutas relativas pueden no resolverse.
+  _assetUrl(ruta) {
+    const p = String(ruta || '');
+    if (!p) return '';
+    if (/^(data:|https?:|blob:)/i.test(p)) return p;
+    try {
+      if (typeof document !== 'undefined' && document.baseURI) return new URL(p, document.baseURI).href;
+    } catch { /* ruta no valida: se deja tal cual */ }
+    return p;
+  },
+
   _esc(str) {
     if (str == null) return '';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -261,7 +273,13 @@ const PdfExport = {
     const ent = (typeof Dashboard !== 'undefined' && Dashboard._contratoEntidadDatos)
       ? Dashboard._contratoEntidadDatos(c)
       : { nombre: c.entidad_nombre || 'Asociación Grupo Nebak', cif: c.entidad_cif || '', domicilio: c.entidad_domicilio || '', email: c.entidad_email || '', telefono: c.entidad_telefono || '', registro: c.entidad_registro || '', web: c.entidad_web || '' };
-    const sello = `<div class="sello" aria-label="Sello de la entidad"><div class="sello-inner"><img src="${this._esc(logo || this._logoFallback)}" alt=""><span>${this._esc(ent.nombre)}</span><small>SELLO DE LA ENTIDAD</small></div></div>`;
+    // Sello real de la asociación (el mismo que lleva el papel), no un sello
+    // dibujado con CSS. Si la entidad ha subido otro sello, manda el suyo.
+    const selloUrl = (typeof Dashboard !== 'undefined' && Dashboard._selloUrl && Dashboard._selloUrl())
+      || this._assetUrl('assets/contratos/sello-nebak.jpg');
+    const sello = selloUrl
+      ? `<div class="sello sello--img" aria-label="Sello de la entidad"><img src="${this._esc(this._assetUrl(selloUrl))}" alt="Sello de ${this._esc(ent.nombre)}"></div>`
+      : '';
 
     // Importes del contrato: si faltan (contratos antiguos) se usan los del documento.
     const porDefecto = (typeof Dashboard !== 'undefined' && Dashboard._contratoImportesPorDefecto)
@@ -429,6 +447,8 @@ const PdfExport = {
         .sig-line{border-top:1px solid #191919;margin-top:auto;padding-top:6px;font-size:9pt;font-weight:600}
         .firma-fallback{height:70px;display:flex;align-items:center;color:#999;font-style:italic}
         .sello{width:88px;height:88px;flex:0 0 88px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff;margin:0}
+        .sello--img{width:96px;height:96px;flex:0 0 96px;border:0;border-radius:0;background:transparent;transform:none;display:flex;align-items:center;justify-content:center}
+        .sello--img img{width:100%;height:100%;object-fit:contain}
         .sello-inner{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px;max-width:78px}
         .sello img{width:20px;height:20px;border-radius:50%;object-fit:cover}
         .sello span{font-size:6pt;font-weight:800;line-height:1.1;text-transform:uppercase}
@@ -507,7 +527,10 @@ const PdfExport = {
     const material = (Array.isArray(caso.material) ? caso.material : String(caso.material || '').split(/[|,;]/))
       .map(x => String(x).trim())
       .filter(Boolean);
-    const tiene = nombre => material.some(m => m.toLowerCase() === String(nombre).toLowerCase());
+    // "Otros" solo va marcado si hay texto que detalle el material extra.
+    const materialOtros = String(caso.material_otros == null ? '' : caso.material_otros).trim();
+    const tiene = nombre => material.some(m => m.toLowerCase() === String(nombre).toLowerCase())
+      || (String(nombre).toLowerCase() === 'otros' && !!materialOtros);
     let foto = animal.foto || '';
     if (foto && !/^(data:|https?:|blob:)/i.test(foto) && typeof document !== 'undefined') {
       try { foto = new URL(foto, document.baseURI).href; } catch { /* ruta no valida: se deja tal cual */ }
@@ -555,7 +578,7 @@ const PdfExport = {
       <div class="acogida-material">
         <p>${this._esc(T ? T.materialIntro : '')}</p>
         <div class="acogida-material-grid">${materialHtml}</div>
-        <p class="acogida-material-otros">${this._esc(T ? T.materialOtros : 'Otros (detallar):')} ______________________________</p>
+        <p class="acogida-material-otros">${this._esc(T ? T.materialOtros : 'Otros (detallar):')} ${this._esc(materialOtros || '______________________________')}</p>
       </div>
 
       <p class="acogida-acepta">${this._esc(T ? T.aceptacion : '')}</p>

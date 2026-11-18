@@ -1247,7 +1247,10 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
   it('_contratoTerminosHtml no muestra el rol del adoptante y añade el sello', () => {
     const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana', animal: 'Luna' });
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
-    assert.match(html, /SELLO DE LA ENTIDAD/);
+    // El sello es la imagen real de la asociación, no un sello dibujado con CSS.
+    assert.match(html, /contrato-doc-sello--img/);
+    assert.match(html, /assets\/contratos\/sello-nebak\.jpg/);
+    assert.doesNotMatch(html, /SELLO DE LA ENTIDAD/);
     assert.match(html, /Estipulaciones/);
     assert.match(html, /la Asociación/);
     assert.match(html, /el Adoptante/);
@@ -1265,19 +1268,23 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
 
   it('_contratoTextos da la version que se guarda al firmar', () => {
     const T = Dashboard._contratoTextos();
-    assert.equal(T.version, '2.0');
+    assert.equal(T.version, '2.1');
     assert.equal(T.estipulaciones.length, 20);
   });
 
   it('_terminosAdopcionHtml es la hoja de estipulaciones con sus 20 estipulaciones y su version', () => {
     const html = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, { f1_dni: '123' });
     assert.match(html, /Hoja de estipulaciones/);
-    assert.match(html, /Versión 2\.0 \(2026\/11\/18\)/);
-    assert.equal((html.match(/contrato-doc-estipulacion/g) || []).length, 20);
+    assert.match(html, /Versión 2\.1 \(2026\/11\/18\)/);
+    // 20 estipulaciones + las 4 cláusulas del anexo de condiciones (D-C5).
+    assert.equal((html.match(/contrato-doc-estipulacion/g) || []).length, 24);
     assert.match(html, /1ª\./);
     assert.match(html, /20ª\./);
+    assert.match(html, /Anexo\. Condiciones complementarias/);
+    assert.match(html, /Periodo de prueba/);
+    assert.match(html, /Protección de datos personales/);
     assert.match(html, /Aceptado por el adoptante/);
-    assert.match(html, /SELLO DE LA ENTIDAD/);
+    assert.match(html, /assets\/contratos\/sello-nebak\.jpg/);
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
   });
 
@@ -1374,6 +1381,67 @@ describe('_contratoAcogidaDatos: documento opcional de acogida', () => {
       Dashboard.animales = prev.animales;
       Dashboard.familias = prev.familias;
       Dashboard.responses = prev.responses;
+    }
+  });
+});
+
+describe('material de la acogida: casillas, «otros» y devolución', () => {
+  it('_materialAcogidaLista añade «Otros» solo si hay texto y no lo duplica', () => {
+    assert.deepEqual(Dashboard._materialAcogidaLista(['Collar', 'Correa'], ''), ['Collar', 'Correa']);
+    assert.deepEqual(Dashboard._materialAcogidaLista(['Collar'], '  Cama  '), ['Collar', 'Otros']);
+    assert.deepEqual(Dashboard._materialAcogidaLista(['Collar', 'Otros'], 'Cama'), ['Collar', 'Otros']);
+    assert.deepEqual(Dashboard._materialAcogidaLista([], '   '), []);
+  });
+
+  it('_acogidaMaterialDatos lee la fila del caso, incluso con la lista como texto', () => {
+    const m = Dashboard._acogidaMaterialDatos({
+      material: 'Collar|Correa', material_otros: 'Arnés', material_devuelto: '1',
+      material_devuelto_en: '2026-02-01', fecha_fin_prevista: '2026-03-01'
+    }, null);
+    assert.deepEqual(m.material, ['Collar', 'Correa']);
+    assert.equal(m.otros, 'Arnés');
+    assert.equal(m.devuelto, true);
+    assert.equal(m.devueltoEn, '2026-02-01');
+    assert.equal(m.finPrevisto, '2026-03-01');
+  });
+
+  it('_acogidaMaterialDatos cae al snapshot del contrato si el caso no lo tiene', () => {
+    const snapshot = { animal: { nombre: 'Luna' }, familia: { nombre: 'Ana' }, material: ['Bozal'], material_otros: 'Cama', fecha_fin_prevista: '2026-04-01' };
+    const guardado = { id: 'ctr_1', tipo: 'acogida', acogida_id: 'acg1', datos_json: JSON.stringify(snapshot) };
+    const m = Dashboard._acogidaMaterialDatos({ id: 'acg1' }, guardado);
+    assert.deepEqual(m.material, ['Bozal']);
+    assert.equal(m.otros, 'Cama');
+    assert.equal(m.devuelto, false);
+    assert.equal(m.finPrevisto, '2026-04-01');
+  });
+
+  it('_acogidaMaterialEditorHtml marca lo prestado y ofrece guardar', () => {
+    const prev = globalThis.AcogidaTextos;
+    globalThis.AcogidaTextos = require('../src/js/acogida-textos.js');
+    try {
+      const html = Dashboard._acogidaMaterialEditorHtml({ id: 'acg1', material: ['Collar'], material_otros: 'Cama' }, null);
+      assert.match(html, /Material prestado/);
+      assert.match(html, /value="Collar" checked/);
+      assert.match(html, /value="Bozal" >/);
+      assert.match(html, /data-action="guardarMaterialAcogida" data-arg0="acg1"/);
+      assert.match(html, /id="mat-otros"/);
+      assert.match(html, /id="mat-fin"/);
+    } finally {
+      globalThis.AcogidaTextos = prev;
+    }
+  });
+});
+
+describe('_contratoAcogidaDatos: marcas y pasaporte del animal', () => {
+  it('devuelve los campos que imprime el documento de acogida', () => {
+    const prev = Dashboard.animales;
+    try {
+      Dashboard.animales = [{ id: 'a1', nombre: 'Luna', marcas: 'Mancha blanca en el pecho', pasaporte: 'PAS-9' }];
+      const d = Dashboard._contratoAcogidaDatos({ id: 'acg1', animal_id: 'a1', animal: 'Luna' });
+      assert.equal(d.animal.marcas, 'Mancha blanca en el pecho');
+      assert.equal(d.animal.pasaporte, 'PAS-9');
+    } finally {
+      Dashboard.animales = prev;
     }
   });
 });

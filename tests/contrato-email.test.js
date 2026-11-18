@@ -167,3 +167,102 @@ describe('isOriginAllowed: coincidencia exacta y origen vacio', () => {
     assert.equal(ctx.isOriginAllowed('https://gn-admin.github.io'), true);
   });
 });
+
+// El PDF firmado lleva DNI y firmas: se guarda en Drive SIN enlace publico
+// (a diferencia de `uploadDocumento`) y solo acepta PDF dentro de tamano.
+describe('uploadContratoPdf: PDF firmado privado en Drive', () => {
+  function entornoDrive(opciones = {}) {
+    const archivos = [];
+    const compartidos = [];
+    const carpetas = {};
+    const carpeta = (clave) => ({
+      getId: () => clave,
+      getName: () => clave.split('/').pop(),
+      getFoldersByName(nombre) {
+        const items = carpetas[clave + '/' + nombre] || [];
+        let i = 0;
+        return { hasNext: () => i < items.length, next: () => items[i++] };
+      },
+      createFolder(nombre) {
+        const nueva = carpeta(clave + '/' + nombre);
+        (carpetas[clave + '/' + nombre] = carpetas[clave + '/' + nombre] || []).push(nueva);
+        return nueva;
+      },
+      createFile(blob) {
+        const f = {
+          id: 'FILE_' + (archivos.length + 1),
+          nombre: blob.getName(),
+          blob,
+          getId() { return this.id; },
+          getUrl() { return 'https://drive.example/' + this.id; },
+          setSharing() { compartidos.push(this.id); }
+        };
+        archivos.push(f);
+        return f;
+      }
+    });
+    const ctx = {
+      CONFIG: Object.assign({
+        ROLES: { ADMIN: 'admin' },
+        sheets: {},
+        DRIVE_DOCS_FOLDER_ID: 'DOCS',
+        ALLOWED_ORIGINS: ['https://gn-admin.github.io'],
+        ALLOW_ORIGIN_EMPTY: true
+      }, opciones.config || {}),
+      DriveApp: { getFolderById: (id) => carpeta(id) },
+      Utilities: {
+        base64Decode: (b64) => ({ bytes: String(b64).length }),
+        newBlob: (bytes, mime, nombre) => ({ bytes, mime, getName: () => nombre }),
+        getUuid: () => 'uuid-de-prueba'
+      },
+      Logger: { log: () => {} },
+      readSheet: () => []
+    };
+    vm.createContext(ctx);
+    vm.runInContext(CODE_GS, ctx, { filename: 'Code.gs' });
+    return { ctx, archivos, compartidos };
+  }
+
+  const PDF = 'JVBERi0xLjQKJcOkw7zDtsOfCg=='; // cabecera %PDF
+
+  it('guarda el PDF en la subcarpeta Contratos sin compartirlo', () => {
+    const { ctx, archivos, compartidos } = entornoDrive();
+    const r = ctx.uploadContratoPdf({ archivo_base64: PDF, nombre: 'contrato-luna.pdf', mime_type: 'application/pdf' }, null);
+    assert.equal(archivos.length, 1);
+    assert.equal(r.fileId, 'FILE_1');
+    // El nombre en Drive es un uuid con la extension del original (no se
+    // conserva el nombre del cliente para no arrastrar datos personales).
+    assert.equal(r.nombre, 'uuid-de-prueba.pdf');
+    assert.equal(r.webViewLink, 'https://drive.example/FILE_1');
+    assert.equal(archivos[0].blob.mime, 'application/pdf');
+    assert.deepEqual(compartidos, []);
+  });
+
+  it('acepta el data URL completo y normaliza el nombre', () => {
+    const { ctx, archivos } = entornoDrive();
+    ctx.uploadContratoPdf({ archivo_base64: 'data:application/pdf;base64,' + PDF, nombre: 'escaneado' }, null);
+    assert.equal(archivos.length, 1);
+    assert.match(archivos[0].nombre, /\.pdf$/);
+  });
+
+  it('rechaza lo que no es PDF y no toca Drive', () => {
+    const { ctx, archivos } = entornoDrive();
+    const r = ctx.uploadContratoPdf({ archivo_base64: PDF, nombre: 'foto.jpg', mime_type: 'image/jpeg' }, null);
+    assert.match(r.error, /PDF/);
+    assert.equal(archivos.length, 0);
+  });
+
+  it('rechaza un PDF por encima del limite', () => {
+    const { ctx, archivos } = entornoDrive({ config: { MAX_CONTRATO_PDF_BYTES: 16 } });
+    const r = ctx.uploadContratoPdf({ archivo_base64: PDF, nombre: 'grande.pdf' }, null);
+    assert.match(r.error, /demasiado grande/);
+    assert.equal(archivos.length, 0);
+  });
+
+  it('falla claro si falta la carpeta de documentos en Config.gs', () => {
+    const { ctx, archivos } = entornoDrive({ config: { DRIVE_DOCS_FOLDER_ID: '' } });
+    const r = ctx.uploadContratoPdf({ archivo_base64: PDF, nombre: 'x.pdf' }, null);
+    assert.match(r.error, /DRIVE_DOCS_FOLDER_ID/);
+    assert.equal(archivos.length, 0);
+  });
+});

@@ -9,7 +9,9 @@
  * los datos del contrato.
  */
 const ContratoTextos = {
-  version: '2.0',
+  // 2.1: añade el anexo de condiciones complementarias (D-C5). El 2.0 era el
+  // documento de la asociación tal cual; las estipulaciones 1-20 no cambian.
+  version: '2.1',
   fecha: '2026/11/18',
   titulo: 'Contrato de adopción',
   notaEstipulaciones: 'Se adjunta hoja de estipulaciones revisada y firmada por el adoptante.',
@@ -123,6 +125,42 @@ const ContratoTextos = {
       parrafos: ['Ambas partes, tras manifestar su plena capacidad de obrar, prestan libre y voluntariamente su consentimiento al presente contrato, formado por tres folios a doble cara, aceptando expresamente todas y cada una de las condiciones y obligaciones dimanantes del mismo.']
     }
   ],
+
+  // Condiciones que la asociación aplicaba de palabra y que el documento 2.0
+  // no recogía (D-C5). Se imprimen al final del anexo, después de las 20
+  // estipulaciones, para que el adoptante las firme con el resto.
+  anexo: {
+    titulo: 'Anexo. Condiciones complementarias',
+    intro: 'Estas condiciones completan las estipulaciones anteriores y forman parte del contrato que el Adoptante firma junto a la hoja de estipulaciones.',
+    clausulas: [
+      {
+        titulo: 'Periodo de prueba y devolución',
+        parrafos: [
+          'Durante los quince días siguientes a la entrega, y como máximo hasta los treinta días, el Adoptante y la Asociación podrán resolver este contrato si la convivencia no resulta adecuada para el animal o para la familia.',
+          'La devolución se comunicará a la Asociación con al menos 48 horas de antelación y el animal se entregará en las condiciones sanitarias en que se recibió. La donación no se devuelve: no es el precio del animal.'
+        ]
+      },
+      {
+        titulo: 'Seguimiento de la adopción',
+        parrafos: [
+          'La Asociación realizará un seguimiento al mes, a los tres, a los seis y a los doce meses de la entrega, por teléfono, mensajería o visita acordada. El Adoptante se compromete a responder y a facilitar una fotografía actual del animal.'
+        ]
+      },
+      {
+        titulo: 'Microchip y registro',
+        parrafos: [
+          'Mientras dure el periodo de prueba, el microchip del animal permanecerá a nombre de la Asociación. Confirmada la adopción, el Adoptante tramitará el cambio de titularidad en el registro autonómico y remitirá a la Asociación el justificante en el plazo de un mes.'
+        ]
+      },
+      {
+        titulo: 'Protección de datos personales',
+        parrafos: [
+          'Los datos personales del Adoptante y, en su caso, del tutor o de la persona responsable se tratan para formalizar y ejecutar este contrato, cumplir las obligaciones legales de la Asociación y realizar el seguimiento de la adopción. Se conservan mientras dure la relación y durante los plazos legales de conservación.',
+          'El Adoptante puede ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a la dirección de contacto de la Asociación, y reclamar ante la Agencia Española de Protección de Datos. Los datos no se ceden a terceros salvo obligación legal.'
+        ]
+      }
+    ]
+  },
 
   /**
    * Párrafos y lista de una estipulación con los importes del contrato ya

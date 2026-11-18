@@ -131,7 +131,10 @@ describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
     assert.match(html, /page-break/);
     assert.match(html, /Calle Menor 2/);
     assert.match(html, /data:image\/png;base64,TUTOR/);
-    assert.match(html, /SELLO DE LA ENTIDAD/);
+    // Sello real de la asociación en lugar del sello generado con CSS.
+    assert.match(html, /sello--img/);
+    assert.match(html, /assets\/contratos\/sello-nebak\.jpg/);
+    assert.doesNotMatch(html, /SELLO DE LA ENTIDAD/);
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
     assert.match(html, /2026\/11\/10/);
     assert.match(html, /2022\/01\/02/);
@@ -201,6 +204,15 @@ describe('_buildContratoAcogida: documento real de la asociación', () => {
     assert.match(con, /☒ Collar/);
     assert.match(con, /☒ Correa/);
     assert.match(con, /☐ Bozal/);
+  });
+
+  it('detalla el material extra y marca «Otros» solo si hay texto', () => {
+    const con = PdfExport._buildContratoAcogida({ ...c, material: ['Collar'], material_otros: 'Cama y arnés' }, LOGO);
+    assert.match(con, /☒ Otros/);
+    assert.match(con, /Otros \(detallar\): Cama y arnés/);
+    const sin = PdfExport._buildContratoAcogida({ ...c, material: ['Collar'] }, LOGO);
+    assert.match(sin, /☐ Otros/);
+    assert.match(sin, /Otros \(detallar\): _+/);
   });
 
   it('firma al pie con los datos reales de la asociación', () => {

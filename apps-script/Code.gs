@@ -152,7 +152,7 @@ function _audit(endpoint, user, body, result) {
       'delete-animal':1,'delete-familia':1,'delete-adopcion':1,'delete-socio':1,'delete-blacklist':1,'delete-contrato':1,
       'delete-documento':1,'delete-acogida':1,'delete-candidatura':1,'delete-apadrinamiento':1,'delete-gasto':1,'delete-donacion':1,
       'delete-seguimiento':1,'delete-recordatorio':1,'delete-inventario':1,'delete-grupo':1,'delete-historial-fase-adopcion':1,
-      'upload-foto-animal':1,'upload-documento':1,'send-contrato-email':1,'blacklist':1,'update-blacklist':1,
+      'upload-foto-animal':1,'upload-documento':1,'upload-contrato-pdf':1,'send-contrato-email':1,'blacklist':1,'update-blacklist':1,
       'contratos':1,'update-contrato':1,'adopciones':1,'update-adopcion':1,'acogidas':1,'update-acogida':1,
       'socios':1,'update-socio':1,'web-media-subir':1,'web-media-eliminar':1,'web-deploy':1
     };
@@ -327,6 +327,8 @@ function handlePost(endpoint, user, e) {
       var _r = jsonResponse({ data: uploadFotoAnimal(body, user) }); _audit(endpoint,user,body,_r); return _r; }
     case 'upload-documento': {
       var _r = jsonResponse({ data: uploadDocumento(body, user) }); _audit(endpoint,user,body,_r); return _r; }
+    case 'upload-contrato-pdf': {
+      var _r = jsonResponse({ data: uploadContratoPdf(body, user) }); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-animal': {
       var _r = jsonResponse({ success: deleteSheetRow(CONFIG.sheets.animales, body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-familia': {
@@ -1370,6 +1372,49 @@ function uploadDocumento(body, user) {
     };
   } catch (err) {
     Logger.log('uploadDocumento error: ' + err.message);
+    return { error: 'Error subiendo a Drive: ' + err.message };
+  }
+}
+
+// PDF escaneado del contrato firmado (D-C10). Va a una subcarpeta «Contratos»
+// de los documentos y NO se comparte: lleva DNI y firmas, y `uploadDocumento`
+// publica el fichero con enlace de cualquiera. Solo lo abre la cuenta titular.
+function uploadContratoPdf(body, user) {
+  var folderId = CONFIG.DRIVE_DOCS_FOLDER_ID;
+  if (!folderId || folderId === 'TU_CARPETA_DRIVE_ID_AQUI') {
+    return { error: 'DRIVE_DOCS_FOLDER_ID no configurado en Config.gs' };
+  }
+  try {
+    var base64 = String((body && (body.archivo_base64 || body.pdf_base64)) || '');
+    var comma = base64.indexOf(',');
+    if (base64.indexOf('data:') === 0 && comma !== -1) base64 = base64.substring(comma + 1);
+    base64 = base64.replace(/\s+/g, '');
+    if (!base64) return { error: 'Falta archivo_base64' };
+
+    var maxBytes = Number(CONFIG.MAX_CONTRATO_PDF_BYTES || (10 * 1024 * 1024));
+    if (_uploadBytesApprox(base64) > maxBytes) {
+      return { error: 'PDF demasiado grande (máx. ' + Math.round(maxBytes / 1024 / 1024) + ' MB)' };
+    }
+
+    var mimeType = String((body && body.mime_type) || 'application/pdf').toLowerCase();
+    if (mimeType.indexOf('application/pdf') !== 0) return { error: 'El contrato firmado debe ser un PDF' };
+
+    var nombre = _safeUploadName(body.nombre, '.pdf');
+    var raiz = DriveApp.getFolderById(folderId);
+    var sub = raiz.getFoldersByName('Contratos');
+    var destino = sub.hasNext() ? sub.next() : raiz.createFolder('Contratos');
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, nombre);
+    var file = destino.createFile(blob);
+
+    // Sin setSharing a proposito: el archivo queda privado.
+    return {
+      fileId: file.getId(),
+      nombre: nombre,
+      webViewLink: file.getUrl(),
+      contrato_id: (body && body.contrato_id) || ''
+    };
+  } catch (err) {
+    Logger.log('uploadContratoPdf error: ' + err.message);
     return { error: 'Error subiendo a Drive: ' + err.message };
   }
 }
