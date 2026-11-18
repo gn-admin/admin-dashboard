@@ -1998,12 +1998,9 @@ const Web = {
   },
 
   copiarPreview() {
-    const json = JSON.stringify(this._ultimoPreview || {}, null, 2);
-    try {
-      navigator.clipboard.writeText(json).then(() => this._snack('JSON copiado'), () => this._snack('No se pudo copiar', 'warning'));
-    } catch (e) {
-      this._snack('No se pudo copiar', 'warning');
-    }
+    this.copiarTexto(JSON.stringify(this._ultimoPreview || {}, null, 2),
+      () => this._snack('JSON copiado'),
+      () => this._snack('No se pudo copiar', 'warning'));
   },
 
   /** URL canónica de la página estática de una publicación. */
@@ -2018,19 +2015,17 @@ const Web = {
     }
   },
 
-  /** Copia el enlace público (página estática canónica) de una publicación. */
-  copiarEnlaceWeb(slug, titulo) {
-    const url = this.urlPublicaEstatica(slug);
-    if (!url) { this._snack('Esta publicación todavía no tiene slug', 'warning'); return; }
-    const ok = () => this._snack('Enlace copiado' + (titulo ? ': ' + titulo : ''));
-    const fallo = () => this._snack('No se pudo copiar el enlace', 'warning');
+  /** Copia al portapapeles con la API moderna; si no existe, con un textarea. */
+  copiarTexto(texto, ok, fallo) {
+    const listo = typeof ok === 'function' ? ok : () => {};
+    const error = typeof fallo === 'function' ? fallo : () => {};
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        navigator.clipboard.writeText(url).then(ok, fallo);
+        navigator.clipboard.writeText(texto).then(listo, error);
         return;
       }
       const area = document.createElement('textarea');
-      area.value = url;
+      area.value = texto;
       area.setAttribute('readonly', '');
       area.style.position = 'fixed';
       area.style.top = '0';
@@ -2039,10 +2034,19 @@ const Web = {
       area.select();
       const bien = document.execCommand('copy');
       document.body.removeChild(area);
-      bien ? ok() : fallo();
+      bien ? listo() : error();
     } catch (e) {
-      fallo();
+      error(e);
     }
+  },
+
+  /** Copia el enlace público (página estática canónica) de una publicación. */
+  copiarEnlaceWeb(slug, titulo) {
+    const url = this.urlPublicaEstatica(slug);
+    if (!url) { this._snack('Esta publicación todavía no tiene slug', 'warning'); return; }
+    this.copiarTexto(url,
+      () => this._snack('Enlace copiado' + (titulo ? ': ' + titulo : '')),
+      () => this._snack('No se pudo copiar el enlace', 'warning'));
   },
 
   /** Slugs anteriores que ya redirigen (301) a esta publicación. */

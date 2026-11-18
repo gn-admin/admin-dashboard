@@ -254,8 +254,14 @@ a:hover { color: var(--pub-primary-dark); }
   display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .9rem;
   font-size: .9rem; color: var(--pub-soft);
 }
-.pub-acciones { position: relative; display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
-.pub-compartir-aviso { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.pub-acciones { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
+.pub-compartir-aviso { display: none; }
+.pub-compartir-aviso:not(:empty) {
+  display: inline-flex; align-items: center;
+  padding: .45rem .85rem; border-radius: 999px;
+  background: var(--pub-primary-soft); border: 1px solid #bfe8cf;
+  color: var(--pub-primary-dark); font-size: .86rem; font-weight: 600;
+}
 .pub-ficha-media { min-width: 0; }
 .pub-ficha-media img {
   width: 100%; aspect-ratio: 4 / 3; max-height: 300px; object-fit: cover;

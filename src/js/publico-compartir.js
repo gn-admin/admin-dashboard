@@ -5,16 +5,17 @@
  * canónica (la página estática que genera el prerender). Se carga tanto en
  * el visor SPA como en las páginas estáticas, que no ejecutan `publico.js`.
  */
-(function () {
+(() => {
   'use strict';
 
+  /** Copia con la API moderna y, si no existe, con el textarea temporal. */
   function copiar(texto) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       return navigator.clipboard.writeText(texto);
     }
-    return new Promise(function (resolve, reject) {
+    return new Promise((resolve, reject) => {
       try {
-        var area = document.createElement('textarea');
+        const area = document.createElement('textarea');
         area.value = texto;
         area.setAttribute('readonly', '');
         area.style.position = 'fixed';
@@ -22,7 +23,7 @@
         area.style.left = '-9999px';
         document.body.appendChild(area);
         area.select();
-        var ok = document.execCommand('copy');
+        const ok = document.execCommand('copy');
         document.body.removeChild(area);
         if (ok) resolve(); else reject(new Error('copy'));
       } catch (err) {
@@ -31,35 +32,43 @@
     });
   }
 
+  let temporizador = 0;
+
+  /**
+   * Muestra la confirmación en el aviso visible junto al botón (se apaga solo)
+   * y, si el marcado no lo trae, en el propio texto del botón.
+   */
   function avisar(btn, texto) {
-    var cont = btn.parentElement;
-    var aviso = cont && cont.querySelector('.pub-compartir-aviso');
-    if (aviso) {
-      aviso.textContent = texto;
+    const cont = btn.parentElement;
+    const aviso = cont && cont.querySelector('.pub-compartir-aviso');
+    if (!aviso) {
+      const original = btn.textContent;
+      btn.textContent = texto;
+      setTimeout(() => { btn.textContent = original; }, 3000);
       return;
     }
-    var original = btn.textContent;
-    btn.textContent = texto;
-    setTimeout(function () { btn.textContent = original; }, 2400);
+    aviso.textContent = texto;
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => { aviso.textContent = ''; }, 4000);
   }
 
   function compartir(btn) {
-    var url = btn.getAttribute('data-url') || (typeof location !== 'undefined' ? location.href : '');
-    var title = btn.getAttribute('data-title') || (typeof document !== 'undefined' ? document.title : '');
+    const url = btn.getAttribute('data-url') || location.href;
+    const title = btn.getAttribute('data-title') || document.title;
+    const confirmar = () => avisar(btn, 'Enlace copiado');
+    const fallar = () => avisar(btn, 'No se pudo copiar');
     if (navigator.share) {
-      navigator.share({ title: title, url: url }).catch(function (err) {
-        if (err && err.name === 'AbortError') return;
-        copiar(url).then(function () { avisar(btn, 'Enlace copiado'); })
-          .catch(function () { avisar(btn, 'No se pudo copiar'); });
+      navigator.share({ title, url }).catch(err => {
+        if (err && err.name === 'AbortError') return; // cancelado por la persona
+        copiar(url).then(confirmar, fallar);
       });
       return;
     }
-    copiar(url).then(function () { avisar(btn, 'Enlace copiado'); })
-      .catch(function () { avisar(btn, 'No se pudo copiar'); });
+    copiar(url).then(confirmar, fallar);
   }
 
-  document.addEventListener('click', function (evento) {
-    var btn = evento.target && evento.target.closest
+  document.addEventListener('click', evento => {
+    const btn = evento.target && evento.target.closest
       ? evento.target.closest('[data-compartir]')
       : null;
     if (!btn) return;
