@@ -1709,3 +1709,22 @@ describe('F-C1: nombre definitivo del contrato', () => {
     assert.equal(sinNombre.nombre_definitivo, '');
   });
 });
+
+
+describe('F-C1: importes del contrato', () => {
+  it('la donacion y la indemnizacion traen los valores del documento', () => {
+    assert.deepEqual(Dashboard._contratoImportesPorDefecto(), { donacion: 100, indemnizacion: 900 });
+  });
+});
+
+
+describe('F-C1: importes del contrato (validacion)', () => {
+  it('respeta el 0 y rechaza vacio, texto y negativos', () => {
+    assert.equal(Dashboard._contratoImporte('0', 100), 0);
+    assert.equal(Dashboard._contratoImporte('50,5', 100), 50.5);
+    assert.equal(Dashboard._contratoImporte('', 100), 100);
+    assert.equal(Dashboard._contratoImporte('abc', 100), 100);
+    assert.equal(Dashboard._contratoImporte('-5', 900), 900);
+    assert.equal(Dashboard._contratoImporte(undefined, 900), 900);
+  });
+});

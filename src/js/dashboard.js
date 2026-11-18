@@ -7643,6 +7643,17 @@ const Dashboard = {
     return (this.responses[sol.surveyId] || []).find(x => String(x.id) === String(sol.responseId)) || {};
   },
 
+  /** Importes que trae el contrato por defecto (editables en el formulario). */
+  _contratoImportesPorDefecto() {
+    return { donacion: 100, indemnizacion: 900 };
+  },
+
+  /** Importe del contrato: respeta el 0 y solo cae al valor por defecto si no es un numero valido. */
+  _contratoImporte(valor, porDefecto) {
+    const n = parseFloat(String(valor == null ? '' : valor).replace(',', '.'));
+    return Number.isFinite(n) && n >= 0 ? n : porDefecto;
+  },
+
   showContratoForm(adopcionId) {
     const p = this.adopciones.find(x => x.id === adopcionId);
     if (!p) return;
@@ -7657,6 +7668,7 @@ const Dashboard = {
     if (title) title.textContent = 'Contrato de adopcion · ' + (p.animal || '');
     const sol = this._contratoSolicitudDatos(p);
     const animal = this._contratoAnimalDatos(p);
+    const imp = this._contratoImportesPorDefecto();
     body.innerHTML = `
       <div class="contrato-shell">
         <div class="contrato-topbar">
@@ -7675,7 +7687,7 @@ const Dashboard = {
             ${this._contratoAnimalEditorHtml({ prefix: 'ct-animal', nombre: animal.nombre || p.animal || '', foto: animal.foto || '', raza: animal.raza || '', edad: animal.edad || '', sexo: animal.sexo || '', microchip: animal.microchip || '' })}
             <div class="form-row"><div class="form-group"><label for="ct-nombre-definitivo">Nombre definitivo</label><input type="text" id="ct-nombre-definitivo" placeholder="Nombre con el que se adopta (opcional)"><div class="form-hint">Si el adoptante ya le ha puesto nombre, se usara en el contrato. En blanco, se mantiene el nombre de la ficha.</div></div></div>
             <div class="form-row"><div class="form-group"><label for="ct-fecha">Fecha de adopcion</label><input type="date" id="ct-fecha" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label for="ct-ciudad">Ciudad</label><input type="text" id="ct-ciudad" value="${this._esc(sol.ciudad || '')}" placeholder="Localidad del contrato"></div></div>
-            <div class="form-row"><div class="form-group"><label for="ct-donacion">Donacion del adoptante (€)</label><input type="text" id="ct-donacion" value="50" inputmode="decimal" placeholder="50"><div class="form-hint">Cantidad que el adoptante entrega a Grupo Nebak con la adopcion. Editable; por defecto 50 €.</div></div></div>
+            <div class="form-row"><div class="form-group"><label for="ct-donacion">Donacion del adoptante (€)</label><input type="text" id="ct-donacion" value="${imp.donacion}" inputmode="decimal" placeholder="${imp.donacion}"><div class="form-hint">Cantidad que el adoptante entrega a Grupo Nebak con la adopcion. Editable; por defecto ${imp.donacion} €.</div></div><div class="form-group"><label for="ct-indemnizacion">Indemnizacion (€)</label><input type="text" id="ct-indemnizacion" value="${imp.indemnizacion}" inputmode="decimal" placeholder="${imp.indemnizacion}"><div class="form-hint">Importe que el contrato fija para los supuestos de indemnizacion. Editable; por defecto ${imp.indemnizacion} €.</div></div></div>
 
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Adoptante</div>
               <div class="form-row"><div class="form-group"><label for="f1-nombre">Nombre completo *</label><input type="text" id="f1-nombre" value="${this._esc(p.adoptante || '')}" required></div><div class="form-group"><label for="f1-dni">DNI</label><input type="text" id="f1-dni" value="${this._esc(sol.dni || '')}" placeholder="12345678A"></div></div>
@@ -7860,7 +7872,8 @@ const Dashboard = {
       nombre_definitivo: ((document.getElementById('ct-nombre-definitivo') || {}).value || '').trim(),
       fecha: document.getElementById('ct-fecha').value || new Date().toISOString().slice(0, 10),
       ciudad: document.getElementById('ct-ciudad').value.trim(),
-      donacion_adoptante: parseFloat(String((document.getElementById('ct-donacion')?.value || '50').replace(',', '.'))) || 50,
+      donacion_adoptante: this._contratoImporte((document.getElementById('ct-donacion') || {}).value, this._contratoImportesPorDefecto().donacion),
+      indemnizacion_importe: this._contratoImporte((document.getElementById('ct-indemnizacion') || {}).value, this._contratoImportesPorDefecto().indemnizacion),
       f1_nombre: f1Nombre,
       f1_dni: document.getElementById('f1-dni').value.trim(),
       f1_direccion: document.getElementById('f1-direccion').value.trim(),
@@ -8773,7 +8786,7 @@ const Dashboard = {
     const adopciones = (this.adopciones || []).filter(p => enAnio(p.fecha));
     const altas = (this.animales || []).filter(a => enAnio(a.fecha_ingreso));
     const sociosNuevos = (this.socios || []).filter(s => enAnio(s.fecha_registro));
-    // Donacion pactada en el contrato de adopcion (por defecto 50 EUR). Se
+    // Donacion pactada en el contrato de adopcion (por defecto 100 EUR). Se
     // suma al total de donaciones del ejercicio para que la memoria refleje
     // el dinero aportado por los adoptantes al cerrar la adopcion.
     const contratosAnio = (this.contratos || []).filter(c => enAnio(c.fecha));
