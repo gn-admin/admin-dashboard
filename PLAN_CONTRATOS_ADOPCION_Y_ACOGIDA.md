@@ -363,6 +363,8 @@ En cualquier caso, el texto debe validarlo la asociación antes de publicarlo.
 | **F-C4** | Cláusula 65 + contrato de acogida según el `.doc` real + persistencia/envío | Formulario, hoja, PDF y email | Tests de condicionales, de material y de acogida |
 | **F-C5** | Endurecimiento: tamaños de celda, privacidad, backup, impresión real | Checklist de impresión y límites documentados | QA en Chrome (A4, 3–6 caras), revisión de PII |
 
+**Estado (2026-11-18):** F-C1 hecha para `capa`, `color` y `tamano` — formulario de animal, hoja `Animales`, ficha interna y copia congelada en `contratos` (`animal_capa`, `animal_color`, `animal_tamano`); sin migración, las columnas las crea el backend al primer guardado. Quedan de F-C1 `nombre_definitivo` y los importes, que se cierran con el contrato (F-C2/F-C4).
+
 Cada fase es independiente y se puede parar entre ellas; F-C1 no cambia el PDF y F-C2 no necesita la acogida.
 
 ---

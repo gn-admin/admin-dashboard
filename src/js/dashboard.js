@@ -4871,10 +4871,16 @@ const Dashboard = {
       + listaGrupos.map(g => `<option value="${this._esc(g.nombre)}" ${enLista && g.norm === normVal ? 'selected' : ''}>${this._esc(g.nombre)}${g.n ? ` (${g.n})` : ''}</option>`).join('')
       + (grupoVal && !enLista ? `<option value="${this._esc(grupoVal)}" selected>${this._esc(grupoVal)}</option>` : '')
       + `<option value="__nuevo__">Crear grupo nuevo...</option>`;
+    const tamLista = ['Pequeño', 'Mediano', 'Grande'];
+    const tamActual = data?.tamano || '';
+    const tamOpts = `<option value="">(Sin especificar)</option>`
+      + tamLista.map(t => `<option value="${t}" ${tamActual === t ? 'selected' : ''}>${t}</option>`).join('')
+      + (tamActual && !tamLista.includes(tamActual) ? `<option value="${this._esc(tamActual)}" selected>${this._esc(tamActual)}</option>` : '');
     this.showFormModal(isEdit ? 'Editar Animal' : 'Nuevo Animal', `<form data-submit="saveAnimal" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-row"><div class="form-group"><label for="an-nombre">Nombre *</label><input type="text" id="an-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label for="an-especie">Especie *</label><select id="an-especie" required data-change="_toggleEspecieOtra" data-cpass="value">${especieOpts}</select><input type="text" id="an-especie-otra" style="display:none;margin-top:4px" placeholder="Otra especie" aria-label="Otra especie"><p style="font-size:var(--text-xs);color:var(--gray-500);margin-top:6px">Si no aparece, elige <b>Otro...</b> y escribe la especie. De momento, adopcion y acogida de <b>cualquier especie</b> se tramitan con las encuestas de perros, gatos y acogida.</p></div></div>
       <div class="form-row"><div class="form-group"><label for="an-raza">Raza *</label><input type="text" id="an-raza" value="${this._esc(data?.raza||'')}" required></div><div class="form-group"><label for="an-edad">Edad</label><input type="text" id="an-edad" value="${this._esc(data?.edad||'')}" placeholder="Ej: 2 anios"></div></div>
       <div class="form-row"><div class="form-group"><label for="an-peso">Peso</label><input type="text" id="an-peso" value="${this._esc(data?.peso||'')}" placeholder="Ej: 4.2 kg"></div><div class="form-group"><label for="an-sexo">Sexo *</label><select id="an-sexo" required><option value="Macho" ${data?.sexo==='Macho'?'selected':''}>Macho</option><option value="Hembra" ${data?.sexo==='Hembra'?'selected':''}>Hembra</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label for="an-capa">Capa</label><input type="text" id="an-capa" value="${this._esc(data?.capa||'')}" placeholder="Ej: atigrada"></div><div class="form-group"><label for="an-color">Color</label><input type="text" id="an-color" value="${this._esc(data?.color||'')}" placeholder="Ej: negro y blanco"></div><div class="form-group"><label for="an-tamano">Tamaño</label><select id="an-tamano">${tamOpts}</select></div></div>
       <div class="form-row"><div class="form-group"><label for="an-grupo">Grupo / Camada</label><select id="an-grupo" data-change="_onChangeGrupo" data-cpass="value" data-carg0="${isEdit?'true':'false'}">${grupoOpts}</select><input type="text" id="an-grupo-nuevo" style="display:none;margin-top:6px" placeholder="Nombre del grupo nuevo" aria-label="Nombre del grupo nuevo" data-change="_onChangeGrupoNuevo" data-carg0="${isEdit?'true':'false'}"><p style="font-size:var(--text-xs);color:var(--gray-500)">${isEdit?'Al cambiar de grupo se actualiza la relacion del animal.':'Elige un grupo existente (se rellenan especie, raza, edad y sexo) o "Crear grupo nuevo".'}</p></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px;padding-top:22px"><input type="checkbox" id="an-grupo-obl" ${data?.grupo_obligatorio?'checked':''}> Grupo obligatorio</label></div></div>
       <div class="form-row"><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-apadrinable" ${data?.apadrinable?'checked':''}> Acepta apadrinamiento</label></div><div class="form-group"><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="an-urgente" ${this._esUrgente(data)?'checked':''}> Necesita acogida/adopcion urgente</label></div></div>
       <div class="form-row"><div class="form-group"><label for="an-foto">Foto principal (opcional)</label><input type="file" id="an-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="an-foto-preview"><div id="an-foto-preview">${this._fotoSrc(data) ? `<img src="${this._esc(this._fotoSrc(data))}" style="max-width:140px;max-height:140px;border-radius:8px;border:2px solid var(--primary)">` : ''}</div><p style="font-size:var(--text-xs);color:var(--gray-500)">Opcional. Tambien puedes colocarla en <code>src/assets/animales/</code> y referenciarla por ruta en el campo Foto (URL) del carnet.</p></div><div class="form-group"><label for="an-foto-url">Foto (URL/ruta opcional)</label><input type="text" id="an-foto-url" value="${this._esc(data?.foto_url||'')}" placeholder="Ej: assets/animales/luna.jpg"></div></div>
@@ -4998,6 +5004,9 @@ const Dashboard = {
       raza: document.getElementById('an-raza').value.trim(),
       edad: document.getElementById('an-edad').value.trim(),
       peso: document.getElementById('an-peso').value.trim(),
+      capa: ((document.getElementById('an-capa') || {}).value || '').trim(),
+      color: ((document.getElementById('an-color') || {}).value || '').trim(),
+      tamano: (document.getElementById('an-tamano') || {}).value || '',
       sexo: document.getElementById('an-sexo').value,
       estado: document.getElementById('an-estado').value,
       microchip: document.getElementById('an-microchip').value.trim(),
@@ -5237,6 +5246,9 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Edad</div><div class="detail-answer">${this._esc(a.edad)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Sexo</div><div class="detail-answer">${this._esc(a.sexo)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Peso</div><div class="detail-answer">${this._esc(a.peso)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Capa</div><div class="detail-answer">${this._esc(a.capa)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Color</div><div class="detail-answer">${this._esc(a.color)||'—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Tamaño</div><div class="detail-answer">${this._esc(a.tamano)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Fecha ingreso</div><div class="detail-answer">${this._fmtFecha(a.fecha_ingreso)}</div></div>
         <div class="detail-field"><div class="detail-question">Microchip</div><div class="detail-answer">${this._esc(a.microchip)||'—'}</div></div>
         <div class="detail-field"><div class="detail-question">Esterilizado/a</div><div class="detail-answer">${a.esterilizada?'Si':'No'}</div></div>
@@ -6484,6 +6496,9 @@ const Dashboard = {
       microchip: val(c && c.animal_microchip, a && a.microchip),
       fecha_nacimiento: val(c && c.animal_fecha_nacimiento, a && a.fecha_nacimiento),
       peso: val(c && c.animal_peso, a && a.peso),
+      capa: val(c && c.animal_capa, a && a.capa),
+      color: val(c && c.animal_color, a && a.color),
+      tamano: val(c && c.animal_tamano, a && a.tamano),
       esterilizada: c && c.animal_esterilizada !== undefined && c.animal_esterilizada !== '' ? c.animal_esterilizada : (a ? a.esterilizada : ''),
       descripcion: val(c && c.animal_descripcion, a && a.descripcion)
     };
@@ -7908,6 +7923,9 @@ const Dashboard = {
       c.animal_microchip = a.microchip || '';
       c.animal_fecha_nacimiento = a.fecha_nacimiento || '';
       c.animal_peso = a.peso || '';
+      c.animal_capa = a.capa || '';
+      c.animal_color = a.color || '';
+      c.animal_tamano = a.tamano || '';
       c.animal_esterilizada = a.esterilizada;
       c.animal_descripcion = a.descripcion || '';
     }

@@ -1665,3 +1665,36 @@ describe('_webEstadoChipHtml: estado del grupo en la ficha (H-3)', () => {
     assert.match(html, /descartada">Retirado/);
   });
 });
+
+
+describe('F-C1: capa, color y tamano del animal', () => {
+  it('el contrato usa las senas guardadas y, si faltan, las de la ficha viva', () => {
+    const previos = Dashboard.animales;
+    Dashboard.animales = [{ id: 'a1', nombre: 'Luna', capa: 'atigrada', color: 'gris', tamano: 'Mediano' }];
+    try {
+      const d = Dashboard._contratoAnimalDatos({ animal_id: 'a1' }, { animal_id: 'a1', animal_capa: '', animal_color: 'negro', animal_tamano: '' });
+      assert.equal(d.capa, 'atigrada');
+      assert.equal(d.color, 'negro');
+      assert.equal(d.tamano, 'Mediano');
+    } finally {
+      Dashboard.animales = previos;
+    }
+  });
+
+  it('el formulario de animal pide capa, color y tamano y los rellena al editar', () => {
+    const previos = Dashboard.animales;
+    const modalOriginal = Dashboard.showFormModal;
+    let html = '';
+    Dashboard.animales = [];
+    Dashboard.showFormModal = (_t, h) => { html = h; };
+    try {
+      Dashboard.showAnimalForm({ id: 'a1', nombre: 'Luna', especie: 'Gato', raza: 'Comun', sexo: 'Hembra', capa: 'atigrada', color: 'gris', tamano: 'Grande' });
+    } finally {
+      Dashboard.showFormModal = modalOriginal;
+      Dashboard.animales = previos;
+    }
+    assert.match(html, /id="an-capa"[^>]*value="atigrada"/);
+    assert.match(html, /id="an-color"[^>]*value="gris"/);
+    assert.match(html, /<option value="Grande" selected>Grande<\/option>/);
+  });
+});
