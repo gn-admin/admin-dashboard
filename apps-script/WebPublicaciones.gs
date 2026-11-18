@@ -690,6 +690,41 @@ function webGrupoInfo(grupoId) {
   return g || null;
 }
 
+/**
+ * Publicación de grupo vigente (estado `publicado`) a la que pertenece un
+ * animal, si la hay. Es la mitad que faltaba de la exclusividad 1:1:
+ * `webUpsertGrupo` y `webEstadoGrupoPub` ya impiden activar el grupo mientras
+ * un miembro tenga publicación individual publicada; esto impide publicar el
+ * individuo cuando el grupo manda, y da el aviso con nombre y slug.
+ */
+function webGrupoVigenteDeAnimal(animal, filas) {
+  var a = animal || null;
+  var gid = a ? webTexto(a.grupo_id || a.grupo) : '';
+  if (!gid) return null;
+  var pubs = Array.isArray(filas) ? filas : webFilasWeb();
+  for (var i = 0; i < pubs.length; i++) {
+    var p = pubs[i];
+    if (!p || p.tipo !== 'animal_grupo') continue;
+    if (String(p.origen_id) !== String(gid)) continue;
+    if (p.estado_publicacion !== 'publicado') continue;
+    var g = webGrupoInfo(gid);
+    return {
+      grupo_id: String(gid),
+      nombre: webTexto(g && g.nombre) || webTexto(a.grupo) || String(gid),
+      publicacion_id: p.id,
+      slug: p.slug
+    };
+  }
+  return null;
+}
+
+/** Mensaje único del conflicto de exclusividad, con la salida posible. */
+function webErrorExclusividadGrupo(conf) {
+  return 'No se puede publicar la ficha individual: el animal forma parte del grupo \u00ab' + conf.nombre
+    + '\u00bb, que ya tiene publicación publicada' + (conf.slug ? ' (' + conf.slug + ')' : '')
+    + '. Oculta o retira la publicación del grupo para publicarlo por separado.';
+}
+
 function webEstadoGrupoDerivado(miembros) {
   var ms = Array.isArray(miembros) ? miembros : [];
   if (!ms.length) return 'cerrado';
@@ -1088,8 +1123,14 @@ function webListarAnimales(params) {
   var cfg = webSheetConfig();
   if (!cfg) return webDiagnostico();
   var animales = readSheet(CONFIG.sheets.animales);
+  var filasWeb = webFilasWeb();
   var mapaPub = {};
-  webFilasWeb().forEach(function (p) { if (p.tipo === 'animal') mapaPub[String(p.origen_id)] = p; });
+  filasWeb.forEach(function (p) { if (p.tipo === 'animal') mapaPub[String(p.origen_id)] = p; });
+  // Grupos con publicación viva: sus miembros no se ofrecen como ficha suelta.
+  var gruposVigentes = {};
+  filasWeb.forEach(function (p) {
+    if (p.tipo === 'animal_grupo' && p.estado_publicacion === 'publicado') gruposVigentes[String(p.origen_id)] = true;
+  });
 
   var q = webTexto(params.q).toLowerCase();
   var estadoFiltro = webTexto(params.estado_publicacion);
@@ -1099,9 +1140,13 @@ function webListarAnimales(params) {
     var pub = mapaPub[String(a.id)] || null;
     var origen = a;
     var valida = pub ? webValidarPublicacion(pub, origen) : { ok: false, faltan: [{ campo: 'publicacion', mensaje: 'Sin publicación web' }] };
+    var gid = webTexto(a.grupo_id || a.grupo);
     return {
       animal_id: String(a.id),
       publicacion_id: pub ? pub.id : '',
+      grupo_id: gid,
+      grupo_nombre: webTexto(a.grupo),
+      grupo_publicado: (gid && gruposVigentes[String(gid)]) ? (webTexto(a.grupo) || String(gid)) : '',
       nombre: webTexto(a.nombre),
       especie: webTexto(a.especie),
       estado_animal: webTexto(a.estado),
@@ -1302,6 +1347,9 @@ function webUpsertAnimal(body) {
   registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
 
   if (registro.estado_publicacion === 'publicado') {
+    // Exclusividad 1:1 con el grupo, en el sentido que faltaba (H-1).
+    var grupoVigenteAnimal = webGrupoVigenteDeAnimal(a);
+    if (grupoVigenteAnimal) return { status: 'warning', error: webErrorExclusividadGrupo(grupoVigenteAnimal) };
     var check = webValidarPublicacion(webFilaAPublicacion(registro), a);
     if (!check.ok) {
       return {
@@ -1338,6 +1386,8 @@ function webEstadoAnimal(body, user) {
   if (!previa) return { status: 'error', error: 'Este animal aún no tiene publicación web. Abre "Publicación web" para configurarla.' };
   var a = webMapaAnimales()[animalId];
   if (estado === 'publicado') {
+    var grupoVigenteAnimal = webGrupoVigenteDeAnimal(a);
+    if (grupoVigenteAnimal) return { status: 'warning', error: webErrorExclusividadGrupo(grupoVigenteAnimal) };
     var check = webValidarPublicacion(Object.assign({}, previa, { estado_publicacion: 'publicado' }), a);
     if (!check.ok) {
       return {
@@ -2247,8 +2297,29 @@ function webDeployProbar() {
 // ==================== CANAL PÚBLICO ====================
 
 function webPublicables() {
-  return webFilasWeb().filter(function (p) {
+  var publicadas = webFilasWeb().filter(function (p) {
     return p.estado_publicacion === 'publicado' && p.listed !== false;
+  });
+  // Deduplicación por animal: una ficha no puede salir dos veces (individual y
+  // en su grupo). Los datos antiguos pueden tener las dos publicadas, y las
+  // guardas de escritura solo cubren las transiciones nuevas. Cuando el grupo
+  // está publicado, manda el grupo.
+  var gruposVigentes = {};
+  var hayGrupo = false;
+  for (var i = 0; i < publicadas.length; i++) {
+    if (publicadas[i].tipo === 'animal_grupo') {
+      gruposVigentes[String(publicadas[i].origen_id)] = true;
+      hayGrupo = true;
+    }
+  }
+  if (!hayGrupo) return publicadas;
+  var mapaAnimales = webMapaAnimales();
+  return publicadas.filter(function (p) {
+    if (p.tipo !== 'animal') return true;
+    var a = mapaAnimales[String(p.origen_id)];
+    if (!a) return true;
+    var gid = webTexto(a.grupo_id || a.grupo);
+    return !(gid && gruposVigentes[String(gid)]);
   });
 }
 
@@ -2394,9 +2465,36 @@ function webPublicacionPublica(slug) {
     }
   }
 
+  // Ficha individual superada por la publicación de su grupo (deduplicación
+  // de H-1): el detalle no la sirve, pero el enlace se conserva con una 301 al
+  // grupo, igual que un slug antiguo. Así ni el canal ni las estáticas pueden
+  // publicar al mismo animal dos veces.
+  var todas = webFilasWeb();
+  for (var d = 0; d < todas.length; d++) {
+    var indiv = todas[d];
+    if (indiv.tipo !== 'animal' || indiv.estado_publicacion !== 'publicado' || indiv.slug !== s) continue;
+    var grupoConf = webGrupoVigenteDeAnimal(mapa[String(indiv.origen_id)], todas);
+    if (!grupoConf) continue;
+    var grupoServido = null;
+    for (var gs = 0; gs < pubs.length; gs++) {
+      if (pubs[gs].tipo === 'animal_grupo' && String(pubs[gs].origen_id) === String(grupoConf.grupo_id)) { grupoServido = pubs[gs]; break; }
+    }
+    if (!grupoServido) continue;
+    return {
+      status: 'success',
+      redirect: {
+        from: webRutaPublica('animal', s),
+        to: webRutaPublica('animal_grupo', grupoServido.slug),
+        slug: grupoServido.slug,
+        permanent: true,
+        motivo: 'ficha_en_grupo'
+      },
+      data: webConstruirPublicacion(grupoServido, webOrigenDePublicacion(grupoServido, mapa, mapaGrupos), { ficha: true })
+    };
+  }
+
   // Lapida: el slug existio y se retiro. Se responde `gone` (410 logico) en
   // lugar de un 404, para que la web y los buscadores lo traten como retirado.
-  var todas = webFilasWeb();
   for (var r = 0; r < todas.length; r++) {
     if (todas[r].estado_publicacion !== 'retirado') continue;
     var coincide = todas[r].slug === s;
@@ -2424,9 +2522,12 @@ function webRedirects() {
   if (diag) return diag;
   var base = webDominioPublico();
   var out = [];
-  webPublicables().forEach(function (p) {
+  var servidas = webPublicables();
+  var vistos = {};
+  servidas.forEach(function (p) {
     (p.slug_historial || []).forEach(function (h) {
       if (!h.slug || h.slug === p.slug) return;
+      vistos[String(h.slug)] = true;
       out.push({
         from: (base || '') + webRutaPublica(p.tipo, h.slug),
         to: (base || '') + webRutaPublica(p.tipo, p.slug),
@@ -2435,6 +2536,32 @@ function webRedirects() {
         slug: h.slug,
         currentSlug: p.slug,
         changedAt: h.fecha || ''
+      });
+    });
+  });
+  // Fichas individuales superadas por la publicación de su grupo: la web
+  // conserva el enlace con una 301 al grupo (mismo tratamiento que un slug
+  // antiguo) en lugar de servir al animal dos veces.
+  var filas = webFilasWeb();
+  servidas.forEach(function (g) {
+    if (g.tipo !== 'animal_grupo') return;
+    webMiembrosDeGrupo(g.origen_id, null).forEach(function (a) {
+      var pa = null;
+      for (var i = 0; i < filas.length; i++) {
+        if (filas[i].tipo === 'animal' && String(filas[i].origen_id) === String(a.id)) { pa = filas[i]; break; }
+      }
+      if (!pa || pa.estado_publicacion !== 'publicado' || !pa.slug || pa.slug === g.slug) return;
+      if (vistos[String(pa.slug)]) return;
+      vistos[String(pa.slug)] = true;
+      out.push({
+        from: (base || '') + webRutaPublica('animal', pa.slug),
+        to: (base || '') + webRutaPublica('animal_grupo', g.slug),
+        status: 301,
+        type: 'animal',
+        slug: pa.slug,
+        currentSlug: g.slug,
+        motivo: 'ficha_en_grupo',
+        changedAt: pa.actualizado_en || ''
       });
     });
   });
@@ -2482,8 +2609,11 @@ function webSitemap() {
     return { status: 'success', generatedAt: webAhora(), data: [], notice: 'Sin dominio público: la base actual es la demo de GitHub Pages' };
   }
   var mapa = webMapaAnimales();
-  var urls = webFilasWeb()
-    .filter(function (p) { return p.estado_publicacion === 'publicado' && p.indexable; })
+  // Sale de `webPublicables` (publicado + listado + sin duplicados por grupo):
+  // si se leyera la hoja entera, la ficha individual superada por su grupo
+  // seguiría entrando en el sitemap y las estáticas duplicarían el animal.
+  var urls = webPublicables()
+    .filter(function (p) { return p.indexable; })
     .map(function (p) {
       var ruta = webRutaPublica(p.tipo, p.slug);
       return {

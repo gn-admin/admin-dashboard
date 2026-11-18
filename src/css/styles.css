@@ -8339,6 +8339,11 @@ body.web-picker-abierto { overflow: hidden; }
 }
 .web-picker-datos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .web-picker-vacio { margin: 8px 0; font-size: var(--text-sm, 0.875rem); color: var(--gray-500, #6b7280); }
+.web-picker-aviso {
+  margin: 0; padding: 8px 10px; font-size: var(--text-sm, 0.875rem); line-height: 1.45;
+  color: var(--gray-700, #374151); background: var(--gray-100, #f3f4f6);
+  border: 1px solid var(--gray-200, #e5e7eb); border-radius: 8px;
+}
 
 /* Móvil: tarjeta de publicación legible (título arriba, acciones en rejilla).
    El paso tabla → tarjetas ya lo hace el patrón global (≤767px, U4). */

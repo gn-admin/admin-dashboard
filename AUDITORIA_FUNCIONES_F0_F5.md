@@ -10,8 +10,8 @@
 - **Volumen:** 117 funciones en `WebPublicaciones.gs`, 104 métodos en `web.js`, 16 rutas `web-*` en `Code.gs` y 15 llamadas del gestor en `api.js`. 8 suites y 705 pruebas en verde.
 - **Producción estaba desactualizada:** antes del push servía `sw` **v267** (16 versiones por detrás). Tras el push, `v283` y `js/web.js` **idéntico byte a byte** al local.
 - **Backend al día:** el gestor de producción consulta grupos y recibe agregados (`Cachorros de Oreo`, 4 miembros, estado derivado `en_adopcion`), así que el `.gs` desplegado incluye F4.
-- **F0–F5 cumplen** salvo una regla del propio contrato: la **exclusividad 1:1 ↔ grupo solo se aplica en una dirección** (H-1).
-- **Huecos funcionales:** 5 (exclusividad inversa, selector, indicador de grupo, refresco/importar, deploy al cambiar miembros) y 2 decisiones abiertas (D7 y orden de publicaciones).
+- **F0–F5 cumplen**; la exclusividad 1:1 ↔ grupo se aplica ya en **las dos direcciones** (H-1 cerrado el 2026-11-18).
+- **Huecos funcionales:** 5 al auditar, **3 abiertos** (indicador de grupo en el miembro, refresco/importar, deploy al cambiar miembros); cerrados H-1 y H-2. Siguen abiertas 2 decisiones (D7 y orden de publicaciones).
 
 ## 1. Producción verificada (2026-11-18)
 
@@ -375,14 +375,14 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 | `preview == feed` | `webConstruirPublicacion` (981) en preview y canal | ✅ |
 | Slug único + historial + 301 | `webSlugOcupado` (852), `webHistorial` (496), `webRedirects` (2422) | ✅ |
 | Whitelist y saneado | `webBloqueAnimal` (905), `webBloqueEvento` (955), `webSanearHtml` (357), `webUrlSegura` (222) | ✅ |
-| Exclusividad 1:1 ↔ grupo | solo en `webEstadoGrupoPub` (1564) | ⚠️ **una dirección** (H-1) |
+| Exclusividad 1:1 ↔ grupo | `webEstadoGrupoPub` (1564) + `webGrupoVigenteDeAnimal`, `webEstadoAnimal`, `webUpsertAnimal`, `webPublicables` | ✅ **dos direcciones** (H-1) |
 
 ### F1 — UX y flujos
 
 | Requisito | Dónde | Estado |
 |---|---|---|
 | Pestañas con contadores | `_contadoresTab` (web.js 344) | ✅ |
-| Selector de animales sin publicación | `animalesSinPublicacion` (185), `_pickerLista` (629) | ⚠️ no excluye miembros de grupo obligatorio (H-2) |
+| Selector de animales sin publicación | `animalesSinPublicacion` (185), `animalesEnGrupoVigente`, `_pickerAvisoGrupo`, `_pickerLista` (629) | ✅ excluye y avisa (H-2) |
 | Selector de grupos | `nuevaPublicacionGrupo` (1445), `_pickerGrupoHtml` (1458) | ✅ |
 | Formularios con heredados en solo lectura | `_mostrarFormAnimal` (676), `_mostrarFormGrupo` (1486) | ✅ |
 | Acciones por estado | `_filaAnimal` (406), `_filaGrupo` (461), `_filaEvento` (437) | ✅ |
@@ -416,7 +416,7 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 | Agregación (estado, urgente, portada, miembros) | `webEstadoGrupoDerivado` (693), `webGrupoUrgente` (726), `webPortadaGrupo` (734), `webMiembrosResumen` (743) | ✅ |
 | Publicabilidad del conjunto | `webGrupoValidoParaPublicar` (715), `webValidarPublicacion` (872) | ✅ |
 | Exclusividad al activar el grupo | `webEstadoGrupoPub` (1564) | ✅ |
-| Exclusividad al publicar el individuo | — | ❌ **falta** (H-1) |
+| Exclusividad al publicar el individuo | `webGrupoVigenteDeAnimal` en `webEstadoAnimal`/`webUpsertAnimal` + dedupe en `webPublicables` | ✅ (H-1) |
 | Render público y prerender del grupo | `webBloqueGrupo` (777), `publico.js`, `prerender-publico.js` | ✅ |
 | Refresco tras cambios de miembros | recomposición en lectura | ⚠️ estática hasta el cron (H-5) |
 
@@ -436,8 +436,8 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 
 | ID | Hallazgo | Evidencia | Impacto | Coste |
 |---|---|---|---|---|
-| **H-1** | **Exclusividad 1:1 ↔ grupo invertida**: se puede publicar un individuo cuyo grupo ya está publicado | `webEstadoAnimal` (1332) y `webUpsertAnimal` (1206) no miran el grupo; `webPublicables` (2249) no deduplica; única guarda en 1564 | Dos fichas vivas del mismo animal en feed, sitemap y estática | S |
-| **H-2** | El selector de animales ofrece miembros de grupo obligatorio y no avisa | `animalesSinPublicacion` (web.js 185); 0 apariciones de «exclusiv» en `web.js` | Empuja al error de H-1 | S |
+| **H-1** | **Exclusividad 1:1 ↔ grupo invertida**: se puede publicar un individuo cuyo grupo ya está publicado | `webEstadoAnimal` y `webUpsertAnimal` no miran el grupo; `webPublicables` no deduplicaba; única guarda en `webEstadoGrupoPub` | Dos fichas vivas del mismo animal en feed, sitemap y estática | **✅ cerrado** (v284): guardas en las dos direcciones, dedupe en `webPublicables`, detalle con **301 al grupo**, sitemap desde `webPublicables` y `?endpoint=redirects` con esa 301 |
+| **H-2** | El selector de animales ofrece miembros de grupo obligatorio y no avisa | `animalesSinPublicacion` (web.js 185); 0 apariciones de «exclusiv» en `web.js` | Empuja al error de H-1 | **✅ cerrado** (v284) |
 | **H-3** | Sin indicador del estado web del grupo en la ficha del miembro | `_webEstadoChipHtml` (dashboard.js 5116) solo pinta el del animal | Incertidumbre al editar miembros | S |
 | **H-4** | No hay «importar desde ficha» ni refresco manual de la publicación | propagación solo publicación → ficha (`_propagarMediaAFicha` 1341) | Retrabajo si cambia la ficha interna | M |
 | **H-5** | Cambiar un miembro no regenera la estática | el deploy se decide en `_webAnotarDeploy` a partir de las rutas del gestor | Web desfasada hasta el cron (30 min), sin aviso | M |
@@ -450,13 +450,13 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 - **Backend:** 54 de 117 funciones con referencia directa (46 %). Las 63 restantes son, en su mayoría, helpers puros y utilidades de Drive/hoja que se ejercitan de forma indirecta a través de los flujos.
 - **Frontend:** 59 de 104 métodos con referencia directa (57 %). Los 45 sin referencia son casi todos render y handlers (`_mostrarForm*`, `_tabla`, `abrir*`, `guardar*`), cubiertos por el contrato de backend y por las pruebas de helpers.
 - **Riesgo real de la parte no referenciada:** los `get*` (`webGetAnimal` 1147, `webGetGrupo` 1466, `webGetEvento` 1680), toda la capa de Drive (`webRaizMedia`…`webCarpetaEnArbolMedia`) y `webDeployProbar`.
-- **Propuesta mínima:** pruebas de los tres `get*`, de la exclusividad en las dos direcciones y de `webPublicables` con un grupo publicado y un miembro publicado.
+- **Propuesta mínima:** pruebas de los tres `get*`, de la exclusividad en las dos direcciones y de `webPublicables` con un grupo publicado y un miembro publicado. **Hecho para exclusividad y publicables** (7 casos en `tests/web-backend.test.js` y 5 en `tests/web.test.js`, 2026-11-18); los `get*` siguen pendientes.
 
 ## 8. Conclusión y orden recomendado
 
-El gestor está **implementado y coherente con el contrato**; lo que falta no es rehacer nada, sino cerrar una regla (H-1), añadir tres avisos/acciones (H-2 a H-4), decidir dos cosas (D7 y orden) y terminar la verificación en producción con escrituras reales.
+El gestor está **implementado y coherente con el contrato**. H-1 y H-2 están cerrados (2026-11-18); lo que falta no es rehacer nada, sino añadir dos avisos/acciones (H-3, H-4), decidir dos cosas (D7 y orden) y terminar la verificación en producción con escrituras reales.
 
-1. **H-1 + H-2** (exclusividad bidireccional y aviso en el selector): evita datos incorrectos en la web.
+1. ~~**H-1 + H-2** (exclusividad bidireccional y aviso en el selector)~~ — **hecho** (v284); falta subir `WebPublicaciones.gs` a GAS.
 2. **H-5** (aviso de «publicación desactualizada» y acción de refresco/deploy).
 3. **H-4 + H-3** (importar desde ficha e indicador de grupo en el miembro).
 4. **D7** y orden de publicaciones (H-7).

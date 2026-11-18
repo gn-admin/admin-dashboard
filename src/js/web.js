@@ -181,9 +181,18 @@ const Web = {
     return (lista || []).filter(a => a && a.publicacion_id);
   },
 
-  /** Animales sin publicación web: candidatos del selector "Nueva publicación". */
+  /**
+   * Candidatos del selector "Nueva publicación": animales sin publicación y
+   * que no pertenecen a un grupo con publicación viva (exclusividad 1:1; si
+   * salieran sueltos, el backend los rechazaría al publicar).
+   */
   animalesSinPublicacion(lista) {
-    return (lista || []).filter(a => a && !a.publicacion_id);
+    return (lista || []).filter(a => a && !a.publicacion_id && !a.grupo_publicado);
+  },
+
+  /** Miembros de un grupo ya publicado: no se ofrecen sueltos, pero se avisa. */
+  animalesEnGrupoVigente(lista) {
+    return (lista || []).filter(a => a && !a.publicacion_id && !!a.grupo_publicado);
   },
 
   // ==================== ACCIONES DE UI (desde Dashboard) ====================
@@ -620,9 +629,25 @@ const Web = {
           </div>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="cerrarPickerWeb" aria-label="Cerrar">${cerrar}</button>
         </div>
+        ${this._pickerAvisoGrupo()}
         <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="search" aria-label="Buscar animal sin publicación" placeholder="Buscar por nombre o especie..." data-input="onPickerWebBuscar"></div>
         <div id="web-picker-lista" class="web-picker-lista">${this._pickerLista()}</div>
       </div>`;
+  },
+
+  /** Aviso del selector: miembros de grupos ya publicados (exclusividad 1:1). */
+  _pickerAvisoGrupo() {
+    const bloqueados = this.animalesEnGrupoVigente(this.animales);
+    if (!bloqueados.length) return '';
+    const grupos = [...new Set(bloqueados.map(a => a.grupo_publicado).filter(Boolean))];
+    const nombres = grupos.slice(0, 3).map(g => `«${this._esc(g)}»`).join(', ');
+    const resto = grupos.length > 3 ? ` y ${grupos.length - 3} más` : '';
+    const n = bloqueados.length;
+    const sujeto = n === 1 ? '1 animal no aparece' : `${n} animales no aparecen`;
+    const poseedor = grupos.length === 1 ? 'su grupo' : 'sus grupos';
+    const verbo = grupos.length === 1 ? 'ya tiene' : 'ya tienen';
+    const pronombre = n === 1 ? 'publicarlo' : 'publicarlos';
+    return `<p class="web-picker-aviso" role="status">${sujeto} aquí porque ${poseedor} ${nombres}${resto} ${verbo} publicación publicada. Oculta o retira la del grupo para ${pronombre} por separado.</p>`;
   },
 
   /** Lista de candidatos del selector (solo animales sin publicación). */
@@ -633,7 +658,9 @@ const Web = {
       return ((a.nombre || '') + ' ' + (a.especie || '') + ' ' + (a.raza || '')).toLowerCase().includes(q);
     });
     if (!libres.length) {
-      return `<p class="web-picker-vacio">${q ? 'Ningún animal sin publicar coincide con la búsqueda.' : 'No quedan animales sin publicación web.'}</p>`;
+      if (q) return `<p class="web-picker-vacio">Ningún animal sin publicar coincide con la búsqueda.</p>`;
+      const enGrupo = this.animalesEnGrupoVigente(this.animales).length;
+      return `<p class="web-picker-vacio">${enGrupo ? 'No quedan animales sueltos: los que faltan pertenecen a grupos que ya tienen publicación.' : 'No quedan animales sin publicación web.'}</p>`;
     }
     return libres.map(a => `<div class="web-picker-item">
         <div class="web-picker-datos">

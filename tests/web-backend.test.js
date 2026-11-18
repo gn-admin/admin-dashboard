@@ -1480,3 +1480,160 @@ describe('grupos · gestor, exclusividad y ciclo de vida (G-D5, G1)', () => {
     assert.equal(b.estado.publicaciones.length, 0);
   });
 });
+
+describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', () => {
+  function baseAnimal(extra) {
+    return Object.assign({
+      animal_id: 'ani_1',
+      titulo: 'Luna busca familia',
+      slug: 'luna',
+      categoria: 'Perros en adopción',
+      estado_publico: 'en_adopcion',
+      contenido_html: '<p>Luna es una perra sociable que busca una familia responsable.</p>',
+      seo: { metaDescription: 'Luna en adopción' }
+    }, extra || {});
+  }
+
+  it('bloquea publicar el individuo mientras su grupo está publicado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1', estado_publicacion: 'borrador' }), filaGrupo());
+
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, null);
+    assert.equal(r.status, 'warning');
+    assert.match(r.error, /Camada Luna/);
+    assert.match(r.error, /Oculta o retira/);
+    assert.equal(b.ctx.webPublicacionPorId('web_ani1').estado_publicacion, 'borrador');
+  });
+
+  it('bloquea también el guardado directo como publicado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(filaGrupo());
+
+    const r = b.ctx.webUpsertAnimal(baseAnimal({ estado_publicacion: 'publicado' }));
+    assert.equal(r.status, 'warning');
+    assert.match(r.error, /Camada Luna/);
+    assert.equal(b.estado.publicaciones.filter(p => p.tipo === 'animal').length, 0);
+  });
+
+  it('deja guardar el borrador aunque el grupo esté publicado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(filaGrupo());
+
+    const r = b.ctx.webUpsertAnimal(baseAnimal({ estado_publicacion: 'borrador' }));
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(r.data.estado_publicacion, 'borrador');
+  });
+
+  it('permite publicar el individuo cuando el grupo está oculto o retirado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1', estado_publicacion: 'borrador' }), filaGrupo({ estado_publicacion: 'oculto' }));
+
+    const oculto = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, null);
+    assert.equal(oculto.status, 'success', JSON.stringify(oculto));
+
+    b.estado.publicaciones.find(p => p.id === 'web_ani1').estado_publicacion = 'borrador';
+    b.estado.publicaciones.find(p => p.id === 'web_g1').estado_publicacion = 'retirado';
+    const retirado = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' }, null);
+    assert.equal(retirado.status, 'success', JSON.stringify(retirado));
+  });
+
+  it('el canal no sirve dos veces al mismo animal: gana el grupo', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), animal({ id: 'ani_3', nombre: 'Milo', grupo_id: '', grupo: '' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo(), fila({ id: 'web_ani3', origen_id: 'ani_3', slug: 'milo' }));
+
+    const pubs = plano(b.ctx.webPublicables()).map(p => p.tipo + ':' + p.origen_id).sort();
+    assert.deepEqual(pubs, ['animal:ani_3', 'animal_grupo:grp_1']);
+  });
+
+  it('sin grupo publicado el canal mantiene la ficha individual', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo({ estado_publicacion: 'borrador' }));
+
+    const pubs = plano(b.ctx.webPublicables()).map(p => p.tipo + ':' + p.origen_id);
+    assert.deepEqual(pubs, ['animal:ani_1']);
+  });
+
+  it('el listado del gestor marca grupo y grupo publicado para el selector', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), animal({ id: 'ani_2', nombre: 'Milo', grupo_id: '', grupo: '' }));
+    b.estado.publicaciones.push(filaGrupo());
+
+    const filas = plano(b.ctx.webListarAnimales({}).data);
+    const luna = filas.find(f => f.animal_id === 'ani_1');
+    assert.equal(luna.grupo_id, 'grp_1');
+    assert.equal(luna.grupo_publicado, 'Camada Luna');
+    const milo = filas.find(f => f.animal_id === 'ani_2');
+    assert.equal(milo.grupo_id, '');
+    assert.equal(milo.grupo_publicado, '');
+  });
+
+  it('el detalle por slug no sirve la ficha individual: redirige al grupo', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo());
+
+    const r = b.ctx.webPublicacionPublica('luna');
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.ok(r.redirect, 'debe redirigir, no servir la ficha duplicada');
+    assert.equal(r.redirect.permanent, true);
+    assert.equal(r.redirect.motivo, 'ficha_en_grupo');
+    assert.equal(r.redirect.from, '/animales/luna');
+    assert.equal(r.redirect.to, '/animales/camada-luna');
+    assert.equal(r.data.slug, 'camada-luna');
+    assert.equal(r.data.type, 'animal_grupo');
+  });
+
+  it('el detalle sigue sirviendo la individual cuando el grupo no está publicado', () => {
+    const b = crearBackend();
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo({ estado_publicacion: 'borrador' }));
+
+    const r = b.ctx.webPublicacionPublica('luna');
+    assert.equal(r.status, 'success');
+    assert.equal(r.redirect, undefined);
+    assert.equal(r.data.slug, 'luna');
+  });
+
+  it('el sitemap no lista la ficha individual superada por el grupo', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo());
+
+    const locs = plano(b.ctx.webSitemap().data).map(u => u.loc).sort();
+    assert.deepEqual(locs, ['https://gruponebak.net/animales/camada-luna']);
+  });
+
+  it('las redirecciones conservan el enlace de la ficha individual hacia el grupo', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }), miembro({ id: 'ani_2', nombre: 'Sol' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }), filaGrupo());
+
+    const entradas = plano(b.ctx.webRedirects().data);
+    const entrada = entradas.find(x => x.slug === 'luna');
+    assert.ok(entrada, JSON.stringify(entradas));
+    assert.equal(entrada.status, 301);
+    assert.equal(entrada.currentSlug, 'camada-luna');
+    assert.equal(entrada.motivo, 'ficha_en_grupo');
+    assert.equal(entrada.from, 'https://gruponebak.net/animales/luna');
+    assert.equal(entrada.to, 'https://gruponebak.net/animales/camada-luna');
+  });
+
+  it('sin grupo publicado no hay redirección de la individual', () => {
+    const b = crearBackend();
+    b.ctx.CONFIG.PUBLIC_WEB_BASE_URL = 'https://gruponebak.net/';
+    b.estado.animales.push(miembro({ id: 'ani_1' }));
+    b.estado.publicaciones.push(fila({ id: 'web_ani1' }));
+
+    assert.deepEqual(plano(b.ctx.webRedirects().data), []);
+    assert.equal(b.ctx.webSitemap().data.length, 1);
+  });
+});

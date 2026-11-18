@@ -53,6 +53,47 @@ describe('Web: publicaciones frente a fichas internas', () => {
   });
 });
 
+describe('exclusividad 1:1 con grupo publicado (H-1, H-2)', () => {
+  const lista = [
+    { animal_id: 'a1', nombre: 'Luna' },
+    { animal_id: 'a2', nombre: 'Sol', grupo_id: 'grp_1', grupo_publicado: 'Camada Luna' },
+    { animal_id: 'a3', nombre: 'Nube', publicacion_id: 'p1' }
+  ];
+
+  it('no ofrece sueltos los miembros de un grupo publicado', () => {
+    assert.deepEqual(Web.animalesSinPublicacion(lista).map(a => a.animal_id), ['a1']);
+  });
+
+  it('los identifica aparte para poder avisar', () => {
+    assert.deepEqual(Web.animalesEnGrupoVigente(lista).map(a => a.animal_id), ['a2']);
+    assert.deepEqual(Web.animalesEnGrupoVigente(null), []);
+  });
+
+  it('un miembro con publicación propia no se ofrece ni se avisa', () => {
+    const mixta = [{ animal_id: 'a4', publicacion_id: 'p9', grupo_publicado: 'Camada Luna' }];
+    assert.deepEqual(Web.animalesSinPublicacion(mixta), []);
+    assert.deepEqual(Web.animalesEnGrupoVigente(mixta), []);
+  });
+
+  it('el selector avisa con el nombre del grupo y no lista al miembro', () => {
+    Web.animales = lista;
+    Web._pickerQ = '';
+    const dialogo = Web._pickerHtml();
+    assert.match(dialogo, /web-picker-aviso/);
+    assert.match(dialogo, /Camada Luna/);
+    assert.match(dialogo, /Oculta o retira/);
+    const listado = Web._pickerLista();
+    assert.doesNotMatch(listado, /Sol/);
+    assert.match(listado, /Luna/);
+  });
+
+  it('sin candidatos sueltos, el vacío explica el motivo', () => {
+    Web.animales = [{ animal_id: 'a2', nombre: 'Sol', grupo_publicado: 'Camada Luna' }];
+    Web._pickerQ = '';
+    assert.match(Web._pickerLista(), /pertenecen a grupos que ya tienen publicación/);
+  });
+});
+
 describe('Web._pickerLista', () => {
   it('solo lista animales sin publicación y filtra por búsqueda', () => {
     Web.animales = [
