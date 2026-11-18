@@ -117,6 +117,38 @@
 - [ ] Sin errores nuevos en consola ni en la pestaña de red (404 de imágenes o `index.json`
       antes del primer deploy pueden ser esperados; anotarlos).
 
+## Móvil y tablet — toda la gestión, no solo mirarla
+
+El gestor es una PWA: no hay ninguna función que exija escritorio. Repetir estas
+comprobaciones en **tablet (768–1024, vertical y horizontal)** y en **móvil
+(360–430)** con las acciones reales, al menos una vez por cada fase de arriba.
+
+- [ ] Navegación completa: menú lateral / «Más» y barra inferior llegan a todas
+      las páginas del rol, marcan la activa y no dejan nada inalcanzable por falta
+      de sitio en la barra.
+- [ ] Login y cierre de sesión tecleando en el móvil; al enfocar un campo el
+      teclado no lo tapa (formularios con scroll suficiente).
+- [ ] Animales: abrir ficha, editar y guardar; el formulario largo se recorre sin
+      saltos, `details` desplegables incluidos.
+- [ ] Publicaciones: crear / editar / preview / publicar / ocultar / retirar /
+      restaurar / eliminar desde las tarjetas de fila, sin scroll horizontal.
+- [ ] Grupos: crear, editar (miembros en solo lectura), preview, publicar y
+      retirar desde el dispositivo.
+- [ ] Media: subir portada y galería desde cámara o galería del dispositivo, ver
+      el chip del archivo y borrarlo con «×».
+- [ ] Selector «Publicar animal» / «Publicar grupo»: buscar, seleccionar y crear
+      con el teclado abierto, sin quedarse sin ver la lista.
+- [ ] Snackbar: se lee entero, aparece **por encima de la barra inferior** (con
+      *safe area*), no tapa acciones y se anuncia al lector de pantalla.
+- [ ] Modales, preview y confirmaciones: cabecera y botones alcanzables con el
+      pulgar, cierre visible y foco de vuelta al botón que los abrió.
+- [ ] Tablas convertidas en tarjetas: no se pierde ningún dato (estado, slug,
+      completitud, acciones) ni aparece scroll lateral.
+- [ ] Zonas táctiles ≥44 px en pestañas, menú y acciones principales; las acciones
+      secundarias de fila (`.btn-sm`, ~36–40 px) cumplen al menos el mínimo AA de
+      24 px y no se solapan entre sí.
+- [ ] Girar el dispositivo en mitad de un formulario no pierde lo escrito.
+
 ## Cierre
 
 - [ ] Limpieza del contenido de prueba (retirar u ocultar y eliminar borradores) y volver a

@@ -1957,8 +1957,11 @@ body {
   z-index: 800;
   max-width: min(92vw, 440px);
   text-align: center;
-  animation: snackbarIn 0.25s ease-out;
-  display: none;
+  /* Sin display:none: es una region viva (role="status") y tiene que seguir en
+     el arbol de accesibilidad para que el lector anuncie el mensaje. Invisible
+     y sin captura de clics hasta que hay algo que decir. */
+  opacity: 0;
+  pointer-events: none;
   border-left: 5px solid transparent;
 }
 
@@ -1987,7 +1990,9 @@ body {
 .toast-error.toast-danger::before { content: '×'; }
 
 .toast-error.active {
-  display: block;
+  opacity: 1;
+  pointer-events: auto;
+  animation: snackbarIn 0.25s ease-out;
 }
 
 @keyframes snackbarIn {

@@ -8917,15 +8917,16 @@ const Dashboard = {
     // el selector de error coincidiera con todos los snacks y los pintaba rojos.
     const tipo = type === 'error' ? 'danger' : type;
     el.className = 'toast-error toast-' + tipo;
-    el.classList.remove('active');
-    void el.offsetWidth;
+    void el.offsetWidth; // reflow: reinicia la animación de entrada
     el.classList.add('active');
     clearTimeout(this._snackbarTimer);
     const token = (this._snackbarToken = (this._snackbarToken || 0) + 1);
     this._snackbarTimer = setTimeout(() => {
       if (this._snackbarToken !== token) return;
-      el.classList.remove('active');
+      // Sin .active vuelve a oculto y se vacia la region viva: un mensaje
+      // caducado no debe quedar ahi para quien navegue con lector de pantalla.
       el.className = 'toast-error';
+      el.textContent = '';
     }, 5000);
   },
 

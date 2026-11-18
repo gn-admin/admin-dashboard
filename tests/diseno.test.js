@@ -13,6 +13,9 @@ const path = require('node:path');
 const RAIZ = path.join(__dirname, '..');
 const leer = f => fs.readFileSync(path.join(RAIZ, 'src', f), 'utf8');
 const CSS = leer('css/styles.css');
+// Sin comentarios: al buscar declaraciones, un comentario que mencione
+// "display:none" colaba como si fuera la regla.
+const CSS_LIMPIO = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 
 // --- variables del :root y resolucion de var(--x) ---
 const RAIZ_VARS = Object.fromEntries(
@@ -26,10 +29,10 @@ const resolver = v => {
 
 // --- declaraciones de una regla concreta ---
 const declaraciones = selector => {
-  const i = CSS.indexOf(selector + ' {');
+  const i = CSS_LIMPIO.indexOf(selector + ' {');
   assert.ok(i >= 0, 'No existe la regla ' + selector);
-  const fin = CSS.indexOf('}', i);
-  const bloque = CSS.slice(i + selector.length + 2, fin);
+  const fin = CSS_LIMPIO.indexOf('}', i);
+  const bloque = CSS_LIMPIO.slice(i + selector.length + 2, fin);
   return Object.fromEntries([...bloque.matchAll(/([a-z-]+)\s*:\s*([^;]+);/g)].map(m => [m[1], m[2].trim()]));
 };
 
@@ -195,5 +198,25 @@ describe('integridad estatica: clases, ids e iconos', () => {
     assert.match(CSS, /\.acuerdo-preview-btns/);
     assert.match(CSS, /\.acuerdo-preview-chip\.is-saved/);
     assert.match(CSS, /\.contrato-doc-firma-espacio/);
+  });
+});
+
+describe('snackbar del gestor: region viva siempre disponible', () => {
+  it('el contenedor es una region viva atomica en el HTML inicial', () => {
+    assert.match(leer('index.html'),
+      /id="error-message"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/);
+  });
+
+  // Regresion: con display:none el aviso sale del arbol de accesibilidad al
+  // llegar el mensaje y algunos lectores no lo anuncian. Se oculta con opacidad
+  // (sin captura de clics) y .active lo devuelve a la vista con animacion.
+  it('no se oculta con display:none', () => {
+    const base = declaraciones('.toast-error');
+    assert.equal(base.display, undefined, '.toast-error no debe usar display:none');
+    assert.equal(base.opacity, '0');
+    assert.equal(base['pointer-events'], 'none');
+    const activo = declaraciones('.toast-error.active');
+    assert.equal(activo.opacity, '1');
+    assert.equal(activo['pointer-events'], 'auto');
   });
 });
