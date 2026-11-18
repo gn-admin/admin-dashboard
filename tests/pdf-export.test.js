@@ -143,10 +143,12 @@ describe('_buildTerminosAdopcion: anexo independiente', () => {
   const html = PdfExport._buildTerminosAdopcion(c, LOGO);
 
   it('genera un documento propio con los terminos y sin rol', () => {
+    assert.match(html, /<title>Hoja de estipulaciones<\/title>/);
     assert.match(html, /Términos y condiciones de adopción responsable/);
     assert.match(html, /Anexo del contrato/);
     assert.match(html, /Documento 2 de 2|Anexo del contrato/);
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
+    assert.match(html, /\.contrato-doc-estipulacion/);
   });
 });
 

@@ -194,15 +194,15 @@ const PdfExport = {
   },
 
   exportTerminosAdopcion(c) {
-    return this._printAsync(`Terminos-Adopcion-${c.adopcion_id || 'signed'}.pdf`, (logo) => this._buildTerminosAdopcion(c, logo));
+    return this._printAsync(`Estipulaciones-Adopcion-${c.adopcion_id || 'signed'}.pdf`, (logo) => this._buildTerminosAdopcion(c, logo));
   },
 
   _buildTerminosAdopcion(c, logo) {
     const body = (typeof Dashboard !== 'undefined' && Dashboard._terminosAdopcionCuerpo)
       ? Dashboard._terminosAdopcionCuerpo({}, c || {}, logo)
-      : '<p>No se pudo cargar el documento de cláusulas de adopción.</p>';
+      : '<p>No se pudo cargar la hoja de estipulaciones.</p>';
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-      <title>Cláusulas de adopción</title>
+      <title>Hoja de estipulaciones</title>
       <style>
         @page{size:A4;margin:2cm}
         body{font:11pt/1.6 Arial,sans-serif;color:#191919;padding:0;margin:0}
@@ -218,6 +218,7 @@ const PdfExport = {
         .contrato-doc-entidad{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:12px 14px;margin:0 0 18px;border:1px solid #e8eaed;border-radius:8px;background:#f9fafb;break-inside:avoid}
         .contrato-doc-entidad-datos{flex:1;min-width:0;font-size:9pt;color:#4b5563;line-height:1.55}
         .contrato-doc-entidad-datos b{display:block;color:#191919;font-size:10pt}
+        .contrato-doc-entidad-datos span b{display:inline;font-size:inherit;color:#6b7280;font-weight:600}
         .contrato-doc-entidad-datos span{display:block;overflow-wrap:anywhere}
         .contrato-doc-entidad-rol{color:#6b7280;font-size:8pt;margin-bottom:4px}
         .contrato-doc-sello{width:94px;height:94px;flex:0 0 94px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff}
@@ -232,6 +233,11 @@ const PdfExport = {
         .contrato-doc-firma small{display:block;margin-top:2px;color:#6b7280}
         .contrato-doc-firma-img{height:58px;max-width:100%;object-fit:contain;display:block;margin-top:4px}
         .contrato-doc-sello--firma{margin-top:6px}
+        .contrato-doc-estipulacion{margin:0 0 9px;font-size:10pt;text-align:justify;break-inside:avoid}
+        .contrato-doc-estipulacion p{margin:0 0 4px}
+        .contrato-doc-estipulacion b{color:#191919}
+        .contrato-doc-lista{margin:2px 0 6px;padding-left:20px;font-size:10pt}
+        .contrato-doc-lista li{margin-bottom:2px}
         .contrato-doc-nota{margin-top:18px;padding:10px 12px;border-radius:8px;background:#ebf5fb;color:#374151;font-size:8pt}
       </style></head><body><div class="contrato-doc">${body}</div></body></html>`;
   },

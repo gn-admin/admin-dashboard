@@ -1225,7 +1225,7 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
     assert.equal(Dashboard._debeOfrecerMailto(null), false);
   });
 
-  it('_contratoTerminosHtml incluye clausulas y escapa los nombres', () => {
+  it('_contratoTerminosHtml incluye estipulaciones y escapa los nombres', () => {
     const html = Dashboard._contratoTerminosHtml({ adoptante: 'Ana <b>X</b>', animal: 'Luna' });
     assert.match(html, /Contrato de adopción/);
     assert.match(html, /hasta que dicho animal muera/);
@@ -1263,13 +1263,40 @@ describe('fases de adopcion: requisitos, checklists y contrato', () => {
     assert.match(html, /Tutor \/ persona de apoyo/);
   });
 
-  it('_terminosAdopcionHtml es un anexo independiente con sus clausulas', () => {
+  it('_contratoTextos da la version que se guarda al firmar', () => {
+    const T = Dashboard._contratoTextos();
+    assert.equal(T.version, '2.0');
+    assert.equal(T.estipulaciones.length, 20);
+  });
+
+  it('_terminosAdopcionHtml es la hoja de estipulaciones con sus 20 estipulaciones y su version', () => {
     const html = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, { f1_dni: '123' });
-    assert.match(html, /Cláusulas de adopción responsable/);
+    assert.match(html, /Hoja de estipulaciones/);
+    assert.match(html, /Versión 2\.0 \(2026\/11\/18\)/);
+    assert.equal((html.match(/contrato-doc-estipulacion/g) || []).length, 20);
+    assert.match(html, /1ª\./);
+    assert.match(html, /20ª\./);
     assert.match(html, /Aceptado por el adoptante/);
-    assert.match(html, /Datos personales/);
     assert.match(html, /SELLO DE LA ENTIDAD/);
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
+  });
+
+  it('_terminosAdopcionHtml usa los importes del contrato y cae a 100/900', () => {
+    const con = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, { donacion_adoptante: 150, indemnizacion_importe: 600 });
+    assert.match(con, /150 €/);
+    assert.match(con, /600 €/);
+    const sin = Dashboard._terminosAdopcionHtml({ adoptante: 'Ana', animal: 'Luna' }, {});
+    assert.match(sin, /100 €/);
+    assert.match(sin, /900 €/);
+  });
+
+  it('_terminosAdopcionHtml firma tambien al tutor cuando lo hay', () => {
+    const html = Dashboard._terminosAdopcionHtml(
+      { adoptante: 'Ana', animal: 'Luna' },
+      { f1_nombre: 'Ana', f1_dni: '123', f2_nombre: 'Luis', f2_rol: 'Tutor', f2_dni: '456' }
+    );
+    assert.match(html, /Tutor \/ persona de apoyo/);
+    assert.match(html, /DNI 456/);
   });
 
   it('_contratoEntidadDatos usa el nombre por defecto y no inventa CIF', () => {

@@ -6394,16 +6394,16 @@ const Dashboard = {
     const accionesFirmado = cerrado ? `
         <div class="detail-actions-inline">
           <button type="button" class="btn btn-primary btn-sm" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} Descargar contrato</button>
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar estipulaciones</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoDoc" data-arg0="${p.id}">${Icons.eye} Ver documento</button>
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver estipulaciones</button>
         </div>` : `
         <div class="detail-actions-inline">
           <button type="button" class="btn btn-primary btn-sm" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} Descargar contrato</button>
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} Descargar estipulaciones</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoEmailForm" data-arg0="${p.id}">${Icons.mail} Enviar por email</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoDoc" data-arg0="${p.id}">${Icons.eye} Ver documento</button>
-          <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver cláusulas</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver estipulaciones</button>
           <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoIdentidad" data-arg0="${p.id}">${Icons.pencil} Foto / nombre</button>
           <button type="button" class="btn btn-danger btn-sm" data-action="anularContrato" data-arg0="${p.id}">${Icons.xCircle} Anular firma</button>
         </div>`;
@@ -6700,62 +6700,68 @@ const Dashboard = {
     </div>`;
   },
 
-  // Base comun del documento de "he leido y acepto los terminos". El PDF y el
-  // modal comparten estas clausulas para que no se separen con el tiempo.
-  _terminosAdopcionClausulas() {
-    return [
-      { titulo: 'Objeto', texto: 'Estos términos regulan la adopción responsable del animal identificado en el contrato y forman parte inseparable de él. El adoptante acepta las obligaciones que aquí se recogen.' },
-      { titulo: 'Capacidad y veracidad', texto: 'El adoptante declara ser mayor de edad, tener capacidad legal para asumir esta responsabilidad y que los datos personales facilitados son veraces y están actualizados.' },
-      { titulo: 'Cuidados y bienestar', texto: 'El adoptante se compromete a proporcionar al animal alimentación, agua, refugio, higiene, ejercicio, compañía y un trato respetuoso durante toda su vida, adaptados a su especie y necesidades.' },
-      { titulo: 'Salud veterinaria', texto: 'El adoptante mantendrá el microchip actualizado, las vacunas y desparasitaciones al día, acudirá al veterinario ante cualquier problema de salud y, cuando proceda, esterilizará al animal y aportará el informe acreditativo.' },
-      { titulo: 'Prohibiciones', texto: 'El animal no se utilizará para cría, venta, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos. No permanecerá atado ni encerrado en jaulas, terrazas, patios o garajes.' },
-      { titulo: 'Seguimiento', texto: 'El adoptante acepta el periodo de prueba de 15-30 días y el seguimiento posterior a 1, 3, 6 y 12 meses. Facilitará las visitas, fotografías y comprobaciones necesarias para verificar el bienestar del animal.' },
-      { titulo: 'Gastos', texto: 'Todos los gastos derivados del cuidado del animal (alimentación, veterinario, seguro, identificaciones y otros) corren a cargo del adoptante.' },
-      { titulo: 'Devolución', texto: 'Si el adoptante no puede continuar cuidando al animal, deberá informar a la entidad y devolverlo. Nunca lo abandonará ni lo entregará a terceros sin autorización expresa.' },
-      { titulo: 'Datos personales', texto: 'Los datos del adoptante y del tutor se tratarán para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición ante la entidad.' },
-      { titulo: 'Microchip y titularidad', texto: 'Durante el periodo de adaptacion (15-30 dias) el microchip podra permanecer a nombre de la entidad, lo que permite a la protectora reclamar al animal en caso de incumplimiento. Tras ese periodo se transferira la titularidad al adoptante.' },
-      { titulo: 'Prohibicion de cesion', texto: 'No podra vender, regalar, ceder ni prestar el animal a terceros sin autorizacion expresa y por escrito de la entidad. Si no pudiera continuar con su cuidado, contactara con Grupo Nebak para su devolucion.' },
-      { titulo: 'Informacion veterinaria', texto: 'Informara a la entidad si el veterinario le indica que el animal padece alguna enfermedad o le recomienda la eutanasia, para que la entidad pueda dar su opinion al respecto.' },
-      { titulo: 'Incumplimiento y aceptación', texto: 'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan. El adoptante declara haber leído, comprendido y aceptado estos términos.' }
-    ];
-  },
-
+  // Hoja de estipulaciones que el adoptante firma junto al contrato (anexo).
+  // Comparte texto y version con el contrato (ContratoTextos): la hoja, el
+  // documento del modal y el PDF no pueden contar cosas distintas.
   _terminosAdopcionCuerpo(p, c, logo) {
     const cc = c || {};
+    const T = this._contratoTextos();
     const nombre = cc.f1_nombre || (p && p.adoptante) || '[adoptante]';
     const animal = cc.animal || (p && p.animal) || '[animal]';
     const fecha = cc.fecha ? this._fmtFecha(cc.fecha) : '[fecha]';
     const ent = this._contratoEntidadDatos(cc);
-    const clausulas = this._terminosAdopcionClausulas();
-    const firmaImg = cc.f1_firma && String(cc.f1_firma).indexOf('data:') === 0
-      ? `<img class="contrato-doc-firma-img" src="${this._esc(cc.f1_firma)}" alt="Firma del adoptante">`
-      : '';
+    const tutor = this._contratoTutor(cc);
+    const def = this._contratoImportesPorDefecto ? this._contratoImportesPorDefecto() : { donacion: 100, indemnizacion: 900 };
+    // Misma regla que el contrato y el formulario: con vacio o texto, el valor del documento.
+    const importe = (v, porDefecto) => this._contratoImporte
+      ? this._contratoImporte(v, porDefecto)
+      : (v != null && v !== '' ? v : porDefecto);
+    const importes = {
+      donacion: importe(cc.donacion_adoptante, def.donacion),
+      indemnizacion: importe(cc.indemnizacion_importe, def.indemnizacion)
+    };
+    const version = T ? T.version : '2.0';
+    const versionFecha = T ? T.fecha : '2026/11/18';
     const logoSrc = logo || 'assets/icons/logo-nebak.jpg';
+    const firmaImg = (f, alt) => f && String(f).indexOf('data:') === 0
+      ? `<img class="contrato-doc-firma-img" src="${this._esc(f)}" alt="${alt}">`
+      : '';
+    const tutorHtml = tutor ? `<div class="contrato-doc-firma">
+          <div class="contrato-doc-firma-label">Tutor / persona de apoyo</div>
+          ${firmaImg(tutor.f2_firma, 'Firma del tutor')}
+          <b>${this._esc(tutor.f2_nombre)}</b><small>DNI ${this._esc(tutor.f2_dni || '—')}</small>
+        </div>` : '';
+    // El numero va dentro del primer parrafo: si no, queda solo en su linea.
+    const estipulaciones = (T ? T.estipulaciones : []).map(est => {
+      const x = T.texto(est, importes);
+      const parrafos = x.parrafos.map((t, i) => `<p>${i === 0 ? `<b>${est.n}ª.</b> ` : ''}${this._esc(t)}</p>`).join('');
+      const lista = x.lista.length
+        ? `<ol class="contrato-doc-lista">${x.lista.map(t => `<li>${this._esc(t)}</li>`).join('')}</ol>`
+        : '';
+      return `<div class="contrato-doc-estipulacion">${parrafos}${lista}</div>`;
+    }).join('');
     return `<div class="contrato-doc-header">
         <img src="${this._esc(logoSrc)}" alt="${this._esc(ent.nombre)}">
-        <div><div class="contrato-doc-title">Cláusulas de adopción responsable</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión 1.0 (2026/11/10)</div></div>
+        <div><div class="contrato-doc-title">Hoja de estipulaciones</div><div class="contrato-doc-sub">Anexo del contrato · ${this._esc(ent.nombre)} · Versión ${this._esc(version)} (${this._esc(versionFecha)})</div></div>
       </div>
       <div class="contrato-doc-meta">
-        <div><span class="label">Adoptante</span><b>${this._esc(nombre)}</b></div>
-        <div><span class="label">Animal</span><b>${this._esc(animal)}</b></div>
-        <div><span class="label">Fecha</span>${this._esc(fecha)}</div>
-        <div><span class="label">Documento</span>Anexo de aceptación</div>
+        <div><div class="label">Adoptante</div><b>${this._esc(nombre)}</b></div>
+        <div><div class="label">Animal</div><b>${this._esc(animal)}</b></div>
+        <div><div class="label">Fecha</div>${this._esc(fecha)}</div>
+        <div><div class="label">Documento</div>Hoja de estipulaciones (anexo)</div>
       </div>
-      <p class="contrato-doc-intro">El presente documento recoge los cláusulas de adopción que el adoptante declara haber leído y aceptado antes de firmar el contrato. Forma parte del expediente y se entrega junto al contrato.</p>
+      <p class="contrato-doc-intro">El Adoptante declara haber leído y aceptado las estipulaciones que se recogen a continuación, que forman parte del contrato de adopción firmado con la Asociación y que se adjuntan a él revisadas y firmadas.</p>
       ${this._contratoEntidadHtml(cc, logo)}
-      ${clausulas.map((x, i) => `<h3>${i + 1}. ${this._esc(x.titulo)}</h3><p>${this._esc(x.texto)}</p>`).join('')}
+      ${estipulaciones}
       <div class="contrato-doc-firmas contrato-doc-firmas--aceptacion">
         <div class="contrato-doc-firma">
           <div class="contrato-doc-firma-label">Aceptado por el adoptante</div>
-          ${firmaImg}
+          ${firmaImg(cc.f1_firma, 'Firma del adoptante')}
           <b>${this._esc(nombre)}</b><small>DNI ${this._esc(cc.f1_dni || '—')} · ${this._esc(fecha)}</small>
         </div>
-        <div class="contrato-doc-firma">
-          <div class="contrato-doc-firma-label">Por la entidad</div>
-          ${this._selloHtml(ent, logoSrc)}
-        </div>
+        ${tutorHtml}
       </div>
-      <div class="contrato-doc-nota">Este anexo de cláusulas de adopción se envía junto al contrato de adopción. Versión 1.0 · 2026/11/10.</div>`;
+      <div class="contrato-doc-nota">Hoja de estipulaciones · versión ${this._esc(version)} (${this._esc(versionFecha)}). Se entrega junto al contrato de adopción y forma parte del expediente.</div>`;
   },
 
   _terminosAdopcionHtml(p, c, logo) {
@@ -6792,14 +6798,20 @@ const Dashboard = {
     </div>`;
   },
 
+  // Textos legales compartidos (contrato y hoja de estipulaciones). Se pide
+  // siempre por aqui para que guardado, modal y PDF lean la misma version.
+  _contratoTextos() {
+    return (typeof module !== 'undefined' && module.exports)
+      ? require('./contrato-textos.js')
+      : (typeof ContratoTextos !== 'undefined' ? ContratoTextos : null);
+  },
+
   // Documento que se muestra en el modal de contrato. El PDF definitivo lo
   // genera PdfExport con el mismo texto de ContratoTextos: aqui solo cambia
   // el envoltorio (clases del modal), nunca las estipulaciones.
   _contratoTerminosHtml(p, contrato) {
     const c = contrato || {};
-    const T = (typeof module !== 'undefined' && module.exports)
-      ? require('./contrato-textos.js')
-      : (typeof ContratoTextos !== 'undefined' ? ContratoTextos : null);
+    const T = this._contratoTextos();
     const a = this._contratoAnimalDatos(p, c);
     const nombre = c.f1_nombre || (p && p.adoptante) || '[adoptante]';
     const fecha = c.fecha ? this._fmtFecha(c.fecha) : '[fecha]';
@@ -7683,7 +7695,7 @@ const Dashboard = {
               <div class="form-row"><div class="form-group"><label for="f2-email">Email</label><input type="email" id="f2-email"></div><div class="form-group"><label for="f2-telefono">Telefono</label><input type="text" id="f2-telefono"></div></div>
             </div>
 
-            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto las <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">cláusulas de adopción</a> del contrato de adopción responsable.</span></label>
+            <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto la <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">hoja de estipulaciones</a> del contrato de adopción.</span></label>
             <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
               <div class="detail-section-note">Sube el sello real de la asociacion (imagen) o firma como persona en su lugar. Si no haces nada, se usa el sello generico con el logo.</div>
               <div class="form-row"><div class="form-group"><label for="ct-sello">Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" data-change="_previewSelloContrato" data-cpass="el"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_limpiarSelloContrato">Quitar sello</button></div>
@@ -7867,7 +7879,7 @@ const Dashboard = {
       f2_firma: tutorActivo ? await firma('f2-firma') : '',
       entidad_firma: firmaEntidadActiva ? await firma('entidad-firma') : '',
       terminos_aceptados: true,
-      terminos_version: '1.0',
+      terminos_version: (this._contratoTextos() || {}).version || '2.0',
       terminos_fecha: new Date().toISOString(),
       estado: 'firmado',
       creado: new Date().toISOString()
@@ -7989,7 +8001,7 @@ const Dashboard = {
     await this._ensureListas(['contratos']);
     const p = this._byId(this.adopciones, adopcionId) || {};
     const c = this._contratoDeAdopcion(adopcionId) || {};
-    this.showInfoModal('Cláusulas de adopción', `
+    this.showInfoModal('Hoja de estipulaciones', `
       <div class="terminos-preview-actions">
         <button type="button" class="btn btn-primary btn-sm" data-action="descargarTerminosAdopcion" data-arg0="${this._esc(adopcionId)}">${Icons.download} Descargar PDF</button>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="closeInfoModal">Cerrar</button>
@@ -8015,8 +8027,8 @@ const Dashboard = {
           <div class="contrato-topbar-meta">${Icons.fileText} <span><b>${this._esc(p.animal || 'Animal')}</b> · ${this._esc(p.adoptante || '')}</span> ${c ? '<span class="estado-badge aprobada">Firmado</span>' : '<span class="estado-badge pendiente">Pendiente de firma</span>'}</div>
           <div class="contrato-topbar-actions">
             ${c ? `<button type="button" class="btn btn-sm btn-primary" data-action="descargarContrato" data-arg0="${p.id}">${Icons.download} PDF contrato</button>` : ''}
-            ${c ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} PDF cláusulas</button>` : ''}
-            <button type="button" class="btn btn-sm btn-outline-green" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver cláusulas</button>
+            ${c ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="descargarTerminosAdopcion" data-arg0="${p.id}">${Icons.download} PDF estipulaciones</button>` : ''}
+            <button type="button" class="btn btn-sm btn-outline-green" data-action="showTerminosAdopcion" data-arg0="${p.id}">${Icons.fileText} Ver estipulaciones</button>
             ${c ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="showContratoEmailForm" data-arg0="${p.id}">${Icons.mail} Enviar</button>` : ''}
             <button type="button" class="btn btn-sm btn-outline-green" data-action="closeContratoForm">Cerrar</button>
           </div>
@@ -8142,7 +8154,7 @@ const Dashboard = {
     const emails = this._contratoEmails(p);
     this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
       <form data-submit="enviarContratoEmail" data-sarg0="${adopcionId}">
-        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y el anexo de cláusulas de adopción a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y la hoja de estipulaciones a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
         <div class="form-group"><label>Destinatarios</label>
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>

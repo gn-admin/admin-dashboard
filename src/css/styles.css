@@ -2800,6 +2800,15 @@ select.form-input {
   overflow-wrap: anywhere;
 }
 
+/* Cada dato va en una linea ("CIF: G00000000"); solo el nombre de la entidad
+   queda como titulo del bloque. */
+.contrato-doc-entidad-datos span b {
+  display: inline;
+  font-size: inherit;
+  color: var(--gray-500);
+  font-weight: 600;
+}
+
 .contrato-doc-entidad-rol {
   color: var(--gray-500);
   font-size: var(--text-2xs);
@@ -2828,33 +2837,34 @@ select.form-input {
 }
 
 .contrato-doc-sello-inner {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  max-width: 78px;
+  gap: 1px;
+  max-width: 100%;
   padding: 6px;
 }
 
 .contrato-doc-sello img {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .contrato-doc-sello span {
-  padding: 0 6px;
-  font-size: 0.5rem;
+  padding: 0 4px;
+  font-size: 0.46rem;
   font-weight: 800;
   line-height: 1.15;
   text-transform: uppercase;
 }
 
 .contrato-doc-sello small {
-  font-size: 0.52rem;
+  font-size: 0.44rem;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .contrato-doc-sello--firma {
@@ -2868,7 +2878,7 @@ select.form-input {
 }
 
 .contrato-doc-firma .contrato-doc-sello small {
-  font-size: 0.46rem;
+  font-size: 0.42rem;
 }
 
 .contrato-doc-firmas--aceptacion {
