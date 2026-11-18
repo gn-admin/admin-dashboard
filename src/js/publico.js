@@ -622,7 +622,7 @@ const Publico = {
 
     const compartirUrl = this.urlCompartir(p);
     const compartir = compartirUrl
-      ? `<button type="button" class="pub-btn pub-btn--ghost" data-compartir data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}">Compartir</button><span class="pub-compartir-aviso" role="status" aria-live="polite"></span>`
+      ? `<button type="button" class="pub-btn pub-btn--ghost" data-compartir data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}">Compartir</button><span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"></span>`
       : '';
     const acciones = (cta || compartir)
       ? `<div class="pub-acciones">${cta}${compartir}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`

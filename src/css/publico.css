@@ -254,13 +254,19 @@ a:hover { color: var(--pub-primary-dark); }
   display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .9rem;
   font-size: .9rem; color: var(--pub-soft);
 }
-.pub-acciones { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
-.pub-compartir-aviso { display: none; }
-.pub-compartir-aviso:not(:empty) {
+.pub-acciones { position: relative; display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .4rem; }
+/* Región viva del aviso: siempre renderizada (así permanece en el árbol de
+   accesibilidad y el lector anuncia el cambio). Vacía se saca del flujo, para
+   no dejar hueco junto a los botones. */
+.pub-compartir-aviso {
   display: inline-flex; align-items: center;
   padding: .45rem .85rem; border-radius: 999px;
   background: var(--pub-primary-soft); border: 1px solid #bfe8cf;
   color: var(--pub-primary-dark); font-size: .86rem; font-weight: 600;
+}
+.pub-compartir-aviso:empty {
+  position: absolute; width: 1px; height: 1px; padding: 0; border: 0;
+  overflow: hidden; white-space: nowrap; clip-path: inset(50%); pointer-events: none;
 }
 .pub-ficha-media { min-width: 0; }
 .pub-ficha-media img {

@@ -5,7 +5,7 @@
 
 ## Estado en una frase
 
-El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`. **Replanificación con grupos integrada:** **F0–F4 cerradas en código local** (contrato unificado 1:1+grupos, UX/flujos, composición/whitelist y esquema aditivo; implementación end-to-end de grupos `animal_grupo`/G1: backend `apps-script/WebPublicaciones.gs`+`Code.gs`, API `src/js/api.js`, gestor `src/js/web.js`+`src/js/dashboard-web.js`, visor/prerender `src/js/publico.js`). **F5** (endurecimiento y QA 1:1+grupos) queda posterior. Base 1:1 conservada. `npm test` **659/659, 164 suites, 0 fallos** (2026-11-18), `CACHE_NAME` **v274**. **Pendiente operativo/manual:** re-subir `.gs` a GAS y verificar en producción 1:1 (F2/F3) y grupos (F4) de punta a punta; asegurar columnas aditivas en `WebPublicaciones` (`documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`) si faltan. Contracto público de grupos en `main`: coordinar vía `TRANSFERIR_A_MAIN.md` (sin cambios en `main` desde este repo).
+El flujo gestor -> canal público -> visor funciona de punta a punta en `https://gn-admin.github.io/admin-dashboard/`. **Replanificación con grupos integrada:** **F0–F5 cerradas en código local** (contrato unificado 1:1+grupos, UX/flujos, composición/whitelist y esquema aditivo; implementación end-to-end de grupos `animal_grupo`/G1: backend `apps-script/WebPublicaciones.gs`+`Code.gs`, API `src/js/api.js`, gestor `src/js/web.js`+`src/js/dashboard-web.js`, visor/prerender `src/js/publico.js`). **F5** (endurecimiento y QA 1:1+grupos) cerrada. Base 1:1 conservada. **Compartir/copiar enlace de ficha cerrado** (aviso «Enlace copiado» visible y anunciado). `npm test` **697/697, 170 suites, 0 fallos** (2026-11-18), `CACHE_NAME` **v278**. **Pendiente operativo/manual:** verificar en producción 1:1 (F2/F3) y grupos (F4/F5) de punta a punta (el `.gs` ya está subido a GAS); asegurar columnas aditivas en `WebPublicaciones` (`documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`) si faltan. Contracto público de grupos en `main`: coordinar vía `TRANSFERIR_A_MAIN.md` (sin cambios en `main` desde este repo).
 
 ## Entregado
 
@@ -15,6 +15,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 - Listado, ficha y estados vacío/error/retirada; composición de la ficha extraída a `Publico.htmlDetalle(p)` para reutilizarla desde Node.
 - **Canónica única**: la ficha del SPA emite `canonical`, `og:url` y `mainEntityOfPage` hacia `publicaciones/<slug>.html`; el listado y las páginas de estado conservan su URL. SPA y estática ya no compiten.
 - La pantalla de retirada muestra «Publicación retirada» con `noindex,nofollow`, sin JSON-LD.
+- **Compartir la ficha (2026-11-18):** `Publico.urlCompartir(p)` y `Web.urlPublicaEstatica(slug)` devuelven la **página estática canónica** (`publicaciones/<slug>.html`), o `seo.canonical` si el payload la trae. `src/js/publico-compartir.js` (lo cargan `publico.html` y cada página del prerender) usa la Web Share API y cae al portapapeles; confirma con «Enlace copiado» en un aviso `role="status"` visible que se apaga a los 4 s. El aviso está **siempre renderizado** (vacío: 1 px fuera de flujo con `clip-path`, nunca `display:none`) para no salir del árbol de accesibilidad y que el lector de pantalla lo anuncie. En el gestor, las filas `publicado` con slug tienen «Copiar enlace» (snackbar); la copia vive en un único `Web.copiarTexto`. Pruebas: `urlCompartir` (3) y `urlPublicaEstatica` (1).
 
 ### SEO y prerender (`scripts/prerender-publico.js`)
 
@@ -87,8 +88,8 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 ### Despliegue
 
-- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v267` (visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js`, controles con orden de bloques y `publico-embed.js` con vídeo click-to-load).
-- `npm test`: **646/646** en local (**636** en CI, donde `roles-auth` se omite) (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`, `tests/publico-embed.test.js`; contrato C3 v1.1 y vídeo click-to-load).
+- GitHub Pages sirve `publico.html`, `sitemap.xml` y `robots.txt` (200); con el canal actual (sin fichas publicadas) el prerender solo genera el listado. Service worker actual `v278` (compartir: `v276`→`v277` aviso visible y `v278` aviso accesible; visor público con skip link/navegación accesible; admin con título/foco en navegación, modales con restauración de foco, formularios con labels/ARIA, recuentos anunciados, estados vacío/error consistentes, iconos decorativos ocultos a AT, lazy/decoding en imágenes de detalle y modularización progresiva: `dashboard-actividad.js`, `dashboard-finanzas.js`, `dashboard-blacklist.js`, `dashboard-web.js`; C3: `ficha-config.js`, controles con orden de bloques y `publico-embed.js` con vídeo click-to-load).
+- `npm test`: **697/697, 170 suites** en local (en CI se omiten los 10 de `roles-auth`) (incluye `tests/roles-d1.test.js`, `tests/roles-auth.test.js`, `tests/auditoria-d3.test.js`, `tests/ficha-config.test.js`, `tests/publico-embed.test.js`; contrato C3 v1.1 y vídeo click-to-load).
 
 ### F2 — ficha interna como fuente y “qué enseñar” (2026-11-17, código local)
 
@@ -187,7 +188,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 
 | Área | Archivos |
 |---|---|
-| Visor | `src/publico.html`, `src/js/publico.js`, `src/js/publico-embed.js`, `src/css/publico.css` |
+| Visor | `src/publico.html`, `src/js/publico.js`, `src/js/publico-embed.js`, `src/js/publico-compartir.js`, `src/css/publico.css` |
 | Prerender | `scripts/prerender-publico.js`, `tests/prerender.test.js`, `tests/fixtures/prerender/` |
 | Gestor | `src/js/web.js`, `src/js/api.js` |
 | Admin (modular) | `src/js/dashboard.js`, `src/js/dashboard-actividad.js`, `src/js/dashboard-finanzas.js`, `src/js/dashboard-blacklist.js`, `src/js/dashboard-web.js` |
@@ -209,3 +210,4 @@ npx --no-install serve src -l 8099 --no-clipboard
 
 - **2026-11-14:** `714f053`…`06ce8fa` visor/SEO/prerender/retiradas/docs — `870735f` A3 (fallo retiradas bloquea deploy) — `7fbeca0` UI móvil publicaciones (`v229`) — `9435a6d` eliminar borrador publicación web de animal (`v230`) — `d4daabf` C2 prerender (redirect 301/oculta/JSON-LD-canonical) — `39fb362` C1 restaurar retirada (`v231`).
 - **2026-11-15 (Track E, `e86a662`…`8d93563`):** mejoras a11y/navegación y foco (`e86a662`, `df2e7c8`, `08a17f0`, `3d77fb2`, `f7d339e`, `0a9b748`, `f32308c`, `8d93563`), labels/formularios y estados (`c47e12d`, `09b0121`, `fd17604`, `ed1152a`, `e2fcac1`, `f7ac2f9`), rendimiento/lazy y SW (`dbe4537`, `v246`–`v252`), modularización E3 (`bd9cb8f` actividad, `4817c44` finanzas, `5ae8149` blacklist, `ecfc77d` delegados web) y sincronía documental (`2971d45`).
+- **2026-11-18:** `f17e7ae` cierra grupos de adopción conjunta (F4/F5) y añade compartir/copiar enlace (SW `v276`); `2e754fb` hace visible el aviso de «Enlace copiado», unifica la copia del gestor en `Web.copiarTexto` y sube el SW a `v277`; a11y del aviso (`aria-atomic`, región viva siempre renderizada) y SW `v278`.
