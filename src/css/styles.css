@@ -6850,6 +6850,14 @@ body {
   scroll-padding-bottom: 96px;
 }
 
+/* El pie es sticky en todos los anchos, pero en móvil, tablet y punteros
+   gruesos deja aire bajo el último control en vez de tocar el borde del modal. */
+@media (max-width: 1023px), (pointer: coarse) {
+  .modal-body--form {
+    padding-bottom: 16px;
+  }
+}
+
 .modal-body--form .form-actions {
   position: sticky;
   bottom: 0;
@@ -7099,13 +7107,6 @@ body {
 
   .modal-footer {
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* Las acciones del formulario son sticky: un poco de aire bajo el último
-     control evita que quede pegado a la barra al llegar al final. */
-  .modal-body--form {
-    padding-bottom: 16px;
-    scroll-padding-bottom: 96px;
   }
 
   .modal-body--form .form-actions {
@@ -8303,7 +8304,7 @@ body.modal-open { overflow: hidden; }
 .web-bloque-controles .btn[disabled] { opacity: .38; cursor: default; }
 .web-preview-json {
   max-height: 60vh; overflow: auto; margin: 8px 0 12px;
-  font-size: 12px; line-height: 1.45; white-space: pre;
+  font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
   background: var(--gray-50, #f7f8f9); border: 1px solid var(--gray-200, #e5e7eb);
   border-radius: 8px; padding: 12px;
 }
@@ -8388,12 +8389,6 @@ body.web-picker-abierto { overflow: hidden; }
   }
   .card .data-table.web-tabla td.table-actions .web-sub {
     grid-column: 1 / -1;
-  }
-
-  /* El JSON del preview obligaba a scroll horizontal en móvil. */
-  .web-preview-json {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
 }
 
