@@ -209,6 +209,25 @@ describe('_buildContratoAcogida: documento real de la asociación', () => {
     assert.match(html, /Modelo v1\.0/);
   });
 
+  // La hoja real es de una sola cara: A4 con márgenes y sin saltos forzados,
+  // y los bloques que se firman no se pueden partir entre páginas.
+  // Un texto de ficha largo (la descripcion del animal puede traer cientos de
+  // caracteres) no puede empujar la hoja a una segunda cara: el recuadro de
+  // «otros rasgos» se queda en las tres lineas del formulario de papel.
+  it('acota el texto libre para que los datos largos no rompan la cara única', () => {
+    // Ocho campos de la parrilla del animal; «Esterilizado» lleva casillas propias.
+    assert.equal((html.match(/class="acogida-val"/g) || []).length, 8);
+    assert.match(html, /\.acogida-full \.acogida-val\{[^}]*-webkit-line-clamp:3/);
+  });
+
+  it('se imprime en una cara A4 sin partir firmas ni material', () => {
+    assert.match(html, /@page\{size:A4;margin:1\.8cm 2cm\}/);
+    assert.doesNotMatch(html, /page-break-before:always/);
+    ['acogida-animal', 'acogida-material', 'acogida-firmas', 'acogida-pie'].forEach(cl => {
+      assert.match(html, new RegExp('\\.' + cl + '\\{[^}]*break-inside:avoid'), cl + ' debe evitar partirse entre páginas');
+    });
+  });
+
   it('escapa los datos personales', () => {
     assert.match(html, /Ana &lt;b&gt;X&lt;\/b&gt;/);
     assert.doesNotMatch(html, /<b>X<\/b>/);

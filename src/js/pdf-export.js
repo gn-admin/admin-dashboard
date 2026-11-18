@@ -520,7 +520,7 @@ const PdfExport = {
       `<div class="acogida-cond"><b>${i + 1}-</b> ${this._esc(texto)}</div>`).join('');
     const materialHtml = (T ? T.material : []).map(nombre =>
       `<div class="acogida-material-item">${box(tiene(nombre))} ${this._esc(nombre)}</div>`).join('');
-    const field = (label, value, cls) => `<div${cls ? ` class="${cls}"` : ''}><div class="label">${this._esc(label)}</div>${this._esc(value || '—')}</div>`;
+    const field = (label, value, cls) => `<div${cls ? ` class="${cls}"` : ''}><div class="label">${this._esc(label)}</div><div class="acogida-val">${this._esc(value || '—')}</div></div>`;
     const poblacion = familia.poblacion || familia.ubicacion || '';
     return `
       <div class="acogida-header">
@@ -585,35 +585,39 @@ const PdfExport = {
       <style>
         @page{size:A4;margin:1.8cm 2cm}
         body{font:10pt/1.45 Arial,sans-serif;color:#191919;padding:0;margin:0}
-        .acogida-header{display:flex;align-items:center;gap:14px;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1FC95B}
-        .acogida-header img{width:150px;max-height:52px;object-fit:contain;flex-shrink:0}
-        .acogida-title{font-size:13pt;font-weight:800;text-transform:uppercase;letter-spacing:.4px;line-height:1.2;margin:0}
-        .acogida-top{display:flex;gap:16px;align-items:flex-start;margin-bottom:12px}
-        .acogida-foto{flex:0 0 120px;width:120px;height:140px;border:1px solid #9ca3af;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f4f5f7}
+        .acogida-header{display:flex;align-items:center;gap:12px;padding-bottom:5px;margin-bottom:6px;border-bottom:3px solid #1FC95B}
+        .acogida-header img{width:140px;max-height:44px;object-fit:contain;flex-shrink:0}
+        .acogida-title{font-size:12.5pt;font-weight:800;text-transform:uppercase;letter-spacing:.4px;line-height:1.2;margin:0}
+        .acogida-top{display:flex;gap:14px;align-items:flex-start;margin-bottom:7px;break-inside:avoid}
+        .acogida-foto{flex:0 0 100px;width:100px;height:112px;border:1px solid #9ca3af;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f4f5f7}
         .acogida-foto img{display:block;width:100%;height:100%;object-fit:cover}
         .acogida-foto-vacia{font-size:7.5pt;color:#9aa0a6;letter-spacing:.5px}
-        .acogida-partes{flex:1;min-width:0}
-        .acogida-partes p{margin:0 0 5px}
+        .acogida-partes{flex:1;min-width:0;font-size:9.4pt}
+        .acogida-partes p{margin:0 0 3px}
         .acogida-partes b{font-weight:600}
-        .acogida-animal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 18px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:12px;font-size:9.5pt;break-inside:avoid}
-        .acogida-animal .label{font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#9aa0a6}
+        .acogida-animal{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 14px;padding:3px 9px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:7px;font-size:8.6pt;break-inside:avoid}
+        .acogida-animal .label{font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#9aa0a6}
         .acogida-full{grid-column:1 / -1}
-        .acogida-condiciones{margin-bottom:10px}
-        .acogida-cond{margin:0 0 5px;font-size:9.5pt;text-align:justify}
+        /* La ficha completa vive en la app: en la hoja, el texto libre se queda
+           en las tres líneas del recuadro del formulario para no empujar el
+           contrato a una segunda cara. */
+        .acogida-full .acogida-val{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+        .acogida-condiciones{margin-bottom:4px}
+        .acogida-cond{margin:0 0 1px;font-size:8.5pt;line-height:1.25;text-align:justify;break-inside:avoid}
         .acogida-cond b{font-weight:700}
-        .acogida-material{margin:0 0 10px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;break-inside:avoid}
-        .acogida-material p{margin:0 0 6px;font-size:9pt}
-        .acogida-material-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px 18px;font-size:9pt}
+        .acogida-material{margin:0 0 5px;padding:3px 9px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;break-inside:avoid}
+        .acogida-material p{margin:0 0 2px;font-size:7.8pt}
+        .acogida-material-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;font-size:7.8pt}
         .acogida-material-item{white-space:nowrap}
-        .acogida-material-otros{margin:6px 0 0!important}
-        .acogida-acepta{font-size:9.5pt;text-align:justify;margin:0 0 14px}
-        .acogida-firmas{display:flex;gap:40px;margin:10px 0 18px;break-inside:avoid}
-        .acogida-firma{flex:1;min-width:0;font-size:9pt}
-        .acogida-firma-linea{height:54px;border-bottom:1px solid #191919}
-        .acogida-firma-label{margin-top:4px;font-size:8pt;color:#4b5563}
-        .acogida-firma b{display:block;margin-top:2px}
-        .acogida-firma small{display:block;color:#6b7280}
-        .acogida-pie{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 14px;border-top:1px solid #e5e7eb;padding-top:8px;font-size:8pt;color:#6b7280;text-align:center}
+        .acogida-material-otros{margin:3px 0 0!important}
+        .acogida-acepta{font-size:8.8pt;text-align:justify;margin:0 0 7px;break-inside:avoid}
+        .acogida-firmas{display:flex;gap:40px;margin:3px 0 7px;break-inside:avoid}
+        .acogida-firma{flex:1;min-width:0;font-size:8.6pt}
+        .acogida-firma-linea{height:34px;border-bottom:1px solid #191919}
+        .acogida-firma-label{margin-top:3px;font-size:7.8pt;color:#4b5563}
+        .acogida-firma b{display:block;margin-top:1px;font-size:8.5pt}
+        .acogida-firma small{display:block;color:#6b7280;font-size:7.6pt}
+        .acogida-pie{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 14px;border-top:1px solid #e5e7eb;padding-top:4px;font-size:7.2pt;color:#6b7280;text-align:center;break-inside:avoid}
         .acogida-pie .acogida-modelo{flex-basis:100%;font-size:7pt;color:#9aa0a6}
       </style></head><body><div class="acogida-doc">${this._contratoAcogidaBody(c, logo)}</div></body></html>`;
   },
