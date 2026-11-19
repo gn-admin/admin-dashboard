@@ -1422,15 +1422,33 @@ function uploadContratoPdf(body, user) {
 // Borrado de un contrato: la fila y, si existe, el PDF firmado privado de
 // Drive. El PDF lleva DNI y firmas; si se borra el contrato no debe quedar
 // accesible para siempre en la carpeta «Contratos».
+
+/**
+ * Manda un archivo de Drive a la papelera quitando antes el permiso público.
+ * La papelera no revoca un enlace ANYONE_WITH_LINK, así que sin esto
+ * «eliminar» deja el archivo descargable desde su URL. Nunca lanza: si el
+ * archivo ya no existe o el permiso no se puede cambiar, el borrado de la
+ * fila sigue adelante.
+ */
+function _driveArchivarPrivado(fileId) {
+  if (!fileId) return false;
+  try {
+    var file = DriveApp.getFileById(String(fileId));
+    try { file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE); } catch (errPermiso) {}
+    file.setTrashed(true);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 function deleteContratoCascade(recordId) {
   var rows = readSheet(CONFIG.sheets.contratos);
   var target = null;
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i].id) === String(recordId)) { target = rows[i]; break; }
   }
-  if (target && target.pdf_file_id) {
-    try { DriveApp.getFileById(target.pdf_file_id).setTrashed(true); } catch (err) {}
-  }
+  if (target && target.pdf_file_id) _driveArchivarPrivado(target.pdf_file_id);
   return deleteSheetRow(CONFIG.sheets.contratos, recordId);
 }
 
@@ -1440,9 +1458,7 @@ function deleteDocumentoCaso(recordId) {
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i].id) === String(recordId)) { target = rows[i]; break; }
   }
-  if (target && target.file_id) {
-    try { DriveApp.getFileById(target.file_id).setTrashed(true); } catch (err) {}
-  }
+  if (target && target.file_id) _driveArchivarPrivado(target.file_id);
   return deleteSheetRow(CONFIG.sheets.documentos, recordId);
 }
 

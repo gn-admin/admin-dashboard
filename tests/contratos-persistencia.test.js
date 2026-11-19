@@ -109,4 +109,68 @@ describe('deleteContratoCascade: fila y PDF firmado', () => {
     assert.equal(ctx.deleteContratoCascade('ctr_2'), true);
     assert.equal(borrado, 'ctr_2');
   });
+
+  it('el PDF se revoca antes de ir a la papelera', () => {
+    const ctx = cargarBackend();
+    const ops = [];
+    ctx.DriveApp = {
+      Access: { PRIVATE: 'private' },
+      Permission: { NONE: 'none' },
+      getFileById: () => ({
+        setSharing: (acceso, permiso) => ops.push('permiso:' + acceso + ':' + permiso),
+        setTrashed: (v) => ops.push('papelera:' + v)
+      })
+    };
+    ctx.readSheet = () => [{ id: 'ctr_1', pdf_file_id: 'FILE1' }];
+    ctx.deleteSheetRow = () => true;
+    assert.equal(ctx.deleteContratoCascade('ctr_1'), true);
+    assert.deepEqual(ops, ['permiso:private:none', 'papelera:true']);
+  });
+});
+
+describe('deleteDocumentoCaso: fila y archivo de Drive', () => {
+  const HOJA_DOCS = { sheetId: 'SHEET_DOCS', sheetName: 'Documentos' };
+
+  function conDocumentos(fakeDrive) {
+    const ctx = cargarBackend();
+    ctx.CONFIG.sheets.documentos = HOJA_DOCS;
+    if (fakeDrive) ctx.DriveApp = fakeDrive;
+    return ctx;
+  }
+
+  it('revoca el permiso público y manda el archivo a la papelera', () => {
+    const ops = [];
+    const ctx = conDocumentos({
+      Access: { PRIVATE: 'private' },
+      Permission: { NONE: 'none' },
+      getFileById: () => ({
+        setSharing: (acceso, permiso) => ops.push('permiso:' + acceso + ':' + permiso),
+        setTrashed: (v) => ops.push('papelera:' + v)
+      })
+    });
+    let borrado = null;
+    ctx.readSheet = () => [{ id: 'doc_1', file_id: 'FILE2' }];
+    ctx.deleteSheetRow = (cfg, id) => { borrado = { cfg, id }; return true; };
+    assert.equal(ctx.deleteDocumentoCaso('doc_1'), true);
+    assert.deepEqual(ops, ['permiso:private:none', 'papelera:true']);
+    assert.deepEqual(borrado, { cfg: HOJA_DOCS, id: 'doc_1' });
+  });
+
+  it('si el archivo ya no existe, la fila se borra igual', () => {
+    const ctx = conDocumentos({ getFileById: () => { throw new Error('Archivo no encontrado'); } });
+    let borrado = null;
+    ctx.readSheet = () => [{ id: 'doc_2', file_id: 'FANTASMA' }];
+    ctx.deleteSheetRow = (cfg, id) => { borrado = id; return true; };
+    assert.equal(ctx.deleteDocumentoCaso('doc_2'), true);
+    assert.equal(borrado, 'doc_2');
+  });
+
+  it('un documento sin archivo solo borra la fila', () => {
+    const ctx = conDocumentos();
+    let borrado = null;
+    ctx.readSheet = () => [{ id: 'doc_3' }];
+    ctx.deleteSheetRow = (cfg, id) => { borrado = id; return true; };
+    assert.equal(ctx.deleteDocumentoCaso('doc_3'), true);
+    assert.equal(borrado, 'doc_3');
+  });
 });
