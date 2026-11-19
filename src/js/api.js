@@ -225,6 +225,8 @@ const API = {
   // Documentos a Drive
   async getDocumentos() { return this._get('documentos'); },
   async createDocumento(data) { return this._post('documentos', data); },
+  // Archivo privado (documento del animal o factura): `origen` = documento | gasto.
+  async getDocumentoArchivo(origen, id) { return this._get('documento-archivo', { origen, id }); },
   async uploadDocumento(base64, nombre, mimeType, tipo) {
     // Validacion de tamano en frontend (max 5MB aprox. -> ~6.800.000 chars base64)
     if (base64 && base64.length > 6800000) {

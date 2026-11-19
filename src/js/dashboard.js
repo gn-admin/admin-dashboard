@@ -4095,7 +4095,7 @@ const Dashboard = {
     const list = this._gastosDe(animalId);
     const total = this._totalGastos(list);
     const rows = list.length
-      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${g.factura_url ? ` · <a href="${this._esc(g.factura_url)}" target="_blank" rel="noopener noreferrer">${Icons.fileText} Ver factura</a>` : ''} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" data-action="deleteGasto" data-arg0="${this._esc(g.id)}">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(g => `<div class="detail-field"><div class="detail-question">${g.fecha ? this._fmtFecha(g.fecha) : '—'} · ${this._esc(g.concepto || 'Gasto')}</div><div class="detail-answer">${this._euros(g.importe)} €${(g.factura_file_id || g.factura_url) ? ` · <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirDocumento" data-arg0="gasto" data-arg1="${this._esc(g.id)}">${Icons.fileText} Ver factura</button>` : ''} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" data-action="deleteGasto" data-arg0="${this._esc(g.id)}">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin gastos registrados</div></div>`;
     const badgeGastos = list.length ? ` · ${total.toFixed(2)} €` : '';
     return this._collapsibleSection('gastos', `${Icons.activity} Gastos veterinarios${badgeGastos}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showGastoForm" data-arg0="${animalId}">${Icons.plus} Nuevo gasto</button></div>`);
@@ -4196,7 +4196,7 @@ const Dashboard = {
   _documentosFicha(animalId) {
     const list = this._documentosDe(animalId);
     const rows = list.length
-      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.url ? `<a href="${this._esc(d.url)}" target="_blank" rel="noopener noreferrer">${this._esc(d.nombre || '—')}</a>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" data-action="deleteDocumento" data-arg0="${this._esc(d.id)}">${Icons.trash}</button></div></div>`).join('')
+      ? list.slice().reverse().map(d => `<div class="detail-field"><div class="detail-question">${this._esc(d.tipo || 'Documento')}</div><div class="detail-answer">${d.id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirDocumento" data-arg0="documento" data-arg1="${this._esc(d.id)}">${Icons.fileText} ${this._esc(d.nombre || 'Abrir')}</button>` : this._esc(d.nombre || '—')} · ${d.fecha ? this._fmtFecha(d.fecha) : '—'} <button type="button" class="btn btn-danger btn-sm" style="margin-left:8px" data-action="deleteDocumento" data-arg0="${this._esc(d.id)}">${Icons.trash}</button></div></div>`).join('')
       : `<div class="detail-field"><div class="detail-answer" style="color:var(--gray-400)">Sin documentos</div></div>`;
     const badgeDocs = list.length ? ` · ${list.length}` : '';
     return this._collapsibleSection('docs', `${Icons.fileText} Documentos${badgeDocs}`, `${rows}<div style="padding:0 16px 16px"><button type="button" class="btn btn-primary btn-sm" data-action="showDocumentoForm" data-arg0="${animalId}">${Icons.plus} Añadir documento</button></div>`);
@@ -4212,6 +4212,47 @@ const Dashboard = {
       <div class="form-group"><label for="dc-archivo">Fichero (PDF o imagen) *</label><input type="file" id="dc-archivo" accept="application/pdf,image/*" required><p style="font-size:var(--text-xs);color:var(--gray-500)">Se guarda en la carpeta de Drive y requiere conexion.</p></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">Subir y guardar</button></div>
       </form>`);
+  },
+
+  /**
+   * Abre un archivo privado (documento del animal o factura) pidiéndolo al
+   * backend con el token: el enlace de Drive ya no es público. La ventana se
+   * abre antes del await para que el navegador no la bloquee.
+   * Si el navegador bloquea la ventana, avisa al usuario y ofrece reintentar.
+   */
+  async abrirDocumento(origen, id) {
+    const busyKey = 'abrir-doc:' + id;
+    if (!this._busyStart(busyKey)) return;
+    let win = null;
+    try { win = window.open('', '_blank'); } catch (e) { win = null; }
+    try {
+      const res = await API.getDocumentoArchivo(origen, id);
+      const d = (res && res.data) || {};
+      if (!d.base64) throw new Error((res && res.error) || 'El servidor no devolvió el archivo');
+      const bin = atob(d.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: d.mime || 'application/pdf' }));
+      if (win && !win.closed) { win.opener = null; win.location = url; }
+      else {
+        // Si no hubo ventana ni se pudo abrir, mostramos aviso y ofrecemos
+        // descargar haciendo clic en un enlace temporal.
+        this.showSnackbar('El navegador bloqueó la ventana emergente; se ofrece descarga directa.', 'warning');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = d.nombre || 'documento.pdf';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    } catch (err) {
+      if (win && !win.closed) win.close();
+      this._snackErr(err, 'No se pudo abrir: ' + this._errMsg(err));
+    } finally {
+      this._busyEnd(busyKey);
+    }
   },
 
   async saveDocumento(e, animalId) {

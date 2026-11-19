@@ -624,11 +624,18 @@ describe('fichas de animal y socio', () => {
     assert.match(Dashboard._gastosFicha('otro'), /Sin gastos registrados/);
   });
 
-  it('_documentosFicha enlaza solo si hay url', () => {
+  it('_documentosFicha abre el documento privado por el endpoint, sin enlace de Drive', () => {
     const html = Dashboard._documentosFicha('a1');
     assert.match(html, /Documentos · 1/);
-    assert.match(html, /href="https:\/\/x\/f"/);
+    assert.match(html, /data-action="abrirDocumento" data-arg0="documento" data-arg1="d1"/);
+    assert.doesNotMatch(html, /href="https:\/\/x\/f"/);
     assert.match(Dashboard._documentosFicha('otro'), /Sin documentos/);
+  });
+
+  it('_gastosFicha abre la factura privada por el endpoint', () => {
+    Dashboard.gastos = [{ id: 'g2', animal_id: 'a1', fecha: '2025-04-13', concepto: 'Analitica', importe: '12', factura_file_id: 'FILE_FAC' }];
+    const html = Dashboard._gastosFicha('a1');
+    assert.match(html, /data-action="abrirDocumento" data-arg0="gasto" data-arg1="g2"/);
   });
 
   it('_seguimientosFicha filtra por adopcion', () => {

@@ -79,7 +79,7 @@ function _canReadEndpoint(endpoint, user) {
     return !deny[endpoint];
   }
   if (role === 'tesoreria') {
-    var allow = { 'donaciones':1, 'gastos':1, 'apadrinamientos':1, 'inventario':1, 'actividad':1, 'user-profile':1, 'surveys':1, 'responses':1, 'animales':1, 'adopciones':1, 'socios':1 };
+    var allow = { 'donaciones':1, 'gastos':1, 'apadrinamientos':1, 'inventario':1, 'actividad':1, 'user-profile':1, 'surveys':1, 'responses':1, 'animales':1, 'adopciones':1, 'socios':1, 'documento-archivo':1 };
     return !!allow[endpoint];
   }
   return false;
@@ -191,6 +191,7 @@ function handleGet(endpoint, user, e) {
     case 'seguimientos': return jsonResponse({ data: _dataForUser(readSheet(CONFIG.sheets.seguimientos), user) });
     case 'historial-fases-adopcion': return jsonResponse({ data: _dataForUser(readSheet(CONFIG.sheets.historialFasesAdopcion), user) });
     case 'documentos': return jsonResponse({ data: _dataForUser(readSheet(CONFIG.sheets.documentos), user) });
+    case 'documento-archivo': return handleDocumentoArchivo(e, user);
     case 'inventario': return jsonResponse({ data: _dataForUser(readSheet(CONFIG.sheets.inventario), user) });
     case 'grupos':
       if (!CONFIG.sheets.grupos || !CONFIG.sheets.grupos.sheetId) return jsonResponse({ data: [] });
@@ -1331,6 +1332,16 @@ function carpetaDestino(tipo) {
   return DriveApp.getFolderById(docsId);
 }
 
+/**
+ * Galería y foto de entrega se comparten (se pintan en el panel y en la web);
+ * documentos y facturas no: pueden llevar DNI, datos fiscales o justificantes
+ * y un enlace `ANYONE_WITH_LINK` no caduca nunca.
+ */
+function _documentoCompartible(tipo) {
+  var t = String(tipo || '').toLowerCase();
+  return t.indexOf('galeria') === 0 || t === 'entrega';
+}
+
 function uploadDocumento(body, user) {
   var folder = carpetaDestino(body.tipo);
   if (!folder) {
@@ -1362,17 +1373,87 @@ function uploadDocumento(body, user) {
     var nombre = _safeUploadName(body.nombre, ext);
     var blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, nombre);
     var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    // El panel abre documentos y facturas con `GET documento-archivo`, que
+    // valida token y rol; aquí no se comparten. Solo galería y entrega.
+    var compartible = _documentoCompartible(body.tipo);
+    if (compartible) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     return {
       fileId: file.getId(),
       nombre: nombre,
-      webViewLink: file.getUrl(),
-      webContentLink: 'https://drive.google.com/uc?id=' + file.getId() + '&export=download'
+      compartido: compartible,
+      webViewLink: compartible ? file.getUrl() : '',
+      webContentLink: compartible ? ('https://drive.google.com/uc?id=' + file.getId() + '&export=download') : ''
     };
   } catch (err) {
     Logger.log('uploadDocumento error: ' + err.message);
     return { error: 'Error subiendo a Drive: ' + err.message };
+  }
+}
+
+/**
+ * Mantenimiento: ejecutar a mano UNA vez desde el editor de Apps Script tras
+ * desplegar este `Code.gs`. Los documentos y facturas subidos antes de `v304`
+ * se compartieron con `ANYONE_WITH_LINK`; esto les quita el enlace público.
+ * No toca galería ni fotos de entrega (esas deben seguir compartidas).
+ */
+function revocarPermisosDocumentosPrivados() {
+  var res = { documentos: 0, facturas: 0, errores: [] };
+  var tareas = [
+    { cfg: CONFIG.sheets.documentos, campo: 'file_id', clave: 'documentos' },
+    { cfg: CONFIG.sheets.gastos, campo: 'factura_file_id', clave: 'facturas' }
+  ];
+  for (var t = 0; t < tareas.length; t++) {
+    var filas = readSheet(tareas[t].cfg) || [];
+    for (var i = 0; i < filas.length; i++) {
+      var fileId = String(filas[i][tareas[t].campo] || '');
+      if (!fileId) continue;
+      try {
+        DriveApp.getFileById(fileId).setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+        res[tareas[t].clave]++;
+      } catch (e) {
+        res.errores.push(fileId + ': ' + e.message);
+      }
+    }
+  }
+  Logger.log('revocarPermisosDocumentosPrivados: ' + JSON.stringify(res));
+  return res;
+}
+
+/**
+ * Sirve un archivo privado del panel: `documentos.file_id` (documento del
+ * animal) o `gastos.factura_file_id` (factura). Exige sesión y el permiso de
+ * lectura de la hoja de origen; el `file_id` nunca llega del cliente, se saca
+ * de la fila, así que no se puede pedir un archivo arbitrario de Drive.
+ */
+function handleDocumentoArchivo(e, user) {
+  var p = (e && e.parameter) || {};
+  var origen = String(p.origen || '').toLowerCase();
+  var id = String(p.id || '');
+  if (!id) return jsonResponse({ status: 'error', error: 'Falta id' }, 400);
+  var hoja, campo, permiso;
+  if (origen === 'documento') { hoja = CONFIG.sheets.documentos; campo = 'file_id'; permiso = 'documentos'; }
+  else if (origen === 'gasto') { hoja = CONFIG.sheets.gastos; campo = 'factura_file_id'; permiso = 'gastos'; }
+  else return jsonResponse({ status: 'error', error: 'Origen no válido (documento o gasto)' }, 400);
+  if (!_canReadEndpoint(permiso, user)) return _deny('No autorizado para este documento');
+  var filas = readSheet(hoja) || [];
+  var fila = null;
+  for (var i = 0; i < filas.length; i++) {
+    if (String(filas[i].id) === id) { fila = filas[i]; break; }
+  }
+  if (!fila) return jsonResponse({ status: 'error', error: 'Registro no encontrado' }, 404);
+  var fileId = String(fila[campo] || '');
+  if (!fileId) return jsonResponse({ status: 'error', error: 'El registro no tiene archivo' }, 404);
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var blob = file.getBlob();
+    return jsonResponse({ status: 'success', data: {
+      nombre: file.getName(),
+      mime: blob.getContentType() || 'application/octet-stream',
+      base64: Utilities.base64Encode(blob.getBytes())
+    } });
+  } catch (err) {
+    return jsonResponse({ status: 'error', error: 'No se pudo abrir el archivo: ' + err.message }, 500);
   }
 }
 
