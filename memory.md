@@ -129,9 +129,42 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 1. **C3 (despliegue):** ✅ **Hecho.** `WebPublicaciones.gs`, `Code.gs` y `Config.gs` subidos a GAS con nueva versión. Frontend v267 desplegado en Pages y verificado con Playwright contra producción (orden, precedencia, embed click-to-load, 410). Vídeo real en modo `embed` pendiente de probar con un vídeo de producción real cuando se decida.
 2. **D5 (condicional):** servidor OK y `RECAPTCHA_SITE_KEY` configurada (`.env` local + `config.js` regenerada; ya añadida como secreto de GitHub por el usuario). Gate de login desactivado por decisión; para reactivar solo hace falta hacer push a `main` (Pages regenera `config.js` con el secreto).
 3. **D3 (opcional):** inspección visual en la hoja de auditoría/fases.
-4. **D4 (acción periódica):** rotación del token cuando proceda (Secrets + config GAS + redespliegue).
+4. **D4 (acción periódica):** rotación del token cuando proceda (revocar sesiones en Firebase y rotar `GITHUB_DEPLOY_TOKEN` en las propiedades de script, que se leen en cada ejecución: sin redespliegue).
 5. **Raíz de media:** confirmar `DRIVE_WEB_FOLDER_ID` en `Config.gs` desplegado si aplica.
-6. **Exclusividad 1:1 (2026-11-18):** subir `WebPublicaciones.gs` a GAS con una versión nueva; el bloqueo y el `grupo_publicado` del listado no llegan a producción hasta entonces. Verificar después el rechazo al publicar un miembro de un grupo vigente y el aviso del selector.
+6. **Exclusividad 1:1 (2026-11-18):** ✅ **Subido** (2026-11-19, versión nueva). Confirmado en vivo: `GET web-animales` ya devuelve `grupo_id`, `grupo_nombre` y `grupo_publicado` en las 11 fichas, así que producción corre el fichero nuevo. Queda probar en producción el rechazo al publicar un miembro de un grupo vigente, el aviso del selector y el 301 al slug del grupo.
+
+### Checklist de los pasos manuales (2026-11-19) — puntos 4, 5 y 6
+
+#### A. Rotación del token (D4)
+
+Qué se rota: el panel **no usa un token estático**. Guarda el ID token de Firebase y lo manda en `?token=`; `Code.gs` lo valida con `verifyFirebaseToken` (`extractToken`, ~1086). Ese ID token caduca solo (1 h), así que «rotar» es revocar sesiones y, si hay sospecha real, cambiar los secretos fijos que sí viven en el proyecto.
+
+- [ ] **A1. Revocar sesiones** (sospecha de ID token filtrado): Firebase → Authentication → Usuarios → menú ⋮ de la cuenta → «Revocar tokens de actualización»; si pudo haber compromiso, cambiar también la contraseña. Sin token nuevo la API responde 401 «Token invalido» y el usuario debe volver a entrar.
+- [ ] **A2. Crear el PAT nuevo** del deploy (`GITHUB_DEPLOY_TOKEN`, el secreto fijo del backend): GitHub → Settings → Developer settings → Personal access tokens → Fine-grained → nuevo token limitado al repo `gn-admin/admin-dashboard`, permiso **Actions: Read and write**, caducidad ≤ 90 días.
+- [ ] **A3. Cambiar la propiedad**: Apps Script → ⚙️ Configuración del proyecto → Propiedades de la secuencia de comandos → editar `GITHUB_DEPLOY_TOKEN` (se lee en cada ejecución: **no** hace falta versión nueva). No tocar `GITHUB_DEPLOY_REPO`/`GITHUB_DEPLOY_REF`/`GITHUB_DEPLOY_WORKFLOW`.
+- [ ] **A4. Verificar**: gestor → «Regenerar web» (`POST web-deploy`) debe decir «lanzado» o «ya en marcha»; alternativa en el editor: ejecutar `webDeployProbar` y ver en el registro `{"ok":true,"disparado":true,"codigo":204}` (lanza un deploy real).
+- [ ] **A5. Retirar el viejo**: revocar el PAT anterior en GitHub y repetir A4; si el chip sigue en «Deploy automático activo · repo (main)», el nuevo funciona.
+- [ ] **A6. Si la revisión incluye reCAPTCHA**: consola reCAPTCHA → clave secreta nueva → propiedad `RECAPTCHA_SECRET` → probar login; si cambia la site key, actualizar el secreto `RECAPTCHA_SITE_KEY` en GitHub y hacer push a `main` para que Pages regenere `config.js`.
+- [ ] **A7. Cierre**: `git status` limpio, sin `.env`/`src/js/config.js`/`apps-script/Config.gs` en el índice y sin URLs con `?token=` en logs o documentación versionada.
+
+#### B. Subir `WebPublicaciones.gs` con versión nueva (exclusividad 1:1)
+
+- [x] **B1. Confirmar el fichero local** (hecho 2026-11-19): `git log -1 --stat -- apps-script/WebPublicaciones.gs` y `rg -n "webGrupoVigenteDeAnimal|grupo_publicado" apps-script/WebPublicaciones.gs` (función ~709 y clave ~1175).
+- [x] **B2. Pegar en GAS** (hecho 2026-11-19): abrir el proyecto de Apps Script del backend (el del `/exec`) → fichero `WebPublicaciones.gs` → seleccionar todo, pegar el contenido local completo → Guardar. En este paso **no** tocar `Code.gs` ni `Config.gs`.
+- [x] **B3. Nueva versión sin cambiar la URL** (hecho 2026-11-19): Implementar → **Administrar implementaciones** → lápiz de la implementación **existente** → Versión **Nueva versión** → Descripción → **Implementar**. Editar la existente conserva el `/exec`; crear otra lo cambia y rompe el panel.
+- [ ] **B4. Selector**: gestor → «Nueva publicación»: ya no ofrece animales con grupo vigente y avisa con el nombre del grupo (`_pickerAvisoGrupo`). El backend nuevo ya sirve `grupo_id`/`grupo_nombre`/`grupo_publicado`, así que el front tiene lo que necesita; falta verlo en pantalla.
+- [ ] **B5. Bloqueo**: con un grupo publicado vigente, publicar la ficha individual de un miembro debe fallar nombrando el grupo y cómo salir; `GET web-animales` devuelve `grupo_publicado` en esos miembros.
+- [ ] **B6. 301**: abrir en el visor el slug de la ficha individual (y uno de sus slugs históricos) → acaba en la ficha del grupo, sin 404.
+- [ ] **B7. Si falla**: volver a la versión anterior desde Administrar implementaciones (la URL no cambia) y anotar el motivo.
+
+#### C. Confirmar `DRIVE_WEB_FOLDER_ID`
+
+- [ ] **C1. Sacar el ID** de la carpeta raíz de media en Drive (URL `https://drive.google.com/drive/folders/<ID>`) y comprobar que la cuenta que ejecuta el backend la ve.
+- [ ] **C2. Generar la config**: en `.env` (no versionado) `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID=<ID>`; después `node scripts/gen-config.js` (o `npm run build`).
+- [ ] **C3. Confirmar el generado**: `apps-script/Config.gs` debe tener `DRIVE_WEB_FOLDER_ID: '<ID>'` y no vacío; si queda vacío, el backend responde «DRIVE_WEB_FOLDER_ID no configurado en Config.gs».
+- [ ] **C4. Subir `Config.gs`**: pegar el generado en GAS → Guardar → Implementar → Administrar implementaciones → editar la existente → **Nueva versión** → Implementar.
+- [ ] **C5. Probar de punta a punta**: subir la portada de una publicación de borrador (`web-media-subir`) → crea `animales|eventos|historias/<slug>` bajo la raíz y devuelve `carpeta`/`url`; la imagen queda compartida (`ANYONE_WITH_LINK`) y un documento de la misma ficha queda privado. Limpiar el archivo de prueba con el «×» del formulario (`web-media-eliminar`).
+- [ ] **C6. Higiene**: la raíz y la carpeta de la ficha **no** se comparten, y `Config.gs` sigue fuera de git.
 
 ## Análisis y planes añadidos (2026-11-16 / 2026-11-17)
 
