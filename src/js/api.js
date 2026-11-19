@@ -8,7 +8,8 @@ const API = {
   // esqueleto (la lista queda en `_loading[key]`). Con timeout (y reintento en
   // lecturas) la pantalla acaba pintando el error con «Reintentar» en vez de
   // colgarse. Las escrituras no se reintentan: un POST que falla por red pudo
-  // llegar al servidor y repetirlo duplicaría la fila.
+  // llegar al servidor y repetirlo duplicaría filas, ficheros de Drive o
+  // correos, que no tienen idempotencia.
   // Se puede ajustar en pruebas.
   _tiemposRed: { lectura: 20000, escritura: 45000, espera: 800, intentos: 2 },
 
@@ -33,10 +34,11 @@ const API = {
       } catch (err) {
         ultimo = err;
         // Un guardado que falla por red o se agota puede haber llegado al
-        // servidor, y no hay idempotencia real: `appendToSheet` solo hace
-        // upsert cuando el cuerpo trae `id`, pero las altas de animales y
-        // familias, las subidas a Drive y el envío de contratos por email no
-        // lo traen. Por eso ningún POST se reintenta aquí.
+        // servidor. Las altas son idempotentes porque el front manda `id` y
+        // `appendToSheet` hace upsert, pero las subidas a Drive (`upload-*`,
+        // `web-media-subir`) y el envío de contratos por email
+        // (`send-contrato-email`) crean fichero o correo nuevo en cada intento.
+        // Por eso ningún POST se reintenta aquí.
         if (escribe) break;
       } finally {
         clearTimeout(timer);

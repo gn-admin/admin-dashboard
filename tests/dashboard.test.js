@@ -2077,3 +2077,40 @@ describe('altas con id generado en el front (idempotencia por id)', () => {
     }
   });
 });
+
+describe('alta de animal con id generado en el front', () => {
+  it('saveAnimal manda un id que el backend usa para deduplicar', async () => {
+    const previos = { api: global.API, animales: Dashboard.animales, guardando: Dashboard._guardando, grupo: Dashboard._resolveGrupoId, cerrar: Dashboard.closeFormModal, render: Dashboard.renderAnimales, snack: Dashboard.showSnackbar, doc: global.document };
+    const valores = { 'an-nombre': 'Luna', 'an-especie': 'perro', 'an-sexo': 'hembra', 'an-estado': 'disponible' };
+    global.document = {
+      getElementById: (id) => ({
+        value: Object.prototype.hasOwnProperty.call(valores, id) ? valores[id] : '',
+        checked: false,
+        files: []
+      })
+    };
+    let enviado = null;
+    global.API = { createAnimal: async (d) => { enviado = d; return { data: d }; } };
+    Dashboard.animales = [];
+    Dashboard._guardando = () => () => {};
+    Dashboard._resolveGrupoId = () => '';
+    Dashboard.closeFormModal = () => {};
+    Dashboard.renderAnimales = () => {};
+    Dashboard.showSnackbar = () => {};
+    try {
+      await Dashboard.saveAnimal({ preventDefault() {}, target: {} }, false, '');
+      assert.match(enviado.id, /^ani_/);
+      assert.equal(enviado.nombre, 'Luna');
+      assert.equal(Dashboard.animales[0].id, enviado.id);
+    } finally {
+      global.API = previos.api;
+      Dashboard.animales = previos.animales;
+      Dashboard._guardando = previos.guardando;
+      Dashboard._resolveGrupoId = previos.grupo;
+      Dashboard.closeFormModal = previos.cerrar;
+      Dashboard.renderAnimales = previos.render;
+      Dashboard.showSnackbar = previos.snack;
+      if (previos.doc === undefined) delete global.document; else global.document = previos.doc;
+    }
+  });
+});
