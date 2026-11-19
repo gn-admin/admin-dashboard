@@ -1163,6 +1163,8 @@ const Dashboard = {
     const exists = this.familias.find(f => (f.email || '').toLowerCase().trim() && f.email.toLowerCase().trim() === email) || this.familias.find(f => (f.nombre || '').toLowerCase().trim() === nombre.toLowerCase().trim());
     if (exists) return exists;
     const data = {
+      // Id generado aquí: el alta es idempotente en el backend (upsert por id).
+      id: 'fam_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       nombre: nombre || (r.nombre || 'Persona'),
       email: r.email || '',
       telefono: r.telefono || '',
@@ -1179,7 +1181,7 @@ const Dashboard = {
       if (res && res.data) this.familias.push(res.data);
       return res && res.data;
     } catch (err) {
-      const fallback = { ...data, id: 'fam_' + Date.now().toString(36), fecha_registro: new Date().toISOString().slice(0, 10) };
+      const fallback = { ...data, fecha_registro: new Date().toISOString().slice(0, 10) };
       this.familias.push(fallback);
       this.showSnackbar('Familia registrada localmente (backend sin hoja)', 'warning');
       return fallback;
@@ -4967,13 +4969,13 @@ const Dashboard = {
     try {
       for (let i = 1; i <= cantidad; i++) {
         const nombre = cantidad > 1 ? base + ' ' + this._romano(i) : base;
-        const row = { nombre, especie, raza, edad, sexo, estado: 'disponible', grupo_id, grupo, grupo_obligatorio: obl, descripcion: 'Camada: ' + grupo, esterilizada: false, vacunas: 'Pendientes', microchip: '', fecha_ingreso: new Date().toISOString().slice(0, 10) };
+        const row = { id: 'ani_' + Date.now().toString(36) + i, nombre, especie, raza, edad, sexo, estado: 'disponible', grupo_id, grupo, grupo_obligatorio: obl, descripcion: 'Camada: ' + grupo, esterilizada: false, vacunas: 'Pendientes', microchip: '', fecha_ingreso: new Date().toISOString().slice(0, 10) };
         try {
           const res = await API.createAnimal(row);
           if (res && res.data) this.animales.push(res.data);
-          else this.animales.push({ ...row, id: 'ani_' + Date.now().toString(36) + i });
+          else this.animales.push({ ...row });
         } catch (err) {
-          this.animales.push({ ...row, id: 'ani_' + Date.now().toString(36) + i });
+          this.animales.push({ ...row });
         }
       }
     } finally { finGuardar(); }
@@ -5073,6 +5075,9 @@ const Dashboard = {
         await API.updateAnimal(id, data);
         const item = this._byId(this.animales, id); if (item) Object.assign(item, data);
       } else {
+        // El id viaja en el alta: `appendToSheet` hace upsert por id y así un
+        // reintento (cola offline o guardado repetido) no duplica la fila.
+        data.id = 'ani_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const res = await API.createAnimal(data);
         if (res.data) { this.animales.push(res.data); id = res.data.id || id; }
       }
@@ -5443,6 +5448,8 @@ const Dashboard = {
         await API.updateFamilia(id, data);
         Object.assign(existing, data);
       } else {
+        // Id generado aquí para que el backend deduplice por id (upsert).
+        data.id = 'fam_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const res = await API.createFamilia(data);
         if (res.data) this.familias.push(res.data);
       }

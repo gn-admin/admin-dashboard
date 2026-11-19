@@ -170,7 +170,7 @@ describe('API: forma de las peticiones', () => {
   });
 });
 
-describe('API._fetch: reintenta una vez si la red falla', () => {
+describe('API._fetch: reintenta una vez las lecturas si la red falla', () => {
   it('el segundo intento vuelve a la red', async () => {
     const fetchReal = global.fetch;
     let intentos = 0;
@@ -231,20 +231,24 @@ describe('API._fetch: reintenta una vez si la red falla', () => {
     }
   });
 
-  it('un guardado con fallo de red inmediato sí se reintenta', async () => {
+  it('un guardado con fallo de red no se reintenta (podría duplicar la fila)', async () => {
     const fetchReal = global.fetch;
     const tiempos = API._tiemposRed;
     API._tiemposRed = { lectura: 200, escritura: 200, espera: 5, intentos: 2 };
     let intentos = 0;
     global.fetch = async () => {
       intentos++;
-      if (intentos === 1) throw new Error('red caida');
-      return { ok: true, status: 200, json: async () => ({ status: 'success', data: 1 }) };
+      throw new Error('red caida');
     };
     try {
-      const r = await API._fetch('https://x', { method: 'POST' });
-      assert.equal(intentos, 2);
-      assert.equal(r.ok, true);
+      await assert.rejects(() => API._fetch('https://x', { method: 'POST' }), (err) => {
+        assert.equal(err.status, 'error');
+        assert.equal(err.code, 'TIMEOUT_RED');
+        assert.match(err.message, /al guardar/);
+        assert.match(err.message, /vuelve a intentarlo/);
+        return true;
+      });
+      assert.equal(intentos, 1);
     } finally {
       global.fetch = fetchReal;
       API._tiemposRed = tiempos;

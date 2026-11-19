@@ -5,19 +5,22 @@
 const API = {
   // Apps Script responde en 2-7 s, pero a veces deja una petición colgada. Sin
   // límite, la promesa no se resuelve nunca y la pantalla se queda en el
-  // esqueleto (la lista queda en `_loading[key]`). Con timeout + reintento la
-  // pantalla acaba pintando el error con «Reintentar» en vez de colgarse.
+  // esqueleto (la lista queda en `_loading[key]`). Con timeout (y reintento en
+  // lecturas) la pantalla acaba pintando el error con «Reintentar» en vez de
+  // colgarse. Las escrituras no se reintentan: un POST que falla por red pudo
+  // llegar al servidor y repetirlo duplicaría la fila.
   // Se puede ajustar en pruebas.
   _tiemposRed: { lectura: 20000, escritura: 45000, espera: 800, intentos: 2 },
 
   async _fetch(url, opts = {}) {
     const escribe = String(opts.method || 'GET').toUpperCase() !== 'GET';
     const limite = escribe ? this._tiemposRed.escritura : this._tiemposRed.lectura;
+    // `intentos` solo aplica a las lecturas: las escrituras se envían una vez.
+    const intentos = escribe ? 1 : this._tiemposRed.intentos;
     let ultimo = null;
-    for (let intento = 1; intento <= this._tiemposRed.intentos; intento++) {
+    for (let intento = 1; intento <= intentos; intento++) {
       const ctrl = new AbortController();
-      let agotado = false;
-      const timer = setTimeout(() => { agotado = true; ctrl.abort(); }, limite);
+      const timer = setTimeout(() => ctrl.abort(), limite);
       // Se respeta la señal del llamador cuando la hay.
       let senal = ctrl.signal;
       if (opts.signal) {
@@ -29,16 +32,16 @@ const API = {
         return await fetch(url, { ...opts, signal: senal });
       } catch (err) {
         ultimo = err;
-        // Un guardado que se agota puede haber llegado al servidor: repetirlo
-        // duplicaría la fila. En escrituras no se reintenta el timeout ni la
-        // cancelación del llamador. Un fallo de red sí se reintenta una vez,
-        // aunque tampoco hay forma de saber si el envío llegó a salir.
-        const cancelado = agotado || !!(opts.signal && opts.signal.aborted);
-        if (escribe && cancelado) break;
+        // Un guardado que falla por red o se agota puede haber llegado al
+        // servidor, y no hay idempotencia real: `appendToSheet` solo hace
+        // upsert cuando el cuerpo trae `id`, pero las altas de animales y
+        // familias, las subidas a Drive y el envío de contratos por email no
+        // lo traen. Por eso ningún POST se reintenta aquí.
+        if (escribe) break;
       } finally {
         clearTimeout(timer);
       }
-      if (intento < this._tiemposRed.intentos) {
+      if (intento < intentos) {
         await new Promise(r => setTimeout(r, this._tiemposRed.espera * intento));
       }
     }

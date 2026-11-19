@@ -2028,3 +2028,52 @@ describe('acogidas: cerrar sin borrar y conservar historial', () => {
     }
   });
 });
+
+describe('altas con id generado en el front (idempotencia por id)', () => {
+  it('la familia auto-registrada desde una encuesta manda id', async () => {
+    const previos = { api: global.API, responses: Dashboard.responses, loaded: Dashboard._loaded, familias: Dashboard.familias };
+    let enviado = null;
+    global.API = { createFamilia: async (d) => { enviado = d; return { data: d }; } };
+    Dashboard.responses = { 'pre-acogida': [{ id: 'r1', nombre: 'Ana', apellidos: 'Paz', email: 'ana@example.test', ciudad: 'Vigo' }] };
+    Dashboard._loaded = { familias: true };
+    Dashboard.familias = [];
+    try {
+      const r = await Dashboard._autoFamiliaDeEncuesta('pre-acogida', 'r1');
+      assert.match(enviado.id, /^fam_/);
+      assert.equal(enviado.email, 'ana@example.test');
+      assert.equal(r.id, enviado.id);
+    } finally {
+      global.API = previos.api;
+      Dashboard.responses = previos.responses;
+      Dashboard._loaded = previos.loaded;
+      Dashboard.familias = previos.familias;
+    }
+  });
+
+  it('el alta de familia desde el formulario manda id', async () => {
+    const previos = { api: global.API, familias: Dashboard.familias, guardando: Dashboard._guardando, cancelForm: Dashboard.cancelForm, render: Dashboard.renderAcogidas, snack: Dashboard.showSnackbar, doc: global.document };
+    const valores = { 'fa-nombre': 'Casa Paz', 'fa-email': 'casa@example.test', 'fa-telefono': '600000000', 'fa-ubicacion': 'Vigo', 'fa-especialidad': '', 'fa-max': '2', 'fa-notas': '' };
+    global.document = { getElementById: (id) => (Object.prototype.hasOwnProperty.call(valores, id) ? { value: valores[id] } : null) };
+    let enviado = null;
+    global.API = { createFamilia: async (d) => { enviado = d; return { data: d }; } };
+    Dashboard.familias = [];
+    Dashboard._guardando = () => () => {};
+    Dashboard.cancelForm = () => {};
+    Dashboard.renderAcogidas = () => {};
+    Dashboard.showSnackbar = () => {};
+    try {
+      await Dashboard.saveFamilia({ preventDefault() {}, target: {} }, false, '');
+      assert.match(enviado.id, /^fam_/);
+      assert.equal(enviado.nombre, 'Casa Paz');
+      assert.equal(Dashboard.familias[0].id, enviado.id);
+    } finally {
+      global.API = previos.api;
+      Dashboard.familias = previos.familias;
+      Dashboard._guardando = previos.guardando;
+      Dashboard.cancelForm = previos.cancelForm;
+      Dashboard.renderAcogidas = previos.render;
+      Dashboard.showSnackbar = previos.snack;
+      if (previos.doc === undefined) delete global.document; else global.document = previos.doc;
+    }
+  });
+});
