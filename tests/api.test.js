@@ -185,4 +185,85 @@ describe('API._fetch: reintenta una vez si la red falla', () => {
       assert.equal(r.ok, true);
     } finally { global.fetch = fetchReal; }
   });
+
+  it('una petición colgada se corta por timeout y no deja la promesa pendiente', async () => {
+    const fetchReal = global.fetch;
+    const tiempos = API._tiemposRed;
+    API._tiemposRed = { lectura: 30, escritura: 30, espera: 5, intentos: 2 };
+    let intentos = 0;
+    global.fetch = (url, opts) => {
+      intentos++;
+      return new Promise((resolve, reject) => {
+        if (opts && opts.signal) opts.signal.addEventListener('abort', () => reject(new Error('abortado')));
+      });
+    };
+    try {
+      await assert.rejects(() => API._fetch('https://x'), /no respondió/);
+      assert.equal(intentos, 2);
+    } finally {
+      global.fetch = fetchReal;
+      API._tiemposRed = tiempos;
+    }
+  });
+
+  it('un guardado colgado no se reintenta (podría duplicar la fila)', async () => {
+    const fetchReal = global.fetch;
+    const tiempos = API._tiemposRed;
+    API._tiemposRed = { lectura: 30, escritura: 30, espera: 5, intentos: 2 };
+    let intentos = 0;
+    global.fetch = (url, opts) => {
+      intentos++;
+      return new Promise((resolve, reject) => {
+        if (opts && opts.signal) opts.signal.addEventListener('abort', () => reject(new Error('abortado')));
+      });
+    };
+    try {
+      await assert.rejects(() => API._fetch('https://x', { method: 'POST' }), (err) => {
+        assert.equal(err.status, 'error');
+        assert.equal(err.code, 'TIMEOUT_RED');
+        assert.match(err.message, /al guardar/);
+        return true;
+      });
+      assert.equal(intentos, 1);
+    } finally {
+      global.fetch = fetchReal;
+      API._tiemposRed = tiempos;
+    }
+  });
+
+  it('un guardado con fallo de red inmediato sí se reintenta', async () => {
+    const fetchReal = global.fetch;
+    const tiempos = API._tiemposRed;
+    API._tiemposRed = { lectura: 200, escritura: 200, espera: 5, intentos: 2 };
+    let intentos = 0;
+    global.fetch = async () => {
+      intentos++;
+      if (intentos === 1) throw new Error('red caida');
+      return { ok: true, status: 200, json: async () => ({ status: 'success', data: 1 }) };
+    };
+    try {
+      const r = await API._fetch('https://x', { method: 'POST' });
+      assert.equal(intentos, 2);
+      assert.equal(r.ok, true);
+    } finally {
+      global.fetch = fetchReal;
+      API._tiemposRed = tiempos;
+    }
+  });
+
+  it('una respuesta lenta pero válida no se corta', async () => {
+    const fetchReal = global.fetch;
+    const tiempos = API._tiemposRed;
+    API._tiemposRed = { lectura: 200, escritura: 200, espera: 5, intentos: 2 };
+    global.fetch = () => new Promise((resolve) => setTimeout(() => resolve({
+      ok: true, status: 200, json: async () => ({ status: 'success', data: 'ok' })
+    }), 40));
+    try {
+      const r = await API._fetch('https://x');
+      assert.equal(r.ok, true);
+    } finally {
+      global.fetch = fetchReal;
+      API._tiemposRed = tiempos;
+    }
+  });
 });

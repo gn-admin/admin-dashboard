@@ -374,7 +374,10 @@ const Dashboard = {
     admin: '*',
     coordinador: ['dashboard','encuestas','encuestas-perros','encuestas-gatos','encuestas-acogida','animales','acogidas','acogidas-activas','adopciones','socios','blacklist','reportes','actividad','web'],
     voluntario: ['dashboard','animales','reportes','actividad'],
-    tesoreria: ['dashboard','animales','donaciones','almacen','reportes','actividad'],
+    // Tesorería no tiene `reportes` (necesita `estados`/`acogidas`, que el
+    // backend le niega) ni puede editar animales: sus páginas son las que el
+    // backend le permite leer de verdad y piden solo esas listas.
+    tesoreria: ['dashboard','animales','donaciones','almacen','actividad'],
     consulta: ['dashboard','animales'],
     sin_acceso: []
   },
@@ -406,7 +409,7 @@ const Dashboard = {
     if (rol === 'consulta') return false;
     if (rol === 'coordinador') return ['encuestas','animales','acogidas','adopciones','socios','blacklist','reportes','actividad','web'].indexOf(modulo) !== -1;
     if (rol === 'voluntario') return ['animales','reportes','actividad'].indexOf(modulo) !== -1;
-    if (rol === 'tesoreria') return ['donaciones','almacen','animales','reportes','actividad'].indexOf(modulo) !== -1;
+    if (rol === 'tesoreria') return ['donaciones','almacen'].indexOf(modulo) !== -1;
     return false;
   },
 
@@ -4284,7 +4287,9 @@ const Dashboard = {
   async renderAnimales(el) {
     await Promise.all([
       this._loadList('animales', () => API.getAnimales()),
-      this._loadList('familias', () => API.getFamilias()),
+      // Best-effort: tesorería puede leer animales pero no familias (403); el
+      // listado debe salir igual, solo sin el nombre de la familia de acogida.
+      this._loadListBestEffort('familias', () => API.getFamilias()),
       // Best-effort: si el backend aun no tiene el endpoint `grupos` (404) no
       // debe romper el listado; los bloques salen igual, solo falta la foto/notas.
       this._loadListBestEffort('grupos', () => API.getGrupos())

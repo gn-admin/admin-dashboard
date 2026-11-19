@@ -3,13 +3,53 @@
  */
 
 const API = {
-  async _fetch(url, opts) {
-    try {
-      return await fetch(url, opts);
-    } catch (err) {
-      await new Promise(r => setTimeout(r, 800));
-      return fetch(url, opts);
+  // Apps Script responde en 2-7 s, pero a veces deja una petición colgada. Sin
+  // límite, la promesa no se resuelve nunca y la pantalla se queda en el
+  // esqueleto (la lista queda en `_loading[key]`). Con timeout + reintento la
+  // pantalla acaba pintando el error con «Reintentar» en vez de colgarse.
+  // Se puede ajustar en pruebas.
+  _tiemposRed: { lectura: 20000, escritura: 45000, espera: 800, intentos: 2 },
+
+  async _fetch(url, opts = {}) {
+    const escribe = String(opts.method || 'GET').toUpperCase() !== 'GET';
+    const limite = escribe ? this._tiemposRed.escritura : this._tiemposRed.lectura;
+    let ultimo = null;
+    for (let intento = 1; intento <= this._tiemposRed.intentos; intento++) {
+      const ctrl = new AbortController();
+      let agotado = false;
+      const timer = setTimeout(() => { agotado = true; ctrl.abort(); }, limite);
+      // Se respeta la señal del llamador cuando la hay.
+      let senal = ctrl.signal;
+      if (opts.signal) {
+        senal = (typeof AbortSignal !== 'undefined' && AbortSignal.any)
+          ? AbortSignal.any([opts.signal, ctrl.signal])
+          : opts.signal;
+      }
+      try {
+        return await fetch(url, { ...opts, signal: senal });
+      } catch (err) {
+        ultimo = err;
+        // Un guardado que se agota puede haber llegado al servidor: repetirlo
+        // duplicaría la fila. En escrituras no se reintenta el timeout ni la
+        // cancelación del llamador. Un fallo de red sí se reintenta una vez,
+        // aunque tampoco hay forma de saber si el envío llegó a salir.
+        const cancelado = agotado || !!(opts.signal && opts.signal.aborted);
+        if (escribe && cancelado) break;
+      } finally {
+        clearTimeout(timer);
+      }
+      if (intento < this._tiemposRed.intentos) {
+        await new Promise(r => setTimeout(r, this._tiemposRed.espera * intento));
+      }
     }
+    const err = new Error(
+      'El servidor no respondió ' + (escribe ? 'al guardar' : 'al consultar') +
+      '. Comprueba la conexión y vuelve a intentarlo.'
+    );
+    err.status = 'error';
+    err.code = 'TIMEOUT_RED';
+    err.cause = ultimo;
+    throw err;
   },
 
   // El backend responde siempre HTTP 200 y marca `status`: 'success' | 'warning'

@@ -214,7 +214,7 @@ El flujo gestor -> canal público -> visor funciona de punta a punta en `https:/
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 793 tests en local (783 en CI)
+npm test                                   # 797 tests en local (787 en CI)
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia
@@ -224,4 +224,5 @@ npx --no-install serve src -l 8099 --no-clipboard
 
 - **2026-11-14:** `714f053`…`06ce8fa` visor/SEO/prerender/retiradas/docs — `870735f` A3 (fallo retiradas bloquea deploy) — `7fbeca0` UI móvil publicaciones (`v229`) — `9435a6d` eliminar borrador publicación web de animal (`v230`) — `d4daabf` C2 prerender (redirect 301/oculta/JSON-LD-canonical) — `39fb362` C1 restaurar retirada (`v231`).
 - **2026-11-15 (Track E, `e86a662`…`8d93563`):** mejoras a11y/navegación y foco (`e86a662`, `df2e7c8`, `08a17f0`, `3d77fb2`, `f7d339e`, `0a9b748`, `f32308c`, `8d93563`), labels/formularios y estados (`c47e12d`, `09b0121`, `fd17604`, `ed1152a`, `e2fcac1`, `f7ac2f9`), rendimiento/lazy y SW (`dbe4537`, `v246`–`v252`), modularización E3 (`bd9cb8f` actividad, `4817c44` finanzas, `5ae8149` blacklist, `ecfc77d` delegados web) y sincronía documental (`2971d45`).
+- **2026-11-19:** `API._fetch` corta por timeout (20 s lectura / 45 s escritura) y reintenta una vez, así una petición colgada de Apps Script acaba en error con «Reintentar» en vez de dejar la pantalla en el esqueleto; en escrituras el timeout **no** se reintenta (podría llegar al servidor y duplicar la fila), solo los fallos de red inmediatos; tesorería deja de ofrecer «Reportes» (necesita `estados`/`acogidas`, que el backend le niega) y el listado de animales carga `familias` best-effort, alineando front y backend; SW `v302`.
 - **2026-11-18:** `f17e7ae` cierra grupos de adopción conjunta (F4/F5) y añade compartir/copiar enlace (SW `v276`); `2e754fb` hace visible el aviso de «Enlace copiado», unifica la copia del gestor en `Web.copiarTexto` y sube el SW a `v277`; a11y del aviso (`aria-atomic`, región viva siempre renderizada) y SW `v278`.
