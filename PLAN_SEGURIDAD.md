@@ -233,7 +233,7 @@ Para **todas** las operaciones (lectura y escritura: `getAnimales`, `getAdopcion
 - Tras cambiar un rol: el usuario debe cerrar sesiÃ³n y volver a entrar (o recargar) para refrescar `user-profile`.
 
 ### 2.2 Token de API y rotaciÃ³n (Hito 2.2, ~76%)
-- **RotaciÃ³n:** si hay sospecha de exposiciÃ³n, generar un nuevo token en la configuraciÃ³n del script (PropertiesService/`CONFIG` segÃºn tu implementaciÃ³n).
+- **RotaciÃ³n:** si hay sospecha de exposiciÃ³n, generar un nuevo token en la configuraciÃ³n del script (PropertiesService/`CONFIG` segÃºn tu implementaciÃ³n). Las propiedades de script se leen en cada ejecuciÃ³n, asÃ­ que **no hace falta volver a implementar la web app**.
 - **Actualizar despliegue frontend** de forma coordinada:
   - Actualizar secreto/variable en GitHub (ver secciÃ³n 4) y regenerar `src/js/config.js` en el flujo de build/despliegue.
   - No guardar el token en el repositorio.
@@ -330,7 +330,7 @@ Hay dos enfoques complementarios (segÃºn disponibilidad):
 ## 4) GitHub (despliegue y secretos) â€” Hito 2.2 / operaciÃ³n
 
 - **Secretos:** en el repositorio (Settings â†’ Secrets and variables â†’ Actions), mantener el token de API y configuraciÃ³n sensible como **Secrets** (no Variables planas si el repo es pÃºblico), y nunca commitear `.env` ni `src/js/config.js`.
-- **RotaciÃ³n de token:** al rotar el token en GAS, actualizar el secreto correspondiente en GitHub y ejecutar el despliegue para regenerar la config inyectada.
+- **RotaciÃ³n de token:** las propiedades de script (`GITHUB_DEPLOY_TOKEN`, `RECAPTCHA_SECRET`) se leen en cada ejecuciÃ³n, asÃ­ que rotarlas **no exige redespliegue**: se guarda el valor nuevo en Propiedades de la secuencia de comandos y se comprueba que funciona («Regenerar web» o la prueba de login). Solo si se rota un secreto que viaja al frontend (`RECAPTCHA_SITE_KEY`) hay que actualizarlo en GitHub y desplegar para regenerar `config.js`.
 - **VerificaciÃ³n:** tras cambios, confirmar que la app desplegada funciona y que no se expone el token en el cÃ³digo publicado mÃ¡s allÃ¡ de lo imprescindible en runtime (teniendo en cuenta la limitaciÃ³n `?token=`).
 
 ---

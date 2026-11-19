@@ -15,7 +15,7 @@
 
 **Pendiente (operativo/manual):**
 - [ ] **D3 (opcional):** inspección visual de filas en hoja de auditoría/fases.
-- [ ] **D4 (periódico):** rotación del token cuando proceda.
+- [ ] **D4 (periódico):** rotación del token cuando proceda. Las propiedades de script se leen en cada ejecución: **no exige redespliegue** (basta con guardar el valor y comprobarlo), salvo que el secreto rotado viaje al frontend (`RECAPTCHA_SITE_KEY`), que sí necesita desplegar para regenerar `config.js`.
 - [ ] **D5:** configurar dominios/umbral en la consola reCAPTCHA v3 y ejecutar la prueba e2e de login (código y `.gs` ya actualizados). **MFA/App Check:** mejora futura opcional.
 
 ## 1. Roles esperados
