@@ -3,10 +3,11 @@
  *
  *   AUDIT_PASSWORD=... node e2e/idempotencia-real.e2e.mjs
  *
- * Envía dos veces el mismo POST de alta (`animales` y `familias`) con el
- * mismo `id`, como haría un reintento tras un fallo de red, y comprueba
- * releyendo la hoja por API que solo hay una fila por id. Si el backend
- * duplicara, el segundo POST habría añadido otra fila.
+ * Envía dos veces un POST de alta (`animales` y `familias`) con el mismo `id`,
+ * como haría un reintento tras un fallo de red, pero cambiando el nombre en el
+ * segundo envío. Releyendo la hoja por API comprueba que solo hay una fila por
+ * id y que conserva el nombre del segundo POST: si el backend duplicara habría
+ * dos filas, y si ignorara el reintento la fila seguiría con el nombre inicial.
  *
  * Se llama al Apps Script desplegado directamente desde Node (sin CORS). El
  * alta de familia no envía correos: solo `send-contrato-email` usa MailApp.
@@ -30,6 +31,7 @@ const sufijo = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const ID_ANI = 'ani_e2e_' + sufijo;
 const ID_FAM = 'fam_e2e_' + sufijo;
 const NOMBRE = 'ZZ E2E Idempotencia ' + sufijo;
+const NOMBRE2 = NOMBRE + ' (reintento)';
 const HOY = new Date().toISOString().slice(0, 10);
 
 const ANIMAL = {
@@ -107,28 +109,32 @@ async function main() {
 
   try {
     const a1 = await post('animales', ANIMAL);
-    const a2 = await post('animales', ANIMAL);
     assert.equal(String(a1.data.id), ID_ANI);
-    assert.equal(String(a2.data.id), ID_ANI);
-    ok('dos POST de animal con el mismo id responden con ' + ID_ANI);
+    const altaAni = filasDe(await getLista('animales'), ID_ANI);
+    assert.equal(altaAni.length, 1, 'animales tiene ' + altaAni.length + ' filas con ' + ID_ANI);
+    assert.equal(altaAni[0].nombre, NOMBRE);
+    ok('animal: el primer POST crea la fila con el nombre inicial');
 
-    const animales = await getLista('animales');
-    const filasAni = filasDe(animales, ID_ANI);
+    const a2 = await post('animales', { ...ANIMAL, nombre: NOMBRE2 });
+    assert.equal(String(a2.data.id), ID_ANI);
+    const filasAni = filasDe(await getLista('animales'), ID_ANI);
     assert.equal(filasAni.length, 1, 'animales tiene ' + filasAni.length + ' filas con ' + ID_ANI);
-    assert.equal(filasAni[0].nombre, NOMBRE);
-    ok('animal: una sola fila tras repetir el alta');
+    assert.equal(filasAni[0].nombre, NOMBRE2, 'el reintento no actualizó la fila');
+    ok('animal: el segundo POST actualiza la fila única (ni duplica ni se ignora)');
 
     const f1 = await post('familias', FAMILIA);
-    const f2 = await post('familias', FAMILIA);
     assert.equal(String(f1.data.id), ID_FAM);
-    assert.equal(String(f2.data.id), ID_FAM);
-    ok('dos POST de familia con el mismo id responden con ' + ID_FAM);
+    const altaFam = filasDe(await getLista('familias'), ID_FAM);
+    assert.equal(altaFam.length, 1, 'familias tiene ' + altaFam.length + ' filas con ' + ID_FAM);
+    assert.equal(altaFam[0].nombre, NOMBRE);
+    ok('familia: el primer POST crea la fila con el nombre inicial');
 
-    const familias = await getLista('familias');
-    const filasFam = filasDe(familias, ID_FAM);
+    const f2 = await post('familias', { ...FAMILIA, nombre: NOMBRE2 });
+    assert.equal(String(f2.data.id), ID_FAM);
+    const filasFam = filasDe(await getLista('familias'), ID_FAM);
     assert.equal(filasFam.length, 1, 'familias tiene ' + filasFam.length + ' filas con ' + ID_FAM);
-    assert.equal(filasFam[0].nombre, NOMBRE);
-    ok('familia: una sola fila tras repetir el alta');
+    assert.equal(filasFam[0].nombre, NOMBRE2, 'el reintento no actualizó la fila');
+    ok('familia: el segundo POST actualiza la fila única (ni duplica ni se ignora)');
   } catch (err) {
     fallo(err.message);
   } finally {
