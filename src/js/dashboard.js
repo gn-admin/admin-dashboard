@@ -5728,12 +5728,15 @@ const Dashboard = {
     const T = (typeof AcogidaTextos !== 'undefined') ? AcogidaTextos : null;
     if (!T) return '';
     const m = this._acogidaMaterialDatos(caso, guardado);
+    const snap = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+    const fechaContrato = (snap && snap.fecha) || (this._contratoAcogidaDatos ? (this._contratoAcogidaDatos(caso).fecha || '') : '') || '';
     const tiene = n => m.material.some(x => x.toLowerCase() === String(n).toLowerCase());
     const items = (T.material || []).filter(n => n.toLowerCase() !== 'otros');
     const casillas = items.map(n => `<label style="display:flex;align-items:flex-start;gap:6px"><input type="checkbox" value="${this._esc(n)}" ${tiene(n) ? 'checked' : ''}><span>${this._esc(n)}</span></label>`).join('');
     return `<div class="detail-section" style="margin-top:10px">
       <div class="detail-section-title">Material prestado</div>
       <div class="detail-section-note">Marca lo que se entrega con el animal. Sale en el contrato de acogida y sirve para reclamarlo al finalizar.</div>
+      <div class="form-row" style="margin-bottom:10px"><div class="form-group"><label for="ac-fecha">Fecha del contrato</label><input type="date" id="ac-fecha" value="${this._esc(fechaContrato)}"></div></div>
       <div id="acogida-material-list" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;font-size:var(--text-sm)">${casillas}</div>
       <div class="form-row" style="margin-top:10px"><div class="form-group"><label for="mat-otros">Otros (detallar)</label><input type="text" id="mat-otros" value="${this._esc(m.otros)}" placeholder="Ej: cama, arnés"></div><div class="form-group"><label for="mat-fin">Devolución prevista</label><input type="date" id="mat-fin" value="${this._esc(m.finPrevisto)}"></div></div>
       <label class="contrato-acepta"><input type="checkbox" id="mat-devuelto" ${m.devuelto ? 'checked' : ''}><span>Material devuelto</span></label>
@@ -5752,8 +5755,9 @@ const Dashboard = {
     const otros = ((this._el('mat-otros') || {}).value || '').trim();
     const devuelto = !!(this._el('mat-devuelto') || {}).checked;
     const devueltoEn = ((this._el('mat-devuelto-en') || {}).value || '').trim();
-    const finPrevisto = ((this._el('mat-fin') || {}).value || '').trim();
-    const lista = this._materialAcogidaLista(marcados, otros);
+          const finPrevisto = ((this._el('mat-fin') || {}).value || '').trim();
+      const fechaInput = ((this._el('ac-fecha') || {}).value || '').trim();
+      const lista = this._materialAcogidaLista(marcados, otros);
     c.material = lista;
     c.material_otros = otros;
     c.material_devuelto = devuelto;
@@ -5771,6 +5775,7 @@ const Dashboard = {
         snapshot.material = lista;
         snapshot.material_otros = otros;
         snapshot.fecha_fin_prevista = finPrevisto;
+        if (fechaInput) snapshot.fecha = fechaInput;
         await this._guardarContratoAcogida(c, snapshot);
       }
       this.showSnackbar(devuelto && devueltoEn ? 'Material devuelto guardado' : 'Material de la acogida guardado', 'success');
@@ -5800,6 +5805,11 @@ const Dashboard = {
     };
     const hoy = new Date();
     const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    // La fecha del contrato debe ser la del dia en que se hizo, no la de
+    // hoy al regenerar/actualizar: se preserva la del contrato guardado.
+    const guardado = this._contratoAcogidaDe ? this._contratoAcogidaDe(caso.id) : null;
+    const snapshotGuardado = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
+    const fechaContrato = (snapshotGuardado && snapshotGuardado.fecha) || (guardado && guardado.fecha) || '';
     return {
       id: caso.id || '',
       animal_id: caso.animal_id || '',
@@ -5832,7 +5842,7 @@ const Dashboard = {
       inicio: caso.inicio || '',
       fase: caso.fase || '',
       ciudad: val(sol.ciudad, fam && fam.ubicacion),
-      fecha: fechaHoy
+      fecha: fechaContrato || fechaHoy
     };
   },
 
@@ -5900,6 +5910,8 @@ const Dashboard = {
       const c = this._byId(this.acogidas, id);
       if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
       const datos = this._contratoAcogidaDatos(c);
+      const fechaInput = ((this._el('ac-fecha') || {}).value || '').trim();
+      if (fechaInput) datos.fecha = fechaInput;
       const prev = this._contratoAcogidaDe(id);
       const prevDatos = prev ? this._contratoAcogidaSnapshot(prev) : null;
       const foto = (datos.animal && datos.animal.foto) || (prevDatos && prevDatos.animal && prevDatos.animal.foto) || '';
@@ -5957,6 +5969,8 @@ const Dashboard = {
       const nuevos = Object.assign({}, datos, {
         animal: Object.assign({}, datos.animal || {}, { nombre: identidad.nombre, foto: identidad.foto, raza: identidad.raza || (datos.animal && datos.animal.raza), edad: identidad.edad || (datos.animal && datos.animal.edad), sexo: identidad.sexo || (datos.animal && datos.animal.sexo), microchip: identidad.microchip || (datos.animal && datos.animal.microchip) })
       });
+      const fechaInputIdentidad = ((this._el('ac-fecha') || {}).value || '').trim();
+      if (fechaInputIdentidad) nuevos.fecha = fechaInputIdentidad;
       const res = await this._guardarContratoAcogida(c, nuevos);
       if (res && res.local) this._snackErr(res.err, 'Datos guardados en este dispositivo; se sincronizaran al volver la conexion.');
       else this.showSnackbar('Foto y nombre guardados en el contrato y en la ficha', 'success');
@@ -6042,6 +6056,8 @@ const Dashboard = {
     const snapshot = guardado ? this._contratoAcogidaSnapshot(guardado) : null;
     const live = this._contratoAcogidaDatos(c);
     const datos = snapshot || live;
+    const fechaInputDescarga = ((typeof document !== 'undefined' && document.getElementById('ac-fecha')) ? document.getElementById('ac-fecha').value : '').trim();
+    if (fechaInputDescarga && datos) datos.fecha = fechaInputDescarga;
     if (snapshot) {
       datos.animal = Object.assign({}, datos.animal || {}, {
         nombre: (datos.animal && datos.animal.nombre) || live.animal.nombre || c.animal || '',
