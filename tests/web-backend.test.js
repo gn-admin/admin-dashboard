@@ -51,9 +51,13 @@ function crearBackend() {
           getId: () => fid,
           getName: () => blob.name,
           getUrl: () => 'https://drive.test/file/' + fid,
-          setSharing() {
+          setSharing(acceso, permiso) {
             const registro = drive.archivos.find(a => a.id === fid);
-            if (registro) registro.compartido = true;
+            if (registro) {
+              registro.compartido = acceso === 'anyone';
+              registro.permiso = permiso;
+              registro.orden = (registro.orden || []).concat('permiso:' + acceso);
+            }
             return file;
           }
         };
@@ -104,8 +108,8 @@ function crearBackend() {
       base64Decode: () => []
     },
     DriveApp: {
-      Access: { ANYONE_WITH_LINK: 'anyone' },
-      Permission: { VIEW: 'view' },
+      Access: { ANYONE_WITH_LINK: 'anyone', PRIVATE: 'private' },
+      Permission: { VIEW: 'view', NONE: 'none' },
       getFolderById(id) {
         if (id === 'ROOT_MEDIA') return carpetaDrive('media', 'ROOT_MEDIA', null);
         const c = drive.carpetas.find(x => x.folder.getId() === id);
@@ -119,7 +123,15 @@ function crearBackend() {
         return {
           getId: () => reg.id,
           getName: () => reg.nombre,
-          setTrashed(v) { reg.eliminado = !!v; },
+          setSharing(acceso, permiso) {
+            reg.compartido = acceso === 'anyone';
+            reg.permiso = permiso;
+            reg.orden = (reg.orden || []).concat('permiso:' + acceso);
+          },
+          setTrashed(v) {
+            reg.eliminado = !!v;
+            reg.orden = (reg.orden || []).concat('papelera');
+          },
           getParents() {
             let i = 0;
             const arr = carpeta ? [carpeta.folder] : [];
@@ -986,6 +998,29 @@ describe('media: borrado de archivos en Drive', () => {
     assert.equal(r.status, 'error');
     assert.match(r.error, /no pertenece/);
     assert.equal(b.drive.archivos[0].eliminado, undefined);
+  });
+
+  it('no cae al árbol si la publicación no tiene carpeta de media', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    b.estado.publicaciones.push(fila({ id: 'web_sin', slug: 'sin-media' }));
+    const up = subida(b);
+    const r = b.ctx.webEliminarMedia({ publicacion_id: 'web_sin', file_id: up.data.fileId });
+    assert.equal(r.status, 'error');
+    assert.match(r.error, /no tiene carpeta de media/);
+    assert.equal(b.drive.archivos[0].eliminado, undefined, 'no debe tocar el archivo de otra ficha');
+  });
+
+  it('revoca el permiso público antes de mandar el archivo a la papelera', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila());
+    const up = subida(b);
+    assert.equal(b.drive.archivos[0].compartido, true, 'la imagen se sube compartida');
+    const r = b.ctx.webEliminarMedia({ publicacion_id: 'web_1', file_id: up.data.fileId });
+    assert.equal(r.status, 'success');
+    assert.equal(b.drive.archivos[0].compartido, false, 'el enlace deja de ser público');
+    assert.equal(b.drive.archivos[0].eliminado, true);
+    assert.deepEqual(b.drive.archivos[0].orden.slice(-2), ['permiso:private', 'papelera']);
   });
 
   it('sin publicación solo borra dentro del árbol de media', () => {

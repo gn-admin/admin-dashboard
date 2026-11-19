@@ -163,8 +163,10 @@ Qué se rota: el panel **no usa un token estático**. Guarda el ID token de Fire
 - [ ] **C2. Generar la config**: en `.env` (no versionado) `APPS_SCRIPT_DRIVE_WEB_FOLDER_ID=<ID>`; después `node scripts/gen-config.js` (o `npm run build`).
 - [ ] **C3. Confirmar el generado**: `apps-script/Config.gs` debe tener `DRIVE_WEB_FOLDER_ID: '<ID>'` y no vacío; si queda vacío, el backend responde «DRIVE_WEB_FOLDER_ID no configurado en Config.gs».
 - [ ] **C4. Subir `Config.gs`**: pegar el generado en GAS → Guardar → Implementar → Administrar implementaciones → editar la existente → **Nueva versión** → Implementar.
-- [ ] **C5. Probar de punta a punta**: subir la portada de una publicación de borrador (`web-media-subir`) → crea `animales|eventos|historias/<slug>` bajo la raíz y devuelve `carpeta`/`url`; la imagen queda compartida (`ANYONE_WITH_LINK`) y un documento de la misma ficha queda privado. Limpiar el archivo de prueba con el «×» del formulario (`web-media-eliminar`).
-- [ ] **C6. Higiene**: la raíz y la carpeta de la ficha **no** se comparten, y `Config.gs` sigue fuera de git.
+- [x] **C5. Probar de punta a punta** (hecho 2026-11-19 en producción con `e2e/media-drive.e2e.mjs`): la portada de un borrador temporal subió a `animales/<slug>` con `carpeta_id` de Drive y se descarga **sin sesión** (`200 image/png`); un PDF de la misma ficha fue a la misma carpeta y **no** se descarga sin sesión (devuelve la página de login). El borrado con la propia `publicacion_id` funciona y el archivo sale de la carpeta. La mera subida ya prueba que el `Config.gs` desplegado tiene un `DRIVE_WEB_FOLDER_ID` válido y que la cuenta del backend puede crear carpetas: C1–C4 quedan confirmados por comportamiento (el valor en sí no se puede leer desde aquí por estar en `.env`/`Config.gs`).
+- [ ] **C6. Higiene**: el archivo compartido y el privado se comportan como se espera, pero el reparto de permisos de la raíz y de la carpeta no se puede ver desde la API (no hay endpoint que los exponga); `Config.gs` sigue fuera de git.
+
+**Resultado real de C (2026-11-19) — anotado, no cerrado del todo:** la subida funciona, pero el borrado tiene dos problemas encontrados en vivo. (1) **`webEliminarMedia` pierde el alcance si la publicación no tiene carpeta**: al pasar la `publicacion_id` de otra ficha cuya carpeta no existe (Laia nunca subió media), `webBuscarCarpetaFicha` devuelve `folderId` vacío y el código cae al chequeo del árbol, así que borró la portada de la ficha temporal en vez de rechazar. Arreglo propuesto: si viene `publicacion_id` y no hay carpeta → error «La publicación no tiene carpeta de media» (nunca caer al árbol). (2) **«Eliminar» no revoca el enlace**: `setTrashed` no quita el permiso y la miniatura siguió sirviendo `200 image/png` más de 2 minutos después de borrar; conviene `setSharing(PRIVADA)` antes de la papelera. Residuo menor: la carpeta `animales/e2e-media-…` queda vacía en Drive (no hay endpoint para borrar carpetas). **Corregidos en repo (2026-11-19, 802 tests):** `webEliminarMedia` devuelve «La publicación no tiene carpeta de media» cuando se pasa un `publicacion_id` sin carpeta (ya no cae al árbol) y revoca el permiso con `setSharing(PRIVATE, NONE)` antes de `setTrashed`; dos casos nuevos en `tests/web-backend.test.js` (rechazo sin tocar el archivo y orden permiso → papelera). **Pendiente manual:** subir `WebPublicaciones.gs` a GAS con versión nueva; hasta entonces producción mantiene el comportamiento anterior.
 
 ## Análisis y planes añadidos (2026-11-16 / 2026-11-17)
 
@@ -247,7 +249,7 @@ Qué se rota: el panel **no usa un token estático**. Guarda el ID token de Fire
 ## Cómo reproducir en local
 
 ```bash
-npm test                                   # 800 tests en local (790 en CI)
+npm test                                   # 802 tests en local (790 en CI)
 npm run prerender -- --fixture tests/fixtures/prerender/retirada.json --out .tmp-prerender   # y borrar .tmp-prerender
 npx --no-install serve src -l 8099 --no-clipboard
 # http://localhost:8099/publico.html#/publicacion/laia

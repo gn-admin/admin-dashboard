@@ -2176,6 +2176,10 @@ function webEliminarMedia(body) {
     if (!p) return { status: 'error', error: 'Publicación no encontrada' };
     var carpeta = webBuscarCarpetaFicha(p);
     if (carpeta.error) return { status: 'error', error: carpeta.error };
+    // Sin carpeta no hay nada que borrar en esta ficha. No se cae al chequeo
+    // del árbol: eso dejaría borrar archivos de otras publicaciones pasando
+    // el id de una ficha que nunca subió media.
+    if (!carpeta.folderId) return { status: 'error', error: 'La publicación no tiene carpeta de media: no hay archivos que borrar' };
     carpetaFichaId = carpeta.folderId;
   }
 
@@ -2194,6 +2198,14 @@ function webEliminarMedia(body) {
     }
     if (!dentro) return { status: 'error', error: 'El archivo no pertenece a la carpeta de esta publicación' };
     var nombre = file.getName();
+    // Imágenes y vídeos se comparten al subirlos (ANYONE_WITH_LINK) y la
+    // papelera no quita el permiso: se revoca antes, para que «eliminar»
+    // deje de servir el archivo desde su URL.
+    try {
+      file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+    } catch (errPermiso) {
+      Logger.log('webEliminarMedia permiso: ' + errPermiso.message);
+    }
     file.setTrashed(true);
     return { status: 'success', success: true, data: { fileId: fileId, nombre: nombre, eliminado: true } };
   } catch (err) {
