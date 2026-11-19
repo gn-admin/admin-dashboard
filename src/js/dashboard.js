@@ -4244,7 +4244,10 @@ const Dashboard = {
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
-        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+        // No revocar la URL aquí: el navegador necesita que siga válida
+        // mientras dura la descarga. La revocación la gestiona el timeout
+        // de 120 s de abajo.
+        setTimeout(() => { if (a.parentNode) document.body.removeChild(a); }, 100);
       }
       setTimeout(() => URL.revokeObjectURL(url), 120000);
     } catch (err) {
