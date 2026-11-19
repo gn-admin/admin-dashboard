@@ -349,7 +349,7 @@ function handlePost(endpoint, user, e) {
     case 'delete-apadrinamiento': {
       var _r = jsonResponse({ success: deleteSheetRow(CONFIG.sheets.apadrinamientos, body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-contrato': {
-      var _r = jsonResponse({ success: deleteSheetRow(CONFIG.sheets.contratos, body.id) }); _audit(endpoint,user,body,_r); return _r; }
+      var _r = jsonResponse({ success: deleteContratoCascade(body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'send-contrato-email': {
       var _r = jsonResponse(sendContratoEmail(body, user)); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-gasto': {
@@ -1417,6 +1417,21 @@ function uploadContratoPdf(body, user) {
     Logger.log('uploadContratoPdf error: ' + err.message);
     return { error: 'Error subiendo a Drive: ' + err.message };
   }
+}
+
+// Borrado de un contrato: la fila y, si existe, el PDF firmado privado de
+// Drive. El PDF lleva DNI y firmas; si se borra el contrato no debe quedar
+// accesible para siempre en la carpeta «Contratos».
+function deleteContratoCascade(recordId) {
+  var rows = readSheet(CONFIG.sheets.contratos);
+  var target = null;
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].id) === String(recordId)) { target = rows[i]; break; }
+  }
+  if (target && target.pdf_file_id) {
+    try { DriveApp.getFileById(target.pdf_file_id).setTrashed(true); } catch (err) {}
+  }
+  return deleteSheetRow(CONFIG.sheets.contratos, recordId);
 }
 
 function deleteDocumentoCaso(recordId) {

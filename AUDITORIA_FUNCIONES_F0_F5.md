@@ -7,7 +7,7 @@
 
 ## 0. Resumen ejecutivo
 
-- **Volumen:** 117 funciones en `WebPublicaciones.gs`, 104 métodos en `web.js`, 16 rutas `web-*` en `Code.gs` y 15 llamadas del gestor en `api.js`. 8 suites y 705 pruebas en verde.
+- **Volumen:** 117 funciones en `WebPublicaciones.gs`, 104 métodos en `web.js`, 16 rutas `web-*` en `Code.gs` y 15 llamadas del gestor en `api.js`. 193 suites y 793 pruebas en verde.
 - **Producción estaba desactualizada:** antes del push servía `sw` **v267** (16 versiones por detrás). Tras el push, `v283` y `js/web.js` **idéntico byte a byte** al local.
 - **Backend al día:** el gestor de producción consulta grupos y recibe agregados (`Cachorros de Oreo`, 4 miembros, estado derivado `en_adopcion`), así que el `.gs` desplegado incluye F4.
 - **F0–F5 cumplen**; la exclusividad 1:1 ↔ grupo se aplica ya en **las dos direcciones** (H-1 cerrado el 2026-11-18).
@@ -424,7 +424,7 @@ Comprobado con la sesión de pruebas contra `https://gn-admin.github.io/admin-da
 
 | Requisito | Dónde | Estado |
 |---|---|---|
-| Tests de contrato 1:1 y grupo | `web-backend.test.js`, `web.test.js` | ✅ 705/705 |
+| Tests de contrato 1:1 y grupo | `web-backend.test.js`, `web.test.js` | ✅ 793/793 |
 | Saneado idempotente y URLs | `tests/saneado-html.test.js` | ✅ |
 | Sitemap/robots/estáticas | `scripts/prerender-publico.js`, `tests/prerender.test.js` | ✅ |
 | Compartir y canónica única | `compartir` + `urlPublicaEstatica` (2007) | ✅ |

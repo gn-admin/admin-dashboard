@@ -1,6 +1,6 @@
 # Plan · Contratos de adopción y acogida (textos e imágenes del documento nuevo)
 
-> **Estado:** análisis y planificación. **No implementa nada** (ni código, ni hojas, ni textos).
+> **Estado:** implementado y cerrado en código (F-C0…F-C5, 2026-11-18/19). Queda solo la prueba con impresora real (decisión D-C17: sin numeración de página por ahora).
 > **Fuentes:** `CONTRATO DE ADOPCION ACTUALIZADO.docx` (3 folios a doble cara, dos imágenes JPEG embebidas) y `contratoacogida EN BLANCO.doc` (una cara, con logo y sello).
 > **Alcance:** contrato de adopción, hoja de estipulaciones y contrato de acogida; modelo de datos en las hojas, generación del PDF e impacto visual.
 
@@ -206,29 +206,31 @@ El `.docx` de adopción trae además una **firma manuscrita** (`word/media/image
 
 ### 4.2 `contratos`
 
-| Columna nueva | Tipo | Origen |
+Columnas que usa hoy el contrato (las crea `appendToSheet`/`updateSheetRow` al primer guardado; no hay migración):
+
+| Columna | Tipo | Origen |
 |---|---|---|
 | `nombre_definitivo` | texto | formulario del contrato |
 | `animal_capa` / `animal_color` / `animal_tamano` | texto | snapshot del animal |
-| `donacion_importe` | número | formulario (100 por defecto) — reutilizar `donacion_adoptante` o migrar |
-| `indemnizacion_importe` | número | fijo 900 (configurable) |
+| `donacion_adoptante` | número | formulario (100 por defecto) |
+| `indemnizacion_importe` | número | formulario (900 por defecto) |
 | `adoptante_mayor_65` | booleano | formulario |
 | `responsable_nombre` / `_dni` / `_telefono` / `_email` / `_direccion` / `_firma` | texto | formulario (cláusula 65) |
-| `documento_version` | texto | «2.0 (2026/…)» |
-| `documento_folios` | número | 3 (informativo) |
-| `tipo` | `adopcion` \| `acogida` | para unificar acogida |
-| `pdf_url` | URL | si se guarda el PDF firmado en Drive |
+| `terminos_version` / `terminos_fecha` / `terminos_aceptados` | texto/fecha/booleano | firma |
+| `tipo` | `adopcion` \| `acogida` | unifica las copias de acogida en la misma hoja |
+| `acogida_id` | texto | solo copias de acogida |
+| `datos_json` | texto | snapshot completo de la acogida (partes, material, marcas…) |
+| `pdf_url` / `pdf_file_id` | texto | PDF firmado escaneado, privado en Drive |
 
-- **Límite de celda (50.000 caracteres):** hoy se guardan firmas como dataURL (reducidas a 256×256/0.85). Con adoptante + responsable + entidad + foto puede acercarse al límite y romper el guardado. Recomendación: firmas a Drive (`pdf_url`/`firma_url`) o bajar resolución y medir tamaño real antes de decidir.
-- Las columnas deben crearse **antes** de enviar objetos con esas claves (`appendToSheet` mapea por cabecera).
+- **Límite de celda:** las firmas se reducen a 256×256/0.85 y el snapshot de acogida viaja en `datos_json`; no se ha alcanzado el límite de 50.000 caracteres con los datos reales probados.
+- Las columnas se crean solas en el primer guardado: un contrato antiguo o una hoja sin la columna no rompe el alta.
 
 ### 4.3 Acogida
 
 - `Animales`: `capa` (compartida con el contrato de adopción), `marcas`, `pasaporte`.
-- `familias`: `provincia` y `codigo_postal` (hoy `ubicacion` es texto libre) y `nif` si se separa de `dni`.
-- `contratos` (si se persiste): `tipo: 'acogida'`, `acogida_id`, `material` (lista de los 9 ítems), `firma_familia`, `preaviso_dias`, `fecha_devolucion_prevista`, `estado_material`.
-- `acogidas`: ya hay `fecha_inicio`, `fecha_fin` y fase; faltan material y constancia de firma.
-- Alternativa mínima: seguir sin persistir, pero entonces no hay envío ni trazabilidad ni control del material prestado.
+- `familias`: `provincia` y `codigo_postal` se leen de la encuesta/ficha; `nif`/`dni` según lo que traiga la solicitud.
+- `contratos`: la acogida **se persiste** como una fila más con `tipo: 'acogida'`, `acogida_id` y el snapshot completo en `datos_json` (`nif`, `poblacion`, `provincia`, `codigo_postal`, `material`, `marcas`, `pasaporte`, `otros_rasgos`).
+- `acogidas`: `material`, `material_otros`, `material_devuelto`, `material_devuelto_en` y `fecha_fin_prevista` (columnas aditivas) son la fuente para el material prestado; la copia del contrato se refresca al guardarlo, así que ficha y PDF no divergen. El cierre del caso añade `desenlace` (`finalizada`/`anulada`), `fecha_cierre` y `motivo_cierre` (columnas aditivas); el caso **no se borra**, queda como historial.
 
 ### 4.4 Efectos colaterales a revisar
 
@@ -241,6 +243,18 @@ El `.docx` de adopción trae además una **firma manuscrita** (`word/media/image
 ### 4.5 Privacidad
 
 DNI, domicilio, firma y datos de la persona responsable son **datos personales**. Reglas que ya aplican y hay que mantener: nunca al canal público (`PLAN_SEGURIDAD.md` excluye contratos), no en logs, no en URLs, y el contrato firmado no se reescribe (snapshot + versión).
+
+### 4.6 Persistencia: BBDD primero, PDF bajo demanda
+
+El contrato **no se guarda como PDF**: la fuente de verdad es una fila de la hoja `contratos`. El PDF se genera al vuelo solo para verlo, descargarlo o imprimirlo.
+
+- **Adopción:** `guardarContrato` valida firmas y arma el objeto `c` → `API.createContrato(c)` → `POST ?endpoint=contratos` → `appendToSheet(CONFIG.sheets.contratos, body)`. Después actualiza la adopción a «Contrato firmado» y el animal a `adoptado`.
+- **Acogida:** `guardarContratoAcogida`, `guardarIdentidadContratoAcogida`, `guardarMaterialAcogida` y `descargarContratoAcogida` pasan por `_guardarContratoAcogida`, que construye `_contratoAcogidaFila` (`tipo: 'acogida'`, `acogida_id`, `datos_json`) y llama a `API.createContrato`. La fila se reutiliza (mismo `id`) al reguardar: `appendToSheet` hace upsert por `id` y no duplica.
+- **Sin red:** la copia local se guarda igual y la operación se encola (`createContrato`/`deleteContrato`); al volver la conexión se reintenta con el mismo `id`.
+- **PDF firmado escaneado:** es opcional y distinto del PDF generado. Se sube con `upload-contrato-pdf` a una carpeta privada de Drive y se enlaza desde `pdf_url`/`pdf_file_id` de la fila; el fichero no se comparte.
+- **Firma:** el contrato de adopción captura las firmas en canvas y las guarda en la fila. La acogida se imprime para firmar en papel (el modal lo dice) y el escaneado firmado se adjunta después; no hay firma digital de acogida que persistir.
+- **Cierre, no borrado:** los casos de adopción y acogida no se borran desde la interfaz. Al cerrarlos (`anulado`, `devuelto`, `finalizada`) la fila y su contrato (con el PDF firmado) se conservan como historial del animal y de la familia. `deleteContratoCascade` queda solo para reparaciones manuales y manda el PDF privado a la papelera.
+- **Verificación:** `tests/contratos-persistencia.test.js` (POST `contratos` de adopción y acogida + borrado con PDF) y `tests/dashboard.test.js` (la copia de acogida llama a `API.createContrato`, reutiliza `id`, conserva el PDF y encola si falla).
 
 ---
 
@@ -331,10 +345,10 @@ Es un dato **operativo**, no solo visual: sirve para reclamar la devolución. De
 
 ### 6.5 Impacto en hojas
 
-- `Animales`: `capa`, `marcas`, `pasaporte` (los dos últimos no existen; la capa se comparte con adopción).
+- `Animales`: `capa`, `marcas`, `pasaporte` (los dos últimos se añadieron en el cierre de pendientes y se ven en la ficha).
 - `familias`: `provincia`, `codigo_postal`; hoy `ubicacion` es texto libre.
-- `contratos` (si se persiste): `tipo: 'acogida'`, `acogida_id`, `material`, `firma_familia`, `preaviso_dias`, `fecha_devolucion_prevista`, `estado_material`.
-- `acogidas`: existen fechas y fase; faltan material y constancia de firma.
+- `contratos`: la acogida se persiste como fila con `tipo: 'acogida'`, `acogida_id` y el snapshot completo en `datos_json`; no necesita columnas nuevas para material, marcas o partes.
+- `acogidas`: `material`, `material_otros`, `material_devuelto`, `material_devuelto_en` y `fecha_fin_prevista` (columnas aditivas) guardan el material y su devolución; la copia del contrato se refresca al guardarlo. Al cerrar, `desenlace`, `fecha_cierre` y `motivo_cierre` dejan el resultado en el historial sin borrar la fila.
 
 ### 6.6 Visual
 
@@ -356,7 +370,7 @@ En cualquier caso, el texto debe validarlo la asociación antes de publicarlo.
 
 | Fase | Objetivo | Entregable | Pruebas |
 |---|---|---|---|
-| **F-C0** | Cerrar textos y decisiones D-C1…D-C12; extraer imágenes del `.docx` | Documento de texto definitivo + assets | Revisión de la asociación |
+| **F-C0** | Cerrar textos y decisiones D-C1…D-C12; extraer imágenes del `.docx` — **hecha** | Documento de texto definitivo + assets | Revisión de la asociación |
 | **F-C1** | Datos: columnas en `Animales` y `contratos`, campos en formularios, snapshot | Hojas actualizadas y app guardando | Tests de mapeo y de contrato guardado |
 | **F-C2** | Contrato de adopción nuevo: maqueta, 20 estipulaciones, cláusulas condicionales (PPP, gato/perro), importes, firma Asociación | `_buildContracto` nuevo + vista previa en el modal | Tests de HTML (campos, condicionales, importes) |
 | **F-C3** | Hoja de estipulaciones firmada (anexo) con el texto nuevo y versión — **hecha** | `_buildTerminosAdopcion` reescrito | Tests de anexo y de versión |
@@ -380,6 +394,7 @@ En cualquier caso, el texto debe validarlo la asociación antes de publicarlo.
 - **Firma de la Asociación (D-C2):** el sello deja de dibujarse con CSS y pasa a ser la imagen real `src/assets/contratos/sello-nebak.jpg` en el modal, en la hoja de estipulaciones y en los dos PDF; se puede sustituir por otra imagen subida (`gn_sello_url` en localStorage) para el día que la asociación cambie el sello. Las rutas relativas se resuelven a absolutas antes de imprimir, porque la ventana de impresión se abre en blanco.
 - **PDF firmado escaneado (D-C10):** bloque «PDF firmado» en la ficha del contrato (adopción y acogida) y endpoint nuevo `upload-contrato-pdf` en `apps-script/Code.gs` (`API.uploadContratoPdf`). Se guarda en la subcarpeta «Contratos» de los documentos y **sin `setSharing`**, al revés que `uploadDocumento`: un contrato lleva DNI y firmas y no puede quedar con enlace de cualquiera. Solo acepta `application/pdf` hasta 10 MB y el nombre del fichero en Drive es un uuid con la extensión, sin datos personales. La URL y el `fileId` se guardan en `pdf_url`/`pdf_file_id` del contrato.
 - **Cláusulas legacy en el anexo (D-C5):** las cuatro condiciones que no están en el `.docx` (periodo de prueba y devolución, seguimiento a 1/3/6/12 meses, microchip y registro, protección de datos) viven en `ContratoTextos.anexo` y se imprimen al final de la hoja de estipulaciones, que pasa a versión **2.1**; la firma guarda esa versión, así que el registro de aceptación sigue coincidiendo con el texto firmado.
+- **Cierre, no borrado (2026-11-19):** los casos de adopción y acogida no se borran desde la interfaz; se cierran con resultado y motivo (`anulado`, `devuelto`, `finalizada`) y la fila, su contrato y el PDF firmado se conservan como historial. `deleteContratoCascade` queda para reparaciones manuales y para anular una firma, y manda el PDF privado a la papelera para no dejarlo accesible. Tests: `tests/contratos-persistencia.test.js`, los nuevos casos de `tests/dashboard.test.js` y la prueba E2E `e2e/acogidas-cerrar.e2e.mjs` (API simulada para el flujo de cierre y pasada de solo lectura contra el backend real).
 
 Cada fase es independiente y se puede parar entre ellas; F-C1 no cambia el PDF y F-C2 no necesita la acogida.
 
@@ -405,6 +420,7 @@ Cada fase es independiente y se puede parar entre ellas; F-C1 no cambia el PDF y
 | **D-C14** | Nombre del acogedor | añadirlo al PDF / dejarlo como está | Añadirlo (el documento solo trae NIF y teléfonos) |
 | **D-C15** | Material prestado | solo imprimir / guardar y controlar devolución | Guardar (lista + estado) |
 | **D-C16** | «Renuncio al derecho de denunciar…» | mantener / retirar | Revisar con la asociación; es una renuncia de derechos |
+| **D-C17** | Numeración de páginas en documentos de más de una cara | (a) no numerar; (b) migrar a un motor PDF; (c) pie manual | (a) por ahora: Chrome no soporta *margin boxes* de `@page`; se revisa si se adopta un motor PDF. La prueba con impresora real queda como verificación manual |
 
 ---
 

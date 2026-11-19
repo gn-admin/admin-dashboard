@@ -24,7 +24,7 @@
 | Prerender SEO del visor | `scripts/prerender-publico.js` | `- [x]` fichas estáticas + `sitemap.xml` + `robots.txt` en el build |
 | Acceso desde el login | `src/index.html`, `src/css/styles.css` | `- [x]` botón “Ver publicaciones” (sin sesión) |
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v267`, assets `js/web.js`, `js/publico.js`, `js/publico-embed.js` y `css/publico.css` |
-| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/publico-embed.test.js`, `tests/sheets.test.js` | `- [x]` 646 en local / 636 en CI (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410, ficha configurable v1.1 y vídeo click-to-load) |
+| Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/publico-embed.test.js`, `tests/sheets.test.js` | `- [x]` 793 en local / 783 en CI (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410, ficha configurable v1.1 y vídeo click-to-load) |
 | Ficha configurable desde la publicación | §7.3 | `- [x]` contrato aditivo v1.1 **implementado en local** (sin desplegar): backend validado (orden, `videoModo`, `tags`, `contenido`), precedencia `ficha > base`, controles estructurados con orden, visor/prerender y pruebas; queda el despliegue de `.gs`/Pages y el port |
 | Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
 
@@ -433,7 +433,7 @@ Reglas:
 - `src/publicaciones/laia.html`: `<title>Laia</title>`, description real, `canonical` absoluto a la página estática, OG/Twitter con la portada, **un único** `<script type="application/ld+json">` (`Article` con `mainEntityOfPage`) y **cero** scripts de aplicación.
 - Render sin JS: `h1`, hero a dos columnas (1280), cuerpo y ficha del animal (5 filas), sin desbordes a 360/1280; imagen de portada cargada.
 - `sitemap.xml`: 2 URLs (listado + ficha) con `lastmod`; `robots.txt`: `Allow` de `publico.html` y `publicaciones/`, `Disallow` del resto y línea `Sitemap:`.
-- `npm test`: **646/646** en local (**636** en CI, donde `roles-auth` se omite) (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive, ficha configurable v1.1 y vídeo click-to-load).
+- `npm test`: **793/793** en local (**783** en CI, donde `roles-auth` se omite) (prerender, canónica única, 410, páginas de retirada, fixtures, media por ficha, galería con pie, normalización de Drive, ficha configurable v1.1 y vídeo click-to-load).
 - **En Pages:** el workflow ejecuta el prerender después de los tests y el sitio publicado sirve `sitemap.xml`, `robots.txt` y `publicaciones/laia.html` (los tres **200**); la ficha estática mantiene canonical propio, OG, JSON-LD y la portada cargada.
 - **Límite conocido:** en un Pages de proyecto (`/admin-dashboard/`) `robots.txt` y `sitemap.xml` cuelgan de esa carpeta, no de la raíz del dominio; los rastreadores solo los usan si se envían en Search Console. Con dominio propio (`gruponebak.net`) quedan en la raíz y funcionan solos.
 

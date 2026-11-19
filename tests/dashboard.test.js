@@ -1493,6 +1493,69 @@ describe('contratos de acogida: copia persistida y snapshot', () => {
     assert.equal(fila.datos_json, JSON.stringify(datos));
     assert.match(fila.guardado_en, /^\d{4}-\d{2}-\d{2}T/);
   });
+
+  it('_guardarContratoAcogida persiste la fila en Contratos (no solo el PDF)', async () => {
+    Dashboard.contratos = [{ id: 'ctr_old', tipo: 'acogida', acogida_id: 'acg1', pdf_url: 'https://drive/x', pdf_file_id: 'FILE1' }];
+    const orig = {
+      saveLocal: Dashboard.saveLocal,
+      cacheSet: Dashboard._cacheSet,
+      enqueue: Dashboard._enqueueOp,
+      api: global.API
+    };
+    const llamadas = [];
+    Dashboard.saveLocal = () => {};
+    Dashboard._cacheSet = () => {};
+    Dashboard._enqueueOp = () => {};
+    global.API = {
+      createContrato: async (fila) => { llamadas.push(fila); return { data: Object.assign({}, fila) }; }
+    };
+    try {
+      const datos = { animal: { nombre: 'Luna' }, familia: { nombre: 'Ana' }, fecha: '2026-11-19' };
+      const res = await Dashboard._guardarContratoAcogida({ id: 'acg1', animal: 'Luna', familia: 'Ana', animal_id: 'a1', familia_id: 'f1' }, datos);
+      assert.equal(llamadas.length, 1);
+      assert.equal(llamadas[0].id, 'ctr_old');
+      assert.equal(llamadas[0].tipo, 'acogida');
+      assert.equal(llamadas[0].acogida_id, 'acg1');
+      assert.equal(llamadas[0].datos_json, JSON.stringify(datos));
+      assert.equal(llamadas[0].pdf_url, 'https://drive/x');
+      assert.equal(llamadas[0].pdf_file_id, 'FILE1');
+      assert.equal(res.local, false);
+    } finally {
+      Dashboard.saveLocal = orig.saveLocal;
+      Dashboard._cacheSet = orig.cacheSet;
+      Dashboard._enqueueOp = orig.enqueue;
+      if (orig.api === undefined) delete global.API; else global.API = orig.api;
+    }
+  });
+
+  it('_guardarContratoAcogida deja la operacion en cola si la API falla', async () => {
+    Dashboard.contratos = [];
+    const orig = {
+      saveLocal: Dashboard.saveLocal,
+      cacheSet: Dashboard._cacheSet,
+      enqueue: Dashboard._enqueueOp,
+      api: global.API
+    };
+    let encolada = null;
+    Dashboard.saveLocal = () => {};
+    Dashboard._cacheSet = () => {};
+    Dashboard._enqueueOp = (op) => { encolada = op; };
+    global.API = { createContrato: async () => { throw new Error('sin red'); } };
+    try {
+      const res = await Dashboard._guardarContratoAcogida({ id: 'acg2', animal: 'Luna' }, { animal: { nombre: 'Luna' } });
+      assert.equal(res.local, true);
+      assert.equal(encolada.m, 'createContrato');
+      assert.equal(encolada.a[0].tipo, 'acogida');
+      assert.equal(encolada.a[0].acogida_id, 'acg2');
+      assert.equal(Dashboard.contratos.length, 1);
+    } finally {
+      Dashboard.saveLocal = orig.saveLocal;
+      Dashboard._cacheSet = orig.cacheSet;
+      Dashboard._enqueueOp = orig.enqueue;
+      if (orig.api === undefined) delete global.API; else global.API = orig.api;
+    }
+  });
+
 });
 
 describe('multiusuario: identidad y cache no resucita borrados', () => {
@@ -1856,5 +1919,112 @@ describe('F-C1: importes del contrato (validacion)', () => {
     assert.equal(Dashboard._contratoImporte('abc', 100), 100);
     assert.equal(Dashboard._contratoImporte('-5', 900), 900);
     assert.equal(Dashboard._contratoImporte(undefined, 900), 900);
+  });
+});
+
+describe('acogidas: cerrar sin borrar y conservar historial', () => {
+  const G = globalThis;
+  G.Icons = Object.assign({ activity: '', home: '', eye: '', fileText: '', check: '', checkCircle: '' }, G.Icons || {});
+
+  it('_acogidaCerrada distingue abiertas, finalizadas y anuladas', () => {
+    assert.equal(Dashboard._acogidaCerrada({ fase: 'entrega' }), false);
+    assert.equal(Dashboard._acogidaCerrada({ fase: 'en_casa' }), false);
+    assert.equal(Dashboard._acogidaCerrada({ fase: 'finalizada' }), true);
+    assert.equal(Dashboard._acogidaCerrada({ fase: 'en_casa', desenlace: 'finalizada' }), true);
+    assert.equal(Dashboard._acogidaCerrada({ fase: 'finalizada', desenlace: 'anulada' }), true);
+    assert.equal(Dashboard._acogidaCerrada(null), false);
+  });
+
+  it('el estado visible de una anulada es Anulada, no Finalizada', () => {
+    const anulada = { fase: 'finalizada', desenlace: 'anulada' };
+    assert.equal(Dashboard._acogidaEstadoLabel(anulada), 'Anulada');
+    assert.equal(Dashboard._acogidaEstadoCls(anulada), 'descartada');
+    assert.equal(Dashboard._acogidaEstadoLabel({ fase: 'en_casa' }), 'En casa');
+    assert.equal(Dashboard._acogidaEstadoCls({ fase: 'en_casa' }), 'aprobada');
+  });
+
+  it('la tarjeta no ofrece borrar: ofrece cerrar y ver el caso', () => {
+    const previos = { acogidas: Dashboard.acogidas, contratos: Dashboard.contratos, animales: Dashboard.animales };
+    Dashboard.acogidas = [];
+    Dashboard.contratos = [];
+    Dashboard.animales = [];
+    try {
+      const html = Dashboard._acogidaCardHtml({ id: 'ac1', animal: 'Luna', familia: 'Ana', fase: 'en_casa', inicio: '2026-01-10' });
+      assert.doesNotMatch(html, /deleteAcogida/);
+      assert.match(html, /showCerrarAcogidaForm/);
+      assert.match(html, /Ver caso/);
+    } finally {
+      Dashboard.acogidas = previos.acogidas;
+      Dashboard.contratos = previos.contratos;
+      Dashboard.animales = previos.animales;
+    }
+  });
+
+  it('una acogida cerrada no muestra acciones de avance ni de cierre', () => {
+    const previos = { acogidas: Dashboard.acogidas, contratos: Dashboard.contratos, animales: Dashboard.animales };
+    Dashboard.acogidas = [];
+    Dashboard.contratos = [];
+    Dashboard.animales = [];
+    try {
+      const html = Dashboard._acogidaCardHtml({ id: 'ac2', animal: 'Luna', familia: 'Ana', fase: 'finalizada', desenlace: 'anulada', motivo_cierre: 'No llegó a entregarse', fin: '2026-02-01' });
+      assert.doesNotMatch(html, /avanzarFaseAcogida/);
+      assert.doesNotMatch(html, /showCerrarAcogidaForm/);
+      assert.match(html, /Anulada/);
+    } finally {
+      Dashboard.acogidas = previos.acogidas;
+      Dashboard.contratos = previos.contratos;
+      Dashboard.animales = previos.animales;
+    }
+  });
+
+  it('el modal de cierre pide resultado, fecha y motivo y avisa de que no borra', () => {
+    const previos = { acogidas: Dashboard.acogidas };
+    const modalOriginal = Dashboard.showFormModal;
+    let html = '';
+    Dashboard.acogidas = [{ id: 'ac1', animal: 'Luna', familia: 'Ana', fase: 'en_casa' }];
+    Dashboard.showFormModal = (_t, h) => { html = h; };
+    try {
+      Dashboard.showCerrarAcogidaForm('ac1');
+    } finally {
+      Dashboard.showFormModal = modalOriginal;
+      Dashboard.acogidas = previos.acogidas;
+    }
+    assert.match(html, /id="ac-cerrar-resultado"/);
+    assert.match(html, /id="ac-cerrar-fecha"/);
+    assert.match(html, /id="ac-cerrar-motivo"/);
+    assert.match(html, /no se elimina/i);
+    assert.match(html, /guardarCierreAcogida/);
+  });
+
+  it('el historial del animal mezcla adopciones y acogidas cerradas con su motivo', () => {
+    const previos = { adopciones: Dashboard.adopciones, acogidas: Dashboard.acogidas };
+    Dashboard.adopciones = [{ id: 'ad1', animal_id: 'a1', adoptante: 'Marta', fase: 'Seguimiento', desenlace: 'devuelto', motivo_devolucion: 'No se adaptó', fecha: '2025-09-01' }];
+    Dashboard.acogidas = [{ id: 'ac1', animal_id: 'a1', familia: 'Ana', fase: 'finalizada', desenlace: 'anulada', motivo_cierre: 'Cambio de planes', inicio: '2025-05-01', fin: '2025-05-10' }];
+    try {
+      const html = Dashboard._historialCasosAnimalHtml('a1');
+      assert.match(html, /Adopción · Marta/);
+      assert.match(html, /Devuelto/);
+      assert.match(html, /No se adaptó/);
+      assert.match(html, /Acogida · Ana/);
+      assert.match(html, /Anulada/);
+      assert.match(html, /Cambio de planes/);
+      assert.match(html, /openAdopcionFicha/);
+      assert.match(html, /openAcogidaFicha/);
+    } finally {
+      Dashboard.adopciones = previos.adopciones;
+      Dashboard.acogidas = previos.acogidas;
+    }
+  });
+
+  it('sin casos no pinta la sección de historial', () => {
+    const previos = { adopciones: Dashboard.adopciones, acogidas: Dashboard.acogidas };
+    Dashboard.adopciones = [];
+    Dashboard.acogidas = [];
+    try {
+      assert.equal(Dashboard._historialCasosAnimalHtml('a1'), '');
+    } finally {
+      Dashboard.adopciones = previos.adopciones;
+      Dashboard.acogidas = previos.acogidas;
+    }
   });
 });

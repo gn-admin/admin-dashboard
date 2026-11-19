@@ -4,7 +4,7 @@ const Dashboard = {
   gastos: [], recordatorios: [], donaciones: [], seguimientos: [], documentos: [], inventario: [], historialFasesAdopcion: [],
   // Apadrinamientos contra el backend real (endpoints apadrinamientos/*).
   APADRINAMIENTOS_REMOTE: true,
-  _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
+  _currentAnimalFilter: 'all', _currentFosterFilter: 'all', _currentAcogidaFilter: 'abiertas', _currentEspecieFilter: 'all', _currentSocioTipoFilter: 'all',
   // Prioridad (urgent): 'all' | 'solo' — combinable con estado y especie.
   _currentPrioridadFilter: 'all', _currentAnimalSearch: '', _currentSocioSearch: '',
   _loaded: {}, _loading: {}, _cached: {}, _pageToken: 0, _snackbarTimer: null, _shown: {},
@@ -488,8 +488,8 @@ const Dashboard = {
         showApadrinamientoForm: 'animales', saveApadrinamiento: 'animales', deleteApadrinamiento: 'animales', finalizarApadrinamiento: 'animales', convertirPadrino: 'animales',
         showGrupoForm: 'animales', showGrupoFormFromInfo: 'animales', saveGrupo: 'animales', separarDelGrupo: 'animales',
         showFamiliaForm: 'acogidas', showFamiliaFormById: 'acogidas', saveFamilia: 'acogidas', deleteFamilia: 'acogidas',
-        showAcogidaForm: 'acogidas', saveAcogida: 'acogidas', deleteAcogida: 'acogidas',
-        showAdopcionForm: 'adopciones', showAdopcionFormById: 'adopciones', saveAdopcion: 'adopciones', deleteAdopcion: 'adopciones',
+        showAcogidaForm: 'acogidas', saveAcogida: 'acogidas', showCerrarAcogidaForm: 'acogidas', guardarCierreAcogida: 'acogidas',
+        showAdopcionForm: 'adopciones', showAdopcionFormById: 'adopciones', saveAdopcion: 'adopciones',
         showSeguimientoForm: 'adopciones', saveSeguimiento: 'adopciones', deleteSeguimiento: 'adopciones',
         showAvanzarFaseForm: 'adopciones', showRetrocederFaseForm: 'adopciones', showDevolucionForm: 'adopciones', anularCaso: 'adopciones', showAnularCasoForm: 'adopciones',
         guardarAvanceFase: 'adopciones', guardarRetrocesoFase: 'adopciones', guardarDevolucion: 'adopciones', guardarAnulacionCaso: 'adopciones',
@@ -632,6 +632,7 @@ const Dashboard = {
     this._refreshing = false;
     this._currentAnimalFilter = 'all';
     this._currentFosterFilter = 'all';
+    this._currentAcogidaFilter = 'abiertas';
     this._currentEspecieFilter = 'all';
     this._currentSocioTipoFilter = 'all';
     this._currentPrioridadFilter = 'all';
@@ -1369,6 +1370,7 @@ const Dashboard = {
   onAnimalEspecieFilterChange(el) { this._currentEspecieFilter = el.value; this.renderAnimales(document.getElementById('page-animales')); },
   onAnimalPrioridadFilterChange(el) { this._currentPrioridadFilter = el.value; this.renderAnimales(document.getElementById('page-animales')); },
   onFosterFilterChange(el) { this._currentFosterFilter = el.value; this.renderAcogidas(document.getElementById('page-acogidas')); },
+  onAcogidaFilterChange(el) { this._currentAcogidaFilter = el.value; this.renderAcogidasActivas(document.getElementById('page-acogidas-activas')); },
   onSocioTipoFilterChange(el) { this._currentSocioTipoFilter = el.value; this.renderSocios(document.getElementById('page-socios')); },
   onActividadFilterChange(el) { this.filterActividad(el.closest('.page')); },
   onMemoriaAnioChange() { this._pintarMemoria(); },
@@ -2920,7 +2922,7 @@ const Dashboard = {
       ${this._guideStep(Icons.clock, '5. Seguimiento del caso', 'El caso se controla en <b>Acogidas activas</b> con los botones de fase: <b>Entrega → En casa → Finalizada</b>.', 'Acogidas activas', false)}
       ${this._guideStep(Icons.fileText, '6. Contrato de acogida (opcional)', 'En cada caso tienes <b>Contrato de acogida</b>: documento con los datos del animal, la familia y las condiciones para firmar en papel. Exige <b>foto del animal</b> (y permite corregir su nombre); se puede <b>guardar una copia de los datos</b> y reemplazarla con <b>Actualizar copia</b> aunque la ficha cambie. <b>No es obligatorio</b> ni bloquea las fases.', 'Acogidas activas > Contrato de acogida', false)}
       ${this._guideStep(Icons.checkCircle, '7. Cierre', 'Al marcar <b>Finalizada</b> (pide confirmacion) el animal vuelve a <b>Disponible</b> y la familia vuelve a <b>Libre</b> si queda por debajo de su capacidad (Ocupada solo al llenarla), lista para otra acogida.', 'Acogidas activas', false)}
-      ${this._guideStep(Icons.trash, '8. Eliminar un caso', 'La papelera de cada tarjeta borra el caso con rollback automatico: el animal vuelve a <b>Disponible</b>, la solicitud pasa a <b>En proceso</b> y la candidatura se libera. Lo mismo ocurre al eliminar la familia (cierra sus casos activos).', 'Acogidas activas', false)}`;
+      ${this._guideStep(Icons.checkCircle, '8. Cerrar un caso', 'Al cerrar una acogida eliges <b>Finalizada</b> o <b>Anulada</b> y dejas un motivo. El caso <b>no se borra</b>: queda en el historial del animal y de la familia, y puedes consultarlo en el filtro <b>Cerradas</b>. Al eliminar una familia, sus acogidas abiertas se cierran igual y se conservan.', 'Acogidas activas', false)}`;
   },
 
   _tutorialAnimales() {
@@ -5219,8 +5221,8 @@ const Dashboard = {
     const siblings = a.grupo_id ? this.animales.filter(x => x.grupo_id === a.grupo_id && x.id !== a.id) : [];
     const fotoHero = this._fotoHero(a);
     // Caso activo (adopcion o acogida) para dar contexto desde la ficha.
-    const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && p.desenlace !== 'devuelto' && p.fase !== 'Seguimiento');
-    const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && c.fase !== 'finalizada');
+    const casoAdopcion = (this.adopciones || []).find(p => String(p.animal_id) === String(a.id) && !p.desenlace && p.fase !== 'Seguimiento');
+    const casoAcogida = (this.acogidas || []).find(c => String(c.animal_id) === String(a.id) && !this._acogidaCerrada(c));
     const estadoBanner = casoAdopcion
       ? `<div class="animal-context-banner"><span class="estado-badge en_proceso">En adopcion</span><span>${this._esc(casoAdopcion.adoptante)} · fase <b>${this._esc(casoAdopcion.fase)}</b></span><button type="button" class="btn btn-outline-green btn-sm" data-action="openAdopcionFicha" data-arg0="${this._esc(casoAdopcion.id)}">${Icons.eye} Ver caso</button></div>`
       : (casoAcogida
@@ -5262,6 +5264,7 @@ const Dashboard = {
         <div class="detail-field detail-field--wide"><div class="detail-question">Descripción</div><div class="detail-answer">${this._esc(a.descripcion)||'—'}</div></div>
         ${a.grupo_id ? `<div class="detail-field detail-field--wide"><div class="detail-question">Grupo / Camada</div><div class="detail-answer">${this._esc(a.grupo||a.grupo_id)}${a.grupo_obligatorio?' <span class="estado-badge aprobada">Grupo obligatorio</span>':''} <button type="button" class="btn btn-outline-green btn-sm" data-action="viewGrupo" data-arg0="${a.grupo_id}">${Icons.eye} Ver grupo</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="separarDelGrupo" data-arg0="${a.id}">${Icons.users} Separar</button></div></div>` : ''}
       </div>
+      ${this._historialCasosAnimalHtml(a.id)}
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
@@ -5294,33 +5297,48 @@ const Dashboard = {
     const busyKey = 'del-animal:' + id;
     if (!this._busyStart(busyKey)) return;
     try {
-    if (!(await this._confirm('Eliminar este animal permanentemente? Los casos y candidaturas asociados se quedaran sin animal.'))) return;
-    await this._ensureListas(['acogidas', 'candidaturas', 'adopciones']);
+    if (!(await this._confirm('Eliminar este animal permanentemente? Su historial de adopciones y acogidas se conserva (los casos abiertos se cierran) y las candidaturas quedan sin animal.'))) return;
+    await this._ensureListas(['acogidas', 'candidaturas', 'adopciones', 'contratos']);
     try { const res = await API.deleteAnimal(id); this._assertDeleted(res, 'El animal'); }
     catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    const casos = this.acogidas.filter(x => x.animal_id === id);
-    if (casos.length) {
-      this.acogidas = this.acogidas.filter(x => x.animal_id !== id);
-      casos.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
-        if (c.familia_id) {
-          const fam = this.familias.find(f => f.id === c.familia_id);
-          if (fam) {
-            fam.animales_actuales = Math.max(0, (fam.animales_actuales || 0) - 1);
-            fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
-            this._updateLocalYApi('familias', fam);
-          }
-        }
-      });
+    const hoy = new Date().toISOString().slice(0, 10);
+    // El historial no se borra: los casos abiertos se cierran como anulados y
+    // las filas (con sus contratos) se conservan para poder consultarlos.
+    const casos = this.acogidas.filter(x => String(x.animal_id) === String(id) && !this._acogidaCerrada(x));
+    const familiasTocadas = new Set();
+    for (const c of casos) {
+      const data = { fase: 'finalizada', estado: 'anulada', desenlace: 'anulada', fin: hoy, fecha_cierre: hoy, motivo_cierre: 'Animal eliminado' };
+      try { await API.updateAcogida(c.id, data); Object.assign(c, data); }
+      catch (err) { this._enqueueOp({ m: 'updateAcogida', a: [c.id, data] }); Object.assign(c, data); }
+      if (c.familia_id) familiasTocadas.add(String(c.familia_id));
+      await this._rollbackSolicitud(c.solicitud_id);
     }
-    const cands = this.candidaturas.filter(x => x.animal_id === id);
-    if (cands.length) { this.candidaturas = this.candidaturas.filter(x => x.animal_id !== id); cands.forEach(c => { if (c.id) this._apiCreateRow(() => API.deleteCandidatura(c.id), { m: 'deleteCandidatura', a: [c.id] }); }); }
-    const adps = this.adopciones.filter(x => x.animal_id === id);
-    if (adps.length) { this.adopciones = this.adopciones.filter(x => x.animal_id !== id); adps.forEach(p => { if (p.id) this._apiCreateRow(() => API.deleteAdopcion(p.id), { m: 'deleteAdopcion', a: [p.id] }); }); }
+    familiasTocadas.forEach(fid => {
+      const fam = (this.familias || []).find(f => String(f.id) === fid);
+      if (fam) {
+        fam.animales_actuales = Math.max(0, (fam.animales_actuales || 0) - 1);
+        fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
+        this._updateLocalYApi('familias', fam);
+      }
+    });
+    const adps = this.adopciones.filter(x => String(x.animal_id) === String(id) && !x.desenlace);
+    for (const p of adps) {
+      const data = { desenlace: 'anulado', motivo_devolucion: 'Animal eliminado', fecha_devolucion: hoy, estado: 'Anulado' };
+      try { await API.updateAdopcion(p.id, data); Object.assign(p, data); }
+      catch (err) { this._enqueueOp({ m: 'updateAdopcion', a: [p.id, data] }); Object.assign(p, data); }
+      await this._rollbackSolicitud(p.solicitud_id);
+    }
+    const cands = this.candidaturas.filter(x => String(x.animal_id) === String(id));
+    for (const cd of cands) {
+      cd.animal_id = '';
+      cd.estado = 'en_lista';
+      await this._updateLocalYApi('candidaturas', cd);
+    }
     this.animales = this.animales.filter(a => a.id !== id);
     this.saveLocal();
     this._hideDetail('animales');
     this.renderAnimales(document.getElementById('page-animales'));
-    this.showSnackbar('Animal eliminado (y casos asociados liberados)', 'success');
+    this.showSnackbar('Animal eliminado; sus casos quedan en el historial', 'success');
   
     } finally {
       this._busyEnd(busyKey);
@@ -5441,7 +5459,8 @@ const Dashboard = {
     const animalesEnAcogida = this.animales.filter(a => a.acogida_familia === id);
     const capacidad = this._capacidadEfectiva(f);
     const casos = (this.acogidas || []).filter(c => String(c.familia_id) === String(id));
-    const activos = casos.filter(c => c && c.fase !== 'finalizada');
+    const activos = casos.filter(c => c && !this._acogidaCerrada(c));
+    const cerrados = casos.filter(c => c && this._acogidaCerrada(c));
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaFormById" data-arg0="${f.id}">${Icons.pencil} Editar</button>
@@ -5459,6 +5478,7 @@ const Dashboard = {
       </div>
       ${f.notas?`<div class="detail-section"><div class="detail-section-title">Notas</div><div class="detail-field"><div class="detail-answer">${this._esc(f.notas)}</div></div></div>`:''}
       ${activos.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Casos activos (${activos.length})</div>${activos.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span></div><div class="detail-answer">Desde ${this._esc(this._fmtFecha(c.inicio))} <button type="button" class="btn btn-outline-green btn-sm" data-action="openAcogidaFicha" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
+      ${cerrados.length?`<div class="detail-section"><div class="detail-section-title">${Icons.activity} Historial de acogidas (${cerrados.length})</div>${cerrados.map(c=>`<div class="detail-field"><div class="detail-question">${this._esc(c.animal)} · <span class="estado-badge ${this._acogidaEstadoCls(c)}">${this._esc(this._acogidaEstadoLabel(c))}</span></div><div class="detail-answer">${this._esc(this._fmtFecha(c.inicio))}${c.fin ? ' → ' + this._esc(this._fmtFecha(c.fin)) : ''}${c.motivo_cierre ? ' · ' + this._esc(c.motivo_cierre) : ''} <button type="button" class="btn btn-outline-green btn-sm" data-action="openAcogidaFicha" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button></div></div>`).join('')}</div>`:''}
       ${animalesEnAcogida.length?`<div class="detail-section"><div class="detail-section-title">${Icons.home} Animales en Acogida</div>${animalesEnAcogida.map(a=>`<div class="detail-field"><div class="detail-question">${this._esc(a.nombre)}</div><div class="detail-answer">${this._esc(a.especie)} &middot; ${this._esc(a.raza)} &middot; ${this._esc(a.edad||'')}</div></div>`).join('')}</div>`:''}
       `);
   },
@@ -5467,29 +5487,29 @@ const Dashboard = {
     const busyKey = 'del-familia:' + id;
     if (!this._busyStart(busyKey)) return;
     try {
-    if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? Los casos activos se cerraran y los animales quedaran disponibles.'))) return;
-    await this._ensureListas(['acogidas']);
+    if (!(await this._confirm('Eliminar esta familia acogedora permanentemente? El historial de acogidas se conserva (los casos abiertos se cierran) y los animales quedan disponibles.'))) return;
+    await this._ensureListas(['acogidas', 'contratos']);
     try { const res = await API.deleteFamilia(id); this._assertDeleted(res, 'La familia'); }
     catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    const casos = this.acogidas.filter(x => x && x.familia_id === id && x.fase !== 'finalizada');
-    if (casos.length) {
-      for (const c of casos) {
-        if (c.id) this._apiCreateRow(() => API.deleteAcogida(c.id), { m: 'deleteAcogida', a: [c.id] });
-        const a = this._byId(this.animales, c.animal_id);
-        if (a && a.estado === 'en_acogida' && (!a.acogida_familia || a.acogida_familia === id)) {
-          a.estado = 'disponible';
-          a.acogida_familia = '';
-          await this._updateLocalYApi('animales', a);
-        }
-        await this._rollbackSolicitud(c.solicitud_id);
+    const hoy = new Date().toISOString().slice(0, 10);
+    const casos = this.acogidas.filter(x => x && String(x.familia_id) === String(id) && !this._acogidaCerrada(x));
+    for (const c of casos) {
+      const data = { fase: 'finalizada', estado: 'anulada', desenlace: 'anulada', fin: hoy, fecha_cierre: hoy, motivo_cierre: 'Familia eliminada' };
+      try { await API.updateAcogida(c.id, data); Object.assign(c, data); }
+      catch (err) { this._enqueueOp({ m: 'updateAcogida', a: [c.id, data] }); Object.assign(c, data); }
+      const a = this._byId(this.animales, c.animal_id);
+      if (a && a.estado === 'en_acogida' && (!a.acogida_familia || String(a.acogida_familia) === String(id))) {
+        a.estado = 'disponible';
+        a.acogida_familia = '';
+        await this._updateLocalYApi('animales', a);
       }
-      this.acogidas = this.acogidas.filter(x => x.familia_id !== id);
+      await this._rollbackSolicitud(c.solicitud_id);
     }
     this.familias = this.familias.filter(f => f.id !== id);
     this.saveLocal();
     this._hideDetail('acogidas');
     this.renderAcogidas(document.getElementById('page-acogidas'));
-    this.showSnackbar('Familia eliminada', 'success');
+    this.showSnackbar('Familia eliminada; sus acogidas quedan en el historial', 'success');
   
     } finally {
       this._busyEnd(busyKey);
@@ -5505,8 +5525,29 @@ const Dashboard = {
     return ({ entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' })[f] || '';
   },
 
+  // Una acogida cerrada se conserva siempre: es historial del animal y de la
+  // familia. No hay borrado de casos en la UI; se cierran como finalizada o
+  // anulada y quedan consultables.
+  _acogidaCerrada(c) {
+    if (!c) return false;
+    return c.fase === 'finalizada' || c.desenlace === 'finalizada' ||
+      c.desenlace === 'anulada' || c.estado === 'finalizada' || c.estado === 'anulada';
+  },
+
+  _acogidaAnulada(c) {
+    return !!(c && (c.desenlace === 'anulada' || c.estado === 'anulada'));
+  },
+
+  _acogidaEstadoLabel(c) {
+    return this._acogidaAnulada(c) ? 'Anulada' : this._faseAcogidaLabel(c && c.fase);
+  },
+
+  _acogidaEstadoCls(c) {
+    return this._acogidaAnulada(c) ? 'descartada' : this._faseAcogidaCls(c && c.fase);
+  },
+
   // Tarjeta de caso de acogida con foto del animal, familia, progreso y
-  // estado del contrato opcional. Mantiene las acciones de fase y borrado.
+  // estado del contrato opcional. Mantiene las acciones de fase y cierre.
   _acogidaCardHtml(c) {
     const a = c.animal_id ? this._byId(this.animales || [], c.animal_id) : null;
     const foto = a ? this._fotoSrc(a, 'w200') : '';
@@ -5515,22 +5556,22 @@ const Dashboard = {
     const fases = ['entrega', 'en_casa', 'finalizada'];
     const idx = Math.max(0, fases.indexOf(c.fase));
     const pct = Math.round((idx / (fases.length - 1)) * 100);
+    const cerrada = this._acogidaCerrada(c);
     return `<div class="acogida-card">
       <div class="acogida-card-head">
         <div class="acogida-card-foto">${foto ? `<img loading="lazy" src="${this._esc(foto)}" alt="${this._esc(c.animal)}">` : Icons.home}</div>
         <div class="acogida-card-info">
-          <div class="response-name">${this._esc(c.animal)} <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._faseAcogidaLabel(c.fase)}</span>${snapshot ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
-          <div class="response-email">${this._esc(c.familia)} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}</div>
+          <div class="response-name">${this._esc(c.animal)} <span class="estado-badge ${this._acogidaEstadoCls(c)}">${this._esc(this._acogidaEstadoLabel(c))}</span>${snapshot ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="response-email">${this._esc(c.familia)} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}${c.fin ? ' &middot; hasta ' + this._esc(this._fmtFecha(c.fin)) : ''}</div>
         </div>
-        <div class="acogida-card-pct">${pct}%</div>
+        <div class="acogida-card-pct">${cerrada ? (this._acogidaAnulada(c) ? '—' : '100%') : pct + '%'}</div>
       </div>
-      <div class="acogida-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+      <div class="acogida-progress" aria-hidden="true"><span style="width:${this._acogidaAnulada(c) ? 0 : (cerrada ? 100 : pct)}%"></span></div>
       <div class="acogida-card-actions">
-        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.checkCircle} En casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-sm btn-primary" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.check} Finalizar acogida</button>` : ''}
+        ${!cerrada && c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.checkCircle} En casa</button>` : ''}
+        ${!cerrada ? `<button type="button" class="btn btn-sm ${c.fase === 'en_casa' ? 'btn-primary' : 'btn-outline-green'}" data-action="showCerrarAcogidaForm" data-arg0="${c.id}">${Icons.check} Cerrar acogida</button>` : ''}
         <button type="button" class="btn btn-sm btn-outline-green" data-action="viewAcogida" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button>
         <button type="button" class="btn btn-sm btn-outline-green" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
-        <button type="button" class="btn btn-danger btn-sm" title="Eliminar caso" data-action="deleteAcogida" data-arg0="${this._esc(c.id)}">${Icons.trash}</button>
         ${c.notas ? `<span class="acogida-card-nota">${this._esc(c.notas)}</span>` : ''}
       </div>
     </div>`;
@@ -5544,22 +5585,33 @@ const Dashboard = {
       this._loadListBestEffort('contratos', () => API.getContratos())
     ]);
     const casos = (this.acogidas || []).slice().reverse();
-    const fases = ['entrega', 'en_casa', 'finalizada'];
-    const faseLabel = { entrega: 'Entrega', en_casa: 'En casa', finalizada: 'Finalizada' };
-    const faseCls = { entrega: 'en_proceso', en_casa: 'aprobada', finalizada: 'finalizada' };
+    const filtro = this._currentAcogidaFilter;
+    const abiertas = casos.filter(c => !this._acogidaCerrada(c));
+    const cerradas = casos.filter(c => this._acogidaCerrada(c));
+    const visibles = filtro === 'todas' ? casos : (filtro === 'cerradas' ? cerradas : abiertas);
+    // En curso solo hay entrega y en casa: lo cerrado se cuenta aparte.
+    const fases = ['entrega', 'en_casa'];
+    const faseLabel = { entrega: 'Entrega', en_casa: 'En casa' };
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${casos.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
+        <div class="filters-bar"><div class="filter-row">
+          <select aria-label="Filtrar casos de acogida" data-change="onAcogidaFilterChange" data-cpass="el">
+            <option value="abiertas" ${filtro==='abiertas'?'selected':''}>En curso (${abiertas.length})</option>
+            <option value="cerradas" ${filtro==='cerradas'?'selected':''}>Cerradas (${cerradas.length})</option>
+            <option value="todas" ${filtro==='todas'?'selected':''}>Todas (${casos.length})</option>
+          </select>
+        </div></div>
         <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
           <div class="pipeline" role="list" aria-label="Casos por fase">${fases.map(ff => {
-            const n = casos.filter(c => c.fase === ff).length;
+            const n = abiertas.filter(c => c.fase === ff).length;
             return `<div class="pipeline-step${n ? ' is-active' : ''}" role="listitem">
               <span class="pipeline-value">${n}</span>
               <span class="pipeline-label">${faseLabel[ff]}</span>
             </div>`;
-          }).join('')}</div>
+          }).join('')}${cerradas.length ? `<div class="pipeline-step is-active" role="listitem"><span class="pipeline-value">${cerradas.length}</span><span class="pipeline-label">Cerradas</span></div>` : ''}</div>
         </div></div>
-        <div class="response-list">${casos.length ? casos.map(c => this._acogidaCardHtml(c)).join('') : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.home}</div><h3>Sin acogidas activas</h3><p>Aprueba una encuesta de acogida y asigna un animal desde su ficha.</p></div>`}
+        <div class="response-list">${visibles.length ? visibles.map(c => this._acogidaCardHtml(c)).join('') : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.home}</div><h3>${filtro === 'cerradas' ? 'Sin acogidas cerradas' : 'Sin acogidas activas'}</h3><p>${filtro === 'cerradas' ? 'Cuando cierres un caso quedará aquí como historial.' : 'Aprueba una encuesta de acogida y asigna un animal desde su ficha.'}</p></div>`}
         </div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -5586,21 +5638,23 @@ const Dashboard = {
     const fases = ['entrega', 'en_casa', 'finalizada'];
     const idx = Math.max(0, fases.indexOf(c.fase));
     const pct = Math.round((idx / (fases.length - 1)) * 100);
-    const finalizada = c.fase === 'finalizada';
+    const cerrada = this._acogidaCerrada(c);
+    const anulada = this._acogidaAnulada(c);
+    const finalizada = cerrada && !anulada;
     this._showDetail('acogidas-activas', c.animal || 'Caso de acogida', `
       <div class="proceso-hero">
         <div class="proceso-hero-foto">${foto ? `<img src="${this._esc(foto)}" alt="${this._esc(c.animal)}">` : Icons.home}</div>
         <div class="proceso-hero-info">
-          <div class="proceso-hero-title">${this._esc(c.animal || 'Animal')} <span class="estado-badge ${this._faseAcogidaCls(c.fase)}">${this._esc(this._faseAcogidaLabel(c.fase))}</span>${guardado ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
+          <div class="proceso-hero-title">${this._esc(c.animal || 'Animal')} <span class="estado-badge ${this._acogidaEstadoCls(c)}">${this._esc(this._acogidaEstadoLabel(c))}</span>${guardado ? ' <span class="estado-badge aprobada">Contrato</span>' : ''}</div>
           <div class="proceso-hero-sub">${this._esc(c.familia || 'Familia')} &middot; desde ${this._esc(this._fmtFecha(c.inicio))}${c.fin ? ' &middot; hasta ' + this._esc(this._fmtFecha(c.fin)) : ''}</div>
           <div class="proceso-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
         </div>
         <div class="proceso-hero-pct">${pct}%<small>${idx + 1}/${fases.length}</small></div>
       </div>
-      ${finalizada ? `<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Acogida finalizada. El animal volvió a <b>Disponible</b> y la familia quedó libre.</span></div>` : ''}
+      ${anulada ? `<div class="alert-item warning" style="margin-bottom:16px">${Icons.alertTriangle} <span>Acogida anulada${c.fecha_cierre ? ' el ' + this._fmtFecha(c.fecha_cierre) : ''}${c.motivo_cierre ? ': ' + this._esc(c.motivo_cierre) : ''}. El caso se conserva en el historial y el animal volvió a <b>Disponible</b>.</span></div>` : (finalizada ? `<div class="alert-item info" style="margin-bottom:16px">${Icons.checkCircle} <span>Acogida finalizada${c.fecha_cierre ? ' el ' + this._fmtFecha(c.fecha_cierre) : ''}. El animal volvió a <b>Disponible</b> y la familia quedó libre.</span></div>` : '')}
       <div class="detail-actions-wrap">
-        ${c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Marcar en casa</button>` : ''}
-        ${c.fase === 'en_casa' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.check} Finalizar acogida</button>` : ''}
+        ${!cerrada && c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Marcar en casa</button>` : ''}
+        ${!cerrada ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showCerrarAcogidaForm" data-arg0="${this._esc(c.id)}">${Icons.check} Cerrar acogida</button>` : ''}
         <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
         ${a ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="openAnimalFicha" data-arg0="${this._esc(a.id)}">${Icons.paw} Ver ficha del animal</button>` : ''}
       </div>
@@ -5619,6 +5673,8 @@ const Dashboard = {
         <div class="detail-field"><div class="detail-question">Contacto</div><div class="detail-answer">${this._esc((fam && (fam.telefono || fam.email)) || '') || '—'}</div></div>
         <div class="detail-field"><div class="detail-question">Inicio</div><div class="detail-answer">${this._fmtFecha(c.inicio)}</div></div>
         <div class="detail-field"><div class="detail-question">Fin</div><div class="detail-answer">${c.fin ? this._fmtFecha(c.fin) : '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Resultado</div><div class="detail-answer">${this._esc(this._acogidaEstadoLabel(c)) || '—'}</div></div>
+        <div class="detail-field detail-field--wide"><div class="detail-question">Motivo / observaciones de cierre</div><div class="detail-answer">${this._esc(c.motivo_cierre) || '—'}</div></div>
       </div>
       ${this._notasFichaHtml('acogida', c.id, { title: 'Notas del caso' })}
       <details class="detail-collapse">
@@ -5629,62 +5685,117 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Fase</div><div class="detail-answer">${this._esc(this._faseAcogidaLabel(c.fase))}</div></div>
             ${c.notas ? `<div class="detail-field detail-field--wide"><div class="detail-question">Notas antiguas</div><div class="detail-answer">${this._esc(c.notas)}</div></div>` : ''}
           </div>
-          <div class="detail-actions-inline detail-actions-inline--danger">
-            <button type="button" class="btn btn-danger btn-sm" data-action="deleteAcogida" data-arg0="${this._esc(c.id)}">${Icons.trash} Eliminar caso</button>
-          </div>
         </div>
       </details>`, detailKey);
   },
 
   async avanzarFaseAcogida(id, btn) {
+    const c = this._byId(this.acogidas, id);
+    if (!c || this._acogidaCerrada(c)) return;
+    const next = ({ entrega: 'en_casa' })[c.fase];
+    if (!next) { this.showCerrarAcogidaForm(id); return; }
     const busyKey = 'fase-acogida:' + id;
     if (!this._busyStart(busyKey)) return;
     const fin = this._btnBusy(btn, 'Actualizando...');
     try {
-      const c = this._byId(this.acogidas, id);
-      if (!c) return;
-      const order = { entrega: 'en_casa', en_casa: 'finalizada' };
-      const next = order[c.fase];
-      if (!next) return;
-      if (next === 'finalizada' && !(await this._confirm('Finalizar la acogida? El animal volvera a Disponible y la familia quedara Libre.', 'Finalizar acogida'))) return;
       this.showLoading();
       c.fase = next;
-      if (c.fase === 'finalizada') {
-        c.estado = 'finalizada';
-        c.fin = new Date().toISOString().slice(0, 10);
-        const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
-        if (a) {
-          a.estado = 'disponible';
-          a.acogida_familia = '';
-          this._updateLocalYApi('animales', a);
-        }
-        const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
-        if (fam) {
-          fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
-          fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
-          this._updateLocalYApi('familias', fam);
-        }
-        const sol = this._parseSolicitud(c.solicitud_id);
-        let estadoOk = true;
-        if (sol) estadoOk = await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
-        if (estadoOk) {
-          this.showSnackbar('Acogida finalizada. Animal vuelve a disponible.', 'success');
-        } else {
-          this.showSnackbar('Acogida finalizada, pero no se pudo actualizar el estado de la solicitud.', 'warning');
-        }
-        this._regLog('acogida', 'Acogida finalizada de ' + (a ? a.nombre : 'animal'), 'acogida', c.id);
-      } else {
-        this.showSnackbar('Fase actualizada', 'success');
-      }
       // Persistir el cambio de fase (antes se perdia al recargar).
       await this._updateLocalYApi('acogidas', c);
       this.saveLocal();
       const abierta = this._detailVigente('acogidas-activas', 'acogida:' + id);
       await this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
       if (abierta) this.viewAcogida(id, { ready: true });
+      this.showSnackbar('Fase actualizada: en casa', 'success');
     } finally {
       fin();
       this.hideLoading();
+      this._busyEnd(busyKey);
+    }
+  },
+
+  // Cierre de una acogida: se elige resultado y motivo. La fila no se borra
+  // nunca; queda en el historial del animal, de la familia y del listado de
+  // acogidas cerradas.
+  showCerrarAcogidaForm(id) {
+    const c = this._byId(this.acogidas, id);
+    if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); return; }
+    if (this._acogidaCerrada(c)) { this.showSnackbar('Este caso ya está cerrado', 'warning'); return; }
+    const hoy = new Date().toISOString().slice(0, 10);
+    this.showFormModal('Cerrar acogida · ' + (c.animal || ''), `
+      <form data-submit="guardarCierreAcogida" data-sarg0="${this._esc(id)}">
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.info} <span>El caso <b>no se elimina</b>: quedará en el historial con su resultado y motivo. El animal volverá a <b>Disponible</b> y la familia quedará libre.</span></div>
+        <div class="detail-section" style="margin-bottom:12px">
+          <div class="detail-field"><div class="detail-question">Animal</div><div class="detail-answer">${this._esc(c.animal || '—')}</div></div>
+          <div class="detail-field"><div class="detail-question">Familia</div><div class="detail-answer">${this._esc(c.familia || '—')}</div></div>
+          <div class="detail-field"><div class="detail-question">Fase actual</div><div class="detail-answer">${this._esc(this._faseAcogidaLabel(c.fase) || '—')}</div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="ac-cerrar-resultado">Resultado *</label><select id="ac-cerrar-resultado"><option value="finalizada">Finalizada (terminó el periodo)</option><option value="anulada">Anulada (no llegó a producirse)</option></select></div>
+          <div class="form-group"><label for="ac-cerrar-fecha">Fecha de cierre</label><input type="date" id="ac-cerrar-fecha" value="${hoy}"></div>
+        </div>
+        <div class="form-group"><label for="ac-cerrar-motivo">Motivo / observaciones</label><textarea id="ac-cerrar-motivo" rows="3" placeholder="Ej.: fin del periodo acordado, devolución anticipada, cambio de circunstancias..."></textarea><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Obligatorio si el caso se anula. Queda guardado en el historial.</div></div>
+        <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.check} Cerrar acogida</button></div>
+      </form>`);
+  },
+
+  async guardarCierreAcogida(e, id) {
+    e.preventDefault();
+    const finGuardar = this._guardando(e.target);
+    if (!finGuardar) return;
+    const c = this._byId(this.acogidas, id);
+    if (!c) { this.showSnackbar('Caso de acogida no encontrado. Recarga la lista.', 'warning'); finGuardar(); return; }
+    if (this._acogidaCerrada(c)) { this.showSnackbar('Este caso ya está cerrado', 'warning'); finGuardar(); return; }
+    const resultado = (document.getElementById('ac-cerrar-resultado')?.value === 'anulada') ? 'anulada' : 'finalizada';
+    const motivo = (document.getElementById('ac-cerrar-motivo')?.value || '').trim();
+    if (resultado === 'anulada' && !motivo) {
+      this.showSnackbar('Indica el motivo de la anulación', 'warning'); finGuardar(); return;
+    }
+    const fecha = (document.getElementById('ac-cerrar-fecha')?.value || '').trim() || new Date().toISOString().slice(0, 10);
+    const busyKey = 'cerrar-acogida:' + id;
+    if (!this._busyStart(busyKey)) { finGuardar(); return; }
+    this.showLoading();
+    try {
+      const data = {
+        fase: 'finalizada',
+        estado: resultado,
+        desenlace: resultado,
+        fin: fecha,
+        fecha_cierre: fecha,
+        motivo_cierre: motivo
+      };
+      Object.assign(c, data);
+      await this._updateLocalYApi('acogidas', c);
+      // Efectos del cierre: animal disponible y hueco liberado en la familia.
+      const a = c.animal_id ? this._byId(this.animales, c.animal_id) : null;
+      if (a && a.estado === 'en_acogida' && (!a.acogida_familia || String(a.acogida_familia) === String(c.familia_id))) {
+        a.estado = 'disponible';
+        a.acogida_familia = '';
+        await this._updateLocalYApi('animales', a);
+      }
+      const fam = c.familia_id ? this._byId(this.familias, c.familia_id) : null;
+      if (fam) {
+        fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
+        fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
+        await this._updateLocalYApi('familias', fam);
+      }
+      let estadoOk = true;
+      if (resultado === 'anulada') {
+        await this._rollbackSolicitud(c.solicitud_id);
+      } else {
+        const sol = this._parseSolicitud(c.solicitud_id);
+        if (sol) estadoOk = await this.setEstado(sol.responseId, 'finalizada', sol.surveyId);
+      }
+      this.saveLocal();
+      this.closeFormModal();
+      const abierta = this._detailVigente('acogidas-activas', 'acogida:' + id);
+      await this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
+      if (abierta) this.viewAcogida(id, { ready: true });
+      this._regLog('acogida', (resultado === 'anulada' ? 'Acogida anulada de ' : 'Acogida finalizada de ') + (c.animal || 'animal'), 'acogida', c.id);
+      if (!estadoOk) this.showSnackbar('Acogida cerrada, pero no se pudo actualizar el estado de la solicitud.', 'warning');
+      else this.showSnackbar(resultado === 'anulada' ? 'Acogida anulada: el caso queda en el historial' : 'Acogida finalizada: el caso queda en el historial', 'success');
+    } finally {
+      finGuardar();
       this._busyEnd(busyKey);
     }
   },
@@ -6078,38 +6189,9 @@ const Dashboard = {
     PdfExport.exportContratoAcogida(datos);
   },
 
-  async deleteAcogida(id) {
-    const busyKey = 'del-acogida:' + id;
-    if (!this._busyStart(busyKey)) return;
-    try {
-    if (!(await this._confirm('Eliminar este caso de acogida? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar acogida'))) return;
-    const target = this._byId(this.acogidas, id);
-    try {
-      const res = await API.deleteAcogida(id);
-      this._assertDeleted(res, 'El caso');
-    } catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    const a = target && target.animal_id ? this._byId(this.animales, target.animal_id) : null;
-    if (a && a.estado === 'en_acogida') {
-      a.estado = 'disponible';
-      a.acogida_familia = '';
-      await this._updateLocalYApi('animales', a);
-    }
-    const fam = target && target.familia_id ? this._byId(this.familias, target.familia_id) : null;
-    if (fam) {
-      fam.animales_actuales = Math.max(0, (fam.animales_actuales || 1) - 1);
-      fam.capacidad = this._capacidadFamilia(fam.animales_actuales, fam.max_capacity);
-      await this._updateLocalYApi('familias', fam);
-    }
-    await this._rollbackSolicitud(target && target.solicitud_id);
-    this.acogidas = (this.acogidas || []).filter(x => x.id !== id);
-    this.saveLocal();
-    this.renderAcogidasActivas(document.getElementById('page-acogidas-activas'));
-    this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
-  
-    } finally {
-      this._busyEnd(busyKey);
-    }
-  },
+  // Los casos de acogida no se borran desde la interfaz: se cierran con
+  // `showCerrarAcogidaForm` y quedan como historial del animal y de la familia.
+  // El endpoint `delete-acogida` se conserva solo para reparaciones manuales.
 
   // ==================== ADOPCIONES CRUD ====================
   async renderAdopciones(el) {
@@ -6432,6 +6514,27 @@ const Dashboard = {
       const pad = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     } catch { return this._fmtFecha(v); }
+  },
+
+  // Historial de todos los casos del animal (abiertos y cerrados). Los casos
+  // no se borran al cerrarse: esta lista es la trazabilidad que se consulta
+  // después, aunque el animal cambie de familia o se elimine.
+  _historialCasosAnimalHtml(animalId) {
+    const adps = (this.adopciones || []).filter(p => String(p.animal_id) === String(animalId));
+    const acgs = (this.acogidas || []).filter(c => String(c.animal_id) === String(animalId));
+    if (!adps.length && !acgs.length) return '';
+    const filas = [];
+    adps.forEach(p => {
+      const cierre = p.desenlace === 'devuelto' ? ' · Devuelto' : (p.desenlace === 'anulado' ? ' · Anulado' : '');
+      const motivo = p.motivo_devolucion ? ' · ' + this._esc(p.motivo_devolucion) : '';
+      filas.push(`<div class="detail-field"><div class="detail-question">Adopción · ${this._esc(p.adoptante || '—')}</div><div class="detail-answer">${this._esc(this._fmtFecha(p.fecha))} · ${this._esc(p.fase || '—')}${cierre}${motivo} <button type="button" class="btn btn-outline-green btn-sm" data-action="openAdopcionFicha" data-arg0="${this._esc(p.id)}">${Icons.eye} Ver caso</button></div></div>`);
+    });
+    acgs.forEach(c => {
+      const fin = c.fin ? ' → ' + this._esc(this._fmtFecha(c.fin)) : '';
+      const motivo = c.motivo_cierre ? ' · ' + this._esc(c.motivo_cierre) : '';
+      filas.push(`<div class="detail-field"><div class="detail-question">Acogida · ${this._esc(c.familia || '—')}</div><div class="detail-answer">${this._esc(this._fmtFecha(c.inicio))}${fin} · ${this._esc(this._acogidaEstadoLabel(c) || '—')}${motivo} <button type="button" class="btn btn-outline-green btn-sm" data-action="openAcogidaFicha" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button></div></div>`);
+    });
+    return `<div class="detail-section"><div class="detail-section-title">${Icons.activity} Historial de casos</div>${filas.join('')}</div>`;
   },
 
   _historialFasesAdopcionHtml(p) {
@@ -7793,30 +7896,9 @@ const Dashboard = {
     }
   },
 
-  async deleteAdopcion(id) {
-    const busyKey = 'del-adopcion:' + id;
-    if (!this._busyStart(busyKey)) return;
-    try {
-    if (!(await this._confirm('Eliminar este caso de adopcion? El animal volvera a Disponible y la solicitud a En proceso.', 'Eliminar adopcion'))) return;
-    const target = this._byId(this.adopciones, id);
-    try { const res = await API.deleteAdopcion(id); this._assertDeleted(res, 'El caso'); }
-    catch (err) { this._snackErr(err, 'No se pudo eliminar: ' + this._errMsg(err)); return; }
-    await this._ensureListas(['contratos']);
-    const c = this._contratoDeAdopcion(id);
-    if (c) { this.contratos = this.contratos.filter(x => x.id !== c.id); try { await API.deleteContrato(c.id); } catch (err2) { /* local only */ } }
-    // Espejo local del rollback (el backend ya lo aplico en las hojas):
-    if (target) await this._liberarAnimal(target.animal_id, id);
-    await this._rollbackSolicitud(target && target.solicitud_id);
-    this.adopciones = this.adopciones.filter(x => x.id !== id);
-    this.saveLocal();
-    this._hideDetail('adopciones');
-    this.renderAdopciones(document.getElementById('page-adopciones'));
-    this.showSnackbar('Caso eliminado: animal disponible y solicitud en proceso', 'success');
-  
-    } finally {
-      this._busyEnd(busyKey);
-    }
-  },
+  // Los casos de adopción tampoco se borran desde la interfaz: se cierran con
+  // «Anular caso» o «Registrar devolución» y quedan como historial. El endpoint
+  // `delete-adopcion` se conserva solo para reparaciones manuales.
 
   // ==================== CONTRATOS DE ADOPCION ====================
   // La hoja Contratos se comparte con las copias de acogida (tipo
