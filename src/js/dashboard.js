@@ -8342,7 +8342,7 @@ const Dashboard = {
     this.viewAdopcion(adopcionId);
     this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''), 'contrato', c.id);
     finGuardar();
-    if (envioError) this._snackErr(envioError, 'Contrato firmado, pero no se pudo enviar por email. Puedes reintentarlo desde Enviar por email.');
+    if (envioError) this._snackErr(envioError, 'Contrato firmado, pero no se pudo enviar por email: ' + this._errMsg(envioError) + ' Puedes reintentarlo desde Enviar por email.');
     else if (enviado && envioPruebas) this.showSnackbar('Contrato firmado; correo de PRUEBA enviado a ' + envioPruebas, 'warning');
     else this.showSnackbar(enviado ? 'Contrato firmado y enviado por email' : 'Contrato firmado y guardado', 'success');
   },
@@ -9347,8 +9347,12 @@ const Dashboard = {
   _errMsg(err) {
     if (!err) return 'Error desconocido';
     const m = err.message || err.error || '';
-    if (m && m !== 'Error') return m;
-    return 'Error desconocido';
+    const base = (m && m !== 'Error') ? m : 'Error desconocido';
+    // El backend manda el motivo técnico en `detail` (p. ej. el permiso de
+    // MailApp que falta). Se muestra junto al mensaje para que se pueda actuar.
+    const detalle = String(err.detail || '').trim();
+    if (detalle && detalle !== base && base.indexOf(detalle) === -1) return base + ' — ' + detalle;
+    return base;
   },
 
   // Clasifica el snack a partir de un error (función pura, testeada en tests/).
@@ -9384,13 +9388,15 @@ const Dashboard = {
     el.classList.add('active');
     clearTimeout(this._snackbarTimer);
     const token = (this._snackbarToken = (this._snackbarToken || 0) + 1);
+    // Un mensaje con el detalle técnico (permisos, etc.) necesita más tiempo.
+    const duracion = String(msg).length > 120 ? 9000 : 5000;
     this._snackbarTimer = setTimeout(() => {
       if (this._snackbarToken !== token) return;
       // Sin .active vuelve a oculto y se vacia la region viva: un mensaje
       // caducado no debe quedar ahi para quien navegue con lector de pantalla.
       el.className = 'toast-error';
       el.textContent = '';
-    }, 5000);
+    }, duracion);
   },
 
 };

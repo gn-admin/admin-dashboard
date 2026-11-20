@@ -683,6 +683,11 @@ describe('utilidades de la guia y del panel', () => {
     assert.equal(Dashboard._errMsg(new Error('Error')), 'Error desconocido');
     assert.equal(Dashboard._errMsg(new Error('Fallo real')), 'Fallo real');
     assert.equal(Dashboard._errMsg({ error: 'del backend' }), 'del backend');
+    assert.equal(
+      Dashboard._errMsg({ message: 'Error interno del servidor', detail: 'No tienes permiso para llamar a MailApp.sendEmail.' }),
+      'Error interno del servidor — No tienes permiso para llamar a MailApp.sendEmail.'
+    );
+    assert.equal(Dashboard._errMsg({ message: 'Error interno', detail: '' }), 'Error interno');
   });
 });
 
