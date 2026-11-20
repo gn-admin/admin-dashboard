@@ -140,6 +140,8 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
     assert.equal(Array.isArray(enviados[0].attachments), true);
     assert.equal(enviados[0].attachments.length, 1);
     assert.match(enviados[0].htmlBody, /PDF adjunto/);
+    assert.match(enviados[0].htmlBody, /Adjuntamos en PDF/);
+    assert.doesNotMatch(enviados[0].htmlBody, /Términos y condiciones de adopción responsable/);
     assert.equal(r.data.pdf_adjunto, true);
     assert.equal(r.data.pdf_bytes, 1234);
   });
@@ -152,6 +154,7 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
     assert.equal(enviados[0].attachments, undefined);
     assert.equal(r.data.pdf_adjunto, false);
     assert.match(r.data.pdf_error, /DocumentApp sin permiso/);
+    assert.match(enviados[0].htmlBody, /Términos y condiciones de adopción responsable/);
   });
 
   it('usa CONTRATO_FROM_EMAIL como remitente y reintenta sin alias si falla', () => {

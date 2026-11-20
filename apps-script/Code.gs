@@ -999,7 +999,7 @@ function sendContratoEmail(body, user) {
   var opciones = {
     to: to.join(','),
     subject: asunto,
-    htmlBody: construirEmailContrato(c, !!pdfContrato),
+    htmlBody: pdfContrato ? construirPortadaContrato(c) : construirEmailContrato(c),
     name: 'Grupo Nebak',
     replyTo: _emailLimpio(CONFIG.CONTACT_EMAIL) || (user && user.email) || undefined
   };
@@ -1195,13 +1195,44 @@ function _escEmail(v) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function construirEmailContrato(c, conPdf) {
+/**
+ * Portada breve del correo cuando el contrato va adjunto en PDF. Sin tablas
+ * largas, sin términos duplicados y sin imágenes: el documento completo está
+ * en el adjunto.
+ */
+function construirPortadaContrato(c) {
   var e = _escEmail;
-  // Nada de imágenes remotas ni data: URI en el cuerpo (Gmail y otros clientes
-  // las bloquean): la firma va dentro del PDF adjunto.
-  var firma1 = conPdf
-    ? '<div style="margin-top:8px;color:#6b7280;font-style:italic">[Firma registrada en el PDF adjunto]</div>'
-    : '<div style="margin-top:8px;color:#999;font-style:italic">[Firma registrada en el documento]</div>';
+  var ent = {
+    nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
+    email: c.entidad_email || CONFIG.CONTACT_EMAIL || ''
+  };
+  var fila = function(label, value) {
+    return '<tr><td style="padding:6px 0;color:#757575;width:110px">' + e(label) + '</td><td style="padding:6px 0;font-weight:600">' + e(value || '—') + '</td></tr>';
+  };
+  return '<!DOCTYPE html><html lang="es"><body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#191919">' +
+    '<div style="max-width:600px;margin:0 auto;padding:24px">' +
+    '<div style="padding:20px;border-radius:12px 12px 0 0;background:linear-gradient(135deg,#0A431E,#15863D);color:#fff">' +
+    '<div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:.85">' + e(ent.nombre) + '</div>' +
+    '<h1 style="margin:6px 0 0;font-size:21px">Contrato de adopción de ' + e(c.animal || 'un animal') + '</h1>' +
+    '</div>' +
+    '<div style="padding:22px 20px;background:#fff;border:1px solid #e8eaed;border-top:0;border-radius:0 0 12px 12px">' +
+    '<p style="margin:0 0 12px;font-size:15px">Hola' + (c.f1_nombre ? ' ' + e(c.f1_nombre) : '') + ',</p>' +
+    '<p style="margin:0 0 14px;font-size:14px;line-height:1.6">Adjuntamos en PDF el contrato de adopción y la hoja de estipulaciones. El documento incluye las firmas y no necesita descargar nada más.</p>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 16px">' +
+    fila('Animal', c.animal) + fila('Adoptante', c.f1_nombre) + fila('Fecha', c.fecha) + fila('Entidad', ent.nombre) +
+    '</table>' +
+    '<div style="padding:10px 12px;background:#eef7f1;border:1px solid #cfe8d8;border-radius:8px;font-size:13px;color:#0A431E"><b>PDF adjunto:</b> contrato de adopción y términos y condiciones.</div>' +
+    '<p style="margin:16px 0 0;font-size:13px;color:#4b5563;line-height:1.6">Si no puedes abrir el adjunto, responde a este correo o escríbenos a ' + e(ent.email || 'Grupo Nebak') + '.</p>' +
+    '<p style="margin:16px 0 0;font-size:13px">Un saludo,<br><b>' + e(ent.nombre) + '</b></p>' +
+    '<p style="margin:18px 0 0;font-size:12px;color:#9aa0a6">Correo generado automáticamente. No compartas este documento con terceros.</p>' +
+    '</div></div></body></html>';
+}
+
+function construirEmailContrato(c) {
+  var e = _escEmail;
+  // Sin imágenes remotas ni data: URI en el cuerpo (Gmail y otros clientes las
+  // bloquean). Este HTML solo se usa si el PDF no se pudo generar.
+  var firma1 = '<div style="margin-top:8px;color:#999;font-style:italic">[Firma registrada en el documento]</div>';
   var ent = {
     nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
     cif: c.entidad_cif || '',
@@ -1243,7 +1274,6 @@ function construirEmailContrato(c, conPdf) {
     '<h1 style="margin:6px 0 0;font-size:20px">Contrato de adopción responsable</h1>' +
     '</div>' +
     '<div style="padding:22px 20px;background:#fff;border:1px solid #e8eaed;border-top:0;border-radius:0 0 12px 12px">' +
-    (conPdf ? '<div style="margin:0 0 14px;padding:10px 12px;background:#eef7f1;border:1px solid #cfe8d8;border-radius:8px;font-size:13px;color:#0A431E"><b>Contrato en PDF adjunto.</b> Este correo incluye el contrato y la hoja de estipulaciones en un PDF.</div>' : '') +
     '<div style="display:flex;justify-content:space-between;gap:16px;padding:12px;border:1px solid #e8eaed;border-radius:8px;background:#f9fafb;margin-bottom:16px">' +
     '<div style="font-size:12px;color:#6b7280;line-height:1.5"><b style="display:block;color:#191919;font-size:14px">' + e(ent.nombre) + '</b>Entidad de protección animal' + entLinea('CIF', ent.cif) + entLinea('Domicilio', ent.domicilio) + entLinea('Registro', ent.registro) + entLinea('Email', ent.email) + entLinea('Teléfono', ent.telefono) + '</div>' + sello + '</div>' +
     '<p style="margin:0 0 12px;font-size:14px">Documento de adopción del animal <b>' + e(c.animal || '—') + '</b>' + (c.especie ? ' (' + e(c.especie) + ')' : '') + '.</p>' +
@@ -1272,7 +1302,7 @@ function construirEmailContrato(c, conPdf) {
     '<p style="margin:0 0 12px;font-size:13px;line-height:1.6">El adoptante declara haber leído y aceptado los siguientes términos, que forman parte del expediente de adopción del animal <b>' + e(c.animal || '—') + '</b>.</p>' +
     terminosHtml +
     '<div style="margin-top:18px;padding:12px;border-left:3px solid #15863D;background:#f8faf9;font-size:13px"><b>Aceptado por el adoptante:</b> ' + e(c.f1_nombre || '—') + (c.f1_dni ? ' · DNI ' + e(c.f1_dni) : '') + '<br><span style="color:#6b7280">Fecha: ' + e(c.fecha || '—') + '</span></div>' +
-    '<p style="margin:18px 0 0;font-size:12px;color:#9aa0a6">' + (conPdf ? 'El contrato completo y la hoja de estipulaciones van adjuntos en PDF.' : 'Este correo contiene el contrato y el anexo de términos y condiciones. Los PDF se pueden descargar desde el panel de Grupo Nebak.') + ' Correo generado automáticamente.</p>' +
+    '<p style="margin:18px 0 0;font-size:12px;color:#9aa0a6">Este correo contiene el contrato y el anexo de términos y condiciones. Los PDF se pueden descargar desde el panel de Grupo Nebak. Correo generado automáticamente.</p>' +
     '</div></div></body></html>';
 }
 
