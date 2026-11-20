@@ -871,7 +871,7 @@ function _modoPruebasCorreo() {
  * script.send_mail, aquí sale REQUIRED y el panel avisa antes de intentar nada.
  */
 function _estadoCorreoServidor_() {
-  var out = { autorizado: false, estado: 'DESCONOCIDO', detalle: '', modo_pruebas: false, pruebas_a: '', modo_pruebas_error: '' };
+  var out = { autorizado: false, estado: 'DESCONOCIDO', detalle: '', modo_pruebas: false, pruebas_a: '', modo_pruebas_error: '', pdf_soporte: true };
   try {
     var info = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
     var estado = info.getAuthorizationStatus();
