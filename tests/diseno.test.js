@@ -247,3 +247,33 @@ describe('snackbar del gestor: region viva siempre disponible', () => {
     assert.equal(activo['pointer-events'], 'auto');
   });
 });
+
+describe('CSP: sin handlers inline en el HTML generado', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const fuente = p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+
+  it('ningún JS de interfaz genera atributos on*=', () => {
+    const ficheros = ['dashboard.js', 'web.js', 'app.js', 'publico.js', 'utils.js'];
+    const patron = /\son(click|error|load|focus|blur|change|input|submit|mouseenter|mouseleave)=/g;
+    ficheros.forEach(f => {
+      const hallazgos = fuente('src/js/' + f).match(patron) || [];
+      assert.equal(hallazgos.length, 0, f + ' tiene handlers inline: ' + hallazgos.join(' '));
+    });
+  });
+
+  it('el reintento de foto de Drive va por data-fallback', () => {
+    const js = fuente('src/js/dashboard.js');
+    assert.match(js, /data-fallback=/);
+    assert.match(js, /addEventListener\('error',[\s\S]{0,400}?\}, true\)/);
+  });
+
+  it('el tooltip del gráfico se engancha por delegación y tiene implementación', () => {
+    const js = fuente('src/js/dashboard.js');
+    assert.match(js, /addEventListener\('mouseover',[\s\S]{0,200}?_chartTip\(d\)/);
+    assert.match(js, /addEventListener\('focusin',[\s\S]{0,200}?_chartTip\(d\)/);
+    assert.match(js, /_chartTip\(el\) \{/);
+    assert.match(js, /_chartTipHide\(\) \{/);
+    assert.match(fuente('src/css/styles.css'), /\.chart-tip\.active/);
+  });
+});

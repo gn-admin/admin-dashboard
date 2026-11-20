@@ -1,0 +1,149 @@
+{
+  "pages": [
+    {
+      "id": "page-dashboard",
+      "active": true,
+      "len": 1881,
+      "text": " "
+    },
+    {
+      "id": "page-encuestas",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-encuestas-perros",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-encuestas-gatos",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-encuestas-acogida",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-animales",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-acogidas",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-acogidas-activas",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-adopciones",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-socios",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-blacklist",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-reportes",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-actividad",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-redes",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-donaciones",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-almacen",
+      "active": false,
+      "len": 0,
+      "text": ""
+    },
+    {
+      "id": "page-web",
+      "active": false,
+      "len": 0,
+      "text": ""
+    }
+  ],
+  "actions": [
+    {
+      "a": "showProfile",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "refreshData",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "showTutorial",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "closeTutorial",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "closeProfile",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "closeContratoForm",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "closeInfoModal",
+      "d0": null,
+      "t": ""
+    },
+    {
+      "a": "closeFormModal",
+      "d0": null,
+      "t": ""
+    }
+  ],
+  "mainText": " "
+}

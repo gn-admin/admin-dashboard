@@ -1258,6 +1258,30 @@ const Dashboard = {
     return false;
   },
 
+  // Tooltip del gráfico del panel. Antes solo existía como handler inline (que
+  // la CSP bloqueaba) y sin definición: los puntos no hacían nada.
+  _chartTip(el) {
+    if (!el || !el.dataset) return;
+    let tip = document.getElementById('chart-tip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'chart-tip';
+      tip.className = 'chart-tip';
+      tip.setAttribute('role', 'tooltip');
+      document.body.appendChild(tip);
+    }
+    tip.textContent = (el.dataset.label || '') + ': ' + (el.dataset.count || '');
+    const r = el.getBoundingClientRect();
+    tip.style.left = Math.round(r.left + r.width / 2) + 'px';
+    tip.style.top = Math.round(r.top - 8) + 'px';
+    tip.classList.add('active');
+  },
+
+  _chartTipHide() {
+    const tip = document.getElementById('chart-tip');
+    if (tip) tip.classList.remove('active');
+  },
+
   _initActionDelegation() {
     if (this._actionDelegationInit) return;
     this._actionDelegationInit = true;
@@ -1286,6 +1310,23 @@ const Dashboard = {
         this._snackErr(err, 'No se pudo completar la acción');
       }
     });
+    // Puntos del gráfico: la CSP bloquea onmouseenter/onfocus inline, así que el
+    // tooltip se engancha por delegación (ratón y teclado).
+    const puntoDe = e => e.target && e.target.closest ? e.target.closest('.dash-chart-dot') : null;
+    document.addEventListener('mouseover', e => { const d = puntoDe(e); if (d) this._chartTip(d); });
+    document.addEventListener('mouseout', e => { if (puntoDe(e)) this._chartTipHide(); });
+    document.addEventListener('focusin', e => { const d = puntoDe(e); if (d) this._chartTip(d); });
+    document.addEventListener('focusout', e => { if (puntoDe(e)) this._chartTipHide(); });
+    // Reintento de imagen de Drive con la variante normal (antes `onerror` inline,
+    // bloqueado por la CSP). El evento `error` no burbujea: se captura.
+    document.addEventListener('error', e => {
+      const img = e.target;
+      if (!img || img.tagName !== 'IMG' || !img.dataset || !img.dataset.fallback) return;
+      const alternativa = img.dataset.fallback;
+      delete img.dataset.fallback;
+      img.src = alternativa;
+    }, true);
+
     document.addEventListener('submit', (e) => {
       const form = e.target.closest('form[data-submit]');
       if (!form) return;
@@ -2295,7 +2336,7 @@ const Dashboard = {
       ${grid}
       <polygon class="dash-chart-area" points="${area}"/>
       <polyline class="dash-chart-line" points="${pts}"/>
-      ${buckets.map((b, i) => `<circle class="dash-chart-dot" data-label="${this._esc(b.label)}" data-count="${b.count}" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="4.5" tabindex="0" role="button" aria-label="${this._esc(b.label)}: ${b.count} solicitudes" data-action="_chartTip" data-pass="el" onmouseenter="Dashboard._chartTip(this)" onmouseleave="Dashboard._chartTipHide()" onfocus="Dashboard._chartTip(this)" onblur="Dashboard._chartTipHide()"><title>${this._esc(b.label)}: ${b.count}</title></circle>`).join('')}
+      ${buckets.map((b, i) => `<circle class="dash-chart-dot" data-label="${this._esc(b.label)}" data-count="${b.count}" cx="${x(i).toFixed(1)}" cy="${y(b.count).toFixed(1)}" r="4.5" tabindex="0" role="button" aria-label="${this._esc(b.label)}: ${b.count} solicitudes" data-action="_chartTip" data-pass="el"><title>${this._esc(b.label)}: ${b.count}</title></circle>`).join('')}
     </svg>
     <div class="dash-chart-tooltip" id="dash-chart-tooltip" aria-live="polite"></div>
     <div class="dash-chart-labels">${buckets.map(b => `<span class="dash-chart-label">${b.label}</span>`).join('')}</div>
@@ -5256,7 +5297,8 @@ const Dashboard = {
     if (!grande) return;
     const normal = this._fotoSrc(a);
     const alt = this._esc(a.nombre || '');
-    const fb = normal && normal !== grande ? ` onerror="this.onerror=null;this.src='${this._esc(normal)}'"` : '';
+    // El reintento lo hace la delegación global: la CSP bloquea los handlers inline.
+    const fb = normal && normal !== grande ? ` data-fallback="${this._esc(normal)}"` : '';
     this.showInfoModal(a.nombre || 'Foto', `<img class="modal-foto" src="${this._esc(grande)}" alt="${alt}" loading="lazy" decoding="async"${fb}>`);
   },
 

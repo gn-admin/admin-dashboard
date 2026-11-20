@@ -719,7 +719,9 @@ describe('foto de la ficha: avatar clickable y modal', () => {
       Dashboard.verFotoAnimal('a1');
       assert.match(cap.html, /class="modal-foto"/);
       assert.match(cap.html, /sz=w1600/);
-      assert.match(cap.html, /onerror="this\.onerror=null;this\.src='/);
+      // La CSP bloquea los handlers inline: el reintento va por data-fallback.
+      assert.match(cap.html, /data-fallback="[^"]*sz=w800"/);
+      assert.doesNotMatch(cap.html, /onerror=/);
       assert.match(cap.html, /sz=w800/);
       assert.doesNotMatch(cap.html, /Luna <3/);
 
