@@ -1258,30 +1258,6 @@ const Dashboard = {
     return false;
   },
 
-  // Tooltip del gráfico del panel. Antes solo existía como handler inline (que
-  // la CSP bloqueaba) y sin definición: los puntos no hacían nada.
-  _chartTip(el) {
-    if (!el || !el.dataset) return;
-    let tip = document.getElementById('chart-tip');
-    if (!tip) {
-      tip = document.createElement('div');
-      tip.id = 'chart-tip';
-      tip.className = 'chart-tip';
-      tip.setAttribute('role', 'tooltip');
-      document.body.appendChild(tip);
-    }
-    tip.textContent = (el.dataset.label || '') + ': ' + (el.dataset.count || '');
-    const r = el.getBoundingClientRect();
-    tip.style.left = Math.round(r.left + r.width / 2) + 'px';
-    tip.style.top = Math.round(r.top - 8) + 'px';
-    tip.classList.add('active');
-  },
-
-  _chartTipHide() {
-    const tip = document.getElementById('chart-tip');
-    if (tip) tip.classList.remove('active');
-  },
-
   _initActionDelegation() {
     if (this._actionDelegationInit) return;
     this._actionDelegationInit = true;

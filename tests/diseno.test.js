@@ -268,12 +268,12 @@ describe('CSP: sin handlers inline en el HTML generado', () => {
     assert.match(js, /addEventListener\('error',[\s\S]{0,400}?\}, true\)/);
   });
 
-  it('el tooltip del gráfico se engancha por delegación y tiene implementación', () => {
+  it('el tooltip del gráfico se engancha por delegación y usa su contenedor', () => {
     const js = fuente('src/js/dashboard.js');
     assert.match(js, /addEventListener\('mouseover',[\s\S]{0,200}?_chartTip\(d\)/);
     assert.match(js, /addEventListener\('focusin',[\s\S]{0,200}?_chartTip\(d\)/);
-    assert.match(js, /_chartTip\(el\) \{/);
-    assert.match(js, /_chartTipHide\(\) \{/);
-    assert.match(fuente('src/css/styles.css'), /\.chart-tip\.active/);
+    assert.match(js, /_chartTip\(dot\) \{/);
+    assert.match(js, /dash-chart-tooltip/);
+    assert.match(fuente('src/css/styles.css'), /\.dash-chart-tooltip\.is-visible/);
   });
 });

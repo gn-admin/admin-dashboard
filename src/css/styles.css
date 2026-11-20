@@ -1924,26 +1924,6 @@ body {
   pointer-events: auto;
 }
 
-/* Tooltip de los puntos del gráfico del panel. */
-.chart-tip {
-  position: fixed;
-  z-index: 1300;
-  padding: 6px 10px;
-  background: var(--gray-900, #1f2937);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  border-radius: 8px;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, -100%);
-  transition: opacity 0.12s ease;
-  white-space: nowrap;
-}
-.chart-tip.active {
-  opacity: 1;
-}
-
 /* Aviso flotante de acción en curso: las escrituras de Apps Script tardan
    2-6 s y sin esto parece que el botón no hizo nada. */
 .carga-accion {
