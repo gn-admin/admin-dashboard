@@ -170,6 +170,26 @@ function handleGet(endpoint, user, e) {
       // despliegue y modo de pruebas activo.
       if (!_isAdmin(user)) return _deny('Solo administración puede comprobar el correo');
       return jsonResponse({ data: _estadoCorreoServidor_() });
+    case 'contrato-pdf-preview': {
+      // Solo administración: genera el PDF sin enviarlo, para revisar su texto.
+      if (!_isAdmin(user)) return _deny('Solo administración puede generar el PDF');
+      var idCtr = e && e.parameter ? e.parameter.id : '';
+      if (!idCtr) return jsonResponse({ error: 'Falta id' }, 400);
+      var filasCtr = readSheet(CONFIG.sheets.contratos);
+      var ctr = null;
+      for (var ic = 0; ic < filasCtr.length; ic++) {
+        if (String(filasCtr[ic].id) === String(idCtr)) { ctr = filasCtr[ic]; break; }
+      }
+      if (!ctr) return jsonResponse({ error: 'Contrato no encontrado' }, 404);
+      var pdfPreview = generarPdfContrato(ctr);
+      if (!pdfPreview) return jsonResponse({ error: 'No se pudo generar el PDF' }, 500);
+      var bytesPreview = pdfPreview.getBytes();
+      return jsonResponse({ data: {
+        pdf_base64: Utilities.base64Encode(bytesPreview),
+        pdf_bytes: bytesPreview.length,
+        nombre: pdfPreview.getName()
+      } });
+    }
     case 'surveys':
       return jsonResponse({ data: getAvailableSurveys(user) });
     case 'responses':
@@ -1035,6 +1055,206 @@ function sendContratoEmail(body, user) {
   };
 }
 
+// === CONTRATO_TEXTOS_PDF:INICIO ===
+var CONTRATO_TEXTOS_PDF = {
+  "version": "2.1",
+  "fecha": "2026/11/18",
+  "titulo": "Contrato de adopción",
+  "notaEstipulaciones": "Se adjunta hoja de estipulaciones revisada y firmada por el adoptante.",
+  "estipulaciones": [
+    {
+      "n": 1,
+      "parrafos": [
+        "El Adoptante se compromete a adoptar al animal de la Asociación con los datos que se reseñan a continuación, hasta que dicho animal muera."
+      ]
+    },
+    {
+      "n": 2,
+      "parrafos": [
+        "El Adoptante declara adoptar al animal única y exclusivamente como animal de compañía."
+      ]
+    },
+    {
+      "n": 3,
+      "parrafos": [
+        "El animal entregado en adopción no podrá ser utilizado para:"
+      ],
+      "lista": [
+        "Caza de cualquier tipo y circunstancia.",
+        "Experimentación de cualquier tipo.",
+        "La participación en peleas o enfrentamientos con otros animales.",
+        "La cría.",
+        "Guarda de propiedades.",
+        "Estancia en fincas o chalets de fin de semana.",
+        "Circos u otro tipo de espectáculos.",
+        "Participación en películas o series de televisión.",
+        "Perro policía o fines militares."
+      ]
+    },
+    {
+      "n": 4,
+      "parrafos": [
+        "En ningún caso podrá el animal permanecer atado ni encerrado en jaulas, habitaciones, terrazas, patios o garajes."
+      ]
+    },
+    {
+      "n": 5,
+      "parrafos": [
+        "En caso de que el animal tenga la consideración de Perro Potencialmente Peligroso, el Adoptante, que acredita hallarse en posesión de la licencia correspondiente mediante exhibición de la misma, incorporando a este contrato fotocopia de dicha licencia, póliza del contrato de seguro de responsabilidad civil exigido por la normativa vigente, y el justificante de su inscripción en el Registro Municipal competente, se compromete a cumplir todas las medidas de seguridad exigidas por dicha normativa, tales como pasear al animal con bozal y correa no extensible en los sitios públicos."
+      ]
+    },
+    {
+      "n": 6,
+      "parrafos": [
+        "En ningún caso podrá permanecer en lugar donde no pueda resguardarse de la lluvia, del frío o del sol, o sin espacio suficiente para el normal desarrollo de su especie."
+      ]
+    },
+    {
+      "n": 7,
+      "parrafos": [
+        "En ningún caso se podrá someter al animal a cualquier tratamiento indebido y contrario a las disposiciones de la Ley de Protección Animal, su normativa de desarrollo y Código Penal."
+      ]
+    },
+    {
+      "n": 8,
+      "parrafos": [
+        "El Adoptante se compromete por el presente contrato a proporcionar al animal alimentación y bebida suficiente y adecuada, los cuidados de higiene necesarios, la debida asistencia veterinaria, cuidarlo y respetarlo."
+      ]
+    },
+    {
+      "n": 9,
+      "parrafos": [
+        "(Solamente en el caso de que el animal adoptado sea un gato). El Adoptante se compromete por el presente contrato a esterilizarlo en la fecha adecuada. El Adoptante deberá aportar a la Asociación un informe veterinario que acredite haberse realizado dicha esterilización, informe que ha de estar debidamente sellado, firmado, con n.º de colegiado y con identificación del animal."
+      ]
+    },
+    {
+      "n": 10,
+      "parrafos": [
+        "El Adoptante se compromete por el presente contrato a proporcionar al animal compañía, a tenerle consigo, proporcionarle afecto y atenciones, y permitirle hacer el ejercicio necesario (en su caso sacándolo a pasear a la calle todos los días)."
+      ]
+    },
+    {
+      "n": 11,
+      "parrafos": [
+        "Asimismo se compromete a no regalar, vender o ceder por cualquier título, inter vivos o mortis causa, al animal; igualmente se compromete a no abandonar al animal.",
+        "En caso de fallecimiento del Adoptante, se deberá notificar a la Asociación. Si un familiar o pareja quisiera quedarse con el animal, deberá notificarlo a la Asociación y así asumiría de nuevo la adopción del animal con un nuevo contrato de adopción.",
+        "Si las personas señaladas en el párrafo anterior no desean quedarse con el animal, se notificará a la Asociación para que esta le encuentre un nuevo hogar."
+      ]
+    },
+    {
+      "n": 12,
+      "parrafos": [
+        "La desaparición del animal, por robo, pérdida, extravío o por cualquier otra causa, debe ser notificada a la Asociación lo antes posible."
+      ]
+    },
+    {
+      "n": 13,
+      "parrafos": [
+        "El Adoptante se compromete a informar de inmediato a la Asociación si se produjese un cambio de teléfono, domicilio o cualquier otra circunstancia que impidiese o dificultase su localización y posterior seguimiento."
+      ]
+    },
+    {
+      "n": 14,
+      "parrafos": [
+        "Ante cualquier circunstancia que produjese imposibilidad de mantener o tener consigo al animal, imposibilidad de cumplir los términos del presente contrato, o deseo de rescindir el mismo, el Adoptante debe devolver el animal adoptado a la Asociación sin posibilidad de reclamar los gastos que este le haya ocasionado."
+      ]
+    },
+    {
+      "n": 15,
+      "parrafos": [
+        "El Adoptante declara en este acto que asume la obligación de permitir en cualquier momento a la persona designada por la Asociación que revise el estado físico y psíquico del animal, así como el cumplimiento de las condiciones del presente contrato y de la adopción en general. Dicho representante llamará por teléfono o se personará en el domicilio sin previo aviso."
+      ]
+    },
+    {
+      "n": 16,
+      "parrafos": [
+        "El incumplimiento notorio y fehaciente de cualquiera de las obligaciones anteriormente descritas y asumidas por el Adoptante en virtud del presente contrato supondrá la resolución de pleno derecho del mismo. Al darse a dicho incumplimiento el carácter de condición resolutoria expresamente aceptada por las partes, la Asociación queda legitimada para decidir unilateralmente retirar al Adoptante, de inmediato, la custodia del animal, recobrando automáticamente la Asociación la posesión del mismo. Asimismo, la Asociación se reserva el ejercicio de las acciones legales que le asistan en cada caso.",
+        "Cualquier sospecha que tenga la Asociación de incumplimiento por el Adoptante de cualquiera de las obligaciones dimanantes del presente contrato facultará a la primera para decidir unilateralmente requisarlo de modo temporal mientras se comprueba, por el procedimiento previsto para cada caso, el cumplimiento o incumplimiento de las obligaciones asumidas, todo ello sin más trámite que la previa inspección ocular y personación en el domicilio del Adoptante para la retirada inmediata de la posesión del animal.",
+        "Si existiesen indicios de que el animal ha sido víctima de malos tratos o tortura, se procederá a la inmediata interposición de la correspondiente denuncia por parte de la Asociación.",
+        "Si se produjese la defunción del animal, esta debe ser notificada inmediatamente por burofax o cualquier otro medio que garantice fehacientemente la recepción de dicha comunicación a la Asociación en el plazo máximo de 12 horas desde el fallecimiento, decidiendo, en todo caso, la Asociación el destino del cuerpo del animal, así como la eventualidad de practicar autopsia para esclarecer las causas de la muerte. Si existiesen indicios de que ha existido dolo o negligencia por parte del Adoptante en relación con dicha desaparición, se procederá a la inmediata interposición de la correspondiente denuncia por parte de la Asociación, organización que dispone de asesoramiento jurídico por parte de abogados especializados en legislación animal."
+      ]
+    },
+    {
+      "n": 17,
+      "parrafos": [
+        "El Adoptante abona voluntariamente, en concepto de donación, la cantidad de {donacion} €. Esta cantidad va destinada a costear parte de los gastos veterinarios de los animales que recogemos.",
+        "El importe de la cuota de adopción será destinado íntegramente a costear actividades dirigidas a la consecución del objeto social y finalidad de la Asociación."
+      ]
+    },
+    {
+      "n": 18,
+      "parrafos": [
+        "La cantidad que deberá abonar el Adoptante cuando el animal desaparezca o muera mediante dolo o negligencia por parte de dicho Adoptante asciende a {indemnizacion} €. Dicha cantidad será exigible judicialmente en los citados casos. Todo ello sin perjuicio del resto de acciones administrativas, civiles y/o penales que pudieren ser ejercidas por parte de la Asociación en relación con la desaparición o muerte del animal."
+      ]
+    },
+    {
+      "n": 19,
+      "parrafos": [
+        "Esterilización de perros, excepciones:"
+      ],
+      "lista": [
+        "Justificación veterinaria: cuando la esterilización suponga un riesgo para la salud del animal (por ejemplo, patologías graves o contraindicación quirúrgica).",
+        "Edad insuficiente: si el cachorro no ha alcanzado la edad mínima para la intervención."
+      ]
+    },
+    {
+      "n": 20,
+      "parrafos": [
+        "Ambas partes, tras manifestar su plena capacidad de obrar, prestan libre y voluntariamente su consentimiento al presente contrato, formado por tres folios a doble cara, aceptando expresamente todas y cada una de las condiciones y obligaciones dimanantes del mismo."
+      ]
+    }
+  ],
+  "anexo": {
+    "titulo": "Anexo. Condiciones complementarias",
+    "intro": "Estas condiciones completan las estipulaciones anteriores y forman parte del contrato que el Adoptante firma junto a la hoja de estipulaciones.",
+    "clausulas": [
+      {
+        "titulo": "Periodo de prueba y devolución",
+        "parrafos": [
+          "Durante los quince días siguientes a la entrega, y como máximo hasta los treinta días, el Adoptante y la Asociación podrán resolver este contrato si la convivencia no resulta adecuada para el animal o para la familia.",
+          "La devolución se comunicará a la Asociación con al menos 48 horas de antelación y el animal se entregará en las condiciones sanitarias en que se recibió. La donación no se devuelve: no es el precio del animal."
+        ]
+      },
+      {
+        "titulo": "Seguimiento de la adopción",
+        "parrafos": [
+          "La Asociación realizará un seguimiento al mes, a los tres, a los seis y a los doce meses de la entrega, por teléfono, mensajería o visita acordada. El Adoptante se compromete a responder y a facilitar una fotografía actual del animal."
+        ]
+      },
+      {
+        "titulo": "Microchip y registro",
+        "parrafos": [
+          "Mientras dure el periodo de prueba, el microchip del animal permanecerá a nombre de la Asociación. Confirmada la adopción, el Adoptante tramitará el cambio de titularidad en el registro autonómico y remitirá a la Asociación el justificante en el plazo de un mes."
+        ]
+      },
+      {
+        "titulo": "Protección de datos personales",
+        "parrafos": [
+          "Los datos personales del Adoptante y, en su caso, del tutor o de la persona responsable se tratan para formalizar y ejecutar este contrato, cumplir las obligaciones legales de la Asociación y realizar el seguimiento de la adopción. Se conservan mientras dure la relación y durante los plazos legales de conservación.",
+          "El Adoptante puede ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a la dirección de contacto de la Asociación, y reclamar ante la Agencia Española de Protección de Datos. Los datos no se ceden a terceros salvo obligación legal."
+        ]
+      }
+    ]
+  },
+  "clausula65": {
+    "titulo": "Cláusula especial · adoptantes mayores de 65 años",
+    "parrafos": [
+      "En caso de fallecimiento del titular de la adopción, la persona designada como responsable en el presente contrato se compromete a asumir la custodia, cuidado y bienestar del animal adoptado, garantizando que se mantengan las condiciones adecuadas de alimentación, salud y alojamiento.",
+      "El adoptante deberá indicar previamente, por escrito, el nombre completo, documento de identidad y datos de contacto de la persona que asumirá dicha responsabilidad. Asimismo, dicha persona estará obligada a informar a la entidad protectora en un plazo máximo de 48 horas desde el fallecimiento del adoptante y la asunción de la custodia, para coordinar cualquier seguimiento o apoyo necesario.",
+      "En ausencia de designación expresa, la entidad protectora se reserva el derecho de recuperar al animal para asegurar su protección y reubicación."
+    ],
+    "campos": [
+      "Nombre completo",
+      "DNI/NIE",
+      "Teléfono de contacto",
+      "Correo electrónico",
+      "Dirección"
+    ],
+    "nota": "Cláusula aplicable solo si el adoptante es mayor de 65 años. La firma de la persona responsable se recoge en el contrato."
+  }
+};
+// === CONTRATO_TEXTOS_PDF:FIN ===
+
 /**
  * PDF del contrato de adopción + hoja de estipulaciones, listo para adjuntar
  * a MailApp. No usa imágenes remotas: solo incrusta las firmas que ya viajan
@@ -1042,124 +1262,143 @@ function sendContratoEmail(body, user) {
  */
 function generarPdfContrato(c) {
   if (typeof DocumentApp === 'undefined' || typeof DriveApp === 'undefined') return null;
+  var T = (typeof CONTRATO_TEXTOS_PDF !== 'undefined' && CONTRATO_TEXTOS_PDF) ? CONTRATO_TEXTOS_PDF : { estipulaciones: [] };
   var doc = DocumentApp.create('Contrato-' + (c.animal || 'adopcion') + '-' + Date.now());
   var archivo = null;
   try {
     var body = doc.getBody();
-    body.setMarginTop(40).setMarginBottom(40).setMarginLeft(54).setMarginRight(54);
+    body.setMarginTop(38).setMarginBottom(38).setMarginLeft(50).setMarginRight(50);
     var estilo = {};
     estilo[DocumentApp.Attribute.FONT_FAMILY] = 'Arial';
     estilo[DocumentApp.Attribute.FONT_SIZE] = 10;
     body.setAttributes(estilo);
 
-    var ent = {
-      nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
-      cif: c.entidad_cif || '',
-      domicilio: c.entidad_domicilio || '',
-      email: c.entidad_email || CONFIG.CONTACT_EMAIL || '',
-      telefono: c.entidad_telefono || '',
-      registro: c.entidad_registro || ''
+    var ent = _entidadContratoPdf_(c);
+    var animal = _datosAnimalContratoPdf_(c);
+    var importes = {
+      donacion: _importeContratoPdf_(c.donacion_adoptante, 100),
+      indemnizacion: _importeContratoPdf_(c.indemnizacion_importe, 900)
     };
-
+    var tutor = _tutorContratoPdf_(c);
+    var r65 = _responsable65ContratoPdf_(c);
+    var fecha = _fechaContratoPdf_(c.fecha);
+    var ciudad = c.ciudad || 'Irún';
     var baseWeb = String((CONFIG && CONFIG.PUBLIC_WEB_BASE_URL) || '').replace(/\/$/, '');
+
     var logo = _blobImagenPdf_(baseWeb + '/assets/icons/logo-nebak.jpg');
     if (logo) {
       try {
         var imgLogo = body.appendImage(logo);
-        imgLogo.setWidth(58).setHeight(58);
+        imgLogo.setWidth(56).setHeight(56);
       } catch (eLogo) {}
     }
-    var titulo = body.appendParagraph('CONTRATO DE ADOPCIÓN RESPONSABLE');
+
+    var titulo = body.appendParagraph('Contrato de adopción');
     titulo.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    titulo.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     titulo.setForegroundColor('#0A431E');
-    body.appendParagraph(ent.nombre).setBold(true).setFontSize(12);
-    if (ent.cif) body.appendParagraph('CIF: ' + ent.cif).setFontSize(9);
-    if (ent.domicilio) body.appendParagraph('Domicilio: ' + ent.domicilio).setFontSize(9);
-    if (ent.registro) body.appendParagraph('Registro: ' + ent.registro).setFontSize(9);
-    if (ent.email) body.appendParagraph('Email: ' + ent.email).setFontSize(9);
-    if (ent.telefono) body.appendParagraph('Teléfono: ' + ent.telefono).setFontSize(9);
-    body.appendParagraph('');
+    body.appendParagraph(ent.nombre + ' · Expediente ' + (c.adopcion_id || c.id || '')).setFontSize(9).setForegroundColor('#757575');
+    body.appendHorizontalRule();
 
-    var tutor = (c.f2_nombre && !/entidad|asociaci[oó]n|grupo\s*nebak/i.test(String(c.f2_rol || '') + ' ' + String(c.f2_nombre || '')))
-      ? c : null;
-    var datos = [
-      ['Animal', c.animal || '—'],
-      ['Especie', c.especie || '—'],
-      ['Adoptante', c.f1_nombre || '—'],
-      ['DNI', c.f1_dni || '—'],
-      ['Domicilio', c.f1_direccion || '—'],
-      ['Fecha', c.fecha || '—'],
-      ['Ciudad', c.ciudad || '—']
-    ];
-    if (tutor) datos.push(['Tutor / apoyo', String(tutor.f2_nombre || '—') + (tutor.f2_dni ? ' · DNI ' + tutor.f2_dni : '')]);
-    var tabla = body.appendTable();
-    var negrita = {};
-    negrita[DocumentApp.Attribute.BOLD] = true;
-    datos.forEach(function(fila) {
-      var tr = tabla.appendTableRow();
-      var celda = tr.appendTableCell(String(fila[0]));
-      celda.setAttributes(negrita);
-      celda.setWidth(120);
-      tr.appendTableCell(String(fila[1]));
-    });
+    body.appendParagraph('En ' + ciudad + ', a ' + fecha + '.').setSpacingAfter(6);
+    body.appendParagraph('De una parte, ' + ent.nombre +
+      (ent.cif ? ', con CIF ' + ent.cif : '') +
+      (ent.domicilio ? ', con domicilio en ' + ent.domicilio : '') +
+      (ent.telefono ? ', con teléfonos de contacto ' + ent.telefono : '') +
+      ', en adelante, la Asociación.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    body.appendParagraph('De otra parte, ' + (c.f1_nombre || c.adoptante || '[adoptante]') +
+      ', mayor de edad, que actúa en su propio nombre y derecho, con DNI ' + (c.f1_dni || '—') +
+      (c.f1_direccion ? ', con domicilio en ' + c.f1_direccion : '') +
+      (c.f1_telefono ? ', teléfono ' + c.f1_telefono : '') +
+      (c.f1_email ? ', y correo electrónico ' + c.f1_email : '') +
+      ', en adelante, el Adoptante.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    body.appendParagraph('Ambas partes acuerdan celebrar el presente contrato, de acuerdo con los siguientes datos de adopción.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
 
-    body.appendParagraph('CLÁUSULAS DEL CONTRATO').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-    var clausulas = [
-      'El adoptante se compromete a adoptar al animal como animal de compañía y a proporcionarle durante toda su vida alimentación, agua, higiene, atención veterinaria, ejercicio y un entorno seguro.',
-      'El animal no se utilizará para cría, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos.',
-      'El adoptante mantendrá al animal identificado con microchip y al día en vacunaciones y desparasitaciones.',
-      'No se podrá vender, regalar ni ceder el animal sin autorización expresa de la entidad. Si no puede continuar con su cuidado, deberá devolverlo.',
-      'El adoptante acepta el periodo de prueba de 15-30 días, el seguimiento a 1, 3, 6 y 12 meses y las visitas de comprobación.',
-      'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan.'
-    ];
-    clausulas.forEach(function(texto, i) {
-      var p = body.appendParagraph((i + 1) + '. ' + texto);
-      p.setSpacingAfter(6);
-      p.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-    });
-
-    body.appendParagraph('');
-    insertarFirmaPdf_(body, 'Firma del adoptante', c.f1_nombre, c.f1_firma);
-    body.appendParagraph('');
-    insertarFirmaPdf_(body, 'Por la entidad', ent.nombre, c.entidad_firma || (!tutor ? c.f2_firma : ''));
-    var sello = _blobImagenPdf_(baseWeb + '/assets/contratos/sello-nebak.jpg');
-    if (sello) {
+    body.appendParagraph('Datos de adopción').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+    var foto = _imagenAnimalContratoPdf_(animal.foto);
+    if (foto) {
       try {
-        var imgSello = body.appendImage(sello);
-        imgSello.setWidth(80).setHeight(80);
-      } catch (eSello) {}
+        var imgFoto = body.appendImage(foto);
+        imgFoto.setWidth(100);
+      } catch (eFoto) {}
     }
-    body.appendParagraph('SELLO DE LA ENTIDAD').setBold(true).setFontSize(8).setForegroundColor('#15863D');
-    body.appendParagraph(ent.nombre).setFontSize(8);
+    _tablaDatosContratoPdf_(body, [
+      ['Nombre', animal.nombre],
+      ['Nombre definitivo', animal.nombre_definitivo],
+      ['Especie', animal.especie],
+      ['N.º microchip', animal.microchip],
+      ['Raza', animal.raza],
+      ['Sexo', animal.sexo],
+      ['Fecha de nacimiento', _fechaContratoPdf_(animal.fecha_nacimiento)],
+      ['Capa', animal.capa],
+      ['Color', animal.color],
+      ['Tamaño', animal.tamano],
+      ['Esterilización', _siNoContratoPdf_(animal.esterilizada)],
+      ['Otras reseñas', animal.descripcion]
+    ]);
+    if (T.notaEstipulaciones) body.appendParagraph(T.notaEstipulaciones).setFontSize(9).setForegroundColor('#4b5563');
 
-    body.appendPageBreak();
-    var titulo2 = body.appendParagraph('TÉRMINOS Y CONDICIONES DE ADOPCIÓN RESPONSABLE');
-    titulo2.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    titulo2.setForegroundColor('#0A431E');
-    body.appendParagraph('Anexo del contrato · ' + ent.nombre + ' · Versión 1.0 · 2026/11/10').setFontSize(8).setForegroundColor('#6b7280');
-
-    var terminos = [
-      ['Objeto', 'Estos términos regulan la adopción responsable del animal identificado en el contrato y forman parte inseparable de él.'],
-      ['Capacidad y veracidad', 'El adoptante declara ser mayor de edad, tener capacidad legal para asumir esta responsabilidad y que los datos facilitados son veraces y están actualizados.'],
-      ['Cuidados y bienestar', 'El adoptante se compromete a proporcionar alimentación, agua, refugio, higiene, ejercicio, compañía y un trato respetuoso durante toda la vida del animal.'],
-      ['Salud veterinaria', 'El adoptante mantendrá el microchip actualizado, las vacunas y desparasitaciones al día, acudirá al veterinario ante cualquier problema de salud y, cuando proceda, esterilizará al animal y aportará el informe acreditativo.'],
-      ['Prohibiciones', 'El animal no se utilizará para cría, venta, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos. No permanecerá atado ni encerrado en jaulas, terrazas, patios o garajes.'],
-      ['Seguimiento', 'El adoptante acepta el periodo de prueba de 15-30 días y el seguimiento posterior a 1, 3, 6 y 12 meses, y facilitará las visitas, fotografías y comprobaciones necesarias.'],
-      ['Gastos', 'Todos los gastos derivados del cuidado del animal (alimentación, veterinario, seguro, identificaciones y otros) corren a cargo del adoptante.'],
-      ['Devolución', 'Si el adoptante no puede continuar cuidando al animal, deberá informar a la entidad y devolverlo. Nunca lo abandonará ni lo entregará a terceros sin autorización expresa.'],
-      ['Datos personales', 'Los datos del adoptante y del tutor se tratarán para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición.'],
-      ['Incumplimiento y aceptación', 'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan. El adoptante declara haber leído, comprendido y aceptado estos términos.']
-    ];
-    terminos.forEach(function(t, i) {
-      body.appendParagraph((i + 1) + '. ' + t[0]).setBold(true).setForegroundColor('#15863D');
-      body.appendParagraph(t[1]).setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    body.appendParagraph('Estipulaciones').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+    (T.estipulaciones || []).forEach(function(est) {
+      var x = _textoContratoPdf_(est, importes);
+      (x.parrafos || []).forEach(function(texto, idx) {
+        var p = body.appendParagraph('');
+        var t = p.editAsText();
+        if (idx === 0) {
+          var num = String(est.n) + 'ª. ';
+          t.appendText(num);
+          t.setBold(0, num.length - 1, true);
+        }
+        t.appendText(String(texto));
+        p.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+        p.setSpacingAfter(4);
+      });
+      (x.lista || []).forEach(function(item) {
+        var li = body.appendListItem(String(item));
+        li.setGlyphType(DocumentApp.GlyphType.BULLET);
+        li.setSpacingAfter(1);
+      });
     });
 
-    body.appendParagraph('');
-    body.appendParagraph('Aceptado por el adoptante: ' + (c.f1_nombre || '—') + (c.f1_dni ? ' · DNI ' + c.f1_dni : '')).setBold(true);
-    body.appendParagraph('Fecha: ' + (c.fecha || '—')).setFontSize(9);
-    body.appendParagraph('Documento generado automáticamente por ' + ent.nombre + ' · ' + new Date().toLocaleString('es-ES')).setFontSize(8).setForegroundColor('#999999').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    if (tutor) {
+      body.appendPageBreak();
+      body.appendParagraph('Anexo I. Datos del tutor o persona de apoyo').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+      _tablaDatosContratoPdf_(body, [
+        ['Nombre', tutor.nombre],
+        ['DNI', tutor.dni],
+        ['Relación con el adoptante', tutor.relacion],
+        ['Domicilio', tutor.direccion],
+        ['Email', tutor.email],
+        ['Teléfono', tutor.telefono]
+      ]);
+      body.appendParagraph('La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.').setFontSize(9).setForegroundColor('#4b5563');
+    }
+
+    body.appendParagraph('').setSpacingBefore(10);
+    _firmaContratoPdf_(body, 'Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma);
+    if (tutor) _firmaContratoPdf_(body, 'Tutor / persona de apoyo', tutor.nombre, tutor.dni, tutor.firma);
+    _firmaEntidadContratoPdf_(body, ent, c, baseWeb);
+
+    if (r65) {
+      var k65 = T.clausula65 || {};
+      body.appendPageBreak();
+      body.appendParagraph(k65.titulo || 'Cláusula especial · adoptantes mayores de 65 años').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+      (k65.parrafos || []).forEach(function(texto) {
+        body.appendParagraph(texto).setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+      });
+      body.appendParagraph('Datos de la persona responsable designada').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+      _tablaDatosContratoPdf_(body, [
+        ['Nombre completo', r65.nombre],
+        ['DNI/NIE', r65.dni],
+        ['Teléfono de contacto', r65.telefono],
+        ['Correo electrónico', r65.email],
+        ['Dirección', r65.direccion]
+      ]);
+      body.appendParagraph('En ' + ciudad + ', a ' + fecha + '.');
+      _firmaContratoPdf_(body, 'Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma);
+      _firmaContratoPdf_(body, 'Firma de la persona responsable', r65.nombre, r65.dni, '');
+    }
+
+    body.appendParagraph('Generado por ' + ent.nombre + ' · ' + _fechaContratoPdf_(new Date())).setFontSize(8).setForegroundColor('#999999').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
     doc.saveAndClose();
     archivo = DriveApp.getFileById(doc.getId());
@@ -1174,23 +1413,183 @@ function generarPdfContrato(c) {
   }
 }
 
-function nombrePdfContrato_(c) {
-  var base = 'Contrato-Adopcion-' + (c.animal || 'Grupo-Nebak') + '-' + (c.fecha || Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyy-MM-dd'));
-  return String(base).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+function _entidadContratoPdf_(c) {
+  return {
+    nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
+    cif: c.entidad_cif || '',
+    domicilio: c.entidad_domicilio || '',
+    email: c.entidad_email || CONFIG.CONTACT_EMAIL || '',
+    telefono: c.entidad_telefono || '',
+    registro: c.entidad_registro || ''
+  };
 }
 
-function insertarFirmaPdf_(body, etiqueta, nombre, firma) {
-  body.appendParagraph(etiqueta).setBold(true);
-  body.appendParagraph(nombre || '—');
+function _datosAnimalContratoPdf_(c) {
+  var a = null;
+  try {
+    if (c.animal_id && CONFIG.sheets && CONFIG.sheets.animales) {
+      var filas = readSheet(CONFIG.sheets.animales);
+      for (var i = 0; i < filas.length; i++) {
+        if (String(filas[i].id) === String(c.animal_id)) { a = filas[i]; break; }
+      }
+    }
+  } catch (eAnimal) {}
+  var val = function(saved, live) {
+    if (saved !== undefined && saved !== null && saved !== '') return saved;
+    if (live !== undefined && live !== null && live !== '') return live;
+    return '';
+  };
+  return {
+    nombre: val(c.animal, a && a.nombre),
+    nombre_definitivo: val(c.nombre_definitivo, a && a.nombre_definitivo),
+    foto: val(c.animal_foto, a && a.foto),
+    especie: val(c.especie, a && a.especie),
+    raza: val(c.raza, a && a.raza),
+    edad: val(c.edad, a && a.edad),
+    sexo: val(c.animal_sexo, a && a.sexo),
+    microchip: val(c.animal_microchip, a && a.microchip),
+    fecha_nacimiento: val(c.animal_fecha_nacimiento, a && a.fecha_nacimiento),
+    capa: val(c.animal_capa, a && a.capa),
+    color: val(c.animal_color, a && a.color),
+    tamano: val(c.animal_tamano, a && a.tamano),
+    esterilizada: val(c.animal_esterilizada, a && a.esterilizada),
+    descripcion: val(c.animal_descripcion, a && a.descripcion)
+  };
+}
+
+function _tutorContratoPdf_(c) {
+  var nombre = String(c.f2_nombre || '').trim();
+  if (!nombre) return null;
+  if (/entidad|asociaci[oó]n|grupo\s*nebak/i.test(String(c.f2_rol || '') + ' ' + nombre)) return null;
+  return {
+    nombre: nombre,
+    dni: c.f2_dni || '',
+    relacion: c.f2_relacion || c.f2_rol || '',
+    direccion: c.f2_direccion || '',
+    email: c.f2_email || '',
+    telefono: c.f2_telefono || '',
+    firma: c.f2_firma || ''
+  };
+}
+
+function _responsable65ContratoPdf_(c) {
+  var activo = /^(1|si|sí|true|on|x)$/i.test(String(c.adoptante_mayor_65 || '').trim());
+  if (!activo && !String(c.responsable_nombre || '').trim()) return null;
+  return {
+    nombre: c.responsable_nombre || '',
+    dni: c.responsable_dni || '',
+    telefono: c.responsable_telefono || '',
+    email: c.responsable_email || '',
+    direccion: c.responsable_direccion || ''
+  };
+}
+
+function _importeContratoPdf_(v, porDefecto) {
+  var s = String(v == null ? '' : v).replace(',', '.').trim();
+  if (!s) return porDefecto;
+  var n = Number(s);
+  return (!isNaN(n) && n >= 0) ? n : porDefecto;
+}
+
+function _fechaContratoPdf_(v) {
+  if (v instanceof Date) {
+    var d = v;
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  }
+  var s = String(v || '').trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3] + '/' + m[2] + '/' + m[1];
+  if (s) return s;
+  var hoy = new Date();
+  return ('0' + hoy.getDate()).slice(-2) + '/' + ('0' + (hoy.getMonth() + 1)).slice(-2) + '/' + hoy.getFullYear();
+}
+
+function _siNoContratoPdf_(v) {
+  if (v === true || /^(si|sí|true|1)$/i.test(String(v))) return 'Sí';
+  if (v === false || /^(no|false|0)$/i.test(String(v))) return 'No';
+  return '—';
+}
+
+function _textoContratoPdf_(est, importes) {
+  var rep = function(t) {
+    return String(t == null ? '' : t)
+      .replace(/\{donacion\}/g, importes.donacion)
+      .replace(/\{indemnizacion\}/g, importes.indemnizacion);
+  };
+  var e = est || {};
+  return {
+    parrafos: (e.parrafos || []).map(rep),
+    lista: (e.lista || []).map(rep)
+  };
+}
+
+function _tablaDatosContratoPdf_(body, filas) {
+  var tabla = body.appendTable();
+  var negrita = {};
+  negrita[DocumentApp.Attribute.BOLD] = true;
+  (filas || []).forEach(function(fila) {
+    var tr = tabla.appendTableRow();
+    var celda = tr.appendTableCell(String(fila[0]));
+    celda.setAttributes(negrita);
+    celda.setWidth(135);
+    tr.appendTableCell(String(fila[1] == null || fila[1] === '' ? '—' : fila[1]));
+  });
+  body.appendParagraph('');
+}
+
+function _firmaContratoPdf_(body, etiqueta, nombre, dni, firma) {
+  body.appendParagraph(etiqueta).setFontSize(9).setForegroundColor('#757575');
   var blob = _firmaBlobPdf_(firma);
   if (blob) {
     try {
       var img = body.appendImage(blob);
-      img.setWidth(150).setHeight(55);
-      return;
-    } catch (e) {}
+      img.setWidth(150);
+    } catch (eFirma) {
+      body.appendParagraph('[Sin firma]').setFontSize(9).setForegroundColor('#999999');
+    }
+  } else {
+    body.appendParagraph('[Sin firma]').setFontSize(9).setForegroundColor('#999999');
   }
-  body.appendParagraph('[Firma registrada en el panel]').setFontSize(9).setForegroundColor('#6b7280');
+  body.appendHorizontalRule();
+  body.appendParagraph(String(nombre || '—') + (dni ? ' · DNI ' + dni : '')).setBold(true);
+  body.appendParagraph('');
+}
+
+function _firmaEntidadContratoPdf_(body, ent, c, baseWeb) {
+  body.appendParagraph('Firma Asociación').setFontSize(9).setForegroundColor('#757575');
+  var firma = c.entidad_firma || (!_tutorContratoPdf_(c) ? c.f2_firma : '');
+  var blob = _firmaBlobPdf_(firma);
+  if (blob) {
+    try {
+      var img = body.appendImage(blob);
+      img.setWidth(140);
+    } catch (eFirmaEntidad) {}
+  }
+  var sello = _blobImagenPdf_(baseWeb + '/assets/contratos/sello-nebak.jpg');
+  if (sello) {
+    try {
+      var imgSello = body.appendImage(sello);
+      imgSello.setWidth(80).setHeight(80);
+    } catch (eSello) {}
+  }
+  body.appendHorizontalRule();
+  body.appendParagraph(ent.nombre).setBold(true);
+  body.appendParagraph('');
+}
+
+function _imagenAnimalContratoPdf_(foto) {
+  var s = String(foto || '');
+  if (!s) return null;
+  if (/^data:/i.test(s)) return _firmaBlobPdf_(s);
+  if (/^https?:\/\//i.test(s)) return _blobImagenPdf_(s);
+  if (/^[A-Za-z0-9_-]{20,}$/.test(s)) return _blobImagenPdf_('https://drive.google.com/thumbnail?id=' + encodeURIComponent(s) + '&sz=w800');
+  return null;
+}
+
+
+function nombrePdfContrato_(c) {
+  var base = 'Contrato-Adopcion-' + (c.animal || 'Grupo-Nebak') + '-' + (c.fecha || Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyy-MM-dd'));
+  return String(base).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
 }
 
 function _blobImagenPdf_(url) {
