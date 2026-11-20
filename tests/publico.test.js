@@ -394,6 +394,46 @@ describe('Publico.htmlDetalle: ficha configurable (C3)', () => {
   });
 });
 
+describe('Publico.peticion: diagnóstico cuando falla el canal', () => {
+  it('conserva el motivo del fetch y del JSONP en el error', async () => {
+    const cfg = global.CONFIG;
+    const fetchOrig = global.fetch;
+    const jsonpOrig = Publico.jsonp;
+    global.CONFIG = { apiUrl: 'https://api.test/exec' };
+    global.fetch = async () => { throw new Error('Failed to fetch'); };
+    Publico.jsonp = async () => { throw new Error('No se pudo conectar con el servidor de publicaciones.'); };
+    try {
+      await assert.rejects(
+        Publico.peticion({ endpoint: 'publicaciones' }),
+        /fetch: Failed to fetch[\s\S]*JSONP|No se pudo conectar con el servidor de publicaciones/
+      );
+    } finally {
+      global.fetch = fetchOrig;
+      Publico.jsonp = jsonpOrig;
+      if (cfg === undefined) delete global.CONFIG; else global.CONFIG = cfg;
+    }
+  });
+
+  it('usa el JSON del fetch sin pasar por JSONP', async () => {
+    const cfg = global.CONFIG;
+    const fetchOrig = global.fetch;
+    const jsonpOrig = Publico.jsonp;
+    let jsonpLlamado = false;
+    global.CONFIG = { apiUrl: 'https://api.test/exec' };
+    global.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ status: 'success', data: [] }) });
+    Publico.jsonp = async () => { jsonpLlamado = true; return { status: 'error' }; };
+    try {
+      const res = await Publico.peticion({ endpoint: 'publicaciones' });
+      assert.equal(res.status, 'success');
+      assert.equal(jsonpLlamado, false);
+    } finally {
+      global.fetch = fetchOrig;
+      Publico.jsonp = jsonpOrig;
+      if (cfg === undefined) delete global.CONFIG; else global.CONFIG = cfg;
+    }
+  });
+});
+
 describe('Publico.estadoTexto / esc', () => {
   it('traduce estados públicos', () => {
     assert.equal(Publico.estadoTexto('en_adopcion'), 'En adopción');

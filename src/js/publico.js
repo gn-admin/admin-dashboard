@@ -287,6 +287,7 @@ const Publico = {
     const base = (typeof CONFIG !== 'undefined' && CONFIG.apiUrl) ? CONFIG.apiUrl : '';
     if (!base) throw new Error('Falta API_URL en la configuración del panel.');
     const qs = new URLSearchParams(params);
+    const motivos = [];
     const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timer = ctrl ? setTimeout(() => ctrl.abort(), 20000) : null;
     try {
@@ -297,11 +298,22 @@ const Publico = {
       });
       if (res.ok) {
         const texto = await res.text();
-        try { return JSON.parse(texto); } catch (e) { /* cae al JSONP */ }
+        try { return JSON.parse(texto); } catch (e) { motivos.push('fetch: respuesta no JSON'); }
+      } else {
+        motivos.push('fetch: HTTP ' + res.status);
       }
-    } catch (e) { /* sin CORS o bloqueado: se prueba JSONP */ }
+    } catch (e) {
+      motivos.push('fetch: ' + (e && e.name === 'AbortError' ? 'sin respuesta en 20 s' : ((e && e.message) || 'fallo de red')));
+    }
     finally { if (timer) clearTimeout(timer); }
-    return this.jsonp(params);
+    // Si el fetch falla se prueba el respaldo JSONP, pero el motivo original
+    // se conserva: es lo que permite diagnosticar un móvil desde la pantalla.
+    try {
+      return await this.jsonp(params);
+    } catch (e2) {
+      const sinRed = (typeof navigator !== 'undefined' && navigator.onLine === false) ? ' · sin conexión' : '';
+      throw new Error('No se pudo cargar el canal. ' + motivos.join(' · ') + sinRed + ' · ' + ((e2 && e2.message) || 'JSONP: fallo'));
+    }
   },
 
   jsonp(params) {
@@ -344,7 +356,10 @@ const Publico = {
       });
       const res = await this.peticion(params);
       if (req !== this._req) return;
-      if (!res || res.status === 'error' || res.status === 'warning') throw new Error((res && (res.error || res.detail)) || 'No se pudieron cargar las publicaciones.');
+      if (!res || res.status === 'error' || res.status === 'warning') {
+        const partes = res ? [res.error, res.detail, res.code ? '[' + res.code + ']' : ''].filter(Boolean) : [];
+        throw new Error(partes.join(' · ') || 'No se pudieron cargar las publicaciones.');
+      }
       this.filtros = res.filters || this.filtros;
       this.items = res.data || [];
       this.paginacion = res.pagination || null;
@@ -364,7 +379,7 @@ const Publico = {
       const res = await this.peticion({ endpoint: 'publicacion', slug: slug });
       if (req !== this._req) return;
       if (res && res.status === 'warning') {
-        this.estadoError(res.error || 'Canal público sin configurar.');
+        this.estadoError([res.error, res.detail].filter(Boolean).join(' · ') || 'Canal público sin configurar.');
         return;
       }
       // Publicación retirada (410): la fila se conserva como lápida.

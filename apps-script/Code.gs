@@ -165,6 +165,11 @@ function _audit(endpoint, user, body, result) {
 function handleGet(endpoint, user, e) {
   if (!_canReadEndpoint(endpoint, user)) return _deny('No autorizado para consultar este recurso');
   switch (endpoint) {
+    case 'email-status':
+      // Diagnóstico sin enviar nada: estado OAuth de la cuenta que ejecuta el
+      // despliegue y modo de pruebas activo.
+      if (!_isAdmin(user)) return _deny('Solo administración puede comprobar el correo');
+      return jsonResponse({ data: _estadoCorreoServidor_() });
     case 'surveys':
       return jsonResponse({ data: getAvailableSurveys(user) });
     case 'responses':
@@ -857,6 +862,41 @@ function _modoPruebasCorreo() {
   var destino = _emailLimpio(props.getProperty('EMAIL_PRUEBAS_TO'));
   if (!destino) throw new Error('EMAIL_MODO_PRUEBAS=1 pero EMAIL_PRUEBAS_TO no es una dirección válida: no se envía nada');
   return destino;
+}
+
+/**
+ * Estado del permiso de correo para el panel, sin enviar ningún mensaje.
+ * `ScriptApp.getAuthorizationInfo` refleja la cuenta efectiva del despliegue:
+ * si la web se ejecuta como el usuario que accede y este no autorizó
+ * script.send_mail, aquí sale REQUIRED y el panel avisa antes de intentar nada.
+ */
+function _estadoCorreoServidor_() {
+  var out = { autorizado: false, estado: 'DESCONOCIDO', detalle: '', modo_pruebas: false, pruebas_a: '', modo_pruebas_error: '' };
+  try {
+    var info = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    var estado = info.getAuthorizationStatus();
+    out.estado = String(estado || 'DESCONOCIDO');
+    var noRequerida = (ScriptApp.AuthorizationStatus && ScriptApp.AuthorizationStatus.NOT_REQUIRED);
+    out.autorizado = estado === noRequerida || out.estado === 'NOT_REQUIRED';
+    if (!out.autorizado) {
+      out.detalle = 'La cuenta que ejecuta el script no tiene autorizado el envío de correo (script.send_mail).';
+      try {
+        var url = info.getAuthorizationUrl();
+        if (url) out.detalle += ' Autoriza aquí: ' + url;
+      } catch (eUrl) {}
+    }
+  } catch (e) {
+    out.estado = 'ERROR';
+    out.detalle = 'No se pudo comprobar la autorización: ' + (e && e.message ? e.message : e);
+  }
+  try {
+    var prueba = _modoPruebasCorreo();
+    out.modo_pruebas = !!prueba;
+    out.pruebas_a = prueba || '';
+  } catch (ePrueba) {
+    out.modo_pruebas_error = String(ePrueba && ePrueba.message ? ePrueba.message : ePrueba);
+  }
+  return out;
 }
 
 /** Devuelve las opciones de envío ya redirigidas al buzón de pruebas. */

@@ -8332,6 +8332,8 @@ const Dashboard = {
     const to = this._contratoEmails(p).map(x => x.email);
     if (enviarCopia && to.length) {
       try {
+        const sinPermiso = await this._permisoCorreoError();
+        if (sinPermiso) throw sinPermiso;
         const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
         enviado = true;
         if (r && r.data && r.data.modo_pruebas) envioPruebas = (r.data.enviado_a || []).join(', ');
@@ -8563,6 +8565,41 @@ const Dashboard = {
     return /endpoint no encontrado|404|no configurado|sin configurar|mailapp|gmailapp/.test(m);
   },
 
+  // Comprobación previa del permiso de correo. Si el backend todavía no tiene
+  // el endpoint (o la red falla), devuelve null y el envío sigue su curso: la
+  // comprobación nunca debe impedir enviar por un fallo propio.
+  async _estadoCorreo() {
+    if (typeof API === 'undefined' || typeof API.emailStatus !== 'function') return null;
+    try {
+      const r = await API.emailStatus();
+      return (r && r.data) || null;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  async _permisoCorreoError() {
+    const estado = await this._estadoCorreo();
+    if (!estado || estado.autorizado !== false) return null;
+    const err = new Error('Permiso de correo pendiente en el servidor.');
+    err.status = 'warning';
+    err.code = 'EMAIL_SIN_PERMISO';
+    err.detail = [estado.detalle, estado.modo_pruebas_error].filter(Boolean).join(' · ') || ('Estado de autorización: ' + (estado.estado || 'desconocido'));
+    return err;
+  },
+
+  _avisoCorreo(estado) {
+    if (!estado) return '';
+    if (estado.autorizado === false) {
+      const detalle = estado.detalle || ('Estado de autorización: ' + (estado.estado || 'desconocido'));
+      return `<div class="alert-item warning" id="ce-permiso-correo" role="alert">${Icons.alertTriangle} <span><b>El correo no está autorizado en el servidor.</b> ${this._esc(detalle)} No se enviará hasta autorizarlo.</span></div>`;
+    }
+    if (estado.modo_pruebas) {
+      return `<div class="alert-item info" id="ce-permiso-correo">${Icons.mail} <span>Modo pruebas activo: los correos se enviarán a <b>${this._esc(estado.pruebas_a || '')}</b>.</span></div>`;
+    }
+    return '';
+  },
+
   async showContratoEmailForm(adopcionId) {
     await this._ensureListas(['contratos', 'animales']);
     const p = this._byId(this.adopciones, adopcionId);
@@ -8573,6 +8610,7 @@ const Dashboard = {
       this.showSnackbar('Este contrato no tiene foto del animal. Añádela con Foto / nombre antes de enviarlo.', 'warning');
       return;
     }
+    const avisoCorreo = this._avisoCorreo(await this._estadoCorreo());
     const emails = this._contratoEmails(p);
     this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
       <form data-submit="enviarContratoEmail" data-sarg0="${adopcionId}">
@@ -8581,6 +8619,7 @@ const Dashboard = {
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>
         <div class="form-group"><label>Otro email del contrato (opcional)</label><input type="email" id="ce-otro" placeholder="otro@email.com"><div style="font-size:var(--text-xs);color:var(--gray-500);margin-top:4px">Solo se enviara si pertenece al contrato o a Grupo Nebak.</div></div>
+        ${avisoCorreo}
         <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="closeFormModal">Cancelar</button><button type="button" class="btn btn-outline-green" data-action="_mailtoContrato" data-arg0="${adopcionId}">${Icons.mail} Abrir en mi correo</button><button type="submit" class="btn btn-primary">${Icons.mail} Enviar</button></div>
       </form>`);
   },
@@ -8617,6 +8656,8 @@ const Dashboard = {
       return;
     }
     try {
+      const sinPermiso = await this._permisoCorreoError();
+      if (sinPermiso) throw sinPermiso;
       const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
       const pruebas = r && r.data && r.data.modo_pruebas ? (r.data.enviado_a || []).join(', ') : '';
       this._regLog('contrato', 'Contrato enviado por email (' + to.join(', ') + ')' + (pruebas ? ' [modo pruebas → ' + pruebas + ']' : ''), 'contrato', c.id);
