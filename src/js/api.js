@@ -93,6 +93,51 @@ const API = {
     return {};
   },
 
+  // Aviso de acción en curso. Apps Script tarda 2-6 s en cada escritura y sin
+  // esto parece que el botón no hizo nada hasta que llega el snackbar. Se
+  // muestra solo si la petición pasa de 250 ms, y no bloquea la pantalla.
+  _carga: { pendientes: 0, timer: null },
+
+  _cargaTexto(endpoint) {
+    const ep = String(endpoint || '');
+    if (ep.indexOf('upload-') === 0 || ep === 'web-media-subir') return 'Subiendo el archivo…';
+    if (ep === 'web-media-eliminar') return 'Eliminando el archivo…';
+    if (ep.indexOf('delete-') === 0) return 'Eliminando…';
+    if (ep === 'send-contrato-email') return 'Enviando el correo…';
+    if (ep === 'web-deploy') return 'Lanzando el despliegue…';
+    if (/-estado$/.test(ep)) return 'Actualizando la publicación…';
+    return 'Guardando…';
+  },
+
+  _cargaInicio(endpoint) {
+    this._carga.pendientes += 1;
+    if (typeof document === 'undefined') return;
+    let aviso = document.getElementById('carga-accion');
+    if (!aviso) {
+      aviso = document.createElement('div');
+      aviso.id = 'carga-accion';
+      aviso.className = 'carga-accion';
+      aviso.setAttribute('role', 'status');
+      aviso.setAttribute('aria-live', 'polite');
+      aviso.innerHTML = '<span class="spinner" aria-hidden="true"></span><span class="carga-texto"></span>';
+      document.body.appendChild(aviso);
+    }
+    aviso.querySelector('.carga-texto').textContent = this._cargaTexto(endpoint);
+    clearTimeout(this._carga.timer);
+    this._carga.timer = setTimeout(() => {
+      if (this._carga.pendientes > 0) aviso.classList.add('active');
+    }, 250);
+  },
+
+  _cargaFin() {
+    this._carga.pendientes = Math.max(0, this._carga.pendientes - 1);
+    if (this._carga.pendientes > 0) return;
+    clearTimeout(this._carga.timer);
+    if (typeof document === 'undefined') return;
+    const aviso = document.getElementById('carga-accion');
+    if (aviso) aviso.classList.remove('active');
+  },
+
   // Compatibilidad: token en query (`?token=`). Si CONFIG.useAuthorizationHeader=true,
   // se añade también Authorization (requiere backend con preflight CORS correcto).
   async _get(endpoint, params = {}) {
@@ -107,12 +152,17 @@ const API = {
   async _post(endpoint, body = {}) {
     const token = await Auth.getIdToken();
     const auth = this._authHeaders(token);
-    const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8', ...auth },
-      body: JSON.stringify(body)
-    });
-    return this._resultado(res);
+    this._cargaInicio(endpoint);
+    try {
+      const res = await this._fetch(`${CONFIG.apiUrl}?endpoint=${endpoint}&token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8', ...auth },
+        body: JSON.stringify(body)
+      });
+      return await this._resultado(res);
+    } finally {
+      this._cargaFin();
+    }
   },
 
   // Encuestas (RU)

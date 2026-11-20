@@ -271,3 +271,54 @@ describe('API._fetch: reintenta una vez las lecturas si la red falla', () => {
     }
   });
 });
+
+describe('API._carga: aviso de acción en curso', () => {
+  afterEach(() => { API._carga = { pendientes: 0, timer: null }; });
+
+  it('sin DOM no falla y cuenta las peticiones pendientes', () => {
+    API._cargaInicio('update-animal');
+    API._cargaInicio('delete-animal');
+    assert.equal(API._carga.pendientes, 2);
+    API._cargaFin();
+    assert.equal(API._carga.pendientes, 1);
+    API._cargaFin();
+    assert.equal(API._carga.pendientes, 0);
+    API._cargaFin();
+    assert.equal(API._carga.pendientes, 0, 'no baja de cero');
+  });
+
+  it('usa un texto distinto según lo que se esté haciendo', () => {
+    assert.equal(API._cargaTexto('update-animal'), 'Guardando…');
+    assert.equal(API._cargaTexto('delete-familia'), 'Eliminando…');
+    assert.equal(API._cargaTexto('upload-foto-animal'), 'Subiendo el archivo…');
+    assert.equal(API._cargaTexto('web-media-eliminar'), 'Eliminando el archivo…');
+    assert.equal(API._cargaTexto('web-deploy'), 'Lanzando el despliegue…');
+    assert.equal(API._cargaTexto('send-contrato-email'), 'Enviando el correo…');
+    assert.equal(API._cargaTexto('web-eventos-estado'), 'Actualizando la publicación…');
+    assert.equal(API._cargaTexto(''), 'Guardando…');
+  });
+
+  it('_post muestra el aviso y lo retira aunque la petición falle', async () => {
+    const iniciados = [];
+    const finados = [];
+    const inicioReal = API._cargaInicio;
+    const finReal = API._cargaFin;
+    API._cargaInicio = ep => { iniciados.push(ep); };
+    API._cargaFin = () => { finados.push(1); };
+    const fetchReal = global.fetch;
+    global.fetch = async () => ({ ok: false, status: 500, statusText: 'Server Error', json: async () => ({}) });
+    global.Auth = { getIdToken: async () => 'tk' };
+    global.CONFIG = { apiUrl: 'https://ejemplo.test/exec' };
+    try {
+      await assert.rejects(() => API._post('update-animal', { id: 'x' }));
+    } finally {
+      API._cargaInicio = inicioReal;
+      API._cargaFin = finReal;
+      global.fetch = fetchReal;
+      delete global.Auth;
+      delete global.CONFIG;
+    }
+    assert.deepEqual(iniciados, ['update-animal']);
+    assert.equal(finados.length, 1);
+  });
+});
