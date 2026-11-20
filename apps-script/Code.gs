@@ -879,7 +879,7 @@ function _estadoCorreoServidor_() {
     var noRequerida = (ScriptApp.AuthorizationStatus && ScriptApp.AuthorizationStatus.NOT_REQUIRED);
     out.autorizado = estado === noRequerida || out.estado === 'NOT_REQUIRED';
     if (!out.autorizado) {
-      out.detalle = 'La cuenta que ejecuta el script no tiene autorizado el envío de correo (script.send_mail).';
+      out.detalle = 'La cuenta que ejecuta el script no tiene todos los permisos necesarios (envío de correo y/o generación de PDF).';
       try {
         var url = info.getAuthorizationUrl();
         if (url) out.detalle += ' Autoriza aquí: ' + url;
@@ -986,13 +986,24 @@ function sendContratoEmail(body, user) {
   addCc(ccFijo);
 
   var asunto = 'Contrato de adopcion y terminos · ' + (c.animal || 'Grupo Nebak');
+  // El contrato viaja como PDF adjunto (contrato + estipulaciones). Así el
+  // correo no depende de imágenes remotas ni de que el cliente renderice CSS.
+  var pdfContrato = null;
+  var pdfError = '';
+  try {
+    if (typeof generarPdfContrato === 'function') pdfContrato = generarPdfContrato(c);
+  } catch (errPdf) {
+    pdfError = errPdf && errPdf.message ? errPdf.message : String(errPdf);
+    Logger.log('Contrato ' + c.id + ': no se pudo generar el PDF (' + pdfError + '); se envía el HTML.');
+  }
   var opciones = {
     to: to.join(','),
     subject: asunto,
-    htmlBody: construirEmailContrato(c),
+    htmlBody: construirEmailContrato(c, !!pdfContrato),
     name: 'Grupo Nebak',
     replyTo: _emailLimpio(CONFIG.CONTACT_EMAIL) || (user && user.email) || undefined
   };
+  if (pdfContrato) opciones.attachments = [pdfContrato];
   if (cc.length) opciones.cc = cc.join(',');
   var from = _emailLimpio(CONFIG.CONTRATO_FROM_EMAIL);
   if (from) opciones.from = from;
@@ -1016,9 +1027,166 @@ function sendContratoEmail(body, user) {
       to: to, cc: cc,
       modo_pruebas: envio.prueba,
       enviado_a: envio.prueba ? [envio.opciones.to] : to,
-      destinatarios_reales: envio.prueba ? envio.originales : undefined
+      destinatarios_reales: envio.prueba ? envio.originales : undefined,
+      pdf_adjunto: !!pdfContrato,
+      pdf_bytes: pdfContrato ? pdfContrato.getBytes().length : 0,
+      pdf_error: pdfError || undefined
     }
   };
+}
+
+/**
+ * PDF del contrato de adopción + hoja de estipulaciones, listo para adjuntar
+ * a MailApp. No usa imágenes remotas: solo incrusta las firmas que ya viajan
+ * en base64, para que el correo no tenga imágenes rotas.
+ */
+function generarPdfContrato(c) {
+  if (typeof DocumentApp === 'undefined' || typeof DriveApp === 'undefined') return null;
+  var doc = DocumentApp.create('Contrato-' + (c.animal || 'adopcion') + '-' + Date.now());
+  var archivo = null;
+  try {
+    var body = doc.getBody();
+    body.setMarginTop(40).setMarginBottom(40).setMarginLeft(54).setMarginRight(54);
+    var estilo = {};
+    estilo[DocumentApp.Attribute.FONT_FAMILY] = 'Arial';
+    estilo[DocumentApp.Attribute.FONT_SIZE] = 10;
+    body.setAttributes(estilo);
+
+    var ent = {
+      nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
+      cif: c.entidad_cif || '',
+      domicilio: c.entidad_domicilio || '',
+      email: c.entidad_email || CONFIG.CONTACT_EMAIL || '',
+      telefono: c.entidad_telefono || '',
+      registro: c.entidad_registro || ''
+    };
+
+    var titulo = body.appendParagraph('CONTRATO DE ADOPCIÓN RESPONSABLE');
+    titulo.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    titulo.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    titulo.setForegroundColor('#0A431E');
+    body.appendParagraph(ent.nombre).setBold(true).setFontSize(12);
+    if (ent.cif) body.appendParagraph('CIF: ' + ent.cif).setFontSize(9);
+    if (ent.domicilio) body.appendParagraph('Domicilio: ' + ent.domicilio).setFontSize(9);
+    if (ent.registro) body.appendParagraph('Registro: ' + ent.registro).setFontSize(9);
+    if (ent.email) body.appendParagraph('Email: ' + ent.email).setFontSize(9);
+    if (ent.telefono) body.appendParagraph('Teléfono: ' + ent.telefono).setFontSize(9);
+    body.appendParagraph('');
+
+    var tutor = (c.f2_nombre && !/entidad|asociaci[oó]n|grupo\s*nebak/i.test(String(c.f2_rol || '') + ' ' + String(c.f2_nombre || '')))
+      ? c : null;
+    var datos = [
+      ['Animal', c.animal || '—'],
+      ['Especie', c.especie || '—'],
+      ['Adoptante', c.f1_nombre || '—'],
+      ['DNI', c.f1_dni || '—'],
+      ['Domicilio', c.f1_direccion || '—'],
+      ['Fecha', c.fecha || '—'],
+      ['Ciudad', c.ciudad || '—']
+    ];
+    if (tutor) datos.push(['Tutor / apoyo', String(tutor.f2_nombre || '—') + (tutor.f2_dni ? ' · DNI ' + tutor.f2_dni : '')]);
+    var tabla = body.appendTable();
+    var negrita = {};
+    negrita[DocumentApp.Attribute.BOLD] = true;
+    datos.forEach(function(fila) {
+      var tr = tabla.appendTableRow();
+      var celda = tr.appendTableCell(String(fila[0]));
+      celda.setAttributes(negrita);
+      celda.setWidth(120);
+      tr.appendTableCell(String(fila[1]));
+    });
+
+    body.appendParagraph('CLÁUSULAS DEL CONTRATO').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
+    var clausulas = [
+      'El adoptante se compromete a adoptar al animal como animal de compañía y a proporcionarle durante toda su vida alimentación, agua, higiene, atención veterinaria, ejercicio y un entorno seguro.',
+      'El animal no se utilizará para cría, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos.',
+      'El adoptante mantendrá al animal identificado con microchip y al día en vacunaciones y desparasitaciones.',
+      'No se podrá vender, regalar ni ceder el animal sin autorización expresa de la entidad. Si no puede continuar con su cuidado, deberá devolverlo.',
+      'El adoptante acepta el periodo de prueba de 15-30 días, el seguimiento a 1, 3, 6 y 12 meses y las visitas de comprobación.',
+      'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan.'
+    ];
+    clausulas.forEach(function(texto, i) {
+      var p = body.appendParagraph((i + 1) + '. ' + texto);
+      p.setSpacingAfter(6);
+      p.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    });
+
+    body.appendParagraph('');
+    insertarFirmaPdf_(body, 'Firma del adoptante', c.f1_nombre, c.f1_firma);
+    body.appendParagraph('');
+    insertarFirmaPdf_(body, 'Por la entidad', ent.nombre, c.entidad_firma || (!tutor ? c.f2_firma : ''));
+    body.appendParagraph('SELLO DE LA ENTIDAD').setBold(true).setFontSize(8).setForegroundColor('#15863D');
+    body.appendParagraph(ent.nombre).setFontSize(8);
+
+    body.appendPageBreak();
+    var titulo2 = body.appendParagraph('TÉRMINOS Y CONDICIONES DE ADOPCIÓN RESPONSABLE');
+    titulo2.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    titulo2.setForegroundColor('#0A431E');
+    body.appendParagraph('Anexo del contrato · ' + ent.nombre + ' · Versión 1.0 · 2026/11/10').setFontSize(8).setForegroundColor('#6b7280');
+
+    var terminos = [
+      ['Objeto', 'Estos términos regulan la adopción responsable del animal identificado en el contrato y forman parte inseparable de él.'],
+      ['Capacidad y veracidad', 'El adoptante declara ser mayor de edad, tener capacidad legal para asumir esta responsabilidad y que los datos facilitados son veraces y están actualizados.'],
+      ['Cuidados y bienestar', 'El adoptante se compromete a proporcionar alimentación, agua, refugio, higiene, ejercicio, compañía y un trato respetuoso durante toda la vida del animal.'],
+      ['Salud veterinaria', 'El adoptante mantendrá el microchip actualizado, las vacunas y desparasitaciones al día, acudirá al veterinario ante cualquier problema de salud y, cuando proceda, esterilizará al animal y aportará el informe acreditativo.'],
+      ['Prohibiciones', 'El animal no se utilizará para cría, venta, caza, peleas, experimentación, guarda de propiedades, circos, espectáculos ni fines lucrativos. No permanecerá atado ni encerrado en jaulas, terrazas, patios o garajes.'],
+      ['Seguimiento', 'El adoptante acepta el periodo de prueba de 15-30 días y el seguimiento posterior a 1, 3, 6 y 12 meses, y facilitará las visitas, fotografías y comprobaciones necesarias.'],
+      ['Gastos', 'Todos los gastos derivados del cuidado del animal (alimentación, veterinario, seguro, identificaciones y otros) corren a cargo del adoptante.'],
+      ['Devolución', 'Si el adoptante no puede continuar cuidando al animal, deberá informar a la entidad y devolverlo. Nunca lo abandonará ni lo entregará a terceros sin autorización expresa.'],
+      ['Datos personales', 'Los datos del adoptante y del tutor se tratarán para gestionar la adopción, el seguimiento y las obligaciones legales de la entidad. El interesado puede ejercer sus derechos de acceso, rectificación, supresión y oposición.'],
+      ['Incumplimiento y aceptación', 'El incumplimiento de estas obligaciones facultará a la entidad para recuperar el animal y ejercer las acciones legales que correspondan. El adoptante declara haber leído, comprendido y aceptado estos términos.']
+    ];
+    terminos.forEach(function(t, i) {
+      body.appendParagraph((i + 1) + '. ' + t[0]).setBold(true).setForegroundColor('#15863D');
+      body.appendParagraph(t[1]).setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    });
+
+    body.appendParagraph('');
+    body.appendParagraph('Aceptado por el adoptante: ' + (c.f1_nombre || '—') + (c.f1_dni ? ' · DNI ' + c.f1_dni : '')).setBold(true);
+    body.appendParagraph('Fecha: ' + (c.fecha || '—')).setFontSize(9);
+    body.appendParagraph('Documento generado automáticamente por ' + ent.nombre + ' · ' + new Date().toLocaleString('es-ES')).setFontSize(8).setForegroundColor('#999999').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+    doc.saveAndClose();
+    archivo = DriveApp.getFileById(doc.getId());
+    var pdf = archivo.getAs('application/pdf');
+    pdf.setName(nombrePdfContrato_(c));
+    return pdf;
+  } finally {
+    try {
+      if (!archivo) archivo = DriveApp.getFileById(doc.getId());
+      if (archivo) archivo.setTrashed(true);
+    } catch (eLimpieza) {}
+  }
+}
+
+function nombrePdfContrato_(c) {
+  var base = 'Contrato-Adopcion-' + (c.animal || 'Grupo-Nebak') + '-' + (c.fecha || Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyy-MM-dd'));
+  return String(base).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+}
+
+function insertarFirmaPdf_(body, etiqueta, nombre, firma) {
+  body.appendParagraph(etiqueta).setBold(true);
+  body.appendParagraph(nombre || '—');
+  var blob = _firmaBlobPdf_(firma);
+  if (blob) {
+    try {
+      var img = body.appendImage(blob);
+      img.setWidth(150).setHeight(55);
+      return;
+    } catch (e) {}
+  }
+  body.appendParagraph('[Firma registrada en el panel]').setFontSize(9).setForegroundColor('#6b7280');
+}
+
+function _firmaBlobPdf_(firma) {
+  var s = String(firma || '');
+  var m = /^data:([^;]+);base64,([\s\S]+)$/.exec(s);
+  if (!m) return null;
+  try {
+    return Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], 'firma');
+  } catch (e) {
+    return null;
+  }
 }
 
 function _escEmail(v) {
@@ -1027,10 +1195,12 @@ function _escEmail(v) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function construirEmailContrato(c) {
+function construirEmailContrato(c, conPdf) {
   var e = _escEmail;
-  var firma1 = (c.f1_firma && String(c.f1_firma).indexOf('data:') === 0)
-    ? '<div style="margin-top:8px"><img src="' + e(c.f1_firma) + '" alt="Firma" style="height:60px"></div>'
+  // Nada de imágenes remotas ni data: URI en el cuerpo (Gmail y otros clientes
+  // las bloquean): la firma va dentro del PDF adjunto.
+  var firma1 = conPdf
+    ? '<div style="margin-top:8px;color:#6b7280;font-style:italic">[Firma registrada en el PDF adjunto]</div>'
     : '<div style="margin-top:8px;color:#999;font-style:italic">[Firma registrada en el documento]</div>';
   var ent = {
     nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
@@ -1073,6 +1243,7 @@ function construirEmailContrato(c) {
     '<h1 style="margin:6px 0 0;font-size:20px">Contrato de adopción responsable</h1>' +
     '</div>' +
     '<div style="padding:22px 20px;background:#fff;border:1px solid #e8eaed;border-top:0;border-radius:0 0 12px 12px">' +
+    (conPdf ? '<div style="margin:0 0 14px;padding:10px 12px;background:#eef7f1;border:1px solid #cfe8d8;border-radius:8px;font-size:13px;color:#0A431E"><b>Contrato en PDF adjunto.</b> Este correo incluye el contrato y la hoja de estipulaciones en un PDF.</div>' : '') +
     '<div style="display:flex;justify-content:space-between;gap:16px;padding:12px;border:1px solid #e8eaed;border-radius:8px;background:#f9fafb;margin-bottom:16px">' +
     '<div style="font-size:12px;color:#6b7280;line-height:1.5"><b style="display:block;color:#191919;font-size:14px">' + e(ent.nombre) + '</b>Entidad de protección animal' + entLinea('CIF', ent.cif) + entLinea('Domicilio', ent.domicilio) + entLinea('Registro', ent.registro) + entLinea('Email', ent.email) + entLinea('Teléfono', ent.telefono) + '</div>' + sello + '</div>' +
     '<p style="margin:0 0 12px;font-size:14px">Documento de adopción del animal <b>' + e(c.animal || '—') + '</b>' + (c.especie ? ' (' + e(c.especie) + ')' : '') + '.</p>' +
@@ -1101,7 +1272,7 @@ function construirEmailContrato(c) {
     '<p style="margin:0 0 12px;font-size:13px;line-height:1.6">El adoptante declara haber leído y aceptado los siguientes términos, que forman parte del expediente de adopción del animal <b>' + e(c.animal || '—') + '</b>.</p>' +
     terminosHtml +
     '<div style="margin-top:18px;padding:12px;border-left:3px solid #15863D;background:#f8faf9;font-size:13px"><b>Aceptado por el adoptante:</b> ' + e(c.f1_nombre || '—') + (c.f1_dni ? ' · DNI ' + e(c.f1_dni) : '') + '<br><span style="color:#6b7280">Fecha: ' + e(c.fecha || '—') + '</span></div>' +
-    '<p style="margin:18px 0 0;font-size:12px;color:#9aa0a6">Este correo contiene el contrato y el anexo de términos y condiciones. Los PDF se pueden descargar desde el panel de Grupo Nebak. Correo generado automáticamente.</p>' +
+    '<p style="margin:18px 0 0;font-size:12px;color:#9aa0a6">' + (conPdf ? 'El contrato completo y la hoja de estipulaciones van adjuntos en PDF.' : 'Este correo contiene el contrato y el anexo de términos y condiciones. Los PDF se pueden descargar desde el panel de Grupo Nebak.') + ' Correo generado automáticamente.</p>' +
     '</div></div></body></html>';
 }
 

@@ -8329,6 +8329,7 @@ const Dashboard = {
     let enviado = false;
     let envioError = null;
     let envioPruebas = '';
+    let envioSinPdf = '';
     const to = this._contratoEmails(p).map(x => x.email);
     if (enviarCopia && to.length) {
       try {
@@ -8337,6 +8338,7 @@ const Dashboard = {
         const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
         enviado = true;
         if (r && r.data && r.data.modo_pruebas) envioPruebas = (r.data.enviado_a || []).join(', ');
+        if (r && r.data && !r.data.pdf_adjunto) envioSinPdf = r.data.pdf_error || 'no se pudo generar el PDF';
         this._regLog('contrato', 'Contrato y términos enviados por email (' + to.join(', ') + ')', 'contrato', c.id);
       } catch (err) { envioError = err; }
     }
@@ -8344,9 +8346,11 @@ const Dashboard = {
     this.viewAdopcion(adopcionId);
     this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''), 'contrato', c.id);
     finGuardar();
+    const conPdf = enviado && !envioSinPdf;
     if (envioError) this._snackErr(envioError, 'Contrato firmado, pero no se pudo enviar por email: ' + this._errMsg(envioError) + ' Puedes reintentarlo desde Enviar por email.');
-    else if (enviado && envioPruebas) this.showSnackbar('Contrato firmado; correo de PRUEBA enviado a ' + envioPruebas, 'warning');
-    else this.showSnackbar(enviado ? 'Contrato firmado y enviado por email' : 'Contrato firmado y guardado', 'success');
+    else if (envioSinPdf) this.showSnackbar('Contrato firmado y enviado, pero sin PDF: ' + envioSinPdf, 'warning');
+    else if (enviado && envioPruebas) this.showSnackbar('Contrato firmado; correo de PRUEBA enviado a ' + envioPruebas + (conPdf ? ' (PDF adjunto)' : ''), 'warning');
+    else this.showSnackbar(enviado ? 'Contrato firmado y enviado por email' + (conPdf ? ' (PDF adjunto)' : '') : 'Contrato firmado y guardado', 'success');
   },
 
   // Asegura que el contrato tenga la foto del animal. Los contratos antiguos
@@ -8581,7 +8585,7 @@ const Dashboard = {
   async _permisoCorreoError() {
     const estado = await this._estadoCorreo();
     if (!estado || estado.autorizado !== false) return null;
-    const err = new Error('Permiso de correo pendiente en el servidor.');
+    const err = new Error('Permisos pendientes en el servidor.');
     err.status = 'warning';
     err.code = 'EMAIL_SIN_PERMISO';
     err.detail = [estado.detalle, estado.modo_pruebas_error].filter(Boolean).join(' · ') || ('Estado de autorización: ' + (estado.estado || 'desconocido'));
@@ -8592,7 +8596,7 @@ const Dashboard = {
     if (!estado) return '';
     if (estado.autorizado === false) {
       const detalle = estado.detalle || ('Estado de autorización: ' + (estado.estado || 'desconocido'));
-      return `<div class="alert-item warning" id="ce-permiso-correo" role="alert">${Icons.alertTriangle} <span><b>El correo no está autorizado en el servidor.</b> ${this._esc(detalle)} No se enviará hasta autorizarlo.</span></div>`;
+      return `<div class="alert-item warning" id="ce-permiso-correo" role="alert">${Icons.alertTriangle} <span><b>Faltan permisos en el servidor.</b> ${this._esc(detalle)} No se enviará hasta autorizarlos.</span></div>`;
     }
     if (estado.modo_pruebas) {
       return `<div class="alert-item info" id="ce-permiso-correo">${Icons.mail} <span>Modo pruebas activo: los correos se enviarán a <b>${this._esc(estado.pruebas_a || '')}</b>.</span></div>`;
@@ -8614,7 +8618,7 @@ const Dashboard = {
     const emails = this._contratoEmails(p);
     this.showFormModal('Enviar contrato y términos · ' + (p.animal || ''), `
       <form data-submit="enviarContratoEmail" data-sarg0="${adopcionId}">
-        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se enviará el contrato y la hoja de estipulaciones a los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
+        <div class="alert-item info" style="margin-bottom:14px">${Icons.mail} <span>Se generará un PDF con el contrato y la hoja de estipulaciones y se adjuntará al correo de los destinatarios marcados. Por seguridad, el servidor solo admite emails del contrato (adoptante y tutor) y el de Grupo Nebak.</span></div>
         <div class="form-group"><label>Destinatarios</label>
           ${emails.length ? `<div class="check-grid">${emails.map((e, i) => `<label class="check-item"><input type="checkbox" id="ce-to-${i}" value="${this._esc(e.email)}" ${e.checked ? 'checked' : ''}><span>${this._esc(e.label)}<br><b>${this._esc(e.email)}</b></span></label>`).join('')}</div>` : `<div class="alert-item warning">${Icons.alertTriangle} <span>El contrato no tiene emails guardados. Escribe uno abajo.</span></div>`}
         </div>
@@ -8660,11 +8664,14 @@ const Dashboard = {
       if (sinPermiso) throw sinPermiso;
       const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
       const pruebas = r && r.data && r.data.modo_pruebas ? (r.data.enviado_a || []).join(', ') : '';
-      this._regLog('contrato', 'Contrato enviado por email (' + to.join(', ') + ')' + (pruebas ? ' [modo pruebas → ' + pruebas + ']' : ''), 'contrato', c.id);
+      const conPdf = !!(r && r.data && r.data.pdf_adjunto);
+      const sinPdf = r && r.data && !r.data.pdf_adjunto ? (r.data.pdf_error || 'no se pudo generar el PDF') : '';
+      this._regLog('contrato', 'Contrato enviado por email (' + to.join(', ') + ')' + (pruebas ? ' [modo pruebas → ' + pruebas + ']' : '') + (conPdf ? ' [PDF adjunto]' : ''), 'contrato', c.id);
       finGuardar();
       this.closeFormModal();
-      if (pruebas) this.showSnackbar('Correo de PRUEBA enviado a ' + pruebas, 'warning');
-      else this.showSnackbar('Contrato enviado por email', 'success');
+      if (sinPdf) this.showSnackbar('Contrato enviado, pero sin PDF: ' + sinPdf, 'warning');
+      else if (pruebas) this.showSnackbar('Correo de PRUEBA enviado a ' + pruebas + ' (PDF adjunto)', 'warning');
+      else this.showSnackbar('Contrato enviado por email (PDF adjunto)', 'success');
     } catch (err) {
       finGuardar();
       if (this._debeOfrecerMailto(err)) {

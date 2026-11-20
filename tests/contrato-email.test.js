@@ -132,6 +132,28 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
     assert.equal(enviados[0].replyTo, 'nebakadopciones@gmail.com');
   });
 
+  it('adjunta el PDF del contrato cuando el generador está disponible', () => {
+    const { ctx, enviados } = crearEntorno();
+    ctx.generarPdfContrato = () => ({ getBytes: () => ({ length: 1234 }), name: 'Contrato.pdf' });
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'] }, null);
+    assert.equal(r.status, 'success');
+    assert.equal(Array.isArray(enviados[0].attachments), true);
+    assert.equal(enviados[0].attachments.length, 1);
+    assert.match(enviados[0].htmlBody, /PDF adjunto/);
+    assert.equal(r.data.pdf_adjunto, true);
+    assert.equal(r.data.pdf_bytes, 1234);
+  });
+
+  it('si el PDF falla, envía el HTML sin adjunto y lo indica', () => {
+    const { ctx, enviados } = crearEntorno();
+    ctx.generarPdfContrato = () => { throw new Error('DocumentApp sin permiso'); };
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'] }, null);
+    assert.equal(r.status, 'success');
+    assert.equal(enviados[0].attachments, undefined);
+    assert.equal(r.data.pdf_adjunto, false);
+    assert.match(r.data.pdf_error, /DocumentApp sin permiso/);
+  });
+
   it('usa CONTRATO_FROM_EMAIL como remitente y reintenta sin alias si falla', () => {
     const { ctx, enviados } = crearEntorno({ config: { CONTRATO_FROM_EMAIL: 'alias@example.test' } });
     ctx._rechazarAlias = true;
