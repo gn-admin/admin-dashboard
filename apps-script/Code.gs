@@ -844,6 +844,50 @@ function _emailLimpio(v) {
 //
 // Nunca se aceptan direcciones arbitrarias: solo emails del propio contrato,
 // el buzon de la entidad y el usuario autenticado.
+/**
+ * Modo pruebas de correo. Con la propiedad de script `EMAIL_MODO_PRUEBAS=1`
+ * todos los envíos salen solo a `EMAIL_PRUEBAS_TO`; sin ella, a sus
+ * destinatarios reales. Si el modo está activo pero falta la dirección de
+ * pruebas, se falla en cerrado (nunca se manda a un adoptante real por error).
+ */
+function _modoPruebasCorreo() {
+  if (typeof PropertiesService === 'undefined') return null;
+  var props = PropertiesService.getScriptProperties();
+  if (String(props.getProperty('EMAIL_MODO_PRUEBAS') || '').trim() !== '1') return null;
+  var destino = _emailLimpio(props.getProperty('EMAIL_PRUEBAS_TO'));
+  if (!destino) throw new Error('EMAIL_MODO_PRUEBAS=1 pero EMAIL_PRUEBAS_TO no es una dirección válida: no se envía nada');
+  return destino;
+}
+
+/** Devuelve las opciones de envío ya redirigidas al buzón de pruebas. */
+function _conModoPruebasCorreo(opciones) {
+  var prueba = _modoPruebasCorreo();
+  if (!prueba) return { opciones: opciones, prueba: false };
+  var originales = [];
+  ['to', 'cc', 'bcc'].forEach(function (campo) {
+    String(opciones[campo] || '').split(',').forEach(function (v) {
+      var limpio = String(v || '').trim();
+      if (limpio && originales.indexOf(limpio) === -1) originales.push(limpio);
+    });
+  });
+  var copia = {};
+  for (var k in opciones) if (Object.prototype.hasOwnProperty.call(opciones, k)) copia[k] = opciones[k];
+  var nota = 'MODO PRUEBAS: este correo iba dirigido a ' + (originales.join(', ') || '(sin destinatarios)') +
+    '. El envío real se hará cuando se quite EMAIL_MODO_PRUEBAS.';
+  copia.to = prueba;
+  delete copia.cc;
+  delete copia.bcc;
+  copia.subject = '[PRUEBA] ' + String(opciones.subject || '');
+  if (opciones.htmlBody) {
+    copia.htmlBody = '<div style="font:600 13px/1.4 Arial,sans-serif;background:#FFF4D6;color:#5C3B00;padding:10px 14px;border-radius:8px;margin:0 0 14px">' +
+      _escEmail(nota) + '</div>' + String(opciones.htmlBody);
+  }
+  var texto = opciones.body ? String(opciones.body) : '';
+  copia.body = nota + (texto ? '\n\n' + texto : '');
+  if (!copia.htmlBody) delete copia.htmlBody;
+  return { opciones: copia, prueba: true, originales: originales };
+}
+
 function sendContratoEmail(body, user) {
   var contratoId = body && body.contrato_id;
   if (!contratoId) return { status: 'error', error: 'Falta contrato_id' };
@@ -913,17 +957,28 @@ function sendContratoEmail(body, user) {
   var from = _emailLimpio(CONFIG.CONTRATO_FROM_EMAIL);
   if (from) opciones.from = from;
 
+  // En modo pruebas solo sale al buzón de pruebas; el destinatario real queda
+  // escrito dentro del correo y en la respuesta.
+  var envio = _conModoPruebasCorreo(opciones);
   try {
-    MailApp.sendEmail(opciones);
+    MailApp.sendEmail(envio.opciones);
   } catch (err) {
-    if (!opciones.from) throw err;
+    if (!envio.opciones.from) throw err;
     // El alias no esta verificado en la cuenta: se envia igualmente desde la
     // cuenta del despliegue (sin `from`) y se deja constancia en el log.
-    Logger.log('Contrato: remitente ' + opciones.from + ' rechazado (' + err.message + '); se envia sin alias.');
-    delete opciones.from;
-    MailApp.sendEmail(opciones);
+    Logger.log('Contrato: remitente ' + envio.opciones.from + ' rechazado (' + err.message + '); se envia sin alias.');
+    delete envio.opciones.from;
+    MailApp.sendEmail(envio.opciones);
   }
-  return { status: 'success', data: { to: to, cc: cc } };
+  return {
+    status: 'success',
+    data: {
+      to: to, cc: cc,
+      modo_pruebas: envio.prueba,
+      enviado_a: envio.prueba ? [envio.opciones.to] : to,
+      destinatarios_reales: envio.prueba ? envio.originales : undefined
+    }
+  };
 }
 
 function _escEmail(v) {

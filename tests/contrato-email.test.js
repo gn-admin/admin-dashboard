@@ -26,7 +26,13 @@ function crearEntorno(opciones = {}) {
     f2_nombre: 'Luis',
     f2_email: 'luis@example.test'
   }, opciones.contrato || {});
+  const props = Object.assign({}, opciones.props || {});
   const ctx = {
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: k => (Object.prototype.hasOwnProperty.call(props, k) ? props[k] : null)
+      })
+    },
     CONFIG: Object.assign({
       ROLES: { ADMIN: 'admin' },
       sheets: { contratos: { sheetId: 'SHEET_CONTRATOS', sheetName: 'Contratos' } },
@@ -64,10 +70,12 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
     assert.equal(enviados.length, 1);
     assert.equal(enviados[0].to, 'ana@example.test');
     assert.equal(enviados[0].cc, 'luis@example.test,nebakadopciones@gmail.com');
-    assert.deepEqual(JSON.parse(JSON.stringify(r.data)), {
+    const d = JSON.parse(JSON.stringify(r.data));
+    assert.deepEqual({ to: d.to, cc: d.cc }, {
       to: ['ana@example.test'],
       cc: ['luis@example.test', 'nebakadopciones@gmail.com']
     });
+    assert.equal(d.modo_pruebas, false);
   });
 
   it('si el cliente no indica destinatarios, envia al adoptante y copia al buzon', () => {
@@ -264,5 +272,49 @@ describe('uploadContratoPdf: PDF firmado privado en Drive', () => {
     const r = ctx.uploadContratoPdf({ archivo_base64: PDF, nombre: 'x.pdf' }, null);
     assert.match(r.error, /DRIVE_DOCS_FOLDER_ID/);
     assert.equal(archivos.length, 0);
+  });
+});
+
+describe('modo pruebas de correo: todo sale a un buzón fijo', () => {
+  const props = { EMAIL_MODO_PRUEBAS: '1', EMAIL_PRUEBAS_TO: 'pruebas@example.test' };
+
+  it('redirige To, quita CC/BCC y deja el destinatario real escrito en el cuerpo', () => {
+    const { ctx, enviados } = crearEntorno({ props });
+    const r = ctx.sendContratoEmail(
+      { contrato_id: 'ctr_1', to: ['ana@example.test', 'luis@example.test', 'nebakadopciones@gmail.com'] },
+      { email: 'admin@example.test' }
+    );
+    assert.equal(r.status, 'success');
+    assert.equal(enviados.length, 1);
+    assert.equal(enviados[0].to, 'pruebas@example.test');
+    assert.equal(enviados[0].cc, undefined);
+    assert.equal(enviados[0].bcc, undefined);
+    assert.match(enviados[0].subject, /^\[PRUEBA\] Contrato de adopcion/);
+    assert.match(enviados[0].htmlBody, /MODO PRUEBAS/);
+    assert.match(enviados[0].htmlBody, /ana@example\.test/);
+    assert.equal(r.data.modo_pruebas, true);
+    assert.deepEqual(Array.from(r.data.enviado_a), ['pruebas@example.test']);
+    assert.ok(r.data.destinatarios_reales.includes('ana@example.test'));
+  });
+
+  it('con la propiedad apagada o distinta de 1 se envía a los destinatarios reales', () => {
+    for (const p of [{}, { EMAIL_MODO_PRUEBAS: '0', EMAIL_PRUEBAS_TO: 'pruebas@example.test' }]) {
+      const { ctx, enviados } = crearEntorno({ props: p });
+      const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1' }, null);
+      assert.equal(enviados[0].to, 'ana@example.test');
+      assert.equal(r.data.modo_pruebas, false);
+    }
+  });
+
+  it('modo activo sin EMAIL_PRUEBAS_TO falla en cerrado y no envía nada', () => {
+    const { ctx, enviados } = crearEntorno({ props: { EMAIL_MODO_PRUEBAS: '1' } });
+    assert.throws(() => ctx.sendContratoEmail({ contrato_id: 'ctr_1' }, null), /EMAIL_PRUEBAS_TO/);
+    assert.equal(enviados.length, 0);
+  });
+
+  it('una dirección de pruebas con espacios o inválida no se usa', () => {
+    const { ctx, enviados } = crearEntorno({ props: { EMAIL_MODO_PRUEBAS: '1', EMAIL_PRUEBAS_TO: '   ' } });
+    assert.throws(() => ctx.sendContratoEmail({ contrato_id: 'ctr_1' }, null), /EMAIL_PRUEBAS_TO/);
+    assert.equal(enviados.length, 0);
   });
 });

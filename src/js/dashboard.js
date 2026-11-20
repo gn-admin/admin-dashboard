@@ -8328,11 +8328,13 @@ const Dashboard = {
     }
     let enviado = false;
     let envioError = null;
+    let envioPruebas = '';
     const to = this._contratoEmails(p).map(x => x.email);
     if (enviarCopia && to.length) {
       try {
-        await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
+        const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
         enviado = true;
+        if (r && r.data && r.data.modo_pruebas) envioPruebas = (r.data.enviado_a || []).join(', ');
         this._regLog('contrato', 'Contrato y términos enviados por email (' + to.join(', ') + ')', 'contrato', c.id);
       } catch (err) { envioError = err; }
     }
@@ -8341,6 +8343,7 @@ const Dashboard = {
     this._regLog('contrato', 'Contrato firmado para ' + (p.animal || ''), 'contrato', c.id);
     finGuardar();
     if (envioError) this._snackErr(envioError, 'Contrato firmado, pero no se pudo enviar por email. Puedes reintentarlo desde Enviar por email.');
+    else if (enviado && envioPruebas) this.showSnackbar('Contrato firmado; correo de PRUEBA enviado a ' + envioPruebas, 'warning');
     else this.showSnackbar(enviado ? 'Contrato firmado y enviado por email' : 'Contrato firmado y guardado', 'success');
   },
 
@@ -8614,11 +8617,13 @@ const Dashboard = {
       return;
     }
     try {
-      await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
-      this._regLog('contrato', 'Contrato enviado por email (' + to.join(', ') + ')', 'contrato', c.id);
+      const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
+      const pruebas = r && r.data && r.data.modo_pruebas ? (r.data.enviado_a || []).join(', ') : '';
+      this._regLog('contrato', 'Contrato enviado por email (' + to.join(', ') + ')' + (pruebas ? ' [modo pruebas → ' + pruebas + ']' : ''), 'contrato', c.id);
       finGuardar();
       this.closeFormModal();
-      this.showSnackbar('Contrato enviado por email', 'success');
+      if (pruebas) this.showSnackbar('Correo de PRUEBA enviado a ' + pruebas, 'warning');
+      else this.showSnackbar('Contrato enviado por email', 'success');
     } catch (err) {
       finGuardar();
       if (this._debeOfrecerMailto(err)) {
