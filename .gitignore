@@ -44,3 +44,7 @@ apps-script/*
 
 # Documentación interna / operativa (nunca se sube al repo público)
 .internal-docs/
+
+# Harness y artefactos de pruebas locales
+e2e/
+test-results/
