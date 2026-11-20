@@ -1061,6 +1061,14 @@ function generarPdfContrato(c) {
       registro: c.entidad_registro || ''
     };
 
+    var baseWeb = String((CONFIG && CONFIG.PUBLIC_WEB_BASE_URL) || '').replace(/\/$/, '');
+    var logo = _blobImagenPdf_(baseWeb + '/assets/icons/logo-nebak.jpg');
+    if (logo) {
+      try {
+        var imgLogo = body.appendImage(logo);
+        imgLogo.setWidth(58).setHeight(58);
+      } catch (eLogo) {}
+    }
     var titulo = body.appendParagraph('CONTRATO DE ADOPCIÓN RESPONSABLE');
     titulo.setHeading(DocumentApp.ParagraphHeading.HEADING1);
     titulo.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
@@ -1115,6 +1123,13 @@ function generarPdfContrato(c) {
     insertarFirmaPdf_(body, 'Firma del adoptante', c.f1_nombre, c.f1_firma);
     body.appendParagraph('');
     insertarFirmaPdf_(body, 'Por la entidad', ent.nombre, c.entidad_firma || (!tutor ? c.f2_firma : ''));
+    var sello = _blobImagenPdf_(baseWeb + '/assets/contratos/sello-nebak.jpg');
+    if (sello) {
+      try {
+        var imgSello = body.appendImage(sello);
+        imgSello.setWidth(80).setHeight(80);
+      } catch (eSello) {}
+    }
     body.appendParagraph('SELLO DE LA ENTIDAD').setBold(true).setFontSize(8).setForegroundColor('#15863D');
     body.appendParagraph(ent.nombre).setFontSize(8);
 
@@ -1176,6 +1191,20 @@ function insertarFirmaPdf_(body, etiqueta, nombre, firma) {
     } catch (e) {}
   }
   body.appendParagraph('[Firma registrada en el panel]').setFontSize(9).setForegroundColor('#6b7280');
+}
+
+function _blobImagenPdf_(url) {
+  var u = String(url || '');
+  if (!/^https?:\/\//i.test(u) || typeof UrlFetchApp === 'undefined') return null;
+  try {
+    var r = UrlFetchApp.fetch(u, { muteHttpExceptions: true });
+    if (!r || r.getResponseCode() !== 200) return null;
+    var b = r.getBlob();
+    if (!b || b.getBytes().length > 2 * 1024 * 1024) return null;
+    return b;
+  } catch (e) {
+    return null;
+  }
 }
 
 function _firmaBlobPdf_(firma) {
