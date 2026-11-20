@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "workflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify-workflow.json",
+    "sha256": "f0135a4029b95522e89b614035995be7e2bc7e83593f649750053c34a8016b67",
+    "bytes": 6904
+  },
+  "artifact": {
+    "path": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify\\grupo-nebak-workflow.html",
+    "sha256": "d150502591d605664eaf3b5072e7b1b02acd8d2975f510f84c4545a91b18ed21",
+    "bytes": 857039
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify\\grupo-nebak-workflow.finalize.json",
+    "summaryReceipt": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify\\grupo-nebak-workflow.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify\\grupo-nebak-workflow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-19T23:51:25.371Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 38566,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

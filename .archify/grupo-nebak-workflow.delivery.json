@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "c10269c7-9b52-4aad-9d5a-db06f3ff1068",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify-workflow.json",
+  "output": "C:\\Users\\JonEg\\Documents\\proyectos\\gruponebak\\admin-dashboard\\.archify\\grupo-nebak-workflow.html",
+  "specification": {
+    "sha256": "f0135a4029b95522e89b614035995be7e2bc7e83593f649750053c34a8016b67",
+    "bytes": 6904
+  },
+  "artifact": {
+    "sha256": "d150502591d605664eaf3b5072e7b1b02acd8d2975f510f84c4545a91b18ed21",
+    "bytes": 857039
+  }
+}
