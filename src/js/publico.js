@@ -278,7 +278,31 @@ const Publico = {
     }, true);
   },
 
-  // ==================== CANAL PÚBLICO (JSONP) ====================
+  // ==================== CANAL PÚBLICO (fetch + JSONP de respaldo) ====================
+
+  // Apps Script responde con `Access-Control-Allow-Origin: *`, así que la vía
+  // normal es fetch. El JSONP queda solo como respaldo para despliegues
+  // antiguos o navegadores que bloquean scripts de terceros.
+  async peticion(params) {
+    const base = (typeof CONFIG !== 'undefined' && CONFIG.apiUrl) ? CONFIG.apiUrl : '';
+    if (!base) throw new Error('Falta API_URL en la configuración del panel.');
+    const qs = new URLSearchParams(params);
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 20000) : null;
+    try {
+      const res = await fetch(base + (base.indexOf('?') === -1 ? '?' : '&') + qs.toString(), {
+        signal: ctrl ? ctrl.signal : undefined,
+        cache: 'no-store',
+        credentials: 'omit'
+      });
+      if (res.ok) {
+        const texto = await res.text();
+        try { return JSON.parse(texto); } catch (e) { /* cae al JSONP */ }
+      }
+    } catch (e) { /* sin CORS o bloqueado: se prueba JSONP */ }
+    finally { if (timer) clearTimeout(timer); }
+    return this.jsonp(params);
+  },
 
   jsonp(params) {
     return new Promise((resolve, reject) => {
@@ -318,7 +342,7 @@ const Publico = {
       Object.keys(this.params).forEach(k => {
         if (this.params[k] !== '' && this.params[k] !== null && this.params[k] !== undefined) params[k] = this.params[k];
       });
-      const res = await this.jsonp(params);
+      const res = await this.peticion(params);
       if (req !== this._req) return;
       if (!res || res.status === 'error' || res.status === 'warning') throw new Error((res && (res.error || res.detail)) || 'No se pudieron cargar las publicaciones.');
       this.filtros = res.filters || this.filtros;
@@ -337,7 +361,7 @@ const Publico = {
     if (!cont) return;
     cont.innerHTML = `<div class="pub-estado" role="status"><span class="pub-spinner" aria-hidden="true"></span><p>Cargando publicación...</p></div>`;
     try {
-      const res = await this.jsonp({ endpoint: 'publicacion', slug: slug });
+      const res = await this.peticion({ endpoint: 'publicacion', slug: slug });
       if (req !== this._req) return;
       if (res && res.status === 'warning') {
         this.estadoError(res.error || 'Canal público sin configurar.');
@@ -467,7 +491,7 @@ const Publico = {
   },
 
   _etiquetaFiltro(valor) {
-    const m = { animal: 'Animales', evento: 'Eventos', historia: 'Historias', gato: 'Gatos', perro: 'Perros', otros: 'Otros' };
+    const m = { animal: 'Animales', animal_grupo: 'Grupos', evento: 'Eventos', historia: 'Historias', gato: 'Gatos', perro: 'Perros', otros: 'Otros' };
     return m[valor] || valor;
   },
 
