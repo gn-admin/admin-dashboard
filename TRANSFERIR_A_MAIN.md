@@ -192,7 +192,8 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 }
 ```
 
-**Recetas** (siempre `GET {baseUrl}?…`; `pageSize` ≤ 50, 12 por defecto):
+**Recetas** (siempre `GET {baseUrl}?…`; `pageSize` ≤ 50, 12 por defecto). En desarrollo, añadir `nocache=1` a la llamada para saltar la caché de ~60 s del canal (`canal.pedir('publicaciones', { nocache: 1 })`); en producción, dejarla actuar.
+
 
 | Página de `main` | Llamada | Qué pintar |
 |---|---|---|
