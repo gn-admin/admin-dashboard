@@ -2212,14 +2212,26 @@ describe('canal público: agenda de eventos', () => {
     assert.equal(b.ctx.webListarPublicas({}).data[0].event.pasado, false);
   });
 
-  it('desde=hoy deja fuera lo terminado y lo que no tiene fecha', () => {
+  it('desde=hoy deja fuera los eventos terminados y respeta el resto', () => {
     const b = conEventos();
     b.estado.animales.push(animal());
     b.estado.publicaciones.push(fila());
     assert.equal(b.ctx.webListarPublicas({ pageSize: 50 }).pagination.total, 4);
     const r = b.ctx.webListarPublicas({ pageSize: 50, desde: 'hoy' });
-    assert.deepEqual(plano(r.data.map(p => p.slug)).sort(), ['en-curso', 'futuro']);
+    assert.deepEqual(plano(r.data.map(p => p.slug)).sort(), ['en-curso', 'futuro', 'luna']);
     assert.equal(r.applied.desde, HOY);
+  });
+
+  it('desde no toca animales, grupos ni historias', () => {
+    const b = conEventos();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(
+      fila(),
+      fila({ id: 'web_h', tipo: 'historia', origen_id: '', slug: 'historia', titulo: 'Historia', categoria: 'Historias', animal_json: '', evento_json: '{}' })
+    );
+    assert.equal(b.ctx.webListarPublicas({ type: 'animal', desde: 'hoy' }).pagination.total, 1);
+    assert.equal(b.ctx.webListarPublicas({ type: 'historia', desde: 'hoy' }).pagination.total, 1);
+    assert.equal(b.ctx.webListarPublicas({ type: 'evento', desde: 'hoy' }).pagination.total, 2);
   });
 
   it('desde acepta una fecha y un valor inválido no filtra', () => {

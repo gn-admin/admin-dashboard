@@ -2674,9 +2674,10 @@ function webListarPublicas(params) {
     if (f.featured !== '' && !!p.featured !== webBool(f.featured, true)) return false;
     // `sponsor=1` / `sponsor=0` (R3); sin parámetro no filtra (compatibilidad).
     if (f.sponsor !== '' && !!(p.sponsor && p.sponsor.available) !== webBool(f.sponsor, true)) return false;
-    // `desde=YYYY-MM-DD|hoy` (agenda de eventos): queda lo que no ha terminado.
-    // Sin fecha no se puede decir «a partir de»: esos registros se quedan fuera.
-    if (f.desde) {
+    // `desde=YYYY-MM-DD|hoy` es solo de agenda: filtra los eventos y deja pasar
+    // el resto, así que `animales-publicos&desde=hoy` no se vacía por sorpresa.
+    // Dentro de los eventos, uno sin fecha no puede estar «a partir de» ese día.
+    if (f.desde && p.type === 'evento') {
       var finEvento = webEventoDiaFin(p);
       if (!finEvento || finEvento < f.desde) return false;
     }

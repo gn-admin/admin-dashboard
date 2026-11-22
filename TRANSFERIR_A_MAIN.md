@@ -53,6 +53,26 @@ El canal puede entregar publicaciones de **grupo** (varios animales que se adopt
 - **Referencia de render:** `admin-dashboard/src/js/publico.js` (`_bloqueGrupo`, tarjeta y JSON-LD) y `scripts/prerender-publico.js`.
 
 
+### A.2.2 Agenda de eventos: `sort=startDate`, `desde` y `event.pasado` (aditivo)
+
+Los eventos ya traen `event.startDate`/`endDate`; el canal añade el criterio temporal para que la web abra la sección por el **próximo** evento y no por el último publicado. Todo es aditivo: sin estos parámetros, listado y payload no cambian.
+
+- **`?endpoint=eventos-publicos&sort=startDate`** (y `-startDate`): ordena por el día del evento, con `endDate` mandando sobre `startDate`. Como `sort=orden`, desactiva la prioridad de `urgent` (si no, un animal urgente sin fecha adelanta al evento); las publicaciones **sin fecha van al final** en ambos sentidos. `-publishedAt` sigue siendo el orden por defecto.
+- **`desde=YYYY-MM-DD|hoy`**: deja solo lo que no ha terminado (`endDate` o `startDate` ≥ ese día), con granularidad de día UTC. **Solo filtra `type=evento`**: animales, grupos e historias pasan sin tocar, así que `animales-publicos&desde=hoy` devuelve lo mismo que sin el parámetro. Dentro de los eventos, uno sin fecha no entra; un valor que no es una fecha **no filtra** (no es error).
+- **`event.pasado`** (booleano, solo en `type=evento`): `true` si el último día del evento ya pasó; `false` si está en curso, es futuro o no tiene fechas. Sale de las mismas fechas y con la misma granularidad que `desde`, así que un evento de hoy nunca se marca como pasado.
+- **Eco:** `applied.desde` devuelve el día normalizado (`YYYY-MM-DD`), o `''` si no se pidió o no era válido. `desde` y `sort` forman parte de la clave de caché (~60 s): respuestas con y sin filtro no se mezclan.
+
+**Uso típico en la web:**
+
+```js
+// Próximos eventos, del más cercano al más lejano
+GET ?endpoint=eventos-publicos&desde=hoy&sort=startDate&pageSize=6
+// Archivo de eventos, del más reciente al más antiguo
+GET ?endpoint=eventos-publicos&sort=-startDate
+```
+
+**Qué debe hacer `main`:** pintar «Próximos» con `desde=hoy&sort=startDate`, usar `event.pasado` para separar el archivo histórico (o marcarlo en la tarjeta) y **no** aplicar `desde` a las secciones de animales, grupos o historias. Referencia de render: `admin-dashboard/src/js/publico.js` (evento) y `scripts/prerender-publico.js`.
+
 ### A.3 Port de consumo y render (B1–B2)
 
 1. **Sustituir fuente estática:** reemplazar `blog-posts.json` / `HistoriasAPI` (o equivalente) por consumo del canal (`publicaciones` + `publicacion&slug=`) vía JSONP en cliente y/o fetch en build según arquitectura de `main`.

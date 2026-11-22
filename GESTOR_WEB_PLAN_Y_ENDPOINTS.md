@@ -212,8 +212,9 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - **Agenda de eventos (22/11):** `sort=startDate` ordena por el día del evento (`endDate` si lo hay)
   y, como `sort=orden`, deja de anteponer los urgentes; lo que no tiene fecha va al final en
   cualquier sentido. `desde=YYYY-MM-DD|hoy` deja solo lo que no ha terminado (`endDate` o
-  `startDate` ≥ ese día) y es un criterio **de eventos**: lo que no tiene fecha no entra, y un valor
-  que no es una fecha no filtra. El payload gana `event.pasado`, derivado de esas mismas fechas con
+  `startDate` ≥ ese día) y **solo se aplica a `type=evento`**: animales, grupos e historias pasan sin
+  tocar, así que `animales-publicos&desde=hoy` devuelve lo mismo que sin el parámetro; dentro de los
+  eventos, uno sin fecha no entra y un valor que no es una fecha no filtra. El payload gana `event.pasado`, derivado de esas mismas fechas con
   granularidad de día (UTC): `true` solo si el último día del evento ya pasó, así que un evento de
   hoy no sale como pasado y uno sin fechas nunca se marca. `desde` entra en `_webKeyParams`.
 - **Categoría canónica «Caso externo» (22/11):** el backend guarda y publica siempre `Caso externo`
