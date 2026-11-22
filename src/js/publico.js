@@ -6,9 +6,10 @@
  * permite cabeceras CORS.
  *
  * La página sirve de referencia de lo que la web pública debe renderizar:
- * listado con filtros/paginación, detalle completo (`contentHtml`, media,
- * `animal`/`event`, CTA) y metadatos SEO aplicados (title, description,
- * canonical, robots, OG/Twitter y JSON-LD).
+ * listado con filtros/paginación y agenda (`sort=startDate`, `desde=hoy`,
+ * `event.pasado`), detalle completo (`contentHtml`, media, `animal`/`event`,
+ * CTA) y metadatos SEO aplicados (title, description, canonical, robots,
+ * OG/Twitter y JSON-LD).
  */
 
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23EAF5EE'/%3E%3Ccircle cx='200' cy='128' r='34' fill='%23cfe3d6'/%3E%3Cellipse cx='200' cy='206' rx='58' ry='42' fill='%23cfe3d6'/%3E%3C/svg%3E";
@@ -30,7 +31,7 @@ const _FichaConfig = (typeof FichaConfig !== 'undefined' && FichaConfig)
     : null);
 
 const Publico = {
-  params: { type: '', category: '', species: '', q: '', page: 1, pageSize: 12 },
+  params: { type: '', category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 },
   filtros: { type: [], category: [], status: [], species: [] },
   items: [],
   paginacion: null,
@@ -279,7 +280,7 @@ const Publico = {
       }
       const limpiar = e.target.closest('[data-pub-limpiar]');
       if (limpiar) {
-        this.params = { type: '', category: '', species: '', q: '', page: 1, pageSize: 12 };
+        this.params = { type: '', category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 };
         this.cargarLista();
       }
     });
@@ -358,17 +359,27 @@ const Publico = {
     });
   },
 
+  /**
+   * Parámetros del listado: solo los que tienen valor. `sort` y `desde` son el
+   * contrato de agenda (`startDate`, `hoy`); vacíos, el canal mantiene su
+   * orden por `-publishedAt` y no filtra por fecha.
+   */
+  parametrosCanal() {
+    const params = { endpoint: 'publicaciones' };
+    Object.keys(this.params).forEach(k => {
+      const v = this.params[k];
+      if (v !== '' && v !== null && v !== undefined) params[k] = v;
+    });
+    return params;
+  },
+
   async cargarLista() {
     const req = ++this._req;
     const cont = this._contenedor();
     if (!cont) return;
     cont.innerHTML = `<div class="pub-estado" role="status"><span class="pub-spinner" aria-hidden="true"></span><p>Cargando publicaciones...</p></div>`;
     try {
-      const params = { endpoint: 'publicaciones' };
-      Object.keys(this.params).forEach(k => {
-        if (this.params[k] !== '' && this.params[k] !== null && this.params[k] !== undefined) params[k] = this.params[k];
-      });
-      const res = await this.peticion(params);
+      const res = await this.peticion(this.parametrosCanal());
       if (req !== this._req) return;
       if (!res || res.status === 'error' || res.status === 'warning') {
         const partes = res ? [res.error, res.detail, res.code ? '[' + res.code + ']' : ''].filter(Boolean) : [];
@@ -466,7 +477,7 @@ const Publico = {
     const pag = this.paginacion || { page: 1, totalPages: 1 };
     const opciones = (lista, actual) => (lista || []).map(v => `<option value="${this.esc(v)}" ${actual === v ? 'selected' : ''}>${this.esc(this._etiquetaFiltro(v))}</option>`).join('');
 
-    const hayFiltros = !!(this.params.q || this.params.type || this.params.category || this.params.species);
+    const hayFiltros = !!(this.params.q || this.params.type || this.params.category || this.params.species || this.params.desde);
     const tarjetas = this.items.length
       ? this.items.map(p => this._card(p)).join('')
       : `<div class="pub-error"><h1>${hayFiltros ? 'Sin resultados' : 'Todavía no hay publicaciones'}</h1><p>${hayFiltros ? 'No hay contenido que coincida con estos filtros. Prueba a limpiarlos.' : 'Cuando se publique contenido desde el panel aparecerá aquí.'}</p></div>`;
@@ -503,6 +514,21 @@ const Publico = {
             ${opciones(this.filtros.species, this.params.species)}
           </select>
         </div>
+        <div class="pub-field">
+          <label for="pub-orden">Orden</label>
+          <select id="pub-orden" data-pub-filtro="sort">
+            <option value="" ${this.params.sort === '' ? 'selected' : ''}>Más recientes</option>
+            <option value="orden" ${this.params.sort === 'orden' ? 'selected' : ''}>Orden del panel</option>
+            <option value="startDate" ${this.params.sort === 'startDate' ? 'selected' : ''}>Fecha del evento</option>
+          </select>
+        </div>
+        <div class="pub-field">
+          <label for="pub-agenda">Agenda</label>
+          <select id="pub-agenda" data-pub-filtro="desde">
+            <option value="" ${this.params.desde === '' ? 'selected' : ''}>Todas las fechas</option>
+            <option value="hoy" ${this.params.desde === 'hoy' ? 'selected' : ''}>Ocultar ya celebrados</option>
+          </select>
+        </div>
         <div class="pub-toolbar-actions">
           <button type="submit" class="pub-btn">Buscar</button>
           <button type="button" class="pub-btn pub-btn--ghost" data-pub-limpiar>Limpiar</button>
@@ -524,6 +550,16 @@ const Publico = {
     return m[valor] || valor;
   },
 
+  /** Rango legible del evento: «21 de marzo de 2027» o «21 – 22 de marzo de 2027». */
+  rangoEvento(ev) {
+    const e = ev || {};
+    const inicio = this.fecha(e.startDate);
+    const fin = this.fecha(e.endDate);
+    if (!inicio) return fin;
+    if (!fin || fin === inicio) return inicio;
+    return inicio + ' – ' + fin;
+  },
+
   _card(p) {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
@@ -532,12 +568,19 @@ const Publico = {
     const animal = esGrupo
       ? [g.species, (g.count ? (g.count + ' miembros') : ''), (g.age && g.age.label)].filter(Boolean).join(' · ')
       : (p.animal ? [p.animal.species, p.animal.age && p.animal.age.label].filter(Boolean).join(' · ') : '');
-    const meta = [this.fecha(p.publishedAt), animal].filter(Boolean).join(' · ');
     const urgente = p.urgent ? `<span class="pub-tag pub-tag--urgente">Urgente</span>` : '';
+    // Agenda: un evento se fecha por su día, no por el de publicación, y dice
+    // si ya se celebró (deriva del mismo criterio que `desde`).
+    const evento = p.type === 'evento' ? (p.event || null) : null;
+    const cuando = evento ? this.rangoEvento(evento) : this.fecha(p.publishedAt);
+    const meta = [cuando, animal].filter(Boolean).join(' · ');
+    const celebrado = (evento && evento.pasado)
+      ? `<span class="pub-tag pub-tag--pasado">Ya celebrado</span>`
+      : '';
     return `<a class="pub-card" href="#/publicacion/${encodeURIComponent(p.slug || '')}">
       <div class="pub-card-media${img ? '' : ' pub-card-media--vacia'}">${img ? `<img src="${this.esc(img)}" alt="${this.esc(alt)}" loading="lazy">` : '<span>Sin imagen</span>'}</div>
       <div class="pub-card-body">
-        ${urgente}${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
+        ${urgente}${celebrado}${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
         ${meta ? `<p class="pub-card-meta">${this.esc(meta)}</p>` : ''}
         <h2>${this.esc(p.title)}</h2>
         ${p.excerpt ? `<p class="pub-card-excerpt">${this.esc(p.excerpt)}</p>` : ''}
@@ -873,8 +916,13 @@ const Publico = {
     const inscripcion = (reg.required || this.urlSegura(reg.url)) && this.urlSegura(reg.url)
       ? `<div class="pub-cta"><a class="pub-btn" href="${this.esc(this.urlSegura(reg.url))}" target="_blank" rel="noopener noreferrer">${this.esc(reg.label || 'Inscribirse')}</a></div>`
       : '';
+    const cuando = this.rangoEvento(ev);
+    const estado = ev.pasado === true
+      ? `<p class="pub-evento-estado">Ya celebrado${cuando ? ' · ' + this.esc(cuando) : ''}</p>`
+      : ((ev.pasado === false && cuando) ? `<p class="pub-evento-estado">Próximo evento · ${this.esc(cuando)}</p>` : '');
     return `<section class="pub-bloque">
       <h2>Datos del evento</h2>
+      ${estado}
       <dl class="pub-dl">${filas.join('')}</dl>
       ${inscripcion}
     </section>`;

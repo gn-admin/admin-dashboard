@@ -468,3 +468,61 @@ describe('Publico.estadoTexto / esc', () => {
     assert.equal(Publico.esc(null), '');
   });
 });
+
+describe('Publico: agenda de eventos (sort=startDate, desde, event.pasado)', () => {
+  const evento = (extra) => Object.assign({
+    slug: 'jornada',
+    type: 'evento',
+    title: 'Jornada de puertas abiertas',
+    category: 'Eventos',
+    excerpt: 'Ven a conocer el refugio',
+    coverImage: { src: 'https://x/a.jpg', alt: 'Jornada' },
+    publishedAt: '2026-11-01T10:00:00.000Z',
+    event: { startDate: '2027-03-21', endDate: '2027-03-22', pasado: false }
+  }, extra);
+
+  it('la tarjeta del evento se fecha por su día, no por el de publicación', () => {
+    const html = Publico._card(evento({}));
+    assert.match(html, /21 de marzo de 2027 – 22 de marzo de 2027/);
+    assert.doesNotMatch(html, /1 de noviembre de 2026/);
+    assert.doesNotMatch(html, /Ya celebrado/);
+  });
+
+  it('la tarjeta marca «Ya celebrado» cuando el evento pasó', () => {
+    const html = Publico._card(evento({ event: { startDate: '2025-01-10', pasado: true } }));
+    assert.match(html, /pub-tag--pasado">Ya celebrado/);
+    assert.match(html, /10 de enero de 2025/);
+  });
+
+  it('una publicación que no es evento sigue mostrando su fecha de publicación', () => {
+    const html = Publico._card({ slug: 'luna', type: 'animal', title: 'Luna', publishedAt: '2026-11-01T10:00:00.000Z' });
+    assert.match(html, /1 de noviembre de 2026/);
+    assert.doesNotMatch(html, /pub-tag--pasado/);
+  });
+
+  it('la ficha del evento avisa si es próximo o si ya se celebró', () => {
+    assert.match(Publico.htmlDetalle(evento({})), /Próximo evento · 21 de marzo de 2027 – 22 de marzo de 2027/);
+    const pasado = Publico.htmlDetalle(evento({ event: { startDate: '2025-01-10', pasado: true } }));
+    assert.match(pasado, /Ya celebrado · 10 de enero de 2025/);
+  });
+
+  it('sin `event.pasado` en el payload no inventa estado', () => {
+    const html = Publico.htmlDetalle(evento({ event: { startDate: '2027-03-21' } }));
+    assert.doesNotMatch(html, /pub-evento-estado/);
+    assert.match(html, /Datos del evento/);
+  });
+
+  it('la petición lleva `sort` y `desde` solo cuando se eligen', () => {
+    const conParams = (p) => Publico.parametrosCanal.call({
+      params: Object.assign({ type: '', category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 }, p)
+    });
+    const base = conParams({});
+    assert.equal(base.endpoint, 'publicaciones');
+    assert.equal(base.desde, undefined);
+    assert.equal(base.sort, undefined);
+    const agenda = conParams({ type: 'evento', sort: 'startDate', desde: 'hoy' });
+    assert.equal(agenda.type, 'evento');
+    assert.equal(agenda.sort, 'startDate');
+    assert.equal(agenda.desde, 'hoy');
+  });
+});

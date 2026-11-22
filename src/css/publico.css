@@ -228,6 +228,14 @@ a:hover { color: var(--pub-primary-dark); }
 }
 .pub-tag--estado { color: #6B4A00; background: #FFF4E5; }
 .pub-tag--urgente { color: #8A1C1C; background: #FDECEC; }
+.pub-tag--pasado { color: #4A4A4A; background: #EEEDEA; }
+
+/* Estado de la agenda en la ficha del evento: ya celebrado o próximo. */
+.pub-evento-estado {
+  margin: 0 0 .7rem; padding: .5rem .8rem; border-radius: 12px;
+  background: var(--pub-primary-soft); border: 1px solid #bfe8cf;
+  color: var(--pub-primary-dark); font-size: .9rem; font-weight: 600;
+}
 
 .pub-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 26px; }
 .pub-pager span { font-size: .86rem; color: var(--pub-muted); }
