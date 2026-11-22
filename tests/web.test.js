@@ -8,6 +8,21 @@ const assert = require('node:assert/strict');
 
 const Web = require('../src/js/web.js');
 
+describe('Web.categoriasPublicas', () => {
+  it('incluye «Caso externo» una sola vez, con la grafía del backend', () => {
+    const lista = Web.categoriasPublicas();
+    assert.equal(lista.filter(c => c === 'Caso externo').length, 1);
+    assert.ok(lista.includes('Historias'));
+    assert.ok(lista.includes('Eventos'));
+  });
+
+  it('devuelve una copia: quien la use no puede alterar el catálogo', () => {
+    const lista = Web.categoriasPublicas();
+    lista.push('Otra');
+    assert.equal(Web.categoriasPublicas().includes('Otra'), false);
+  });
+});
+
 describe('Web.normalizarSlug', () => {
   it('quita acentos, mayúsculas y signos', () => {
     assert.equal(Web.normalizarSlug('Luna en Adopción!!'), 'luna-en-adopcion');

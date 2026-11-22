@@ -18,6 +18,11 @@ var WEB_ESTADOS = ['borrador', 'publicado', 'oculto', 'retirado'];
 // Vocabulario público de estado del animal (D1). `urgente` no es un estado:
 // viaja como bandera booleana (`urgent`) y se pinta como badge/orden.
 var WEB_ESTADOS_PUBLICOS = ['en_adopcion', 'en_acogida', 'reservado', 'adoptado', 'cerrado'];
+// R2 del análisis del canal: «Caso externo» es la categoría editorial de los
+// animales que no gestiona la asociación. Se guarda y se publica siempre igual,
+// porque el filtro `category` compara exacto: una mayúscula de más partiría la
+// sección en dos sin dar ningún error.
+var WEB_CATEGORIA_CASO_EXTERNO = 'Caso externo';
 var WEB_ESTADO_PUBLICO_POR_INTERNO = {
   disponible: 'en_adopcion',
   en_acogida: 'en_acogida',
@@ -95,6 +100,21 @@ function webArray(valor) {
 
 function webTexto(valor) {
   return String(valor == null ? '' : valor).trim();
+}
+
+/**
+ * Categoría pública canónica. Solo toca «Caso externo», que la gente escribe de
+ * mil maneras (mayúsculas, guion, sin espacio): todas acaban en el mismo valor
+ * para que el filtro y los chips de taxonomías no se dupliquen (R2).
+ */
+function webCategoriaCanonica(valor) {
+  var t = webTexto(valor);
+  if (!t) return '';
+  var clave = String(t).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s_-]+/g, ' ').trim();
+  if (clave === 'caso externo' || clave === 'casos externos') return WEB_CATEGORIA_CASO_EXTERNO;
+  return t;
 }
 
 /** Estado público derivado del estado interno del animal (D1). */
@@ -1063,7 +1083,7 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     id: p.id || '',
     slug: p.slug || '',
     type: p.tipo || 'animal',
-    category: p.categoria || '',
+    category: webCategoriaCanonica(p.categoria || ''),
     status: webEstadoPublicoEfectivo(p, origen),
     title: p.titulo || '',
     excerpt: p.extracto || '',
@@ -1371,7 +1391,7 @@ function webUpsertAnimal(body) {
   }
   registro.estado_publico_modo = modoIn;
   registro.estado_publico = estadoEf;
-  registro.categoria = categoria;
+  registro.categoria = webCategoriaCanonica(categoria);
   registro.especie = webTexto(a.especie);
   if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
   registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
@@ -1628,7 +1648,7 @@ function webUpsertGrupo(body) {
   var estadoEf = (modoIn === 'manual') ? estadoIn : webEstadoGrupoDerivado(miembros);
   var categoria = webTexto(body.categoria);
   if (!categoria) categoria = webCategoriaGrupoDerivada(estadoEf, miembros);
-  registro.estado_publico_modo = modoIn; registro.estado_publico = estadoEf; registro.categoria = categoria; registro.especie = webEspecieGrupo(miembros);
+  registro.estado_publico_modo = modoIn; registro.estado_publico = estadoEf; registro.categoria = webCategoriaCanonica(categoria); registro.especie = webEspecieGrupo(miembros);
   if (registro.estado_publicacion === 'publicado' && !registro.publicado_en) registro.publicado_en = webAhora();
   registro.slug_historial = JSON.stringify(webHistorialDeCambio(previa, slug));
 
@@ -1804,7 +1824,7 @@ function webUpsertEvento(body, user) {
     titulo: titulo,
     extracto: webTexto(body.extracto),
     contenido_html: String(body.contenido_html || ''),
-    categoria: webTexto(body.categoria) || (tipo === 'evento' ? 'Eventos' : 'Historias'),
+    categoria: webCategoriaCanonica(webTexto(body.categoria)) || (tipo === 'evento' ? 'Eventos' : 'Historias'),
     estado_publico: webTexto(body.estado_publico) || (tipo === 'evento' ? 'programado' : 'publicado'),
     especie: '',
     autor: webTexto(body.autor),
@@ -2421,7 +2441,7 @@ function webListarPublicas(params) {
 
   var f = {
     type: webTexto(params.type),
-    category: webTexto(params.category),
+    category: webCategoriaCanonica(webTexto(params.category)),
     status: webTexto(params.status),
     featured: webTexto(params.featured),
     species: webTexto(params.species).toLowerCase(),

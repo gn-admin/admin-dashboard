@@ -9,6 +9,14 @@
  * testearla con `node --test`.
  */
 
+// Categorías públicas canónicas. «Caso externo» tiene que coincidir letra a letra
+// con `WEB_CATEGORIA_CASO_EXTERNO` del backend: el filtro del canal compara
+// exacto y una mayúscula de más parte la sección en dos (R2).
+const CATEGORIAS_PUBLICAS = [
+  'Gatos en adopción', 'Perros en adopción', 'Acogidas', 'Adoptados', 'Cerrados',
+  'Caso externo', 'Eventos', 'Historias'
+];
+
 const Web = {
   tab: 'animal',
   animales: [],
@@ -22,6 +30,11 @@ const Web = {
   _deployEstado: null,
 
   // ==================== LÓGICA PURA ====================
+
+  /** Copia de las categorías canónicas, para selects y sugerencias del gestor. */
+  categoriasPublicas() {
+    return CATEGORIAS_PUBLICAS.slice();
+  },
 
   normalizarSlug(valor) {
     const mapa = { 'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a', 'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'ñ': 'n', 'ç': 'c' };
@@ -736,7 +749,7 @@ const Web = {
         <div class="form-group"><label for="web-categoria">Categoría pública *</label>
           <select id="web-categoria" class="form-input">
             <option value="">Seleccionar...</option>
-            ${['Gatos en adopción', 'Perros en adopción', 'Acogidas', 'Adoptados', 'Cerrados', 'Caso externo', 'Eventos', 'Historias'].map(c => `<option ${d.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}
+            ${CATEGORIAS_PUBLICAS.map(c => `<option ${d.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}
           </select></div>
         <div class="form-group"><label for="web-estado-publico">Estado público *</label>
           <select id="web-estado-publico" class="form-input">
@@ -1280,7 +1293,7 @@ const Web = {
         <div class="form-group"><label for="we-slug">Slug *</label><input type="text" id="we-slug" class="form-input" value="${this._esc(d.slug || '')}" data-change="onWebSlugChange" data-cpass="el" data-carg0="${this._esc(d.id || '')}" data-carg1="${this._esc(d.tipo || 'evento')}"><p id="web-slug-hint" class="web-slug-hint"></p>${this.historialSlugHtml(d.slug_historial)}</div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label for="we-categoria">Categoría *</label><input type="text" id="we-categoria" class="form-input" value="${this._esc(d.categoria || (d.tipo === 'historia' ? 'Historias' : 'Eventos'))}"></div>
+        <div class="form-group"><label for="we-categoria">Categoría *</label><input type="text" id="we-categoria" class="form-input" list="we-categorias" value="${this._esc(d.categoria || (d.tipo === 'historia' ? 'Historias' : 'Eventos'))}"><datalist id="we-categorias">${CATEGORIAS_PUBLICAS.map(c => `<option value="${c}">`).join('')}</datalist></div>
         <div class="form-group"><label for="we-estado-publico">Estado público</label><input type="text" id="we-estado-publico" class="form-input" value="${this._esc(d.estado_publico || (d.tipo === 'historia' ? 'publicado' : 'programado'))}" placeholder="programado / activo / finalizado"></div>
       </div>
       <div class="form-group"><label for="we-extracto">Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>

@@ -1866,3 +1866,53 @@ describe('canal público: destacados, orden editorial y contacto', () => {
     assert.match(CODE_GS, /'pub_tax_' \+ _webKeyParams\(p\)/);
   });
 });
+
+// R2: «Caso externo» es una categoría editorial y el filtro compara exacto, así
+// que la grafía se fija en un solo sitio (backend) y el gestor sugiere la misma.
+describe('canal público: categoría canónica «Caso externo»', () => {
+  it('acepta las variantes y devuelve siempre la misma grafía', () => {
+    const b = crearBackend();
+    ['Caso externo', 'caso externo', 'Caso Externo', '  CASO  EXTERNO ', 'caso-externo', 'casos externos']
+      .forEach((v) => assert.equal(b.ctx.webCategoriaCanonica(v), 'Caso externo', JSON.stringify(v)));
+    assert.equal(b.ctx.webCategoriaCanonica('Historias'), 'Historias');
+    assert.equal(b.ctx.webCategoriaCanonica('  Otras  '), 'Otras');
+    assert.equal(b.ctx.webCategoriaCanonica(''), '');
+    assert.equal(b.ctx.webCategoriaCanonica(null), '');
+  });
+
+  it('guarda la historia con la categoría canónica y el filtro la encuentra', () => {
+    const b = crearBackend();
+    const alta = b.ctx.webUpsertEvento({
+      tipo: 'historia', titulo: 'Caso de otra protectora', slug: 'caso-otra-protectora',
+      categoria: 'caso externo', extracto: 'Un caso que no gestionamos',
+      contenido_html: '<p>Este caso llega de otra protectora y no se gestiona aquí.</p>',
+      media: { coverImage: { src: 'https://x/caso.jpg', alt: 'Caso' } },
+      estado_publicacion: 'publicado'
+    }, { email: 'x@y.es' });
+    assert.equal(alta.status, 'success', JSON.stringify(alta));
+    assert.equal(b.estado.publicaciones[0].categoria, 'Caso externo');
+
+    assert.deepEqual(plano(b.ctx.webListarPublicas({ category: 'Caso externo' }).data.map(p => p.slug)), ['caso-otra-protectora']);
+    // La web puede mandar la categoría como quiera: se normaliza igual.
+    assert.equal(b.ctx.webListarPublicas({ category: 'CASO EXTERNO' }).pagination.total, 1);
+    assert.ok(b.ctx.webTaxonomias().data.category.includes('Caso externo'));
+  });
+
+  it('una fila antigua con otra grafía sale canónica en el feed y en las taxonomías', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila({
+      id: 'web_9', tipo: 'historia', origen_id: '', slug: 'antigua',
+      categoria: 'Caso Externo', animal_json: '', evento_json: '{}', estado_publico: 'publicado'
+    }));
+    assert.equal(b.ctx.webListarPublicas({}).data[0].category, 'Caso externo');
+    assert.deepEqual(plano(b.ctx.webTaxonomias().data.category), ['Caso externo']);
+  });
+
+  it('las demás categorías no se tocan y el grupo sigue derivando la suya', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal({ id: 'ani_1', especie: 'perro', estado: 'en_acogida' }));
+    b.estado.publicaciones.push(fila({ id: 'web_1', categoria: 'Historias', tipo: 'historia', origen_id: '', animal_json: '', evento_json: '{}' }));
+    assert.deepEqual(plano(b.ctx.webListarPublicas({}).data.map(p => p.category)), ['Historias']);
+    assert.equal(b.ctx.webCategoriaGrupoDerivada('en_acogida', [animal()]), 'Acogidas');
+  });
+});

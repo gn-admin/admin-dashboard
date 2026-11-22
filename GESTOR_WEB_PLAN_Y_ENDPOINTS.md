@@ -189,6 +189,10 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 }
 ```
 - **Reglas:** [x] solo contenido en estado publicable; [x] paginación acotada; [x] proyección ligera (`fields=card`); [x] `filters` devuelve los valores disponibles para construir la UI; [x] **una ficha por animal**: si el grupo está publicado, el feed sirve la del grupo (`animal_grupo`) y descarta la individual del miembro, aunque la hoja tenga las dos (`webPublicables`).
+- **Categoría canónica «Caso externo» (22/11):** el backend guarda y publica siempre `Caso externo`
+  (`webCategoriaCanonica`), aunque llegue como `caso externo`, `Caso Externo` o `caso-externo`; el
+  filtro `category` normaliza también lo que manda la web y el gestor sugiere el catálogo canónico
+  en el formulario de historia/evento. Sirve para que la sección no se parta en dos por una errata.
 - **Destacados y orden editorial (22/11):** `featured=1`/`featured=0` filtra por la bandera y `featured` entra en la clave de caché (`_webKeyParams`). `sort=orden` ordena por el orden manual del gestor y **no** antepone los urgentes (con `-publishedAt` se mantiene D2). El payload expone `orden` y `config-publica` devuelve `contact.phone` desde `CONFIG.CONTACTO_TELEFONO`; sin esa propiedad sale `""`, como antes.
 
 ### 5.2 Detalle de publicación — implementado
