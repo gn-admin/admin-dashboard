@@ -222,7 +222,7 @@ function paginaEstatica(pub, base) {
   const meta = Publico.metaDe(conCanonical);
   const ld = Publico.jsonLd(conCanonical);
   // Los enlaces internos vuelven al visor conservando la sección (`#/eventos`).
-  const cuerpo = Publico.htmlDetalle(conCanonical).replace(/href="#(\/[^"]*)"/g, 'href="../publico.html$1"');
+  const cuerpo = Publico.htmlDetalle(conCanonical).replace(/href="#(\/[^"]*)"/g, 'href="../publico.html#$1"');
   const imagen = Publico.urlSegura(meta.image);
   let imagenAbs = '';
   if (imagen) {

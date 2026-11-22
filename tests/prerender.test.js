@@ -82,6 +82,9 @@ test('paginaEstatica solo carga el runtime de vídeo y no enlaces de hash', () =
   assert.equal(/<script>(?![^]*application\/ld\+json)/.test(html), false);
   assert.equal(/href="#\//.test(html), false);
   assert.match(html, /href="\.\.\/publico\.html"/);
+  // La vuelta conserva la sección: `#/animales`, no un `../publico.html/animales`.
+  assert.match(html, /href="\.\.\/publico\.html#\/animales"/);
+  assert.equal(/href="\.\.\/publico\.html\//.test(html), false);
 });
 
 test('sitemapXml escapa URLs y añade lastmod', () => {
