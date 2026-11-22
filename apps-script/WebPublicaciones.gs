@@ -1077,6 +1077,9 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     gallery: gallery,
     videos: videos,
     featured: !!p.featured,
+    // Orden editorial (C1). Viaja al payload porque es lo que permite ordenar
+    // el carrusel de la home como lo dejó quien edita (`sort=orden`).
+    orden: Number(p.orden) || 0,
     listed: p.listed !== false,
     url: ruta,
     canonical: canonical,
@@ -2410,6 +2413,7 @@ function webListarPublicas(params) {
     type: webTexto(params.type),
     category: webTexto(params.category),
     status: webTexto(params.status),
+    featured: webTexto(params.featured),
     species: webTexto(params.species).toLowerCase(),
     q: webTexto(params.q)
   };
@@ -2417,6 +2421,8 @@ function webListarPublicas(params) {
     if (f.type && p.type !== f.type) return false;
     if (f.category && p.category !== f.category) return false;
     if (f.status && p.status !== f.status) return false;
+    // `featured=1` / `featured=0`; sin parámetro no filtra (compatibilidad).
+    if (f.featured !== '' && !!p.featured !== webBool(f.featured, true)) return false;
     if (f.species && String((p.animal && p.animal.species) || '').toLowerCase() !== f.species) return false;
     if (f.q) {
       var heno = (p.title + ' ' + p.excerpt + ' ' + p.contentHtml + ' ' + (p.tags || []).join(' ')).toLowerCase();
@@ -2428,11 +2434,21 @@ function webListarPublicas(params) {
   var orden = webTexto(params.sort) || '-publishedAt';
   var campo = orden.charAt(0) === '-' ? orden.slice(1) : orden;
   var desc = orden.charAt(0) === '-';
+  // El orden editorial manda: si se pide `sort=orden`, los urgentes no se
+  // adelantan o el carrusel de la home no respeta lo que dejó quien edita.
+  var urgentesPrimero = campo !== 'orden';
   data.sort(function (a, b) {
-    // Los urgentes van primero (D2); después se aplica el criterio pedido.
-    var ua = a.urgent ? 1 : 0;
-    var ub = b.urgent ? 1 : 0;
-    if (ua !== ub) return ub - ua;
+    if (urgentesPrimero) {
+      // Los urgentes van primero (D2); después se aplica el criterio pedido.
+      var ua = a.urgent ? 1 : 0;
+      var ub = b.urgent ? 1 : 0;
+      if (ua !== ub) return ub - ua;
+    }
+    if (campo === 'orden') {
+      var oa = Number(a.orden) || 0;
+      var ob = Number(b.orden) || 0;
+      return desc ? ob - oa : oa - ob;
+    }
     var va = campo === 'title' ? a.title : (campo === 'updatedAt' ? a.updatedAt : a.publishedAt);
     var vb = campo === 'title' ? b.title : (campo === 'updatedAt' ? b.updatedAt : b.publishedAt);
     var r = String(va || '').localeCompare(String(vb || ''));
@@ -2625,7 +2641,12 @@ function webConfigPublica() {
     status: 'success',
     data: {
       site: { name: 'Grupo Nebak', url: base },
-      contact: { email: webTexto(typeof CONFIG !== 'undefined' ? CONFIG.CONTACT_EMAIL : ''), phone: '' },
+      // El teléfono va aquí como un dato más del payload público: la web no
+      // necesita otra llamada (ni hay endpoint de contacto).
+      contact: {
+        email: webTexto(typeof CONFIG !== 'undefined' ? CONFIG.CONTACT_EMAIL : ''),
+        phone: webTexto(typeof CONFIG !== 'undefined' ? CONFIG.CONTACTO_TELEFONO : '')
+      },
       seo: {
         defaultTitle: 'Grupo Nebak · Protección animal',
         defaultDescription: 'Adopciones, acogidas e historias de la protectora Grupo Nebak.',

@@ -1749,3 +1749,83 @@ describe('exclusividad 1:1 · grupo publicado frente a ficha individual (H-1)', 
     assert.equal(r.redirect.motivo, undefined);
   });
 });
+
+// R4 del documento de requisitos del canal público: destacados, orden editorial
+// y teléfono en `config-publica`. Todo aditivo: sin los parámetros, igual que antes.
+describe('canal público: destacados, orden editorial y contacto', () => {
+  const CODE_GS = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+
+  function cargarCodeGs() {
+    const ctx = {};
+    vm.createContext(ctx);
+    vm.runInContext(CODE_GS, ctx, { filename: 'Code.gs' });
+    return ctx;
+  }
+
+  let b;
+  beforeEach(() => {
+    b = crearBackend();
+    b.estado.animales.push(
+      animal({ id: 'ani_1', urgente: 'TRUE', estado: 'disponible' }),
+      animal({ id: 'ani_2', nombre: 'Milo', especie: 'gato', estado: 'en_acogida' })
+    );
+    b.estado.publicaciones.push(
+      fila({ id: 'web_1', publicado_en: '2026-11-01T10:00:00.000Z', featured: 'false', orden: 2 }),
+      fila({ id: 'web_2', origen_id: 'ani_2', slug: 'milo', titulo: 'Milo', especie: 'gato', categoria: 'Gatos en adopción', publicado_en: '2026-11-05T10:00:00.000Z', featured: 'true', orden: 1 }),
+      fila({ id: 'web_3', tipo: 'evento', origen_id: '', slug: 'jornada', titulo: 'Jornada', categoria: 'Eventos', estado_publico: 'programado', animal_json: '', evento_json: '{"startDate":"2026-12-01"}', publicado_en: '2026-11-03T10:00:00.000Z', featured: 'true', orden: 0 })
+    );
+  });
+
+  it('featured=1 devuelve solo las destacadas y featured=0 el resto', () => {
+    assert.equal(b.ctx.webListarPublicas({ pageSize: 50 }).pagination.total, 3);
+
+    const si = b.ctx.webListarPublicas({ pageSize: 50, featured: '1' });
+    assert.deepEqual(plano(si.data.map(p => p.slug)).sort(), ['jornada', 'milo']);
+    assert.equal(si.pagination.total, 2);
+    assert.equal(si.applied.featured, '1');
+
+    const no = b.ctx.webListarPublicas({ pageSize: 50, featured: '0' });
+    assert.deepEqual(plano(no.data.map(p => p.slug)), ['luna']);
+    assert.equal(no.pagination.total, 1);
+  });
+
+  it('sin featured no filtra nada y el payload no cambia', () => {
+    const r = b.ctx.webListarPublicas({ pageSize: 50 });
+    assert.deepEqual(plano(r.data.map(p => p.slug)).sort(), ['jornada', 'luna', 'milo']);
+    assert.equal(r.pagination.total, 3);
+    assert.equal(r.applied.featured, '');
+  });
+
+  it('sort=orden respeta el orden editorial aunque haya un urgente', () => {
+    const asc = b.ctx.webListarPublicas({ pageSize: 50, sort: 'orden' });
+    assert.deepEqual(plano(asc.data.map(p => p.slug)), ['jornada', 'milo', 'luna']);
+    assert.deepEqual(plano(asc.data.map(p => p.orden)), [0, 1, 2]);
+
+    const desc = b.ctx.webListarPublicas({ pageSize: 50, sort: '-orden' });
+    assert.deepEqual(plano(desc.data.map(p => p.slug)), ['luna', 'milo', 'jornada']);
+  });
+
+  it('el orden por defecto sigue poniendo los urgentes primero', () => {
+    const r = b.ctx.webListarPublicas({ pageSize: 50 });
+    assert.equal(r.data[0].slug, 'luna');
+    assert.equal(r.data[0].urgent, true);
+    assert.deepEqual(plano(r.data.map(p => p.slug)), ['luna', 'milo', 'jornada']);
+  });
+
+  it('la clave de caché distingue featured', () => {
+    const ctx = cargarCodeGs();
+    assert.equal(ctx._webKeyParams({ page: '1' }).indexOf('featured'), -1);
+    assert.equal(ctx._webKeyParams({ featured: '1' }), 'featured=1');
+    assert.notEqual(ctx._webKeyParams({ featured: '1' }), ctx._webKeyParams({ featured: '0' }));
+  });
+
+  it('config-publica lleva el teléfono de la asociación como un dato más', () => {
+    assert.equal(b.ctx.webConfigPublica().data.contact.phone, '');
+    b.ctx.CONFIG.CONTACTO_TELEFONO = '625140588 y 600042594';
+    try {
+      assert.equal(b.ctx.webConfigPublica().data.contact.phone, '625140588 y 600042594');
+    } finally {
+      delete b.ctx.CONFIG.CONTACTO_TELEFONO;
+    }
+  });
+});

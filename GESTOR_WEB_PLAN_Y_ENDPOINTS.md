@@ -86,7 +86,7 @@ Endpoints/servicio para que el proyecto web obtenga el contenido publicado y ren
 | `historias.html` | Posts filtrados (excluye adopción/acogida/SC según lógica) | Listado por `type/category/status/listed` | [x] `type`, `category`, `status`, `q`, `page`, `sort` |
 | `post.html` (`blog-render.js`) | Detalle por `?slug` (ficha/historia, `publication.icons/gallery/videos`, CTA contextual) | Detalle completo: `contentHtml`, media, `animal`/`event`, `seo`, `cta` | [x] `endpoint=publicacion&slug=` |
 | Listados adopción (`main.js`, `[data-adoption-list]`) | Filtrado por categoría (Gatos/Perros en adopción) | `type=animal` + `category/status/species` | [x] filtros en el canal público |
-| Secciones a dinamizar | `acogidas.html`, `casos-externos.html`, `adoptados.html`, destacados home | Consultas filtradas al canal público | [x] disponibles (`category`, `featured` en payload) |
+| Secciones a dinamizar | `acogidas.html`, `casos-externos.html`, `adoptados.html`, destacados home | Consultas filtradas al canal público | [x] disponibles (`category`; desde 22/11 `featured` filtrable y `sort=orden` para el carrusel) |
 | Búsqueda/chat | Búsqueda sobre posts cargados | Parámetro `q` o dataset cacheado | [x] `q` sobre título/extracto/contenido/tags |
 | Formularios (alcance opcional) | Envío simulado | `POST /v1/forms/submit` (canal separado del feed) | [ ] fuera de alcance (§5.5) |
 
@@ -175,7 +175,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 
 ### 5.1 Listado de publicaciones — implementado
 - **`GET /api/publicaciones`** → en Apps Script: `?endpoint=publicaciones` (o `api/publicaciones`, `v1/publicaciones`).
-  - **Query:** `type` (`animal|evento|historia`), `category`, `status`, `species` (`gato|perro|otros`), `q`, `page`, `pageSize` (máx. 50), `sort` (`-publishedAt` | `publishedAt` | `title` | `updatedAt`), `fields=card`, `nocache=1`, `callback`.
+  - **Query:** `type` (`animal|evento|historia`), `category`, `status`, `featured` (`1|0`, sin parámetro no filtra), `species` (`gato|perro|otros`), `q`, `page`, `pageSize` (máx. 50), `sort` (`-publishedAt` | `publishedAt` | `title` | `updatedAt` | `orden` | `-orden`), `fields=card`, `nocache=1`, `callback`.
   - **Respuesta:**
 ```json
 {
@@ -183,12 +183,13 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
   "endpoint": "GET /api/publicaciones",
   "generatedAt": "ISO-8601",
   "filters": { "type": [], "category": [], "status": [], "species": [], "q": "string" },
-  "applied": { "type": "", "category": "", "status": "", "species": "", "q": "" },
+  "applied": { "type": "", "category": "", "status": "", "featured": "", "species": "", "q": "" },
   "pagination": { "page": 1, "pageSize": 12, "total": 0, "totalPages": 0 },
   "data": [ /* Publicacion[] */ ]
 }
 ```
 - **Reglas:** [x] solo contenido en estado publicable; [x] paginación acotada; [x] proyección ligera (`fields=card`); [x] `filters` devuelve los valores disponibles para construir la UI; [x] **una ficha por animal**: si el grupo está publicado, el feed sirve la del grupo (`animal_grupo`) y descarta la individual del miembro, aunque la hoja tenga las dos (`webPublicables`).
+- **Destacados y orden editorial (22/11):** `featured=1`/`featured=0` filtra por la bandera y `featured` entra en la clave de caché (`_webKeyParams`). `sort=orden` ordena por el orden manual del gestor y **no** antepone los urgentes (con `-publishedAt` se mantiene D2). El payload expone `orden` y `config-publica` devuelve `contact.phone` desde `CONFIG.CONTACTO_TELEFONO`; sin esa propiedad sale `""`, como antes.
 
 ### 5.2 Detalle de publicación — implementado
 - [x] **`GET /api/publicaciones/:slug`** → `?endpoint=publicaciones/{slug}` o `?endpoint=publicacion&slug=...`: publicación completa (`icons`, `gallery`, `videos[]/video`, `contentHtml`, `animal`/`event`, `seo`).
