@@ -692,6 +692,9 @@ const Publico = {
    */
   htmlDetalle(p) {
     p = p || {};
+    // La vuelta lleva a la sección de la ficha, no siempre a Animales.
+    const seccionPub = SECCIONES.filter((s) => s.tipo === p.type)[0] || SECCION_POR_DEFECTO;
+    const enlaceLista = '#/' + seccionPub.slug;
     const cfg = this._normalizarFichaCfg(p.ficha);
     const b = (cfg && cfg.bloques) || { datos: true, etiquetas: true, contenido: true, galeria: true, videos: true, fichaAnimal: true, cta: true };
     const mostrarLectura = cfg ? cfg.mostrarLectura : true;
@@ -751,7 +754,7 @@ const Publico = {
       ? `<button type="button" class="pub-btn pub-btn--ghost" data-compartir data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}">Compartir</button><span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"></span>`
       : '';
     const acciones = (cta || compartir)
-      ? `<div class="pub-acciones">${cta}${compartir}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
+      ? `<div class="pub-acciones">${cta}${compartir}<a class="pub-btn pub-btn--ghost" href="${enlaceLista}">Ver todas las publicaciones</a></div>`
       : '';
     const metaLinea = [
       urgente,
@@ -784,11 +787,11 @@ const Publico = {
     if (p.event && !eventoPintado) cuerpo.push(this._bloqueEvento(p.event));
 
     const ctaFinal = cta
-      ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="#/">Ver todas las publicaciones</a></div>`
+      ? `<div class="pub-cta pub-cta--final">${cta}<a class="pub-btn pub-btn--ghost" href="${enlaceLista}">Ver todas las publicaciones</a></div>`
       : '';
 
     return `
-      <a class="pub-back" href="#/">← Todas las publicaciones</a>
+      <a class="pub-back" href="${enlaceLista}">← Todas las publicaciones</a>
       <article class="pub-detalle pub-detalle--${this.esc(plantilla)}">
         <header class="pub-ficha-hero">
           <div class="pub-ficha-copy">

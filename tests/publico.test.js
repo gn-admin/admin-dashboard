@@ -564,3 +564,21 @@ describe('Publico: secciones con pestañas (una página por tipo)', () => {
     assert.equal(params('historia').type, 'historia');
   });
 });
+
+describe('Publico: la vuelta desde una ficha respeta su sección', () => {
+  it('un evento vuelve a Eventos y un animal a Animales', () => {
+    const evento = Publico.htmlDetalle({ slug: 'jornada', type: 'evento', title: 'Jornada', event: { startDate: '2027-03-21', pasado: false } });
+    assert.match(evento, /class="pub-back" href="#\/eventos"/);
+    assert.doesNotMatch(evento, /href="#\/"/);
+    const conCta = Publico.htmlDetalle({ slug: 'jornada', type: 'evento', title: 'Jornada', cta: { label: 'Inscribirme', url: 'https://x/i' }, event: { startDate: '2027-03-21' } });
+    assert.ok((conCta.match(/href="#\/eventos"/g) || []).length >= 3);
+    assert.doesNotMatch(conCta, /href="#\/"/);
+    const animal = Publico.htmlDetalle({ slug: 'luna', type: 'animal', title: 'Luna', animal: { species: 'perro' } });
+    assert.match(animal, /class="pub-back" href="#\/animales"/);
+  });
+
+  it('un tipo desconocido cae en la portada (Animales)', () => {
+    const html = Publico.htmlDetalle({ slug: 'x', title: 'X' });
+    assert.match(html, /class="pub-back" href="#\/animales"/);
+  });
+});
