@@ -272,6 +272,39 @@ function webAhora() {
   try { return new Date().toISOString(); } catch (e) { return ''; }
 }
 
+/** Día (UTC, `YYYY-MM-DD`) de una fecha; '' si no se puede leer. */
+function webDiaIso(valor) {
+  var s = webTexto(valor);
+  if (!s) return '';
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  try { return d.toISOString().slice(0, 10); } catch (e) { return ''; }
+}
+
+/** Día del filtro `desde`: acepta `hoy`/`today` o una fecha; '' si no es válida. */
+function webDiaDesde(valor) {
+  var v = webTexto(valor).toLowerCase();
+  if (!v) return '';
+  if (v === 'hoy' || v === 'today') return webDiaIso(webAhora());
+  return webDiaIso(v);
+}
+
+/** Último día de un evento: manda `endDate`; sin fechas, ''. */
+function webEventoDiaFin(publicacion) {
+  var ev = (publicacion && publicacion.event) || {};
+  return webDiaIso(ev.endDate || ev.startDate);
+}
+
+/**
+ * `event.pasado`: el evento ya terminó (su último día es anterior a hoy, UTC).
+ * Un evento sin fechas nunca se marca como pasado: no se puede saber.
+ */
+function webEventoPasado(publicacion, hoyDia) {
+  var fin = webEventoDiaFin(publicacion);
+  var hoy = hoyDia || webDiaIso(webAhora());
+  return !!(fin && hoy && fin < hoy);
+}
+
 // ==================== SANEADO DE HTML (C3) ====================
 // El gestor admite HTML en `contenido_html`. Se sanea con lista blanca al
 // construir el payload público (detalle, listados y prerender): lo guardado no
@@ -1192,7 +1225,12 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     out.group = webBloqueGrupo(p.animal || {}, gInfo, miembros);
     out.animal = out.group; // compatibilidad de consumidores que leen bloque animal
   }
-  if (p.tipo === 'evento') out.event = webBloqueEvento(p.evento || {});
+  if (p.tipo === 'evento') {
+    out.event = webBloqueEvento(p.evento || {});
+    // Derivado del bloque ya normalizado (no de la fila), con la misma regla que
+    // el filtro `desde`: `endDate` manda sobre `startDate`.
+    out.event.pasado = webEventoPasado(out);
+  }
   if (incluirFicha && p.ficha && typeof p.ficha === 'object') out.ficha = webFichaSegura(p.ficha);
   return out;
 
@@ -2625,7 +2663,8 @@ function webListarPublicas(params) {
     featured: webTexto(params.featured),
     sponsor: webTexto(params.sponsor),
     species: webTexto(params.species).toLowerCase(),
-    q: webTexto(params.q)
+    q: webTexto(params.q),
+    desde: webDiaDesde(params.desde)
   };
   var data = todas.filter(function (p) {
     if (f.type && p.type !== f.type) return false;
@@ -2635,6 +2674,12 @@ function webListarPublicas(params) {
     if (f.featured !== '' && !!p.featured !== webBool(f.featured, true)) return false;
     // `sponsor=1` / `sponsor=0` (R3); sin parámetro no filtra (compatibilidad).
     if (f.sponsor !== '' && !!(p.sponsor && p.sponsor.available) !== webBool(f.sponsor, true)) return false;
+    // `desde=YYYY-MM-DD|hoy` (agenda de eventos): queda lo que no ha terminado.
+    // Sin fecha no se puede decir «a partir de»: esos registros se quedan fuera.
+    if (f.desde) {
+      var finEvento = webEventoDiaFin(p);
+      if (!finEvento || finEvento < f.desde) return false;
+    }
     if (f.species && String((p.animal && p.animal.species) || '').toLowerCase() !== f.species) return false;
     if (f.q) {
       var heno = (p.title + ' ' + p.excerpt + ' ' + p.contentHtml + ' ' + (p.tags || []).join(' ')).toLowerCase();
@@ -2648,7 +2693,9 @@ function webListarPublicas(params) {
   var desc = orden.charAt(0) === '-';
   // El orden editorial manda: si se pide `sort=orden`, los urgentes no se
   // adelantan o el carrusel de la home no respeta lo que dejó quien edita.
-  var urgentesPrimero = campo !== 'orden';
+  // El orden editorial y la agenda mandan sobre la urgencia: con `sort=startDate`
+  // un urgente sin fecha no puede adelantar al próximo evento.
+  var urgentesPrimero = campo !== 'orden' && campo !== 'startDate';
   data.sort(function (a, b) {
     if (urgentesPrimero) {
       // Los urgentes van primero (D2); después se aplica el criterio pedido.
@@ -2660,6 +2707,16 @@ function webListarPublicas(params) {
       var oa = Number(a.orden) || 0;
       var ob = Number(b.orden) || 0;
       return desc ? ob - oa : oa - ob;
+    }
+    if (campo === 'startDate') {
+      var da = webEventoDiaFin(a);
+      var db = webEventoDiaFin(b);
+      // Sin fecha no hay sitio en la agenda: al final, se ordene como se ordene.
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      var rd = da < db ? -1 : (da > db ? 1 : 0);
+      return desc ? -rd : rd;
     }
     var va = campo === 'title' ? a.title : (campo === 'updatedAt' ? a.updatedAt : a.publishedAt);
     var vb = campo === 'title' ? b.title : (campo === 'updatedAt' ? b.updatedAt : b.publishedAt);

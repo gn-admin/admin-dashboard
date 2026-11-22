@@ -2162,5 +2162,91 @@ describe('canal público: instantánea única del feed', () => {
     ['updateSheetRow', 'appendToSheet', 'deleteSheetRow'].forEach((fn) => {
       assert.match(helpers, new RegExp(fn + '\\s*\\('));
     });
+    // Y el router tampoco puede escribir la hoja web por su cuenta: si un endpoint
+    // nuevo lo necesita, tiene que pasar por los helpers de arriba. `Code.gs` no
+    // nombra la hoja ni su config, así que cualquier intento cae aquí.
+    const router = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+    assert.doesNotMatch(router, /webPublicaciones|webSheetConfig/,
+      'el router no escribe la hoja web: usa webGuardarFilaPublicacion/webBorrarFilaPublicacion');
+  });
+});
+
+// Agenda de eventos: `sort=startDate` ordena por el día del evento, `desde`
+// recorta lo que ya terminó y `event.pasado` lo dice en el payload.
+describe('canal público: agenda de eventos', () => {
+  const CODE_GS = fs.readFileSync(path.join(__dirname, '..', 'apps-script', 'Code.gs'), 'utf8');
+  const dia = (offset) => new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const HOY = dia(0);
+  const AYER = dia(-1);
+  const MANANA = dia(1);
+  const LEJOS = dia(30);
+
+  function conEventos() {
+    const b = crearBackend();
+    const alta = (slug, evento) => b.estado.publicaciones.push(fila({
+      id: 'web_' + slug, tipo: 'evento', origen_id: '', slug: slug, titulo: slug,
+      categoria: 'Eventos', estado_publico: 'programado', animal_json: '',
+      evento_json: JSON.stringify(evento)
+    }));
+    alta('pasado', { startDate: AYER });
+    alta('en-curso', { startDate: AYER, endDate: MANANA });
+    alta('futuro', { startDate: LEJOS });
+    return b;
+  }
+
+  const porSlug = (b, slug) => b.ctx.webListarPublicas({ pageSize: 50 }).data.find(p => p.slug === slug);
+
+  it('event.pasado distingue terminado, en curso y futuro', () => {
+    const b = conEventos();
+    assert.equal(porSlug(b, 'pasado').event.pasado, true);
+    assert.equal(porSlug(b, 'en-curso').event.pasado, false, 'con endDate por delante sigue vivo');
+    assert.equal(porSlug(b, 'futuro').event.pasado, false);
+  });
+
+  it('un evento sin fechas no se marca como pasado', () => {
+    const b = crearBackend();
+    b.estado.publicaciones.push(fila({
+      id: 'web_sf', tipo: 'evento', origen_id: '', slug: 'sin-fecha',
+      categoria: 'Eventos', animal_json: '', evento_json: '{}'
+    }));
+    assert.equal(b.ctx.webListarPublicas({}).data[0].event.pasado, false);
+  });
+
+  it('desde=hoy deja fuera lo terminado y lo que no tiene fecha', () => {
+    const b = conEventos();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    assert.equal(b.ctx.webListarPublicas({ pageSize: 50 }).pagination.total, 4);
+    const r = b.ctx.webListarPublicas({ pageSize: 50, desde: 'hoy' });
+    assert.deepEqual(plano(r.data.map(p => p.slug)).sort(), ['en-curso', 'futuro']);
+    assert.equal(r.applied.desde, HOY);
+  });
+
+  it('desde acepta una fecha y un valor inválido no filtra', () => {
+    const b = conEventos();
+    assert.deepEqual(plano(b.ctx.webListarPublicas({ desde: LEJOS }).data.map(p => p.slug)), ['futuro']);
+    const r = b.ctx.webListarPublicas({ desde: 'mañana' });
+    assert.equal(r.pagination.total, 3);
+    assert.equal(r.applied.desde, '');
+  });
+
+  it('sort=startDate ordena por día y deja al final lo que no tiene fecha', () => {
+    const b = conEventos();
+    b.estado.animales.push(animal({ urgente: true }));
+    b.estado.publicaciones.push(fila());
+    // Por defecto el urgente sigue primero: lo que ya existía no cambia.
+    assert.equal(b.ctx.webListarPublicas({ pageSize: 50 }).data[0].slug, 'luna');
+    const asc = b.ctx.webListarPublicas({ pageSize: 50, sort: 'startDate' });
+    assert.deepEqual(plano(asc.data.map(p => p.slug)), ['pasado', 'en-curso', 'futuro', 'luna']);
+    const desc = b.ctx.webListarPublicas({ pageSize: 50, sort: '-startDate' });
+    assert.deepEqual(plano(desc.data.map(p => p.slug)), ['futuro', 'en-curso', 'pasado', 'luna']);
+  });
+
+  it('la clave de caché distingue desde', () => {
+    const ctx = {};
+    vm.createContext(ctx);
+    vm.runInContext(CODE_GS, ctx, { filename: 'Code.gs' });
+    assert.equal(ctx._webKeyParams({ desde: HOY }), 'desde=' + HOY);
+    assert.notEqual(ctx._webKeyParams({ desde: HOY }), ctx._webKeyParams({}));
   });
 });

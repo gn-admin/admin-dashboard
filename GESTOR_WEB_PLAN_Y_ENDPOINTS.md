@@ -209,6 +209,13 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
   restaurar se ven en la siguiente petición. `nocache=1` salta la instantánea, recompone fresca y la
   reescribe (es la vía de la comprobación de aceptación); un cambio hecho a mano en la hoja puede
   tardar hasta la ventana. Sin caché disponible el canal responde igual (fail-open).
+- **Agenda de eventos (22/11):** `sort=startDate` ordena por el día del evento (`endDate` si lo hay)
+  y, como `sort=orden`, deja de anteponer los urgentes; lo que no tiene fecha va al final en
+  cualquier sentido. `desde=YYYY-MM-DD|hoy` deja solo lo que no ha terminado (`endDate` o
+  `startDate` ≥ ese día) y es un criterio **de eventos**: lo que no tiene fecha no entra, y un valor
+  que no es una fecha no filtra. El payload gana `event.pasado`, derivado de esas mismas fechas con
+  granularidad de día (UTC): `true` solo si el último día del evento ya pasó, así que un evento de
+  hoy no sale como pasado y uno sin fechas nunca se marca. `desde` entra en `_webKeyParams`.
 - **Categoría canónica «Caso externo» (22/11):** el backend guarda y publica siempre `Caso externo`
   (`webCategoriaCanonica`), aunque llegue como `caso externo`, `Caso Externo` o `caso-externo`; el
   filtro `category` normaliza también lo que manda la web y el gestor sugiere el catálogo canónico
