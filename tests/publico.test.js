@@ -650,6 +650,38 @@ describe('Publico: compartir en redes y «Me gusta»', () => {
     assert.match(html, /data-favorito data-ficha="[^"]*" aria-pressed="true">Quitar de Me gusta<\/button><\/div>$/);
     assert.doesNotMatch(Publico._card({ slug: 'laia', type: 'animal', title: 'Laia' }), /pub-fav/);
   });
+
+  it('«Me gusta» no pinta la toolbar de filtros (y el resto de secciones sí)', () => {
+    const render = (tipo) => {
+      const cont = { innerHTML: '' };
+      const vista = Object.assign(Object.create(Publico), {
+        params: { type: tipo, q: '', category: '', species: '', desde: '', sort: '', page: 1, pageSize: 12 },
+        items: [],
+        filtros: { category: [], species: [] },
+        paginacion: { page: 1, totalPages: 1, total: 0 },
+        _contenedor: () => cont,
+        aplicarSeo: () => {}
+      });
+      Publico.renderLista.call(vista);
+      return cont.innerHTML;
+    };
+
+    const favoritos = render('favorito');
+    assert.match(favoritos, /<h1 class="pub-titulo">Me gusta<\/h1>/);
+    assert.doesNotMatch(favoritos, /pub-toolbar/);
+    assert.doesNotMatch(favoritos, /data-pub-search/);
+    assert.doesNotMatch(favoritos, /display:none/);
+
+    const animales = render('animal');
+    assert.match(animales, /class="pub-toolbar" data-pub-search/);
+  });
+
+  it('publico-compartir.js no conserva el manejador de [data-compartir]', () => {
+    const fuente = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'publico-compartir.js'), 'utf8');
+    assert.doesNotMatch(fuente, /data-compartir/);
+    assert.match(fuente, /data-share-toggle/);
+    assert.match(fuente, /data-copiar/);
+  });
 });
 
 describe('PublicoFavoritos: guardado en localStorage', () => {
