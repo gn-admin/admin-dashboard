@@ -90,7 +90,7 @@ describe('_buildContracto: 20 estipulaciones y datos del contrato', () => {
     assert.match(html, /Atigrada/);
     assert.match(html, /Gris/);
     assert.match(html, /Mediano/);
-    assert.match(html, /Datos de adopción/);
+    assert.match(html, /datos de adopción/);
     assert.doesNotMatch(html, /Peso/);
   });
 
@@ -132,6 +132,7 @@ describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
     assert.match(html, /Calle Menor 2/);
     assert.match(html, /data:image\/png;base64,TUTOR/);
     // Sello real de la asociación en lugar del sello generado con CSS.
+    assert.match(html, /\.animal-photo\{width:110px;height:110px;object-fit:cover/);
     assert.match(html, /sello--img/);
     assert.match(html, /assets\/contratos\/sello-nebak\.jpg/);
     assert.doesNotMatch(html, /SELLO DE LA ENTIDAD/);

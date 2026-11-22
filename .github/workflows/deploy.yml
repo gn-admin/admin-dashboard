@@ -48,6 +48,11 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID || vars.FIREBASE_APP_ID }}
           CONTACTO_TELEFONO: ${{ secrets.CONTACTO_TELEFONO || vars.CONTACTO_TELEFONO }}
           CONTACTO_EMAIL: ${{ secrets.CONTACTO_EMAIL || vars.CONTACTO_EMAIL }}
+          # Datos de la entidad que firman el contrato: sin ellos el párrafo de
+          # la asociación sale sin CIF ni domicilio.
+          ASOCIACION_NOMBRE: ${{ secrets.ASOCIACION_NOMBRE || vars.ASOCIACION_NOMBRE }}
+          ASOCIACION_CIF: ${{ secrets.ASOCIACION_CIF || vars.ASOCIACION_CIF }}
+          ASOCIACION_DOMICILIO: ${{ secrets.ASOCIACION_DOMICILIO || vars.ASOCIACION_DOMICILIO }}
         run: node scripts/gen-config.js
 
       # Un test en rojo (logica, contraste o integridad) bloquea el despliegue.

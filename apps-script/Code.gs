@@ -94,7 +94,7 @@ function _canWriteEndpoint(endpoint, user) {
   if (String(endpoint).indexOf('web-') === 0) return role === 'coordinador';
 
   // Escrituras sensibles solo admin
-  var adminOnly = { 'delete-socio':1, 'delete-blacklist':1, 'blacklist':1, 'update-blacklist':1, 'send-contrato-email':1 };
+  var adminOnly = { 'delete-socio':1, 'delete-blacklist':1, 'blacklist':1, 'update-blacklist':1, 'send-contrato-email':1, 'contrato-pdf-preview':1 };
   if (adminOnly[endpoint]) return false;
 
   if (role === 'coordinador') {
@@ -170,26 +170,6 @@ function handleGet(endpoint, user, e) {
       // despliegue y modo de pruebas activo.
       if (!_isAdmin(user)) return _deny('Solo administración puede comprobar el correo');
       return jsonResponse({ data: _estadoCorreoServidor_() });
-    case 'contrato-pdf-preview': {
-      // Solo administración: genera el PDF sin enviarlo, para revisar su texto.
-      if (!_isAdmin(user)) return _deny('Solo administración puede generar el PDF');
-      var idCtr = e && e.parameter ? e.parameter.id : '';
-      if (!idCtr) return jsonResponse({ error: 'Falta id' }, 400);
-      var filasCtr = readSheet(CONFIG.sheets.contratos);
-      var ctr = null;
-      for (var ic = 0; ic < filasCtr.length; ic++) {
-        if (String(filasCtr[ic].id) === String(idCtr)) { ctr = filasCtr[ic]; break; }
-      }
-      if (!ctr) return jsonResponse({ error: 'Contrato no encontrado' }, 404);
-      var pdfPreview = generarPdfContrato(ctr);
-      if (!pdfPreview) return jsonResponse({ error: 'No se pudo generar el PDF' }, 500);
-      var bytesPreview = pdfPreview.getBytes();
-      return jsonResponse({ data: {
-        pdf_base64: Utilities.base64Encode(bytesPreview),
-        pdf_bytes: bytesPreview.length,
-        nombre: pdfPreview.getName()
-      } });
-    }
     case 'surveys':
       return jsonResponse({ data: getAvailableSurveys(user) });
     case 'responses':
@@ -378,6 +358,17 @@ function handlePost(endpoint, user, e) {
       var _r = jsonResponse({ success: deleteContratoCascade(body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'send-contrato-email': {
       var _r = jsonResponse(sendContratoEmail(body, user)); _audit(endpoint,user,body,_r); return _r; }
+    case 'contrato-pdf-preview': {
+      if (!_isAdmin(user)) return _deny('Solo administración puede generar el PDF');
+      var pdfPreview = generarPdfModelo(body && body.contrato_modelo);
+      if (!pdfPreview) return jsonResponse({ status: 'error', error: 'No se pudo generar el PDF' }, 500);
+      var bytesPreview = pdfPreview.getBytes();
+      return jsonResponse({ data: {
+        pdf_base64: Utilities.base64Encode(bytesPreview),
+        pdf_bytes: bytesPreview.length,
+        nombre: pdfPreview.getName()
+      } });
+    }
     case 'delete-gasto': {
       var _r = jsonResponse({ success: deleteSheetRow(CONFIG.sheets.gastos, body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-recordatorio': {
@@ -958,6 +949,17 @@ function sendContratoEmail(body, user) {
   }
   if (!c) return { status: 'error', error: 'Contrato no encontrado' };
 
+  // El acuerdo de acogida no viaja por correo: este endpoint solo conoce el
+  // contrato de adopcion (modelo de bloques y plantilla). Sin este corte, una
+  // fila de acogida saldria con el correo y los terminos de adopcion y sin su
+  // documento, que se queda en «Descargar PDF» del caso de acogida.
+  if (String(c.tipo || '').toLowerCase() === 'acogida' || c.acogida_id) {
+    return {
+      status: 'error',
+      error: 'El contrato de acogida no se envia por correo. Descarga su PDF desde el caso de acogida (Acogida > Contrato > Descargar PDF).'
+    };
+  }
+
   var permitidos = [];
   var addPerm = function (e) {
     var v = _emailLimpio(e);
@@ -1011,7 +1013,10 @@ function sendContratoEmail(body, user) {
   var pdfContrato = null;
   var pdfError = '';
   try {
-    if (typeof generarPdfContrato === 'function') pdfContrato = generarPdfContrato(c);
+    var modeloContrato = body && body.contrato_modelo;
+    if (!modeloContrato) pdfError = 'El panel no envió el modelo del contrato';
+    else if (JSON.stringify(modeloContrato).length > 900000) pdfError = 'El modelo del contrato es demasiado grande';
+    else if (typeof generarPdfModelo === 'function') pdfContrato = generarPdfModelo(modeloContrato);
   } catch (errPdf) {
     pdfError = errPdf && errPdf.message ? errPdf.message : String(errPdf);
     Logger.log('Contrato ' + c.id + ': no se pudo generar el PDF (' + pdfError + '); se envía el HTML.');
@@ -1055,215 +1060,17 @@ function sendContratoEmail(body, user) {
   };
 }
 
-// === CONTRATO_TEXTOS_PDF:INICIO ===
-var CONTRATO_TEXTOS_PDF = {
-  "version": "2.1",
-  "fecha": "2026/11/18",
-  "titulo": "Contrato de adopción",
-  "notaEstipulaciones": "Se adjunta hoja de estipulaciones revisada y firmada por el adoptante.",
-  "estipulaciones": [
-    {
-      "n": 1,
-      "parrafos": [
-        "El Adoptante se compromete a adoptar al animal de la Asociación con los datos que se reseñan a continuación, hasta que dicho animal muera."
-      ]
-    },
-    {
-      "n": 2,
-      "parrafos": [
-        "El Adoptante declara adoptar al animal única y exclusivamente como animal de compañía."
-      ]
-    },
-    {
-      "n": 3,
-      "parrafos": [
-        "El animal entregado en adopción no podrá ser utilizado para:"
-      ],
-      "lista": [
-        "Caza de cualquier tipo y circunstancia.",
-        "Experimentación de cualquier tipo.",
-        "La participación en peleas o enfrentamientos con otros animales.",
-        "La cría.",
-        "Guarda de propiedades.",
-        "Estancia en fincas o chalets de fin de semana.",
-        "Circos u otro tipo de espectáculos.",
-        "Participación en películas o series de televisión.",
-        "Perro policía o fines militares."
-      ]
-    },
-    {
-      "n": 4,
-      "parrafos": [
-        "En ningún caso podrá el animal permanecer atado ni encerrado en jaulas, habitaciones, terrazas, patios o garajes."
-      ]
-    },
-    {
-      "n": 5,
-      "parrafos": [
-        "En caso de que el animal tenga la consideración de Perro Potencialmente Peligroso, el Adoptante, que acredita hallarse en posesión de la licencia correspondiente mediante exhibición de la misma, incorporando a este contrato fotocopia de dicha licencia, póliza del contrato de seguro de responsabilidad civil exigido por la normativa vigente, y el justificante de su inscripción en el Registro Municipal competente, se compromete a cumplir todas las medidas de seguridad exigidas por dicha normativa, tales como pasear al animal con bozal y correa no extensible en los sitios públicos."
-      ]
-    },
-    {
-      "n": 6,
-      "parrafos": [
-        "En ningún caso podrá permanecer en lugar donde no pueda resguardarse de la lluvia, del frío o del sol, o sin espacio suficiente para el normal desarrollo de su especie."
-      ]
-    },
-    {
-      "n": 7,
-      "parrafos": [
-        "En ningún caso se podrá someter al animal a cualquier tratamiento indebido y contrario a las disposiciones de la Ley de Protección Animal, su normativa de desarrollo y Código Penal."
-      ]
-    },
-    {
-      "n": 8,
-      "parrafos": [
-        "El Adoptante se compromete por el presente contrato a proporcionar al animal alimentación y bebida suficiente y adecuada, los cuidados de higiene necesarios, la debida asistencia veterinaria, cuidarlo y respetarlo."
-      ]
-    },
-    {
-      "n": 9,
-      "parrafos": [
-        "(Solamente en el caso de que el animal adoptado sea un gato). El Adoptante se compromete por el presente contrato a esterilizarlo en la fecha adecuada. El Adoptante deberá aportar a la Asociación un informe veterinario que acredite haberse realizado dicha esterilización, informe que ha de estar debidamente sellado, firmado, con n.º de colegiado y con identificación del animal."
-      ]
-    },
-    {
-      "n": 10,
-      "parrafos": [
-        "El Adoptante se compromete por el presente contrato a proporcionar al animal compañía, a tenerle consigo, proporcionarle afecto y atenciones, y permitirle hacer el ejercicio necesario (en su caso sacándolo a pasear a la calle todos los días)."
-      ]
-    },
-    {
-      "n": 11,
-      "parrafos": [
-        "Asimismo se compromete a no regalar, vender o ceder por cualquier título, inter vivos o mortis causa, al animal; igualmente se compromete a no abandonar al animal.",
-        "En caso de fallecimiento del Adoptante, se deberá notificar a la Asociación. Si un familiar o pareja quisiera quedarse con el animal, deberá notificarlo a la Asociación y así asumiría de nuevo la adopción del animal con un nuevo contrato de adopción.",
-        "Si las personas señaladas en el párrafo anterior no desean quedarse con el animal, se notificará a la Asociación para que esta le encuentre un nuevo hogar."
-      ]
-    },
-    {
-      "n": 12,
-      "parrafos": [
-        "La desaparición del animal, por robo, pérdida, extravío o por cualquier otra causa, debe ser notificada a la Asociación lo antes posible."
-      ]
-    },
-    {
-      "n": 13,
-      "parrafos": [
-        "El Adoptante se compromete a informar de inmediato a la Asociación si se produjese un cambio de teléfono, domicilio o cualquier otra circunstancia que impidiese o dificultase su localización y posterior seguimiento."
-      ]
-    },
-    {
-      "n": 14,
-      "parrafos": [
-        "Ante cualquier circunstancia que produjese imposibilidad de mantener o tener consigo al animal, imposibilidad de cumplir los términos del presente contrato, o deseo de rescindir el mismo, el Adoptante debe devolver el animal adoptado a la Asociación sin posibilidad de reclamar los gastos que este le haya ocasionado."
-      ]
-    },
-    {
-      "n": 15,
-      "parrafos": [
-        "El Adoptante declara en este acto que asume la obligación de permitir en cualquier momento a la persona designada por la Asociación que revise el estado físico y psíquico del animal, así como el cumplimiento de las condiciones del presente contrato y de la adopción en general. Dicho representante llamará por teléfono o se personará en el domicilio sin previo aviso."
-      ]
-    },
-    {
-      "n": 16,
-      "parrafos": [
-        "El incumplimiento notorio y fehaciente de cualquiera de las obligaciones anteriormente descritas y asumidas por el Adoptante en virtud del presente contrato supondrá la resolución de pleno derecho del mismo. Al darse a dicho incumplimiento el carácter de condición resolutoria expresamente aceptada por las partes, la Asociación queda legitimada para decidir unilateralmente retirar al Adoptante, de inmediato, la custodia del animal, recobrando automáticamente la Asociación la posesión del mismo. Asimismo, la Asociación se reserva el ejercicio de las acciones legales que le asistan en cada caso.",
-        "Cualquier sospecha que tenga la Asociación de incumplimiento por el Adoptante de cualquiera de las obligaciones dimanantes del presente contrato facultará a la primera para decidir unilateralmente requisarlo de modo temporal mientras se comprueba, por el procedimiento previsto para cada caso, el cumplimiento o incumplimiento de las obligaciones asumidas, todo ello sin más trámite que la previa inspección ocular y personación en el domicilio del Adoptante para la retirada inmediata de la posesión del animal.",
-        "Si existiesen indicios de que el animal ha sido víctima de malos tratos o tortura, se procederá a la inmediata interposición de la correspondiente denuncia por parte de la Asociación.",
-        "Si se produjese la defunción del animal, esta debe ser notificada inmediatamente por burofax o cualquier otro medio que garantice fehacientemente la recepción de dicha comunicación a la Asociación en el plazo máximo de 12 horas desde el fallecimiento, decidiendo, en todo caso, la Asociación el destino del cuerpo del animal, así como la eventualidad de practicar autopsia para esclarecer las causas de la muerte. Si existiesen indicios de que ha existido dolo o negligencia por parte del Adoptante en relación con dicha desaparición, se procederá a la inmediata interposición de la correspondiente denuncia por parte de la Asociación, organización que dispone de asesoramiento jurídico por parte de abogados especializados en legislación animal."
-      ]
-    },
-    {
-      "n": 17,
-      "parrafos": [
-        "El Adoptante abona voluntariamente, en concepto de donación, la cantidad de {donacion} €. Esta cantidad va destinada a costear parte de los gastos veterinarios de los animales que recogemos.",
-        "El importe de la cuota de adopción será destinado íntegramente a costear actividades dirigidas a la consecución del objeto social y finalidad de la Asociación."
-      ]
-    },
-    {
-      "n": 18,
-      "parrafos": [
-        "La cantidad que deberá abonar el Adoptante cuando el animal desaparezca o muera mediante dolo o negligencia por parte de dicho Adoptante asciende a {indemnizacion} €. Dicha cantidad será exigible judicialmente en los citados casos. Todo ello sin perjuicio del resto de acciones administrativas, civiles y/o penales que pudieren ser ejercidas por parte de la Asociación en relación con la desaparición o muerte del animal."
-      ]
-    },
-    {
-      "n": 19,
-      "parrafos": [
-        "Esterilización de perros, excepciones:"
-      ],
-      "lista": [
-        "Justificación veterinaria: cuando la esterilización suponga un riesgo para la salud del animal (por ejemplo, patologías graves o contraindicación quirúrgica).",
-        "Edad insuficiente: si el cachorro no ha alcanzado la edad mínima para la intervención."
-      ]
-    },
-    {
-      "n": 20,
-      "parrafos": [
-        "Ambas partes, tras manifestar su plena capacidad de obrar, prestan libre y voluntariamente su consentimiento al presente contrato, formado por tres folios a doble cara, aceptando expresamente todas y cada una de las condiciones y obligaciones dimanantes del mismo."
-      ]
-    }
-  ],
-  "anexo": {
-    "titulo": "Anexo. Condiciones complementarias",
-    "intro": "Estas condiciones completan las estipulaciones anteriores y forman parte del contrato que el Adoptante firma junto a la hoja de estipulaciones.",
-    "clausulas": [
-      {
-        "titulo": "Periodo de prueba y devolución",
-        "parrafos": [
-          "Durante los quince días siguientes a la entrega, y como máximo hasta los treinta días, el Adoptante y la Asociación podrán resolver este contrato si la convivencia no resulta adecuada para el animal o para la familia.",
-          "La devolución se comunicará a la Asociación con al menos 48 horas de antelación y el animal se entregará en las condiciones sanitarias en que se recibió. La donación no se devuelve: no es el precio del animal."
-        ]
-      },
-      {
-        "titulo": "Seguimiento de la adopción",
-        "parrafos": [
-          "La Asociación realizará un seguimiento al mes, a los tres, a los seis y a los doce meses de la entrega, por teléfono, mensajería o visita acordada. El Adoptante se compromete a responder y a facilitar una fotografía actual del animal."
-        ]
-      },
-      {
-        "titulo": "Microchip y registro",
-        "parrafos": [
-          "Mientras dure el periodo de prueba, el microchip del animal permanecerá a nombre de la Asociación. Confirmada la adopción, el Adoptante tramitará el cambio de titularidad en el registro autonómico y remitirá a la Asociación el justificante en el plazo de un mes."
-        ]
-      },
-      {
-        "titulo": "Protección de datos personales",
-        "parrafos": [
-          "Los datos personales del Adoptante y, en su caso, del tutor o de la persona responsable se tratan para formalizar y ejecutar este contrato, cumplir las obligaciones legales de la Asociación y realizar el seguimiento de la adopción. Se conservan mientras dure la relación y durante los plazos legales de conservación.",
-          "El Adoptante puede ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a la dirección de contacto de la Asociación, y reclamar ante la Agencia Española de Protección de Datos. Los datos no se ceden a terceros salvo obligación legal."
-        ]
-      }
-    ]
-  },
-  "clausula65": {
-    "titulo": "Cláusula especial · adoptantes mayores de 65 años",
-    "parrafos": [
-      "En caso de fallecimiento del titular de la adopción, la persona designada como responsable en el presente contrato se compromete a asumir la custodia, cuidado y bienestar del animal adoptado, garantizando que se mantengan las condiciones adecuadas de alimentación, salud y alojamiento.",
-      "El adoptante deberá indicar previamente, por escrito, el nombre completo, documento de identidad y datos de contacto de la persona que asumirá dicha responsabilidad. Asimismo, dicha persona estará obligada a informar a la entidad protectora en un plazo máximo de 48 horas desde el fallecimiento del adoptante y la asunción de la custodia, para coordinar cualquier seguimiento o apoyo necesario.",
-      "En ausencia de designación expresa, la entidad protectora se reserva el derecho de recuperar al animal para asegurar su protección y reubicación."
-    ],
-    "campos": [
-      "Nombre completo",
-      "DNI/NIE",
-      "Teléfono de contacto",
-      "Correo electrónico",
-      "Dirección"
-    ],
-    "nota": "Cláusula aplicable solo si el adoptante es mayor de 65 años. La firma de la persona responsable se recoge en el contrato."
-  }
-};
-// === CONTRATO_TEXTOS_PDF:FIN ===
+
 
 /**
- * PDF del contrato de adopción + hoja de estipulaciones, listo para adjuntar
- * a MailApp. No usa imágenes remotas: solo incrusta las firmas que ya viajan
- * en base64, para que el correo no tenga imágenes rotas.
+ * Renderizador genérico del modelo de contrato que envía el panel. No conoce
+ * el contrato: solo pinta bloques (títulos, párrafos, tablas, imágenes,
+ * estipulaciones y firmas). Así el layout y los textos viven en PdfExport /
+ * ContratoTextos y el servidor no los reimplementa.
  */
-function generarPdfContrato(c) {
-  if (typeof DocumentApp === 'undefined' || typeof DriveApp === 'undefined') return null;
-  var T = (typeof CONTRATO_TEXTOS_PDF !== 'undefined' && CONTRATO_TEXTOS_PDF) ? CONTRATO_TEXTOS_PDF : { estipulaciones: [] };
-  var doc = DocumentApp.create('Contrato-' + (c.animal || 'adopcion') + '-' + Date.now());
+function generarPdfModelo(modelo) {
+  if (!modelo || !Array.isArray(modelo.bloques) || typeof DocumentApp === 'undefined' || typeof DriveApp === 'undefined') return null;
+  var doc = DocumentApp.create('Contrato-' + Date.now());
   var archivo = null;
   try {
     var body = doc.getBody();
@@ -1273,137 +1080,55 @@ function generarPdfContrato(c) {
     estilo[DocumentApp.Attribute.FONT_SIZE] = 10;
     body.setAttributes(estilo);
 
-    var ent = _entidadContratoPdf_(c);
-    var animal = _datosAnimalContratoPdf_(c);
-    var importes = {
-      donacion: _importeContratoPdf_(c.donacion_adoptante, 100),
-      indemnizacion: _importeContratoPdf_(c.indemnizacion_importe, 900)
-    };
-    var tutor = _tutorContratoPdf_(c);
-    var r65 = _responsable65ContratoPdf_(c);
-    var fecha = _fechaContratoPdf_(c.fecha);
-    var ciudad = c.ciudad || 'Irún';
-    var baseWeb = String((CONFIG && CONFIG.PUBLIC_WEB_BASE_URL) || '').replace(/\/$/, '');
-
-    var logo = _blobImagenPdf_(baseWeb + '/assets/icons/logo-nebak.jpg');
-    if (logo) {
-      try {
-        var imgLogo = body.appendImage(logo);
-        imgLogo.setWidth(56).setHeight(56);
-      } catch (eLogo) {}
-    }
-
-    var titulo = body.appendParagraph('Contrato de adopción');
-    titulo.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    titulo.setForegroundColor('#0A431E');
-    body.appendParagraph(ent.nombre + ' · Expediente ' + (c.adopcion_id || c.id || '')).setFontSize(9).setForegroundColor('#757575');
-    body.appendHorizontalRule();
-
-    body.appendParagraph('En ' + ciudad + ', a ' + fecha + '.').setSpacingAfter(6);
-    body.appendParagraph('De una parte, ' + ent.nombre +
-      (ent.cif ? ', con CIF ' + ent.cif : '') +
-      (ent.domicilio ? ', con domicilio en ' + ent.domicilio : '') +
-      (ent.telefono ? ', con teléfonos de contacto ' + ent.telefono : '') +
-      ', en adelante, la Asociación.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-    body.appendParagraph('De otra parte, ' + (c.f1_nombre || c.adoptante || '[adoptante]') +
-      ', mayor de edad, que actúa en su propio nombre y derecho, con DNI ' + (c.f1_dni || '—') +
-      (c.f1_direccion ? ', con domicilio en ' + c.f1_direccion : '') +
-      (c.f1_telefono ? ', teléfono ' + c.f1_telefono : '') +
-      (c.f1_email ? ', y correo electrónico ' + c.f1_email : '') +
-      ', en adelante, el Adoptante.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-    body.appendParagraph('Ambas partes acuerdan celebrar el presente contrato, de acuerdo con los siguientes datos de adopción.').setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-
-    body.appendParagraph('Datos de adopción').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-    var foto = _imagenAnimalContratoPdf_(animal.foto);
-    if (foto) {
-      try {
-        var imgFoto = body.appendImage(foto);
-        imgFoto.setWidth(100);
-      } catch (eFoto) {}
-    }
-    _tablaDatosContratoPdf_(body, [
-      ['Nombre', animal.nombre],
-      ['Nombre definitivo', animal.nombre_definitivo],
-      ['Especie', animal.especie],
-      ['N.º microchip', animal.microchip],
-      ['Raza', animal.raza],
-      ['Sexo', animal.sexo],
-      ['Fecha de nacimiento', _fechaContratoPdf_(animal.fecha_nacimiento)],
-      ['Capa', animal.capa],
-      ['Color', animal.color],
-      ['Tamaño', animal.tamano],
-      ['Esterilización', _siNoContratoPdf_(animal.esterilizada)],
-      ['Otras reseñas', animal.descripcion]
-    ]);
-    if (T.notaEstipulaciones) body.appendParagraph(T.notaEstipulaciones).setFontSize(9).setForegroundColor('#4b5563');
-
-    body.appendParagraph('Estipulaciones').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-    (T.estipulaciones || []).forEach(function(est) {
-      var x = _textoContratoPdf_(est, importes);
-      (x.parrafos || []).forEach(function(texto, idx) {
-        var p = body.appendParagraph('');
-        var t = p.editAsText();
-        if (idx === 0) {
-          var num = String(est.n) + 'ª. ';
-          t.appendText(num);
-          t.setBold(0, num.length - 1, true);
+    (modelo.bloques || []).forEach(function(b) {
+      var tipo = String((b && b.tipo) || '');
+      // Las firmas llegan también en la forma antigua (`firma`/`firmaEntidad`)
+      // para los renderizadores que aún no conocen `firmas`: aquí ya se pinta
+      // el grupo, así que las copias marcadas `legado` se ignoran.
+      if (b && b.legado) return;
+      if (tipo === 'titulo') {
+        _parrafoModeloPdf_(body, b.texto, { heading: DocumentApp.ParagraphHeading.HEADING1, color: '#0A431E' });
+      } else if (tipo === 'subtitulo') {
+        _parrafoModeloPdf_(body, b.texto, { size: 9, color: '#757575' });
+      } else if (tipo === 'parrafo') {
+        _parrafoModeloPdf_(body, b.texto, { align: DocumentApp.HorizontalAlignment.JUSTIFY, after: 5 });
+      } else if (tipo === 'seccion') {
+        _parrafoModeloPdf_(body, b.texto, { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#15863D' });
+      } else if (tipo === 'nota') {
+        _parrafoModeloPdf_(body, b.texto, { size: 9, color: '#4b5563' });
+      } else if (tipo === 'tabla') {
+        _tablaModeloPdf_(body, b);
+      } else if (tipo === 'imagen') {
+        var img = _imagenModeloPdf_(b.src);
+        if (img) {
+          try {
+            var inline = body.appendImage(img);
+            if (b.ancho) inline.setWidth(Number(b.ancho) || 100);
+            if (b.alto) inline.setHeight(Number(b.alto) || 100);
+          } catch (eImg) {}
         }
-        t.appendText(String(texto));
-        p.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-        p.setSpacingAfter(4);
-      });
-      (x.lista || []).forEach(function(item) {
-        var li = body.appendListItem(String(item));
-        li.setGlyphType(DocumentApp.GlyphType.BULLET);
-        li.setSpacingAfter(1);
-      });
+      } else if (tipo === 'estipulacion') {
+        _estipulacionModeloPdf_(body, b);
+      } else if (tipo === 'clausula') {
+        _parrafoModeloPdf_(body, b.titulo, { bold: true, size: 10.5 });
+        (Array.isArray(b.parrafos) ? b.parrafos : []).forEach(function(texto) {
+          _parrafoModeloPdf_(body, texto, { align: DocumentApp.HorizontalAlignment.JUSTIFY, after: 4 });
+        });
+      } else if (tipo === 'salto') {
+        body.appendPageBreak();
+      } else if (tipo === 'firmas') {
+        _firmasModeloPdf_(body, b);
+      } else if (tipo === 'firma' || tipo === 'firmaEntidad') {
+        _firmasModeloPdf_(body, { items: [b] });
+      } else if (tipo === 'pie') {
+        _parrafoModeloPdf_(body, b.texto, { size: 8, color: '#999999', align: DocumentApp.HorizontalAlignment.CENTER });
+      }
     });
-
-    if (tutor) {
-      body.appendPageBreak();
-      body.appendParagraph('Anexo I. Datos del tutor o persona de apoyo').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-      _tablaDatosContratoPdf_(body, [
-        ['Nombre', tutor.nombre],
-        ['DNI', tutor.dni],
-        ['Relación con el adoptante', tutor.relacion],
-        ['Domicilio', tutor.direccion],
-        ['Email', tutor.email],
-        ['Teléfono', tutor.telefono]
-      ]);
-      body.appendParagraph('La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.').setFontSize(9).setForegroundColor('#4b5563');
-    }
-
-    body.appendParagraph('').setSpacingBefore(10);
-    _firmaContratoPdf_(body, 'Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma);
-    if (tutor) _firmaContratoPdf_(body, 'Tutor / persona de apoyo', tutor.nombre, tutor.dni, tutor.firma);
-    _firmaEntidadContratoPdf_(body, ent, c, baseWeb);
-
-    if (r65) {
-      var k65 = T.clausula65 || {};
-      body.appendPageBreak();
-      body.appendParagraph(k65.titulo || 'Cláusula especial · adoptantes mayores de 65 años').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-      (k65.parrafos || []).forEach(function(texto) {
-        body.appendParagraph(texto).setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
-      });
-      body.appendParagraph('Datos de la persona responsable designada').setHeading(DocumentApp.ParagraphHeading.HEADING2).setForegroundColor('#15863D');
-      _tablaDatosContratoPdf_(body, [
-        ['Nombre completo', r65.nombre],
-        ['DNI/NIE', r65.dni],
-        ['Teléfono de contacto', r65.telefono],
-        ['Correo electrónico', r65.email],
-        ['Dirección', r65.direccion]
-      ]);
-      body.appendParagraph('En ' + ciudad + ', a ' + fecha + '.');
-      _firmaContratoPdf_(body, 'Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma);
-      _firmaContratoPdf_(body, 'Firma de la persona responsable', r65.nombre, r65.dni, '');
-    }
-
-    body.appendParagraph('Generado por ' + ent.nombre + ' · ' + _fechaContratoPdf_(new Date())).setFontSize(8).setForegroundColor('#999999').setAlignment(DocumentApp.HorizontalAlignment.CENTER);
 
     doc.saveAndClose();
     archivo = DriveApp.getFileById(doc.getId());
     var pdf = archivo.getAs('application/pdf');
-    pdf.setName(nombrePdfContrato_(c));
+    pdf.setName(nombrePdfModelo_(modelo.nombre));
     return pdf;
   } finally {
     try {
@@ -1413,183 +1138,132 @@ function generarPdfContrato(c) {
   }
 }
 
-function _entidadContratoPdf_(c) {
-  return {
-    nombre: c.entidad_nombre || 'Asociación Grupo Nebak',
-    cif: c.entidad_cif || '',
-    domicilio: c.entidad_domicilio || '',
-    email: c.entidad_email || CONFIG.CONTACT_EMAIL || '',
-    telefono: c.entidad_telefono || '',
-    registro: c.entidad_registro || ''
-  };
+// Aplica formato al texto, no al párrafo: Paragraph no documenta setBold /
+// setFontSize / setForegroundColor; Text sí.
+function _parrafoModeloPdf_(body, texto, opts) {
+  var o = opts || {};
+  var p = body.appendParagraph(String(texto == null ? '' : texto));
+  if (o.heading) p.setHeading(o.heading);
+  var t = p.editAsText();
+  if (o.size) t.setFontSize(o.size);
+  if (o.color) t.setForegroundColor(o.color);
+  if (o.bold) t.setBold(true);
+  if (o.align) p.setAlignment(o.align);
+  if (o.after != null) p.setSpacingAfter(o.after);
+  return p;
 }
 
-function _datosAnimalContratoPdf_(c) {
-  var a = null;
-  try {
-    if (c.animal_id && CONFIG.sheets && CONFIG.sheets.animales) {
-      var filas = readSheet(CONFIG.sheets.animales);
-      for (var i = 0; i < filas.length; i++) {
-        if (String(filas[i].id) === String(c.animal_id)) { a = filas[i]; break; }
-      }
-    }
-  } catch (eAnimal) {}
-  var val = function(saved, live) {
-    if (saved !== undefined && saved !== null && saved !== '') return saved;
-    if (live !== undefined && live !== null && live !== '') return live;
-    return '';
-  };
-  return {
-    nombre: val(c.animal, a && a.nombre),
-    nombre_definitivo: val(c.nombre_definitivo, a && a.nombre_definitivo),
-    foto: val(c.animal_foto, a && a.foto),
-    especie: val(c.especie, a && a.especie),
-    raza: val(c.raza, a && a.raza),
-    edad: val(c.edad, a && a.edad),
-    sexo: val(c.animal_sexo, a && a.sexo),
-    microchip: val(c.animal_microchip, a && a.microchip),
-    fecha_nacimiento: val(c.animal_fecha_nacimiento, a && a.fecha_nacimiento),
-    capa: val(c.animal_capa, a && a.capa),
-    color: val(c.animal_color, a && a.color),
-    tamano: val(c.animal_tamano, a && a.tamano),
-    esterilizada: val(c.animal_esterilizada, a && a.esterilizada),
-    descripcion: val(c.animal_descripcion, a && a.descripcion)
-  };
+function nombrePdfModelo_(nombre) {
+  var n = String(nombre || 'Contrato-Adopcion.pdf').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  if (!n) n = 'Contrato-Adopcion.pdf';
+  if (!/\.pdf$/i.test(n)) n += '.pdf';
+  return n;
 }
 
-function _tutorContratoPdf_(c) {
-  var nombre = String(c.f2_nombre || '').trim();
-  if (!nombre) return null;
-  if (/entidad|asociaci[oó]n|grupo\s*nebak/i.test(String(c.f2_rol || '') + ' ' + nombre)) return null;
-  return {
-    nombre: nombre,
-    dni: c.f2_dni || '',
-    relacion: c.f2_relacion || c.f2_rol || '',
-    direccion: c.f2_direccion || '',
-    email: c.f2_email || '',
-    telefono: c.f2_telefono || '',
-    firma: c.f2_firma || ''
-  };
-}
-
-function _responsable65ContratoPdf_(c) {
-  var activo = /^(1|si|sí|true|on|x)$/i.test(String(c.adoptante_mayor_65 || '').trim());
-  if (!activo && !String(c.responsable_nombre || '').trim()) return null;
-  return {
-    nombre: c.responsable_nombre || '',
-    dni: c.responsable_dni || '',
-    telefono: c.responsable_telefono || '',
-    email: c.responsable_email || '',
-    direccion: c.responsable_direccion || ''
-  };
-}
-
-function _importeContratoPdf_(v, porDefecto) {
-  var s = String(v == null ? '' : v).replace(',', '.').trim();
-  if (!s) return porDefecto;
-  var n = Number(s);
-  return (!isNaN(n) && n >= 0) ? n : porDefecto;
-}
-
-function _fechaContratoPdf_(v) {
-  if (v instanceof Date) {
-    var d = v;
-    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
-  }
-  var s = String(v || '').trim();
-  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return m[3] + '/' + m[2] + '/' + m[1];
-  if (s) return s;
-  var hoy = new Date();
-  return ('0' + hoy.getDate()).slice(-2) + '/' + ('0' + (hoy.getMonth() + 1)).slice(-2) + '/' + hoy.getFullYear();
-}
-
-function _siNoContratoPdf_(v) {
-  if (v === true || /^(si|sí|true|1)$/i.test(String(v))) return 'Sí';
-  if (v === false || /^(no|false|0)$/i.test(String(v))) return 'No';
-  return '—';
-}
-
-function _textoContratoPdf_(est, importes) {
-  var rep = function(t) {
-    return String(t == null ? '' : t)
-      .replace(/\{donacion\}/g, importes.donacion)
-      .replace(/\{indemnizacion\}/g, importes.indemnizacion);
-  };
-  var e = est || {};
-  return {
-    parrafos: (e.parrafos || []).map(rep),
-    lista: (e.lista || []).map(rep)
-  };
-}
-
-function _tablaDatosContratoPdf_(body, filas) {
+function _tablaModeloPdf_(body, b) {
+  var filas = (b && b.filas) || [];
+  if (!Array.isArray(filas) || !filas.length) return;
   var tabla = body.appendTable();
   var negrita = {};
   negrita[DocumentApp.Attribute.BOLD] = true;
-  (filas || []).forEach(function(fila) {
+  filas.forEach(function(fila) {
+    if (!Array.isArray(fila)) return;
     var tr = tabla.appendTableRow();
-    var celda = tr.appendTableCell(String(fila[0]));
+    var celda = tr.appendTableCell(String(fila[0] == null ? '' : fila[0]));
     celda.setAttributes(negrita);
     celda.setWidth(135);
     tr.appendTableCell(String(fila[1] == null || fila[1] === '' ? '—' : fila[1]));
   });
-  body.appendParagraph('');
-}
-
-function _firmaContratoPdf_(body, etiqueta, nombre, dni, firma) {
-  body.appendParagraph(etiqueta).setFontSize(9).setForegroundColor('#757575');
-  var blob = _firmaBlobPdf_(firma);
-  if (blob) {
-    try {
-      var img = body.appendImage(blob);
-      img.setWidth(150);
-    } catch (eFirma) {
-      body.appendParagraph('[Sin firma]').setFontSize(9).setForegroundColor('#999999');
+  // La fotografía es una fila más de la tabla, como en el documento.
+  var foto = b && b.foto;
+  if (foto) {
+    var trFoto = tabla.appendTableRow();
+    var etiquetaFoto = trFoto.appendTableCell(String(foto.etiqueta || 'Fotografía'));
+    etiquetaFoto.setAttributes(negrita);
+    etiquetaFoto.setWidth(135);
+    var celdaFoto = trFoto.appendTableCell('');
+    var img = _imagenModeloPdf_(foto.src);
+    if (img) {
+      try {
+        var inline = celdaFoto.appendImage(img);
+        inline.setWidth(Number(foto.ancho) || 100);
+        if (foto.alto) inline.setHeight(Number(foto.alto) || 100);
+      } catch (eFoto) {
+        celdaFoto.setText('Sin foto');
+      }
+    } else {
+      celdaFoto.setText(String(foto.vacio || 'Sin foto'));
     }
-  } else {
-    body.appendParagraph('[Sin firma]').setFontSize(9).setForegroundColor('#999999');
   }
-  body.appendHorizontalRule();
-  body.appendParagraph(String(nombre || '—') + (dni ? ' · DNI ' + dni : '')).setBold(true);
   body.appendParagraph('');
 }
 
-function _firmaEntidadContratoPdf_(body, ent, c, baseWeb) {
-  body.appendParagraph('Firma Asociación').setFontSize(9).setForegroundColor('#757575');
-  var firma = c.entidad_firma || (!_tutorContratoPdf_(c) ? c.f2_firma : '');
-  var blob = _firmaBlobPdf_(firma);
-  if (blob) {
-    try {
-      var img = body.appendImage(blob);
-      img.setWidth(140);
-    } catch (eFirmaEntidad) {}
-  }
-  var sello = _blobImagenPdf_(baseWeb + '/assets/contratos/sello-nebak.jpg');
-  if (sello) {
-    try {
-      var imgSello = body.appendImage(sello);
-      imgSello.setWidth(80).setHeight(80);
-    } catch (eSello) {}
-  }
-  body.appendHorizontalRule();
-  body.appendParagraph(ent.nombre).setBold(true);
+function _estipulacionModeloPdf_(body, b) {
+  var parrafos = Array.isArray(b.parrafos) ? b.parrafos : [];
+  parrafos.forEach(function(texto, idx) {
+    var p = body.appendParagraph('');
+    var t = p.editAsText();
+    if (idx === 0) {
+      var num = String(b.n || '') + 'ª. ';
+      t.appendText(num);
+      t.setBold(0, num.length - 1, true);
+    }
+    t.appendText(String(texto == null ? '' : texto));
+    p.setAlignment(DocumentApp.HorizontalAlignment.JUSTIFY);
+    p.setSpacingAfter(4);
+  });
+  (Array.isArray(b.lista) ? b.lista : []).forEach(function(item) {
+    var li = body.appendListItem(String(item == null ? '' : item));
+    li.setGlyphType(DocumentApp.GlyphType.BULLET);
+    li.setSpacingAfter(1);
+  });
+}
+
+/**
+ * Firmas en una sola fila: cada ítem es una celda con su etiqueta, la firma
+ * (y el sello de la entidad, si lo lleva) y el nombre. La tabla no dibuja
+ * bordes, así que se lee como el bloque de firmas del documento.
+ */
+function _firmasModeloPdf_(body, b) {
+  var items = (b && Array.isArray(b.items)) ? b.items : [];
+  if (!items.length) return;
+  var tabla = body.appendTable();
+  try {
+    var sinBorde = {};
+    sinBorde[DocumentApp.Attribute.BORDER_WIDTH] = 0;
+    tabla.setAttributes(sinBorde);
+  } catch (eBorde) { /* si el documento no acepta el atributo, se deja el borde de serie */ }
+  var tr = tabla.appendTableRow();
+  items.forEach(function(it) {
+    var celda = tr.appendTableCell('');
+    try { celda.setPaddingTop(0); celda.setPaddingBottom(0); } catch (ePad) { }
+    _parrafoModeloPdf_(celda, String(it.etiqueta || 'Firma'), { size: 9, color: '#757575' });
+    var firma = _imagenModeloPdf_(it.firma);
+    if (firma) {
+      try {
+        celda.appendImage(firma).setWidth(140);
+      } catch (eFirma) {
+        _parrafoModeloPdf_(celda, '[Sin firma]', { size: 9, color: '#999999' });
+      }
+    } else if (!it.sello) {
+      _parrafoModeloPdf_(celda, '[Sin firma]', { size: 9, color: '#999999' });
+    }
+    var sello = _imagenModeloPdf_(it.sello);
+    if (sello) {
+      try { celda.appendImage(sello).setWidth(80).setHeight(80); } catch (eSello) { }
+    }
+    _parrafoModeloPdf_(celda, String(it.nombre || '—') + (it.dni ? ' · ' + (it.dniEtiqueta || 'DNI') + ' ' + it.dni : ''), { bold: true });
+  });
   body.appendParagraph('');
 }
 
-function _imagenAnimalContratoPdf_(foto) {
-  var s = String(foto || '');
+function _imagenModeloPdf_(src) {
+  var s = String(src || '');
   if (!s) return null;
   if (/^data:/i.test(s)) return _firmaBlobPdf_(s);
   if (/^https?:\/\//i.test(s)) return _blobImagenPdf_(s);
   if (/^[A-Za-z0-9_-]{20,}$/.test(s)) return _blobImagenPdf_('https://drive.google.com/thumbnail?id=' + encodeURIComponent(s) + '&sz=w800');
   return null;
-}
-
-
-function nombrePdfContrato_(c) {
-  var base = 'Contrato-Adopcion-' + (c.animal || 'Grupo-Nebak') + '-' + (c.fecha || Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyy-MM-dd'));
-  return String(base).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
 }
 
 function _blobImagenPdf_(url) {

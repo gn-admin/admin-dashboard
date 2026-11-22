@@ -4,6 +4,8 @@
  * Se carga el `apps-script/Code.gs` real en un contexto aislado y se ejercitan
  * las funciones puras de autorización (`_role`, `_canReadEndpoint`,
  * `_canWriteEndpoint`, `_dataForUser`) y el perfil minimizado de `sin_acceso`.
+ * La matriz de cada rol se comprueba además contra **todos** los endpoints del
+ * despachador (se leen del `switch`), para que uno nuevo no se cuele abierto.
  * No sustituye a las pruebas en vivo: fija el contrato para que un cambio en
  * `Code.gs` no abra permisos por accidente.
  */
@@ -15,6 +17,18 @@ const vm = require('node:vm');
 
 const RAIZ = path.join(__dirname, '..');
 const CODE_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Code.gs'), 'utf8');
+
+/** Endpoints del `switch` de una función del despachador. */
+function endpointsDe(nombre) {
+  const inicio = CODE_GS.indexOf('function ' + nombre + '(');
+  assert.ok(inicio !== -1, 'no existe ' + nombre + ' en Code.gs');
+  const resto = CODE_GS.slice(inicio + 1);
+  const bloque = resto.slice(0, resto.indexOf('\nfunction '));
+  return Array.from(new Set((bloque.match(/case '[^']+'/g) || []).map(s => s.slice(6, -1))));
+}
+
+const LEER = endpointsDe('handleGet');
+const ESCRIBIR = endpointsDe('handlePost');
 
 function crearEntorno() {
   const ctx = {
@@ -74,17 +88,12 @@ describe('D1: rol sin_acceso', () => {
   const ctx = crearEntorno();
   const user = perfil('sin_acceso');
 
-  it('solo puede leer su perfil', () => {
-    assert.equal(ctx._canReadEndpoint('user-profile', user), true);
-    for (const endpoint of ['animales', 'familias', 'adopciones', 'socios', 'blacklist', 'gastos', 'donaciones', 'inventario', 'actividad', 'surveys', 'web-resumen']) {
-      assert.equal(ctx._canReadEndpoint(endpoint, user), false, endpoint);
-    }
+  it('de todos los endpoints de lectura solo puede leer su perfil', () => {
+    assert.deepEqual(LEER.filter((ep) => ctx._canReadEndpoint(ep, user)), ['user-profile']);
   });
 
   it('no puede escribir en ningún endpoint', () => {
-    for (const endpoint of ['animales', 'update-animal', 'delete-animal', 'familias', 'web-crear-evento', 'web-actualizar-evento', 'actividad']) {
-      assert.equal(ctx._canWriteEndpoint(endpoint, user), false, endpoint);
-    }
+    ESCRIBIR.forEach((ep) => assert.equal(ctx._canWriteEndpoint(ep, user), false, ep));
   });
 
   it('el perfil se minimiza a role + email (sin uid ni nombre)', () => {
@@ -152,8 +161,60 @@ describe('matriz de lectura/escritura por rol', () => {
     assert.equal(puedeEscribir('tesoreria', 'web-crear-evento'), false);
   });
 
-  it('un rol desconocido no lee ni escribe', () => {
-    assert.equal(puedeLeer('gestor', 'animales'), false);
-    assert.equal(puedeEscribir('gestor', 'animales'), false);
+  it('un rol desconocido no lee ni escribe en ningún endpoint', () => {
+    LEER.forEach((ep) => assert.equal(puedeLeer('gestor', ep), false, ep));
+    ESCRIBIR.forEach((ep) => assert.equal(puedeEscribir('gestor', ep), false, ep));
+  });
+});
+
+// Lo mismo, pero pasando por el despachador: un endpoint nuevo que se cuele sin
+// permiso aparece aquí sin que haya que acordarse de añadirlo a ninguna lista.
+describe('puerta cerrada en todos los endpoints del despachador', () => {
+  const ctx = crearEntorno();
+  const cuerpo = (res) => JSON.parse(res.getContent());
+
+  it('el despachador se lee completo', () => {
+    assert.ok(LEER.length >= 25, 'solo ' + LEER.length + ' endpoints de lectura');
+    assert.ok(ESCRIBIR.length >= 25, 'solo ' + ESCRIBIR.length + ' de escritura');
+  });
+
+  it('sin acceso, la única lectura que responde es su perfil', () => {
+    const permitidos = LEER.filter((ep) => cuerpo(ctx.handleGet(ep, perfil('sin_acceso'), { parameter: {} })).status === 'success');
+    assert.deepEqual(permitidos, ['user-profile']);
+  });
+
+  it('sin acceso y consulta no ejecutan ningún POST', () => {
+    for (const role of ['sin_acceso', 'consulta']) {
+      for (const ep of ESCRIBIR) {
+        assert.equal(ctx._canWriteEndpoint(ep, perfil(role)), false, role + ' escribe ' + ep);
+        const res = cuerpo(ctx.handlePost(ep, perfil(role), { postData: { contents: '{}' } }));
+        assert.match(String(res.error), /No autorizado/, role + ' ejecutó ' + ep);
+      }
+    }
+  });
+
+  it('administración llega a todo lo despachado', () => {
+    LEER.forEach((ep) => assert.equal(ctx._canReadEndpoint(ep, perfil('admin')), true, 'GET ' + ep));
+    ESCRIBIR.forEach((ep) => assert.equal(ctx._canWriteEndpoint(ep, perfil('admin')), true, 'POST ' + ep));
+  });
+
+  it('lo que coordinación no escribe no lo escribe ningún rol menor', () => {
+    const soloAdmin = ESCRIBIR.filter((ep) => !ctx._canWriteEndpoint(ep, perfil('coordinador')));
+    // El correo y el PDF del contrato son las dos puertas que no se abren.
+    assert.ok(soloAdmin.includes('send-contrato-email'), 'send-contrato-email debería ser solo-admin');
+    assert.ok(soloAdmin.includes('contrato-pdf-preview'), 'contrato-pdf-preview debería ser solo-admin');
+    for (const role of ['voluntario', 'tesoreria', 'consulta', 'sin_acceso', 'gestor']) {
+      soloAdmin.forEach((ep) => assert.equal(ctx._canWriteEndpoint(ep, perfil(role)), false, role + ' → ' + ep));
+    }
+  });
+
+  it('el gestor web no se toca fuera de administración y coordinación', () => {
+    const webLeer = LEER.filter((ep) => ep.indexOf('web-') === 0);
+    const webEscribir = ESCRIBIR.filter((ep) => ep.indexOf('web-') === 0);
+    assert.ok(webLeer.length && webEscribir.length, 'no hay endpoints web- en el despachador');
+    for (const role of ['voluntario', 'tesoreria', 'consulta']) {
+      webLeer.forEach((ep) => assert.equal(ctx._canReadEndpoint(ep, perfil(role)), false, role + ' lee ' + ep));
+    }
+    webEscribir.forEach((ep) => assert.equal(ctx._canWriteEndpoint(ep, perfil('coordinador')), true, ep));
   });
 });

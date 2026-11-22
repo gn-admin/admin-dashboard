@@ -15,6 +15,56 @@ const vm = require('node:vm');
 
 const RAIZ = path.join(__dirname, '..');
 const CODE_GS = fs.readFileSync(path.join(RAIZ, 'apps-script', 'Code.gs'), 'utf8');
+const ContratoModelo = require('../src/js/contrato-modelo.js');
+
+// DocumentApp mínimo para comprobar que el renderizador recorre el modelo y
+// escribe el texto real (no solo que devuelve un Blob).
+function documentAppFalso() {
+  const salida = [];
+  const parrafo = (inicial) => {
+    let texto = String(inicial || '');
+    const p = {
+      setHeading() { return this; }, setForegroundColor() { return this; },
+      setFontSize() { return this; }, setAlignment() { return this; },
+      setSpacingAfter() { return this; }, setBold() { return this; },
+      setAttributes() { return this; }, setWidth() { return this; }, setGlyphType() { return this; },
+      setText(x) { texto = String(x); return this; },
+      setPaddingTop() { return this; }, setPaddingBottom() { return this; },
+      appendParagraph: (t) => parrafo(t),
+      appendImage() { return { setWidth() { return this; }, setHeight() { return this; } }; },
+      editAsText() { return { appendText(x) { texto += String(x); }, setBold() {}, setFontSize() {}, setForegroundColor() {} }; },
+      getText() { return texto; }
+    };
+    salida.push(p);
+    return p;
+  };
+  const body = {
+    setMarginTop() { return this; }, setMarginBottom() { return this; },
+    setMarginLeft() { return this; }, setMarginRight() { return this; },
+    setAttributes() { return this; },
+    appendParagraph: parrafo,
+    appendListItem(t) { return parrafo(t); },
+    appendImage() { return { setWidth() { return this; }, setHeight() { return this; } }; },
+    appendPageBreak() { salida.push({ page: true }); },
+    appendHorizontalRule() { salida.push({ hr: true }); },
+    appendTable() {
+      const filas = [];
+      salida.push({ tabla: filas });
+      return { appendTableRow() { const celdas = []; filas.push(celdas); return { appendTableCell(t) { const c = parrafo(t); celdas.push(c); return c; } }; } };
+    }
+  };
+  return {
+    salida,
+    DocumentApp: {
+      create: () => ({ getBody: () => body, saveAndClose() {}, getId: () => 'doc_1' }),
+      Attribute: { FONT_FAMILY: 'FONT_FAMILY', FONT_SIZE: 'FONT_SIZE', BOLD: 'BOLD', BORDER_WIDTH: 'BORDER_WIDTH' },
+      ParagraphHeading: { HEADING1: 'HEADING1', HEADING2: 'HEADING2' },
+      HorizontalAlignment: { JUSTIFY: 'JUSTIFY', CENTER: 'CENTER' },
+      GlyphType: { BULLET: 'BULLET' }
+    },
+    DriveApp: { getFileById: () => ({ getAs: () => ({ setName() {}, getBytes: () => Buffer.from('pdf') }), setTrashed() {} }) }
+  };
+}
 
 function crearEntorno(opciones = {}) {
   const enviados = [];
@@ -58,6 +108,233 @@ function crearEntorno(opciones = {}) {
   ctx.readSheet = () => [contrato];
   return { ctx, enviados, contrato };
 }
+
+describe('generarPdfModelo: renderiza el contenido del modelo', () => {
+  it('escribe las 20 estipulaciones, los importes y el anexo del tutor', () => {
+    const { ctx } = crearEntorno();
+    const fake = documentAppFalso();
+    Object.assign(ctx, {
+      DocumentApp: fake.DocumentApp,
+      DriveApp: fake.DriveApp,
+      Utilities: { newBlob: () => ({}), base64Decode: () => [] },
+      UrlFetchApp: { fetch: () => { throw new Error('sin red'); } }
+    });
+    const modelo = ContratoModelo.construir({
+      c: { id: 'ctr_1', f1_nombre: 'Ana', f1_dni: '12345678Z', fecha: '2026-01-15', ciudad: 'Irún' },
+      animal: { nombre: 'Luna', raza: 'Mestiza', microchip: '941000000000001' },
+      entidad: { nombre: 'Asociación Grupo Nebak' },
+      tutor: { nombre: 'Luis', dni: '87654321X', relacion: 'Padre' },
+      importes: { donacion: 150, indemnizacion: 900 },
+      fecha: '15/01/2026'
+    });
+    assert.ok(ctx.generarPdfModelo(modelo));
+    const texto = fake.salida.map(x => x.getText ? x.getText() : JSON.stringify(x)).join(' ');
+    assert.equal((texto.match(/\d+ª\./g) || []).length, 20);
+    assert.match(texto, /150/);
+    assert.match(texto, /900/);
+    assert.match(texto, /Anexo I\. Datos del tutor/);
+    assert.match(texto, /Luis/);
+    // El anexo de condiciones va en la hoja de estipulaciones, no en el contrato.
+    assert.doesNotMatch(texto, /Periodo de prueba y devolución/);
+  });
+
+  // El modelo lleva cada firma dos veces: el grupo (`firmas`) y su copia en la
+  // forma antigua (`legado`), para el .gs que aún no se ha subido. Este
+  // renderizador ya pinta el grupo, así que la copia no puede repetirse.
+  it('no duplica las firmas aunque el modelo traiga también la forma antigua', () => {
+    const { ctx } = crearEntorno();
+    const fake = documentAppFalso();
+    Object.assign(ctx, {
+      DocumentApp: fake.DocumentApp,
+      DriveApp: fake.DriveApp,
+      Utilities: { newBlob: () => ({}), base64Decode: () => [] },
+      UrlFetchApp: { fetch: () => { throw new Error('sin red'); } }
+    });
+    const modelo = ContratoModelo.construir({
+      c: { id: 'ctr_1', f1_nombre: 'Ana', f1_dni: '12345678Z', fecha: '2026-01-15', ciudad: 'Irún' },
+      animal: { nombre: 'Luna' },
+      entidad: { nombre: 'Asociación Grupo Nebak' },
+      tutor: { nombre: 'Luis', dni: '87654321X' },
+      fecha: '15/01/2026'
+    });
+    assert.ok(modelo.bloques.some(b => b.legado), 'faltan las copias para el servidor antiguo');
+    assert.ok(ctx.generarPdfModelo(modelo));
+    const texto = fake.salida.map(x => (x.getText ? x.getText() : '')).join(' ');
+    // Datos y cierre: dos veces la adoptante, una el tutor (el fixture no tiene 65).
+    assert.equal((texto.match(/Firma adoptante/g) || []).length, 2);
+    assert.equal((texto.match(/Tutor \/ persona de apoyo/g) || []).length, 1);
+  });
+});
+
+// Caso de produccion `ctr_mwovlotk` (el contrato firmado de Luna, con los datos
+// personales sustituidos por otros de prueba). El modelo lo construye el panel
+// con este mismo `ContratoModelo`, asi que el adjunto tiene que ser el MISMO
+// documento: todos sus textos, una sola vez y con la entidad completa.
+describe('adjunto del correo: el contrato de ctr_mwovlotk llega entero', () => {
+  const FIRMA = 'data:image/png;base64,AAAA';
+  const ENTIDAD = {
+    nombre: 'Asociación Pro-Bienestar Animal, Grupo Nebak',
+    cif: 'G75203562',
+    domicilio: 'calle Santiago, n.º 27, 1º izquierda, Irun, código postal 20300',
+    telefono: '625140588 y 600042594'
+  };
+
+  // Fila de la hoja `contratos` como la deja el panel al firmar.
+  const fila = {
+    id: 'ctr_mwovlotk',
+    animal: 'Luna',
+    animal_id: 'ani_luna',
+    fecha: '2026-11-19T23:00:00.000Z',
+    ciudad: 'Barakaldo',
+    f1_nombre: 'Nombre Apellido',
+    f1_dni: '00000000T',
+    f1_direccion: 'Calle de Prueba 1',
+    f1_email: 'adoptante@example.test',
+    f1_telefono: '600000000',
+    f1_firma: FIRMA,
+    f2_nombre: '',
+    f2_email: '',
+    donacion_adoptante: '100',
+    indemnizacion_importe: '900',
+    adoptante_mayor_65: '1',
+    responsable_nombre: 'Persona Responsable',
+    responsable_dni: '11111111H',
+    responsable_telefono: '611111111',
+    responsable_email: 'responsable@example.test',
+    responsable_direccion: 'Calle de Prueba 2',
+    entidad_nombre: 'Asociación Grupo Nebak',
+    entidad_cif: '',
+    entidad_domicilio: '',
+    entidad_telefono: ''
+  };
+
+  const modeloLuna = () => ContratoModelo.construir({
+    c: fila,
+    animal: {
+      nombre: 'Luna', nombre_definitivo: 'Luna', especie: 'Gato', raza: 'Europeo',
+      sexo: 'Hembra', microchip: '941000000000000', capa: 'Atigrada', color: 'Gris',
+      tamano: 'Pequeña', esterilizada: 'Sí', descripcion: 'Muy sociable.', foto: FIRMA
+    },
+    entidad: ENTIDAD,
+    tutor: null,
+    responsable65: {
+      nombre: 'Persona Responsable', dni: '11111111H', telefono: '611111111',
+      email: 'responsable@example.test', direccion: 'Calle de Prueba 2'
+    },
+    importes: { donacion: 100, indemnizacion: 900 },
+    fecha: '19/11/2026',
+    ciudad: 'Barakaldo',
+    selloUrl: 'assets/contratos/sello-nebak.jpg',
+    nombreArchivo: 'Contrato-Adopcion-Luna.pdf'
+  });
+
+  const textosDelModelo = (modelo) => {
+    const out = [];
+    (modelo.bloques || []).forEach((b) => {
+      if (b.tipo === 'estipulacion') {
+        out.push(b.n + 'ª.');
+        (b.parrafos || []).forEach(t => out.push(t));
+        (b.lista || []).forEach(t => out.push(t));
+      } else if (b.tipo === 'tabla') {
+        (b.filas || []).forEach(f => { out.push(f[0]); if (f[1]) out.push(f[1]); });
+        if (b.foto && b.foto.etiqueta) out.push(b.foto.etiqueta);
+      } else if (b.tipo === 'firmas') {
+        (b.items || []).forEach((it) => {
+          if (it.etiqueta) out.push(it.etiqueta);
+          if (it.nombre) out.push(it.nombre);
+        });
+      } else if (b.texto) {
+        out.push(b.texto);
+      }
+    });
+    return out;
+  };
+
+  it('el PDF adjunto lleva todos los textos del modelo, sin duplicar', () => {
+    const { ctx, enviados } = crearEntorno({ contrato: fila });
+    const fake = documentAppFalso();
+    Object.assign(ctx, {
+      DocumentApp: fake.DocumentApp,
+      DriveApp: fake.DriveApp,
+      Utilities: { newBlob: () => ({}), base64Decode: () => [] },
+      UrlFetchApp: { fetch: () => { throw new Error('sin red'); } }
+    });
+    const modelo = modeloLuna();
+    const r = ctx.sendContratoEmail(
+      { contrato_id: 'ctr_mwovlotk', to: ['adoptante@example.test'], contrato_modelo: modelo },
+      null
+    );
+
+    // Nada sale a la red: MailApp esta simulado y el adjunto se genera en seco.
+    assert.equal(enviados.length, 1);
+    assert.equal(r.status, 'success');
+    assert.equal(r.data.pdf_adjunto, true);
+    assert.equal(enviados[0].attachments.length, 1);
+
+    const texto = fake.salida.map(x => (x.getText ? x.getText() : '')).join('\n');
+    const faltan = textosDelModelo(modelo).filter(t => !texto.includes(t));
+    assert.deepEqual(faltan, [], 'el adjunto no es el mismo documento');
+
+    // Entidad tal y como la firma el documento, una sola vez.
+    assert.equal((texto.match(/de la otra parte/g) || []).length, 1);
+    assert.match(texto, /con CIF G75203562/);
+    assert.match(texto, /con domicilio en calle Santiago/);
+    assert.doesNotMatch(texto, /Sin foto/);
+    assert.match(texto, /y con teléfonos de contacto 625140588 y 600042594/);
+
+    // Firmas: las del modelo, sin las copias `legado` (adoptante x3: datos,
+    // cierre y cláusula 65). El único hueco es la persona responsable.
+    assert.equal((texto.match(/Firma adoptante/g) || []).length, 3);
+    assert.equal((texto.match(/Firma Asociación/g) || []).length, 1);
+    assert.equal((texto.match(/Firma de la persona responsable/g) || []).length, 1);
+    assert.equal((texto.match(/\[Sin firma\]/g) || []).length, 1);
+    assert.equal((texto.match(/Fotografía/g) || []).length, 1);
+    assert.equal((texto.match(/\d+ª\./g) || []).length, 20);
+  });
+});
+
+// El contrato de acogida NO se puede enviar por correo: el panel solo ofrece
+// «Descargar PDF» (se imprime desde el HTML de `PdfExport._contratoAcogidaBody`)
+// y `sendContratoEmail` solo conoce el contrato de adopcion. El backend lo
+// rechaza con un aviso claro en vez de mandar la plantilla de adopcion; el dia
+// que se conecte la acogida al correo saltara esta prueba.
+describe('contrato de acogida: el correo lo rechaza con un aviso claro', () => {
+  const fila = {
+    id: 'ctr_acogida_1',
+    tipo: 'acogida',
+    acogida_id: 'aco_1',
+    animal: 'Luna',
+    familia_id: 'fam_1',
+    fecha: '2026-11-20',
+    ciudad: 'Barakaldo',
+    f1_nombre: 'Casa de Acogida',
+    f1_dni: '00000000T',
+    f1_email: 'acogida@example.test',
+    f1_telefono: '600000000',
+    f1_direccion: 'Calle de Prueba 3'
+  };
+
+  it('responde error y no envía nada, en vez de usar la plantilla de adopción', () => {
+    const { ctx, enviados } = crearEntorno({ contrato: fila });
+    // El panel no puede construir `contrato_modelo` para una acogida: el PDF de
+    // acogida se imprime en el navegador, no lo genera el servidor.
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_acogida_1', to: ['acogida@example.test'] }, null);
+
+    assert.equal(r.status, 'error');
+    assert.match(r.error, /acogida/i);
+    assert.match(r.error, /Descarga su PDF/);
+    // Nada sale: ni correo, ni plantilla de adopción, ni adjunto a medias.
+    assert.equal(enviados.length, 0, 'el arnés no envía nada real: solo simula MailApp');
+  });
+
+  it('también lo rechaza si la fila solo trae acogida_id', () => {
+    const { ctx, enviados } = crearEntorno({ contrato: Object.assign({}, fila, { tipo: '' }) });
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_acogida_1' }, null);
+    assert.equal(r.status, 'error');
+    assert.match(r.error, /acogida/i);
+    assert.equal(enviados.length, 0);
+  });
+});
 
 describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () => {
   it('pone al adoptante en To y al tutor y al buzon fijo en CC', () => {
@@ -134,8 +411,9 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
 
   it('adjunta el PDF del contrato cuando el generador está disponible', () => {
     const { ctx, enviados } = crearEntorno();
-    ctx.generarPdfContrato = () => ({ getBytes: () => ({ length: 1234 }), name: 'Contrato.pdf' });
-    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'] }, null);
+    ctx.generarPdfModelo = () => ({ getBytes: () => ({ length: 1234 }), name: 'Contrato.pdf' });
+    const modelo = { bloques: [{ tipo: 'parrafo', texto: 'Contrato' }] };
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'], contrato_modelo: modelo }, null);
     assert.equal(r.status, 'success');
     assert.equal(Array.isArray(enviados[0].attachments), true);
     assert.equal(enviados[0].attachments.length, 1);
@@ -148,8 +426,9 @@ describe('sendContratoEmail: To adoptante y CC tutor + buzon de contratos', () =
 
   it('si el PDF falla, envía el HTML sin adjunto y lo indica', () => {
     const { ctx, enviados } = crearEntorno();
-    ctx.generarPdfContrato = () => { throw new Error('DocumentApp sin permiso'); };
-    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'] }, null);
+    ctx.generarPdfModelo = () => { throw new Error('DocumentApp sin permiso'); };
+    const modelo = { bloques: [{ tipo: 'parrafo', texto: 'Contrato' }] };
+    const r = ctx.sendContratoEmail({ contrato_id: 'ctr_1', to: ['ana@example.test'], contrato_modelo: modelo }, null);
     assert.equal(r.status, 'success');
     assert.equal(enviados[0].attachments, undefined);
     assert.equal(r.data.pdf_adjunto, false);

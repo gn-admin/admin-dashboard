@@ -254,164 +254,321 @@ const PdfExport = {
       </style></head><body><div class="contrato-doc">${body}</div></body></html>`;
   },
 
-  _buildContracto(c, logo) {
+  /**
+   * Datos de la entidad que firma el contrato. Es la única implementación de
+   * esa precedencia: el panel la usa en `Dashboard._contratoEntidadDatos` y el
+   * contrato (papel y PDF) aquí.
+   *
+   * Una sola regla para **todos** los campos: config del despliegue
+   * (`ASOCIACION_*` y `CONTACTO_*`) → copia congelada del contrato
+   * (`entidad_*`) → vacío o defecto. La asociación es la misma en todos los
+   * documentos, así que el aspecto que tenía un contrato al firmarse no puede
+   * fijar su nombre, CIF, domicilio ni teléfonos; la copia solo rellena lo que
+   * la config no define.
+   */
+  _entidadDatos(c) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG) || {};
+    const a = cfg.asociacion || {};
+    const contacto = cfg.contacto || {};
+    const snap = c || {};
+    // Primer valor con contenido: el documento nunca se queda con un hueco.
+    const val = (...valores) => {
+      for (let i = 0; i < valores.length; i++) {
+        const v = String(valores[i] == null ? '' : valores[i]).trim();
+        if (v) return v;
+      }
+      return '';
+    };
+    return {
+      nombre: val(a.nombre, snap.entidad_nombre, 'Asociación Grupo Nebak'),
+      cif: val(a.cif, snap.entidad_cif),
+      domicilio: val(a.domicilio, snap.entidad_domicilio),
+      email: val(a.email, contacto.email, snap.entidad_email),
+      telefono: val(a.telefono, contacto.telefono, snap.entidad_telefono),
+      registro: val(a.registro, snap.entidad_registro),
+      web: val(a.web, snap.entidad_web)
+    };
+  },
+
+  /**
+   * Datos del contrato resueltos una sola vez. Es la única fuente que
+   * comparten el contrato impreso (`_buildContracto`) y el modelo que viaja al
+   * PDF del servidor (`modeloContrato`): ficha viva como respaldo, importes por
+   * defecto, tutor, persona responsable designada y firma/sello de la entidad.
+   */
+  _datosContrato(c, logo) {
+    const cv = c || {};
     const T = (typeof module !== 'undefined' && module.exports)
       ? require('./contrato-textos.js')
       : (typeof ContratoTextos !== 'undefined' ? ContratoTextos : null);
-    const fecha = this._fmtFecha(c.fecha || this._hoy());
-    const fmtFecha = f => this._fmtFecha(f);
-    const f1Nombre = this._esc(c.f1_nombre || c.adoptante || '[adoptante]');
-    const f1Dni = this._esc(c.f1_dni || '—');
-    const f2Nombre = String(c.f2_nombre || '').trim();
-    const f2Rol = String(c.f2_rol || '').trim();
-    const f2EsEntidad = /entidad|asociaci[oó]n|grupo\s*nebak/i.test(f2Rol + ' ' + f2Nombre);
-    const tutor = (typeof Dashboard !== 'undefined' && Dashboard._contratoTutor)
-      ? Dashboard._contratoTutor(c)
-      : (f2Nombre && !f2EsEntidad ? c : null);
-    const firmaValida = f => (f && String(f).startsWith('data:')) ? f : '';
-    const entidadFirma = firmaValida(c.entidad_firma) || (!tutor ? firmaValida(c.f2_firma) : '');
-    const ent = (typeof Dashboard !== 'undefined' && Dashboard._contratoEntidadDatos)
-      ? Dashboard._contratoEntidadDatos(c)
-      : { nombre: c.entidad_nombre || 'Asociación Grupo Nebak', cif: c.entidad_cif || '', domicilio: c.entidad_domicilio || '', email: c.entidad_email || '', telefono: c.entidad_telefono || '', registro: c.entidad_registro || '', web: c.entidad_web || '' };
-    // Sello real de la asociación (el mismo que lleva el papel), no un sello
-    // dibujado con CSS. Si la entidad ha subido otro sello, manda el suyo.
-    const selloUrl = (typeof Dashboard !== 'undefined' && Dashboard._selloUrl && Dashboard._selloUrl())
-      || this._assetUrl('assets/contratos/sello-nebak.jpg');
-    const sello = selloUrl
-      ? `<div class="sello sello--img" aria-label="Sello de la entidad"><img src="${this._esc(this._assetUrl(selloUrl))}" alt="Sello de ${this._esc(ent.nombre)}"></div>`
-      : '';
+    if (!T) throw new Error('No se pudo cargar ContratoTextos');
 
-    // Importes del contrato: si faltan (contratos antiguos) se usan los del documento.
-    const porDefecto = (typeof Dashboard !== 'undefined' && Dashboard._contratoImportesPorDefecto)
-      ? Dashboard._contratoImportesPorDefecto()
-      : { donacion: 100, indemnizacion: 900 };
-    // Misma regla que el formulario (acepta coma, respeta el 0 y descarta negativos).
-    const importe = (v, def) => (typeof Dashboard !== 'undefined' && Dashboard._contratoImporte)
-      ? Dashboard._contratoImporte(v, def)
-      : ((v !== undefined && v !== null && v !== '' && !isNaN(Number(v)) && Number(v) >= 0) ? Number(v) : def);
-    const importes = {
-      donacion: importe(c.donacion_adoptante, porDefecto.donacion),
-      indemnizacion: importe(c.indemnizacion_importe, porDefecto.indemnizacion)
+    // La ventana de impresión abre en blanco: las rutas relativas se resuelven
+    // aquí una vez, para el papel y para las imágenes que descarga el servidor.
+    const abs = (u) => {
+      const s = String(u || '');
+      if (!s || /^(data:|https?:|blob:)/i.test(s)) return s;
+      try { return new URL(s, document.baseURI).href; } catch (e) { return s; }
     };
+    const val = (guardado, vivo) => (guardado !== undefined && guardado !== null && guardado !== '')
+      ? guardado
+      : (vivo || '');
+    const firmaValida = (f) => (f && String(f).startsWith('data:')) ? f : '';
+    const siNo = (v) => (v === true || /^(si|sí|true|1)$/i.test(String(v)))
+      ? 'Si'
+      : ((v === false || /^(no|false|0)$/i.test(String(v))) ? 'No' : '—');
 
-    // Los contratos nuevos guardan una copia de los datos del animal al firmar.
-    // Para contratos antiguos, o campos nuevos, se completa desde la ficha viva.
+    // Los contratos nuevos guardan una copia de los datos del animal al firmar;
+    // los antiguos, o los campos nuevos, se completan desde la ficha viva.
     let animal = {
-      nombre: c.animal || '',
-      nombre_definitivo: c.nombre_definitivo || '',
-      foto: c.animal_foto || '',
-      especie: c.especie || '',
-      raza: c.raza || '',
-      edad: c.edad || '',
-      sexo: c.animal_sexo || '',
-      microchip: c.animal_microchip || '',
-      fecha_nacimiento: c.animal_fecha_nacimiento || '',
-      capa: c.animal_capa || '',
-      color: c.animal_color || '',
-      tamano: c.animal_tamano || '',
-      esterilizada: c.animal_esterilizada,
-      descripcion: c.animal_descripcion || ''
+      nombre: cv.animal || '',
+      nombre_definitivo: cv.nombre_definitivo || '',
+      foto: cv.animal_foto || '',
+      especie: cv.especie || '',
+      raza: cv.raza || '',
+      edad: cv.edad || '',
+      sexo: cv.animal_sexo || '',
+      microchip: cv.animal_microchip || '',
+      fecha_nacimiento: cv.animal_fecha_nacimiento || '',
+      capa: cv.animal_capa || '',
+      color: cv.animal_color || '',
+      tamano: cv.animal_tamano || '',
+      esterilizada: cv.animal_esterilizada,
+      descripcion: cv.animal_descripcion || ''
     };
     try {
       if (typeof Dashboard !== 'undefined' && Dashboard._contratoAnimalDatos) {
-        const p = c.adopcion_id && Dashboard._byId
-          ? Dashboard._byId(Dashboard.adopciones || [], c.adopcion_id)
+        const p = cv.adopcion_id && Dashboard._byId
+          ? Dashboard._byId(Dashboard.adopciones || [], cv.adopcion_id)
           : null;
-        const live = Dashboard._contratoAnimalDatos(p, c) || {};
-        const val = (saved, fallback) => (saved !== undefined && saved !== null && saved !== '') ? saved : (fallback || '');
+        const vivo = Dashboard._contratoAnimalDatos(p, cv) || {};
         animal = {
-          nombre: val(c.animal, live.nombre),
-          nombre_definitivo: val(c.nombre_definitivo, live.nombre_definitivo),
-          foto: val(c.animal_foto, live.foto),
-          especie: val(c.especie, live.especie),
-          raza: val(c.raza, live.raza),
-          edad: val(c.edad, live.edad),
-          sexo: val(c.animal_sexo, live.sexo),
-          microchip: val(c.animal_microchip, live.microchip),
-          fecha_nacimiento: val(c.animal_fecha_nacimiento, live.fecha_nacimiento),
-          capa: val(c.animal_capa, live.capa),
-          color: val(c.animal_color, live.color),
-          tamano: val(c.animal_tamano, live.tamano),
-          esterilizada: val(c.animal_esterilizada, live.esterilizada),
-          descripcion: val(c.animal_descripcion, live.descripcion)
+          nombre: val(cv.animal, vivo.nombre),
+          nombre_definitivo: val(cv.nombre_definitivo, vivo.nombre_definitivo),
+          foto: val(cv.animal_foto, vivo.foto),
+          especie: val(cv.especie, vivo.especie),
+          raza: val(cv.raza, vivo.raza),
+          edad: val(cv.edad, vivo.edad),
+          sexo: val(cv.animal_sexo, vivo.sexo),
+          microchip: val(cv.animal_microchip, vivo.microchip),
+          fecha_nacimiento: val(cv.animal_fecha_nacimiento, vivo.fecha_nacimiento),
+          capa: val(cv.animal_capa, vivo.capa),
+          color: val(cv.animal_color, vivo.color),
+          tamano: val(cv.animal_tamano, vivo.tamano),
+          esterilizada: val(cv.animal_esterilizada, vivo.esterilizada),
+          descripcion: val(cv.animal_descripcion, vivo.descripcion)
         };
       }
-    } catch (e) { /* PDF autonomo: si no hay Dashboard, usa los datos guardados */ }
+    } catch (e) { /* PDF autonomo: usa los datos guardados */ }
 
-    const siNo = v => (v === true || /^(si|sí|true|1)$/i.test(String(v)))
-      ? 'Si'
-      : ((v === false || /^(no|false|0)$/i.test(String(v))) ? 'No' : '—');
-    const field = (label, value, cls) => `<div${cls ? ` class="${cls}"` : ''}><div class="label">${this._esc(label)}</div>${this._esc(value || '—')}</div>`;
-    let fotoSrc = animal.foto || '';
-    if (fotoSrc && !/^(data:|https?:|blob:)/i.test(fotoSrc) && typeof document !== 'undefined') {
-      try { fotoSrc = new URL(fotoSrc, document.baseURI).href; } catch { /* ruta no valida: se deja tal cual */ }
+    // Una sola precedencia para la entidad, también sin panel cargado.
+    const ent = PdfExport._entidadDatos(cv);
+
+    let tutor = null;
+    if (typeof Dashboard !== 'undefined' && Dashboard._contratoTutor) {
+      const t = Dashboard._contratoTutor(cv);
+      if (t) tutor = {
+        nombre: t.f2_nombre || t.nombre || '',
+        dni: t.f2_dni || t.dni || '',
+        relacion: t.f2_relacion || t.f2_rol || t.relacion || '',
+        direccion: t.f2_direccion || t.direccion || '',
+        email: t.f2_email || t.email || '',
+        telefono: t.f2_telefono || t.telefono || '',
+        firma: firmaValida(t.f2_firma || t.firma)
+      };
+    } else {
+      const f2Nombre = String(cv.f2_nombre || '').trim();
+      const f2Rol = String(cv.f2_rol || '').trim();
+      const f2EsEntidad = /entidad|asociaci[oó]n|grupo\s*nebak/i.test(f2Rol + ' ' + f2Nombre);
+      if (f2Nombre && !f2EsEntidad) tutor = {
+        nombre: f2Nombre,
+        dni: cv.f2_dni || '',
+        relacion: cv.f2_relacion || f2Rol,
+        direccion: cv.f2_direccion || '',
+        email: cv.f2_email || '',
+        telefono: cv.f2_telefono || '',
+        firma: firmaValida(cv.f2_firma)
+      };
     }
-    const foto = fotoSrc
-      ? `<img class="animal-photo" src="${this._esc(fotoSrc)}" alt="${this._esc(animal.nombre || 'Animal')}">`
-      : '<div class="animal-photo animal-photo--empty">Sin foto</div>';
-    const tutorHtml = tutor ? `
-      <div class="page-break"></div>
-      <h2>Anexo I. Datos del tutor o persona de apoyo</h2>
-      <div class="grid">
-        ${field('Nombre', tutor.f2_nombre)}
-        ${field('DNI', tutor.f2_dni)}
-        ${field('Relacion con el adoptante', tutor.f2_relacion || tutor.f2_rol)}
-        ${field('Domicilio', tutor.f2_direccion)}
-        ${field('Email', tutor.f2_email)}
-        ${field('Telefono', tutor.f2_telefono)}
-      </div>
-      <p class="nota">La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.</p>` : '';
-    const firma = (label, nombre, dni, firmaData, alt) => `<div class="signature">
-      <div class="sig-label">${this._esc(label)}</div>
-      <div class="firma-fila">${firmaData ? `<img class="firma-img" src="${this._esc(firmaData)}" alt="${alt}">` : '<div class="firma-fallback">[Sin firma]</div>'}</div>
-      <div class="sig-line">${this._esc(nombre)}${dni ? ' &middot; DNI ' + this._esc(dni) : ''}</div>
-    </div>`;
-    const firmaAdoptante = firma('Adoptante', c.f1_nombre || c.adoptante || '[adoptante]', c.f1_dni, c.f1_firma, 'Firma del adoptante');
-    const firmaTutor = tutor ? firma('Tutor / persona de apoyo', tutor.f2_nombre, tutor.f2_dni, tutor.f2_firma, 'Firma del tutor') : '';
-    const firmaEntidad = `<div class="signature signature--entidad">
-      <div class="sig-label">Firma Asociación</div>
-      <div class="firma-fila">
-        ${entidadFirma ? `<img class="firma-img" src="${this._esc(entidadFirma)}" alt="Firma de la entidad">` : ''}
-        ${sello}
-      </div>
-      <div class="sig-line">${this._esc(ent.nombre)}</div>
-    </div>`;
-    const estipulaciones = (T ? T.estipulaciones : []).map(est => {
-      const x = T.texto(est, importes);
-      // El numero va dentro del primer parrafo: si no, queda solo en su linea.
-      const parrafos = x.parrafos.map((t, i) => `<p>${i === 0 ? `<b>${est.n}ª.</b> ` : ''}${this._esc(t)}</p>`).join('');
-      const lista = x.lista.length
-        ? `<ol class="est-lista">${x.lista.map(t => `<li>${this._esc(t)}</li>`).join('')}</ol>`
-        : '';
-      return `<div class="clausula">${parrafos}${lista}</div>`;
-    }).join('');
 
-    // Cláusula especial de mayores de 65: página propia y solo si se marcó.
-    const r65 = (typeof Dashboard !== 'undefined' && Dashboard._contratoResponsable65)
-      ? Dashboard._contratoResponsable65(c)
-      : ((c.adoptante_mayor_65 && /^(1|si|sí|true|on|x)$/i.test(String(c.adoptante_mayor_65))) || c.responsable_nombre ? c : null);
-    const k65 = T && T.clausula65;
-    const clausula65 = (r65 && k65) ? `
-      <div class="page-break"></div>
-      <h2>${this._esc(k65.titulo)}</h2>
-      ${k65.parrafos.map(p => `<p>${this._esc(p)}</p>`).join('')}
-      <h2>Datos de la persona responsable designada</h2>
-      <div class="grid">
-        ${field('Nombre completo', r65.responsable_nombre)}
-        ${field('DNI/NIE', r65.responsable_dni)}
-        ${field('Teléfono de contacto', r65.responsable_telefono)}
-        ${field('Correo electrónico', r65.responsable_email)}
-        ${field('Dirección', r65.responsable_direccion, 'grid-full')}
-      </div>
-      <p>En <b>${this._esc(c.ciudad || 'Irún')}</b>, a <b>${fecha}</b>.</p>
-      <div class="signatures">
-        ${firmaAdoptante}
-        <div class="signature">
-          <div class="sig-label">Firma de la persona responsable</div>
-          <div class="firma-fila"></div>
-          <div class="sig-line">${this._esc(r65.responsable_nombre || '—')}${r65.responsable_dni ? ' &middot; DNI/NIE ' + this._esc(r65.responsable_dni) : ''}</div>
-        </div>
-      </div>` : '';
+    let responsable65 = null;
+    if (typeof Dashboard !== 'undefined' && Dashboard._contratoResponsable65) {
+      const r = Dashboard._contratoResponsable65(cv);
+      if (r) responsable65 = {
+        nombre: r.responsable_nombre || r.nombre || '',
+        dni: r.responsable_dni || r.dni || '',
+        telefono: r.responsable_telefono || r.telefono || '',
+        email: r.responsable_email || r.email || '',
+        direccion: r.responsable_direccion || r.direccion || ''
+      };
+    } else if ((cv.adoptante_mayor_65 && /^(1|si|sí|true|on|x)$/i.test(String(cv.adoptante_mayor_65))) || cv.responsable_nombre) {
+      responsable65 = {
+        nombre: cv.responsable_nombre || '',
+        dni: cv.responsable_dni || '',
+        telefono: cv.responsable_telefono || '',
+        email: cv.responsable_email || '',
+        direccion: cv.responsable_direccion || ''
+      };
+    }
+
+    // Importes del contrato: si faltan (contratos antiguos) se usan los del
+    // documento. Misma regla que el formulario: acepta coma, respeta el 0 y
+    // descarta negativos.
+    const porDefecto = (typeof Dashboard !== 'undefined' && Dashboard._contratoImportesPorDefecto)
+      ? Dashboard._contratoImportesPorDefecto()
+      : { donacion: 100, indemnizacion: 900 };
+    const importe = (v, def) => (typeof Dashboard !== 'undefined' && Dashboard._contratoImporte)
+      ? Dashboard._contratoImporte(v, def)
+      : ((v !== undefined && v !== null && v !== '' && !isNaN(Number(v)) && Number(v) >= 0) ? Number(v) : def);
+
+    const fecha = this._fmtFecha(cv.fecha || this._hoy());
+    // Sello real de la asociación (el mismo que lleva el papel), no un sello
+    // dibujado con CSS. Si la entidad ha subido otro, manda el suyo.
+    const sello = (typeof Dashboard !== 'undefined' && Dashboard._selloUrl && Dashboard._selloUrl())
+      || this._assetUrl('assets/contratos/sello-nebak.jpg');
+    const nacimiento = animal.fecha_nacimiento ? this._fmtFecha(animal.fecha_nacimiento) : '';
+    const nombreArchivo = ('Contrato-Adopcion-' + (animal.nombre || 'Grupo-Nebak') + '-' + (cv.fecha || cv.id || 'signed'))
+      .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
+
+    return {
+      c: cv,
+      animal: Object.assign({}, animal, {
+        foto: abs(animal.foto),
+        fecha_nacimiento: nacimiento,
+        esterilizada: siNo(animal.esterilizada)
+      }),
+      entidad: ent,
+      tutor,
+      entidadFirma: firmaValida(cv.entidad_firma) || (!tutor ? firmaValida(cv.f2_firma) : ''),
+      responsable65,
+      importes: {
+        donacion: importe(cv.donacion_adoptante, porDefecto.donacion),
+        indemnizacion: importe(cv.indemnizacion_importe, porDefecto.indemnizacion)
+      },
+      fecha,
+      fechaNacimiento: nacimiento,
+      ciudad: cv.ciudad || 'Irún',
+      expediente: cv.adopcion_id || cv.id || '',
+      logoUrl: logo || this._logoFallback,
+      selloUrl: abs(sello),
+      textos: T,
+      nombreArchivo
+    };
+  },
+
+  /**
+   * Modelo del documento (bloques). Lo consumen el HTML de impresión
+   * (`_htmlContrato`) y el PDF del servidor (`generarPdfModelo`): el contenido
+   * y su orden viven solo en ContratoModelo, así que los dos documentos no
+   * pueden separarse.
+   */
+  _modeloContrato(c, logo) {
+    const M = (typeof module !== 'undefined' && module.exports)
+      ? require('./contrato-modelo.js')
+      : (typeof ContratoModelo !== 'undefined' ? ContratoModelo : null);
+    if (!M) throw new Error('No se pudo cargar el modelo del contrato');
+    return M.construir(this._datosContrato(c, logo));
+  },
+
+  /** Modelo que viaja al renderizador PDF del servidor (`contrato_modelo`). */
+  async modeloContrato(c) {
+    return this._modeloContrato(c, await this._logoUrl());
+  },
+
+  /**
+   * Contrato imprimible: envuelve el modelo compartido con los estilos A4.
+   * No añade contenido propio; si un dato no está en el modelo, no sale en papel.
+   */
+  _htmlContrato(modelo) {
+    const esc = (s) => this._esc(s);
+    const bloques = (modelo && modelo.bloques) || [];
+    // Destaca los mismos trozos que el modelo marca (`negrita`), ya escapados.
+    const conNegrita = (texto, partes) => {
+      let html = esc(texto);
+      (partes || []).forEach((p) => {
+        const e = esc(p);
+        if (!e) return;
+        html = html.replace(e, '<b>' + e + '</b>');
+      });
+      return html;
+    };
+    const salida = [];
+    let logo = '';
+    let titulo = '';
+    let subtitulo = '';
+    let grupoFirmas = [];
+
+    const bloqueFirma = (b) => {
+      const etiqueta = b.etiqueta || 'Firma';
+      const sello = b.sello
+        ? `<div class="sello sello--img" aria-label="Sello de la entidad"><img src="${esc(b.sello)}" alt="Sello de ${esc(b.nombre || 'la entidad')}"></div>`
+        : '';
+      const firma = b.firma
+        ? `<img class="firma-img" src="${esc(b.firma)}" alt="Firma de ${esc(b.nombre || 'la parte')}">`
+        : (sello ? '' : '<div class="firma-fallback">[Sin firma]</div>');
+      const linea = esc(b.nombre || '—') + (b.dni ? ' &middot; ' + esc(b.dniEtiqueta || 'DNI') + ' ' + esc(b.dni) : '');
+      return `<div class="signature"><div class="sig-label">${esc(etiqueta)}</div><div class="firma-fila">${firma}${sello}</div><div class="sig-line">${linea}</div></div>`;
+    };
+
+    const cerrarFirmas = () => {
+      if (!grupoFirmas.length) return;
+      salida.push('<div class="signatures' + (grupoFirmas.length > 2 ? ' signatures--three' : '') + '">' + grupoFirmas.join('') + '</div>');
+      grupoFirmas = [];
+    };
+
+    bloques.forEach((b) => {
+      const tipo = b && b.tipo;
+      // Copia de una firma en la forma antigua, para el .gs aún sin actualizar:
+      // aquí ya la pinta el grupo, así que no se repite.
+      if (b && b.legado) return;
+      // Las firmas consecutivas comparten fila; cualquier otro bloque la cierra.
+      if (tipo === 'firmas') { (b.items || []).forEach(it => grupoFirmas.push(bloqueFirma(it))); return; }
+      if (tipo === 'firma' || tipo === 'firmaEntidad') { grupoFirmas.push(bloqueFirma(b)); return; }
+      cerrarFirmas();
+      if (tipo === 'imagen') {
+        if (b.clase === 'logo') { logo = b.src; return; }
+        salida.push(`<img class="imagen" src="${esc(b.src)}" alt="${esc(b.alt || '')}">`);
+        return;
+      }
+      if (tipo === 'titulo') { titulo = b.texto || ''; return; }
+      if (tipo === 'subtitulo') { subtitulo = b.texto || ''; return; }
+      if (tipo === 'seccion') { salida.push(`<h2>${esc(b.texto)}</h2>`); return; }
+      if (tipo === 'parrafo') { salida.push(`<p>${conNegrita(b.texto, b.negrita)}</p>`); return; }
+      if (tipo === 'nota') { salida.push(`<p class="nota">${esc(b.texto)}</p>`); return; }
+      if (tipo === 'salto') { salida.push('<div class="page-break"></div>'); return; }
+      if (tipo === 'tabla') {
+        // Tabla etiqueta/valor del documento; la fotografía es la última fila.
+        const filas = (b.filas || []).map(f => `<tr><th scope="row">${esc(f[0])}</th><td>${esc(f[1] == null || f[1] === '' ? '—' : f[1])}</td></tr>`).join('');
+        const f = b.foto;
+        const fotoFila = f
+          ? `<tr><th scope="row">${esc(f.etiqueta || 'Fotografía')}</th><td>${f.src
+            ? `<img class="animal-photo" src="${esc(f.src)}" alt="${esc(f.alt || 'Animal')}">`
+            : `<div class="animal-photo animal-photo--empty">${esc(f.vacio || 'Sin foto')}</div>`}</td></tr>`
+          : '';
+        salida.push(`<table class="ficha">${filas}${fotoFila}</table>`);
+        return;
+      }
+      if (tipo === 'estipulacion') {
+        const parrafos = (b.parrafos || []).map((t, i) => `<p>${i === 0 ? `<b>${esc(b.n)}ª.</b> ` : ''}${esc(t)}</p>`).join('');
+        const lista = (b.lista || []).length
+          ? `<ol class="est-lista">${b.lista.map(t => `<li>${esc(t)}</li>`).join('')}</ol>`
+          : '';
+        salida.push(`<div class="clausula">${parrafos}${lista}</div>`);
+        return;
+      }
+      if (tipo === 'clausula') {
+        const parrafos = (b.parrafos || []).map((t, i) => `<p>${i === 0 && b.titulo ? `<b>${esc(b.titulo)}.</b> ` : ''}${esc(t)}</p>`).join('');
+        salida.push(`<div class="clausula-anexo">${parrafos}</div>`);
+        return;
+      }
+      if (tipo === 'pie') salida.push(`<div class="footer">${esc(b.texto)}</div>`);
+    });
+    cerrarFirmas();
+
+    const cabecera = `<div class="header">
+        ${logo ? `<img src="${esc(logo)}" class="logo" alt="Grupo Nebak">` : ''}
+        <div><div class="title">${esc(titulo || 'Contrato de adopción')}</div>${subtitulo ? `<div class="sub">${esc(subtitulo)}</div>` : ''}</div>
+      </div>`;
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
       <title>Contrato de adopción</title>
@@ -424,18 +581,18 @@ const PdfExport = {
         .sub{font-size:9pt;color:#757575}
         h2{font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e8eaed;break-after:avoid}
         p{margin:0 0 8px;text-align:justify}
-        .grid{display:flex;flex-wrap:wrap;gap:4px 24px;font-size:10pt}
-        .grid>div{width:45%}
-        .grid-full{width:100%!important}
-        .label{font-size:8pt;font-weight:600;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.3px}
-        .animal{display:flex;gap:16px;align-items:flex-start;margin-bottom:12px;break-inside:avoid}
-        .animal-photo{width:110px;height:140px;object-fit:cover;border:1px solid #d1d5db;border-radius:4px;flex-shrink:0;display:block}
+        .imagen{max-width:100%;height:auto}
+        .ficha{width:100%;border-collapse:collapse;font-size:10pt;margin:6px 0 10px;break-inside:avoid}
+        .ficha th,.ficha td{border:1px solid #d1d5db;padding:4px 8px;text-align:left;vertical-align:top}
+        .ficha th{width:34%;font-size:8.5pt;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:0.3px;background:#fafafa}
+        .animal-photo{width:110px;height:110px;object-fit:cover;border:1px solid #d1d5db;border-radius:4px;display:block}
         .animal-photo--empty{display:flex;align-items:center;justify-content:center;background:#f4f5f7;color:#9aa0a6;font-size:8pt;text-align:center;padding:8px}
-        .animal-data{flex:1;min-width:0}
         .nota{font-size:9pt;color:#4b5563;margin:8px 0;text-align:left}
         .clausula{margin-bottom:9px;font-size:10pt;text-align:justify;break-inside:avoid}
         .clausula p{margin:0 0 4px}
         .clausula b{color:#191919}
+        .clausula-anexo{margin-bottom:9px;font-size:10pt;text-align:justify;break-inside:avoid}
+        .clausula-anexo p{margin:0 0 4px}
         .est-lista{margin:2px 0 0;padding-left:20px;font-size:10pt}
         .est-lista li{margin-bottom:2px}
         .signatures{display:flex;gap:36px;margin-top:34px;break-inside:avoid;align-items:stretch}
@@ -449,58 +606,16 @@ const PdfExport = {
         .sello{width:88px;height:88px;flex:0 0 88px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff;margin:0}
         .sello--img{width:96px;height:96px;flex:0 0 96px;border:0;border-radius:0;background:transparent;transform:none;display:flex;align-items:center;justify-content:center}
         .sello--img img{width:100%;height:100%;object-fit:contain}
-        .sello-inner{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px;max-width:78px}
-        .sello img{width:20px;height:20px;border-radius:50%;object-fit:cover}
-        .sello span{font-size:6pt;font-weight:800;line-height:1.1;text-transform:uppercase}
-        .sello small{font-size:4.6pt;font-weight:700;letter-spacing:.2px}
         .page-break{break-before:page;page-break-before:always}
         .footer{text-align:center;margin-top:26px;padding-top:10px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
       </style></head><body>
-      <div class="header">
-        <img src="${logo || this._logoFallback}" class="logo" alt="Grupo Nebak">
-        <div><div class="title">Contrato de adopción</div><div class="sub">${this._esc(ent.nombre)} &middot; Expediente ${this._esc(c.adopcion_id || c.id || '')}</div></div>
-      </div>
-
-      <p>En <b>${this._esc(c.ciudad || 'Irún')}</b>, a <b>${fecha}</b>.</p>
-      <p>De una parte, <b>${this._esc(ent.nombre)}</b>${ent.cif ? `, con CIF <b>${this._esc(ent.cif)}</b>` : ''}${ent.domicilio ? `, con domicilio en <b>${this._esc(ent.domicilio)}</b>` : ''}${ent.telefono ? `, con teléfonos de contacto <b>${this._esc(ent.telefono)}</b>` : ''}, en adelante, <b>la Asociación</b>.</p>
-      <p>De otra parte, <b>${f1Nombre}</b>, mayor de edad, que actúa en su propio nombre y derecho, con DNI <b>${f1Dni}</b>${c.f1_direccion ? `, con domicilio en <b>${this._esc(c.f1_direccion)}</b>` : ''}${c.f1_telefono ? `, teléfono <b>${this._esc(c.f1_telefono)}</b>` : ''}${c.f1_email ? `, y correo electrónico <b>${this._esc(c.f1_email)}</b>` : ''}, en adelante, <b>el Adoptante</b>.</p>
-      <p>Ambas partes acuerdan celebrar el presente contrato, de acuerdo con los siguientes <b>datos de adopción</b>.</p>
-
-      <h2>Datos de adopción</h2>
-      <div class="animal">
-        ${foto}
-        <div class="animal-data"><div class="grid">
-          ${field('Nombre', animal.nombre)}
-          ${field('Nombre definitivo', animal.nombre_definitivo)}
-          ${field('Especie', animal.especie)}
-          ${field('N.º microchip', animal.microchip)}
-          ${field('Raza', animal.raza)}
-          ${field('Sexo', animal.sexo)}
-          ${field('Fecha de nacimiento', fmtFecha(animal.fecha_nacimiento))}
-          ${field('Capa', animal.capa)}
-          ${field('Color', animal.color)}
-          ${field('Tamaño', animal.tamano)}
-          ${field('Esterilización', siNo(animal.esterilizada))}
-          ${field('Otras reseñas', animal.descripcion, 'grid-full')}
-        </div></div>
-      </div>
-      <p class="nota">${this._esc(T ? T.notaEstipulaciones : '')}</p>
-
-      <h2>Estipulaciones</h2>
-      ${estipulaciones}
-
-      ${tutorHtml}
-
-      <div class="signatures${tutor ? ' signatures--three' : ''}">
-        ${firmaAdoptante}
-        ${firmaTutor}
-        ${firmaEntidad}
-      </div>
-
-      ${clausula65}
-
-      <div class="footer">Generado por Grupo Nebak · ${this._hoy()}</div>
+      ${cabecera}
+      ${salida.join('\n      ')}
     </body></html>`;
+  },
+
+  _buildContracto(c, logo) {
+    return this._htmlContrato(this._modeloContrato(c, logo || this._logoFallback));
   },
 
   exportContratoAcogida(c) {

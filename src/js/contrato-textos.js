@@ -169,7 +169,9 @@ const ContratoTextos = {
   // Cláusula especial del documento de adopción: solo se imprime cuando el
   // adoptante es mayor de 65 años y designa a una persona responsable.
   clausula65: {
-    titulo: 'Cláusula especial · adoptantes mayores de 65 años',
+    // Rótulo del documento de la asociación (`CONTRATO DE ADOPCION ACTUALIZADO`),
+    // con la tilde que al original le falta.
+    titulo: 'Cláusula especial de contrato de adopción, adoptantes mayores de 65 años',
     parrafos: [
       'En caso de fallecimiento del titular de la adopción, la persona designada como responsable en el presente contrato se compromete a asumir la custodia, cuidado y bienestar del animal adoptado, garantizando que se mantengan las condiciones adecuadas de alimentación, salud y alojamiento.',
       'El adoptante deberá indicar previamente, por escrito, el nombre completo, documento de identidad y datos de contacto de la persona que asumirá dicha responsabilidad. Asimismo, dicha persona estará obligada a informar a la entidad protectora en un plazo máximo de 48 horas desde el fallecimiento del adoptante y la asunción de la custodia, para coordinar cualquier seguimiento o apoyo necesario.',

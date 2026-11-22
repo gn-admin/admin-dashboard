@@ -272,6 +272,28 @@ describe('Publico.urlSegura', () => {
   });
 });
 
+describe('Publico.telLink: dos números no rompen el enlace', () => {
+  it('el href lleva el primero y el texto, los dos', () => {
+    assert.equal(
+      Publico.telLink('625140588 y 600042594'),
+      '<a href="tel:625140588">625140588 y 600042594</a>'
+    );
+  });
+
+  it('respeta el prefijo y los separadores del primer número', () => {
+    assert.equal(Publico.telLink('+34 600 123 456'), '<a href="tel:+34600123456">+34 600 123 456</a>');
+    assert.equal(Publico.telLink('600-123-456, 600-654-321'), '<a href="tel:600123456">600-123-456, 600-654-321</a>');
+    assert.equal(Publico.telLink('600 123 456 / 600 654 321'), '<a href="tel:600123456">600 123 456 / 600 654 321</a>');
+  });
+
+  it('sin teléfono no pinta enlace y escapa el texto suelto', () => {
+    assert.equal(Publico.telLink(''), '');
+    assert.equal(Publico.telLink(null), '');
+    assert.equal(Publico.telLink('   '), '');
+    assert.equal(Publico.telLink('sin número'), 'sin número');
+  });
+});
+
 describe('Publico.fecha', () => {
   it('formatea ISO y fechas sin hora sin desplazar el día', () => {
     assert.match(Publico.fecha('2026-11-01T10:00:00.000Z'), /2026/);

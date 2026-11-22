@@ -59,6 +59,20 @@ const Publico = {
     return s;
   },
 
+  /**
+   * Enlace de teléfono: el `href` lleva el primer número y el texto, todos los
+   * que haya. «625140588 y 600042594» no puede acabar en
+   * `tel:625140588y600042594`, que no marca; el primero es el que se descuelga.
+   */
+  telLink(telefono) {
+    const texto = String(telefono == null ? '' : telefono).trim();
+    if (!texto) return '';
+    const primero = (texto.match(/\+?\d[\d\s.()-]*\d|\+?\d/) || [''])[0];
+    const destino = primero.replace(/[^\d+]/g, '');
+    if (!destino) return this.esc(texto);
+    return `<a href="tel:${this.esc(destino)}">${this.esc(texto)}</a>`;
+  },
+
   fecha(valor) {
     if (!valor) return '';
     const s = String(valor);
@@ -777,7 +791,7 @@ const Publico = {
     push('Ubicación', [loc.city, loc.province].filter(Boolean).join(', '));
     push('Contacto', '', [
       contacto.email ? `<a href="mailto:${this.esc(contacto.email)}">${this.esc(contacto.email)}</a>` : '',
-      contacto.phone ? `<a href="tel:${this.esc(String(contacto.phone).replace(/\s+/g, ''))}">${this.esc(contacto.phone)}</a>` : ''
+      contacto.phone ? this.telLink(contacto.phone) : ''
     ].filter(Boolean).join(' · '));
 
     return `<section class="pub-bloque">
@@ -823,7 +837,7 @@ const Publico = {
     push('Ubicación', [loc.city, loc.province, loc.name].filter(Boolean).join(', '));
     push('Contacto', '', [
       contacto.email ? `<a href="mailto:${this.esc(contacto.email)}">${this.esc(contacto.email)}</a>` : '',
-      contacto.phone ? `<a href="tel:${this.esc(String(contacto.phone).replace(/\s+/g, ''))}">${this.esc(contacto.phone)}</a>` : ''
+      contacto.phone ? this.telLink(contacto.phone) : ''
     ].filter(Boolean).join(' · '));
 
     const listaMiembros = miembros.map(m => {

@@ -6986,27 +6986,11 @@ const Dashboard = {
 
   // Datos de la entidad para los documentos. Los contratos nuevos guardan una
   // copia (entidad_*); los antiguos y los borradores usan la configuracion.
+  // La precedencia vive en `PdfExport._entidadDatos`: el papel, el PDF del
+  // servidor y este panel no pueden contar datos distintos.
   _contratoEntidadDatos(c) {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG) || {};
-    const a = cfg.asociacion || {};
-    const contacto = cfg.contacto || {};
-    const snap = c || {};
-    const val = (...valores) => {
-      for (let i = 0; i < valores.length; i++) {
-        const v = String(valores[i] == null ? '' : valores[i]).trim();
-        if (v) return v;
-      }
-      return '';
-    };
-    return {
-      nombre: val(snap.entidad_nombre, a.nombre, 'Asociación Grupo Nebak'),
-      cif: val(snap.entidad_cif, a.cif),
-      domicilio: val(snap.entidad_domicilio, a.domicilio),
-      email: val(snap.entidad_email, a.email, contacto.email),
-      telefono: val(snap.entidad_telefono, a.telefono, contacto.telefono),
-      registro: val(snap.entidad_registro, a.registro),
-      web: val(snap.entidad_web, a.web)
-    };
+    if (typeof PdfExport !== 'undefined' && PdfExport._entidadDatos) return PdfExport._entidadDatos(c);
+    return require('./pdf-export.js')._entidadDatos(c);
   },
 
   _contratoEntidadHtml(c, logo) {
@@ -8335,7 +8319,10 @@ const Dashboard = {
       try {
         const sinPermiso = await this._permisoCorreoError();
         if (sinPermiso) throw sinPermiso;
-        const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
+        const modelo = await this._modeloContratoPayload(c);
+        const payload = { contrato_id: c.id, adopcion_id: adopcionId, to };
+        if (modelo) payload.contrato_modelo = modelo;
+        const r = await API.sendContratoEmail(payload);
         enviado = true;
         if (r && r.data && r.data.modo_pruebas) envioPruebas = (r.data.enviado_a || []).join(', ');
         if (r && r.data && !r.data.pdf_adjunto) envioSinPdf = r.data.pdf_error || 'no se pudo generar el PDF';
@@ -8531,6 +8518,18 @@ const Dashboard = {
   // Destinatarios disponibles segun el caso: adoptante (firmante 1), segundo
   // firmante/titular y una copia al Grupo Nebak (email de contacto o el del
   // usuario que ha iniciado sesion).
+  /** Modelo de documento que comparte PdfExport/ContratoTextos con el PDF del servidor. */
+  async _modeloContratoPayload(c) {
+    try {
+      if (typeof PdfExport !== 'undefined' && PdfExport.modeloContrato) {
+        return await PdfExport.modeloContrato(c);
+      }
+    } catch (err) {
+      console.warn('No se pudo construir el modelo del contrato:', err);
+    }
+    return null;
+  },
+
   _contratoEmails(p) {
     const c = p ? this._contratoDeAdopcion(p.id) : null;
     if (!c) return [];
@@ -8662,7 +8661,10 @@ const Dashboard = {
     try {
       const sinPermiso = await this._permisoCorreoError();
       if (sinPermiso) throw sinPermiso;
-      const r = await API.sendContratoEmail({ contrato_id: c.id, adopcion_id: adopcionId, to });
+      const modelo = await this._modeloContratoPayload(c);
+      const payload = { contrato_id: c.id, adopcion_id: adopcionId, to };
+      if (modelo) payload.contrato_modelo = modelo;
+      const r = await API.sendContratoEmail(payload);
       const pruebas = r && r.data && r.data.modo_pruebas ? (r.data.enviado_a || []).join(', ') : '';
       const conPdf = !!(r && r.data && r.data.pdf_adjunto);
       const sinPdf = r && r.data && !r.data.pdf_adjunto ? (r.data.pdf_error || 'no se pudo generar el PDF') : '';
