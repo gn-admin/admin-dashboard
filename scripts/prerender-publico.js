@@ -274,6 +274,7 @@ function paginaEstatica(pub, base) {
     '  <footer class="pub-footer"><p>Grupo Nebak · Contenido público. <a href="../publico.html">Ver todas las publicaciones</a></p></footer>',
     '  <script src="../js/publico-embed.js"></script>',
     '  <script src="../js/publico-compartir.js"></script>',
+    '  <script src="../js/publico-favoritos.js"></script>',
     '</body>',
     '</html>',
     ''

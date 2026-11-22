@@ -15,10 +15,12 @@
 // Secciones del visor: cada tipo es una «página» del sitio real (`main`), con
 // su propia ruta en el hash para poder enlazarla, compartirla y probarla.
 const SECCIONES = [
-  { slug: 'animales', tipo: 'animal', etiqueta: 'Animales', singular: 'animal', lead: 'Animales en adopción y en acogida, con su ficha completa.' },
-  { slug: 'grupos', tipo: 'animal_grupo', etiqueta: 'Grupos', singular: 'grupo', lead: 'Camadas y parejas que se adoptan juntas.' },
-  { slug: 'eventos', tipo: 'evento', etiqueta: 'Eventos', singular: 'evento', lead: 'Jornadas y citas de la asociación, ordenadas por su fecha.' },
-  { slug: 'historias', tipo: 'historia', etiqueta: 'Historias', singular: 'historia', lead: 'Casos, finales felices y novedades de la asociación.' }
+  { slug: 'animales', tipo: 'animal', etiqueta: 'Animales', uno: 'animal', varios: 'animales', lead: 'Animales en adopción y en acogida, con su ficha completa.' },
+  { slug: 'grupos', tipo: 'animal_grupo', etiqueta: 'Grupos', uno: 'grupo', varios: 'grupos', lead: 'Camadas y parejas que se adoptan juntas.' },
+  { slug: 'eventos', tipo: 'evento', etiqueta: 'Eventos', uno: 'evento', varios: 'eventos', lead: 'Jornadas y citas de la asociación, ordenadas por su fecha.' },
+  { slug: 'historias', tipo: 'historia', etiqueta: 'Historias', uno: 'historia', varios: 'historias', lead: 'Casos, finales felices y novedades de la asociación.' },
+  // «Me gusta» no consulta el canal: lista lo guardado en este navegador.
+  { slug: 'favoritos', tipo: 'favorito', etiqueta: 'Me gusta', uno: 'guardado', varios: 'guardados', lead: 'Las fichas que has marcado con «Me gusta», guardadas en este navegador.' }
 ];
 const SECCION_POR_DEFECTO = SECCIONES[0];
 
@@ -34,6 +36,13 @@ const _PublicoEmbed = (typeof PublicoEmbed !== 'undefined' && PublicoEmbed)
 
 // Normalizador compartido con el gestor. En Node (prerender/tests) se resuelve
 // con require; en el navegador, `ficha-config.js` se carga antes.
+// «Me gusta» en localStorage. En Node (prerender y tests) se resuelve con require.
+const _Favoritos = (typeof PublicoFavoritos !== 'undefined' && PublicoFavoritos)
+  ? PublicoFavoritos
+  : (typeof module !== 'undefined' && module.exports
+    ? (function () { try { return require('./publico-favoritos.js'); } catch (e) { return null; } })()
+    : null);
+
 const _FichaConfig = (typeof FichaConfig !== 'undefined' && FichaConfig)
   ? FichaConfig
   : (typeof module !== 'undefined' && module.exports
@@ -319,6 +328,10 @@ const Publico = {
         this.cargarLista();
       }
     });
+    // Marcar o desmarcar desde una ficha repinta la sección «Me gusta» abierta.
+    document.addEventListener('publico:favoritos', () => {
+      if (this.params.type === 'favorito') this.cargarLista();
+    });
     document.addEventListener('error', ev => {
       const img = ev.target;
       if (img && img.tagName === 'IMG' && !img.dataset.fb) {
@@ -403,6 +416,7 @@ const Publico = {
     const params = { endpoint: 'publicaciones' };
     Object.keys(this.params).forEach(k => {
       const v = this.params[k];
+      if (k === 'type' && v === 'favorito') return; // sección local, no se pide
       if (v !== '' && v !== null && v !== undefined) params[k] = v;
     });
     return params;
@@ -412,6 +426,13 @@ const Publico = {
     const req = ++this._req;
     const cont = this._contenedor();
     if (!cont) return;
+    // «Me gusta» sale del navegador: no hay petición ni estados de carga.
+    if (this.params.type === 'favorito') {
+      this.items = this.favoritos();
+      this.paginacion = { page: 1, pageSize: this.items.length || 12, total: this.items.length, totalPages: 1 };
+      this.renderLista();
+      return;
+    }
     cont.innerHTML = `<div class="pub-estado" role="status"><span class="pub-spinner" aria-hidden="true"></span><p>Cargando publicaciones...</p></div>`;
     try {
       const res = await this.peticion(this.parametrosCanal());
@@ -511,12 +532,16 @@ const Publico = {
     const total = this.paginacion ? this.paginacion.total : this.items.length;
     const pag = this.paginacion || { page: 1, totalPages: 1 };
     const seccion = this.seccionActiva();
+    const esFavoritos = this.params.type === 'favorito';
     const opciones = (lista, actual) => (lista || []).map(v => `<option value="${this.esc(v)}" ${actual === v ? 'selected' : ''}>${this.esc(this._etiquetaFiltro(v))}</option>`).join('');
 
     const hayFiltros = !!(this.params.q || this.params.category || this.params.species || this.params.desde);
-    const tarjetas = this.items.length
-      ? this.items.map(p => this._card(p)).join('')
+    const vacio = esFavoritos
+      ? `<div class="pub-error"><h1>Todavía no has guardado nada</h1><p>Abre la ficha de un animal o de un evento y pulsa «Me gusta»: se queda guardada en este navegador.</p></div>`
       : `<div class="pub-error"><h1>${hayFiltros ? 'Sin resultados' : 'Todavía no hay ' + this.esc(seccion.etiqueta.toLowerCase())}</h1><p>${hayFiltros ? 'No hay contenido que coincida con estos filtros. Prueba a limpiarlos.' : 'Cuando se publique contenido de este tipo aparecerá aquí.'}</p></div>`;
+    const tarjetas = this.items.length
+      ? this.items.map(p => this._card(p, esFavoritos ? { quitar: true } : null)).join('')
+      : vacio;
 
     cont.innerHTML = `
       <section class="pub-hero-lista">
@@ -525,7 +550,7 @@ const Publico = {
         <p class="pub-lead">${this.esc(seccion.lead)}</p>
       </section>
       ${this._tabs()}
-      <form class="pub-toolbar" data-pub-search role="search">
+      <form class="pub-toolbar" data-pub-search role="search"${esFavoritos ? ' style="display:none"' : ''}>
         <div class="pub-field" style="flex:2 1 240px">
           <label for="pub-q">Buscar</label>
           <input id="pub-q" type="search" name="q" value="${this.esc(this.params.q)}" placeholder="Título, texto, etiqueta...">
@@ -564,7 +589,7 @@ const Publico = {
           <button type="button" class="pub-btn pub-btn--ghost" data-pub-limpiar>Limpiar</button>
         </div>
       </form>
-      <p class="pub-count">${total} ${total === 1 ? this.esc(seccion.singular) : this.esc(seccion.etiqueta.toLowerCase())}</p>
+      <p class="pub-count">${total} ${total === 1 ? this.esc(seccion.uno) : this.esc(seccion.varios)}</p>
       <div class="pub-grid">${tarjetas}</div>
       ${pag.totalPages > 1 ? `<nav class="pub-pager" aria-label="Paginación">
         <button type="button" class="pub-btn pub-btn--ghost" data-pub-page="${pag.page - 1}" ${pag.page <= 1 ? 'disabled' : ''}>Anterior</button>
@@ -580,6 +605,43 @@ const Publico = {
     return m[valor] || valor;
   },
 
+  /** Enlaces de compartición en redes (se abren en pestaña nueva). */
+  enlacesCompartir(url, titulo) {
+    const destino = this.urlSegura(url);
+    if (!destino) return [];
+    const u = encodeURIComponent(destino);
+    const t = encodeURIComponent(String(titulo || ''));
+    const texto = encodeURIComponent((String(titulo || '').trim() ? titulo + ' ' : '') + destino);
+    return [
+      { red: 'X (Twitter)', url: 'https://twitter.com/intent/tweet?url=' + u + '&text=' + t },
+      { red: 'Facebook', url: 'https://www.facebook.com/sharer/sharer.php?u=' + u },
+      { red: 'WhatsApp', url: 'https://wa.me/?text=' + texto },
+      { red: 'Telegram', url: 'https://t.me/share/url?url=' + u + '&text=' + t }
+    ];
+  },
+
+  /** Resumen que se guarda en «Me gusta»: lo justo para pintar su tarjeta. */
+  _favoritoItem(p) {
+    const ev = p && p.event;
+    return {
+      slug: (p && p.slug) ? String(p.slug) : '',
+      title: (p && p.title) || '',
+      type: (p && p.type) || '',
+      category: (p && p.category) || '',
+      image: this.urlSegura((p && p.coverImage && p.coverImage.src) || (p && p.image) || ''),
+      publishedAt: (p && p.publishedAt) || '',
+      event: ev ? { startDate: ev.startDate || '', endDate: ev.endDate || '', pasado: ev.pasado === true } : null
+    };
+  },
+
+  esFavorito(slug) {
+    return !!(_Favoritos && slug && _Favoritos.tiene(slug));
+  },
+
+  favoritos() {
+    return _Favoritos ? _Favoritos.leer() : [];
+  },
+
   /** Rango legible del evento: «21 de marzo de 2027» o «21 – 22 de marzo de 2027». */
   rangoEvento(ev) {
     const e = ev || {};
@@ -590,7 +652,7 @@ const Publico = {
     return inicio + ' – ' + fin;
   },
 
-  _card(p) {
+  _card(p, opciones) {
     const img = this.urlSegura((p.coverImage && p.coverImage.src) || p.image);
     const alt = (p.coverImage && p.coverImage.alt) || p.title || '';
     const esGrupo = !!(p && (p.isGroup || p.type === 'animal_grupo'));
@@ -607,7 +669,7 @@ const Publico = {
     const celebrado = (evento && evento.pasado)
       ? `<span class="pub-tag pub-tag--pasado">Ya celebrado</span>`
       : '';
-    return `<a class="pub-card" href="#/publicacion/${encodeURIComponent(p.slug || '')}">
+    const tarjeta = `<a class="pub-card" href="#/publicacion/${encodeURIComponent(p.slug || '')}">
       <div class="pub-card-media${img ? '' : ' pub-card-media--vacia'}">${img ? `<img src="${this.esc(img)}" alt="${this.esc(alt)}" loading="lazy">` : '<span>Sin imagen</span>'}</div>
       <div class="pub-card-body">
         ${urgente}${celebrado}${p.category ? `<span class="pub-tag">${this.esc(p.category)}</span>` : ''}
@@ -617,6 +679,9 @@ const Publico = {
         <span class="pub-card-link">Ver ficha →</span>
       </div>
     </a>`;
+    if (!opciones || !opciones.quitar) return tarjeta;
+    const ficha = this.esc(JSON.stringify(this._favoritoItem(p)));
+    return `<div class="pub-fav">${tarjeta}<button type="button" class="pub-btn pub-btn--ghost pub-fav-quitar" data-favorito data-ficha="${ficha}" aria-pressed="true">Quitar de Me gusta</button></div>`;
   },
 
   // ==================== DETALLE ====================
@@ -750,11 +815,22 @@ const Publico = {
     }).filter(Boolean).join('') : '';
 
     const compartirUrl = this.urlCompartir(p);
-    const compartir = compartirUrl
-      ? `<button type="button" class="pub-btn pub-btn--ghost" data-compartir data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}">Compartir</button><span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"></span>`
+    const redes = this.enlacesCompartir(compartirUrl, p.title || '');
+    const panelRedes = redes.length
+      ? `<div class="pub-share" hidden>${redes.map((r) => `<a class="pub-share-link" href="${this.esc(r.url)}" target="_blank" rel="noopener noreferrer">${this.esc(r.red)}</a>`).join('')}` +
+        `<button type="button" class="pub-share-link" data-copiar data-url="${this.esc(compartirUrl)}">Copiar enlace</button></div>`
       : '';
-    const acciones = (cta || compartir)
-      ? `<div class="pub-acciones">${cta}${compartir}<a class="pub-btn pub-btn--ghost" href="${enlaceLista}">Ver todas las publicaciones</a></div>`
+    const compartir = compartirUrl
+      ? `<button type="button" class="pub-btn pub-btn--ghost" data-share-toggle data-url="${this.esc(compartirUrl)}" data-title="${this.esc(p.title || '')}" aria-expanded="false" aria-haspopup="true">Compartir</button>${panelRedes}<span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"></span>`
+      : '';
+    // «Me gusta» solo en fichas de animales (incluidos grupos) y de eventos.
+    const conFavorito = ['animal', 'animal_grupo', 'evento'].indexOf(p.type) !== -1;
+    const guardado = conFavorito && this.esFavorito(p.slug);
+    const favorito = conFavorito
+      ? `<button type="button" class="pub-btn pub-btn--ghost pub-fav-btn" data-favorito data-ficha="${this.esc(JSON.stringify(this._favoritoItem(p)))}" aria-pressed="${guardado ? 'true' : 'false'}" data-texto-normal="♡ Me gusta" data-texto-activo="♥ Guardado">${guardado ? '♥ Guardado' : '♡ Me gusta'}</button>`
+      : '';
+    const acciones = (cta || compartir || favorito)
+      ? `<div class="pub-acciones">${cta}${compartir}${favorito}<a class="pub-btn pub-btn--ghost" href="${enlaceLista}">Ver todas las publicaciones</a></div>`
       : '';
     const metaLinea = [
       urgente,

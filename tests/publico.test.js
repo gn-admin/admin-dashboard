@@ -162,7 +162,8 @@ describe('Publico.htmlDetalle: aviso de compartir accesible', () => {
 
   it('pinta la región viva vacía y atómica junto al botón Compartir', () => {
     const html = conLocation(() => Publico.htmlDetalle(pub));
-    assert.match(html, /data-compartir[^>]*>Compartir<\/button>/);
+    assert.match(html, /data-share-toggle[^>]*>Compartir<\/button>/);
+    assert.match(html, /aria-expanded="false"/);
     assert.match(html, /<span class="pub-compartir-aviso" role="status" aria-live="polite" aria-atomic="true"><\/span>/);
   });
 
@@ -580,5 +581,111 @@ describe('Publico: la vuelta desde una ficha respeta su sección', () => {
   it('un tipo desconocido cae en la portada (Animales)', () => {
     const html = Publico.htmlDetalle({ slug: 'x', title: 'X' });
     assert.match(html, /class="pub-back" href="#\/animales"/);
+  });
+});
+
+describe('Publico: compartir en redes y «Me gusta»', () => {
+  const conLocation = fn => {
+    const previo = global.location;
+    global.location = { origin: 'https://gn-admin.github.io', pathname: '/admin-dashboard/publico.html' };
+    try { return fn(); } finally { global.location = previo; }
+  };
+
+  it('genera los enlaces de X, Facebook, WhatsApp y Telegram con la URL codificada', () => {
+    const redes = Publico.enlacesCompartir('https://x.test/a?b=1&c=2', 'Luna & Bo');
+    assert.deepEqual(redes.map(r => r.red), ['X (Twitter)', 'Facebook', 'WhatsApp', 'Telegram']);
+    assert.match(redes[0].url, /^https:\/\/twitter\.com\/intent\/tweet\?url=https%3A%2F%2Fx\.test%2Fa%3Fb%3D1%26c%3D2&text=Luna%20%26%20Bo$/);
+    assert.match(redes[1].url, /^https:\/\/www\.facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2Fx\.test/);
+    assert.match(redes[2].url, /^https:\/\/wa\.me\/\?text=Luna%20%26%20Bo%20https%3A%2F%2Fx\.test/);
+    assert.match(redes[3].url, /^https:\/\/t\.me\/share\/url\?url=https%3A%2F%2Fx\.test/);
+  });
+
+  it('sin URL segura no ofrece enlaces ni panel', () => {
+    assert.deepEqual(Publico.enlacesCompartir('', 'x'), []);
+    assert.deepEqual(Publico.enlacesCompartir('javascript:alert(1)', 'x'), []);
+    assert.deepEqual(Publico.enlacesCompartir(null, 'x'), []);
+    // En Node sin `location` no hay URL canónica: ni panel ni botón de compartir.
+    const html = Publico.htmlDetalle({ slug: 'x', title: 'X' });
+    assert.doesNotMatch(html, /pub-share/);
+    assert.doesNotMatch(html, /data-share-toggle/);
+  });
+
+  it('la ficha pinta el panel de redes junto a Compartir', () => {
+    const html = conLocation(() => Publico.htmlDetalle({ slug: 'laia', type: 'animal', title: 'Laia', seo: {} }));
+    assert.match(html, /<div class="pub-share" hidden>/);
+    assert.match(html, /href="https:\/\/twitter\.com\/intent\/tweet[^"]*" target="_blank" rel="noopener noreferrer">X \(Twitter\)/);
+    assert.match(html, /href="https:\/\/www\.facebook\.com\/sharer[^"]*"[^>]*>Facebook/);
+    assert.match(html, /href="https:\/\/wa\.me\/\?text=[^"]*"[^>]*>WhatsApp/);
+    assert.match(html, /href="https:\/\/t\.me\/share\/url[^"]*"[^>]*>Telegram/);
+    assert.match(html, /data-copiar data-url="[^"]*">Copiar enlace/);
+  });
+
+  it('«Me gusta» aparece en animales y eventos, no en historias', () => {
+    const animal = conLocation(() => Publico.htmlDetalle({ slug: 'laia', type: 'animal', title: 'Laia', seo: {} }));
+    assert.match(animal, /data-favorito data-ficha=/);
+    assert.match(animal, /aria-pressed="false"[^>]*>♡ Me gusta/);
+    const evento = conLocation(() => Publico.htmlDetalle({ slug: 'jornada', type: 'evento', title: 'Jornada', seo: {}, event: { startDate: '2027-03-21', pasado: false } }));
+    assert.match(evento, /data-favorito/);
+    const historia = conLocation(() => Publico.htmlDetalle({ slug: 'h', type: 'historia', title: 'Historia', seo: {} }));
+    assert.doesNotMatch(historia, /data-favorito/);
+  });
+
+  it('el resumen guardado lleva lo justo para la tarjeta', () => {
+    const item = Publico._favoritoItem({
+      slug: 'jornada', title: 'Jornada', type: 'evento', category: 'Eventos',
+      coverImage: { src: 'https://x/a.jpg' }, publishedAt: '2026-11-01T10:00:00.000Z',
+      event: { startDate: '2027-03-21', endDate: '2027-03-22', pasado: false }
+    });
+    assert.deepEqual(item, {
+      slug: 'jornada', title: 'Jornada', type: 'evento', category: 'Eventos',
+      image: 'https://x/a.jpg', publishedAt: '2026-11-01T10:00:00.000Z',
+      event: { startDate: '2027-03-21', endDate: '2027-03-22', pasado: false }
+    });
+    assert.equal(Publico._favoritoItem({ slug: 'x' }).event, null);
+  });
+
+  it('la tarjeta de «Me gusta» trae su botón de quitar fuera del enlace', () => {
+    const html = Publico._card({ slug: 'laia', type: 'animal', title: 'Laia' }, { quitar: true });
+    assert.match(html, /^<div class="pub-fav"><a class="pub-card"/);
+    assert.match(html, /data-favorito data-ficha="[^"]*" aria-pressed="true">Quitar de Me gusta<\/button><\/div>$/);
+    assert.doesNotMatch(Publico._card({ slug: 'laia', type: 'animal', title: 'Laia' }), /pub-fav/);
+  });
+});
+
+describe('PublicoFavoritos: guardado en localStorage', () => {
+  const Favoritos = require('../src/js/publico-favoritos.js');
+  const memoria = () => {
+    const datos = {};
+    return {
+      getItem: k => (k in datos ? datos[k] : null),
+      setItem: (k, v) => { datos[k] = String(v); },
+      removeItem: k => { delete datos[k]; }
+    };
+  };
+
+  it('alterna, lee y quita por slug', () => {
+    const store = memoria();
+    assert.deepEqual(Favoritos.leer(store), []);
+    assert.equal(Favoritos.alternar({ slug: 'laia', title: 'Laia' }, store).guardado, true);
+    assert.equal(Favoritos.alternar({ slug: 'jornada', title: 'Jornada' }, store).guardado, true);
+    assert.deepEqual(Favoritos.leer(store).map(x => x.slug), ['jornada', 'laia']);
+    assert.equal(Favoritos.tiene('laia', store), true);
+    const r = Favoritos.alternar({ slug: 'laia' }, store);
+    assert.equal(r.guardado, false);
+    assert.equal(Favoritos.tiene('laia', store), false);
+    assert.deepEqual(Favoritos.quitar('jornada', store), []);
+  });
+
+  it('tolera datos corruptos y almacenamiento bloqueado', () => {
+    const roto = { getItem: () => 'no es json', setItem: () => {} };
+    assert.deepEqual(Favoritos.leer(roto), []);
+    const bloqueado = { getItem: () => { throw new Error('privado'); }, setItem: () => { throw new Error('privado'); } };
+    assert.deepEqual(Favoritos.leer(bloqueado), []);
+    assert.equal(Favoritos.alternar({ slug: 'x' }, bloqueado).guardado, true);
+  });
+
+  it('no guarda nada sin slug', () => {
+    const store = memoria();
+    assert.deepEqual(Favoritos.alternar({}, store), { guardado: false, lista: [] });
   });
 });

@@ -67,12 +67,55 @@
     copiar(url).then(confirmar, fallar);
   }
 
+  /** Abre o cierra el panel de redes junto al botón «Compartir». */
+  function alternarPanel(btn) {
+    const cont = btn.parentElement;
+    const panel = cont && cont.querySelector('.pub-share');
+    if (!panel) return;
+    const abierto = !panel.hasAttribute('hidden');
+    cerrarPaneles(panel);
+    panel.toggleAttribute('hidden', abierto);
+    btn.setAttribute('aria-expanded', abierto ? 'false' : 'true');
+  }
+
+  function cerrarPaneles(excepto) {
+    document.querySelectorAll('.pub-share').forEach(panel => {
+      if (panel === excepto || panel.hasAttribute('hidden')) return;
+      panel.setAttribute('hidden', '');
+      const btn = panel.parentElement && panel.parentElement.querySelector('[data-share-toggle]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   document.addEventListener('click', evento => {
-    const btn = evento.target && evento.target.closest
-      ? evento.target.closest('[data-compartir]')
-      : null;
-    if (!btn) return;
-    evento.preventDefault();
-    compartir(btn);
+    const el = evento.target && evento.target.closest ? evento.target : null;
+    const hay = (sel) => !!(el && el.closest && el.closest(sel));
+
+    if (hay('[data-copiar]')) {
+      evento.preventDefault();
+      const btn = el.closest('[data-copiar]');
+      const url = btn.getAttribute('data-url') || location.href;
+      copiar(url).then(() => avisar(btn, 'Enlace copiado'), () => avisar(btn, 'No se pudo copiar'));
+      return;
+    }
+
+    if (hay('[data-share-toggle]')) {
+      evento.preventDefault();
+      alternarPanel(el.closest('[data-share-toggle]'));
+      return;
+    }
+
+    if (hay('[data-compartir]')) {
+      evento.preventDefault();
+      compartir(el.closest('[data-compartir]'));
+      return;
+    }
+
+    // Un clic dentro del panel no lo cierra; cualquier otro clic, sí.
+    if (!hay('.pub-share')) cerrarPaneles(null);
+  });
+
+  document.addEventListener('keydown', evento => {
+    if (evento.key === 'Escape') cerrarPaneles(null);
   });
 })();
