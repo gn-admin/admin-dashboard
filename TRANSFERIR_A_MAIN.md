@@ -404,3 +404,23 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 - Canal/contrato/SEO de referencia: `GESTOR_WEB_PLAN_Y_ENDPOINTS.md`, `src/js/publico.js`, `scripts/prerender-publico.js`.
 - Transporte C4: `src/js/forms-transport.js`. Verificación reCAPTCHA: `apps-script/Code.gs` (`verificarRecaptchaV3`).
 - Estado: C3 groundwork aditivo (ficha en detalle, no en listados); D5 (login reCAPTCHA en admin) es flujo distinto a formularios de `main`.
+
+---
+
+## Estado final del port (2026-11-22)
+
+### Verificado en `main`
+
+- `node --test`: 41/41 OK (incluye SEO: canonical único y JSON-LD coherente).
+- `node --check` en `js/main.js`, `scripts/prerender.js`: OK.
+- Prerender en seco contra el canal: 7 fichas + 5 lápidas, 15 URLs en sitemap, 0 errores.
+- Canal en vivo: `type=evento` → 1 item; `taxonomias` y `config-publica` OK.
+- Navegación incluye `grupos.html`; `grupos.html` sin tarjetas de acogida sobrantes.
+- Mapeo de sección en `main/js/main.js` cubre `acogidas`, `adoptados`, `casosExternos`, `grupos`, `eventos` vía `getPostsFor`.
+
+### Pendiente manual (M5)
+
+1. Subir `WebPublicaciones.gs` + `Code.gs` a GAS.
+2. Configurar propiedades del script: `GITHUB_DEPLOY_REPO_MAIN=gn-admin/main`, `GITHUB_DEPLOY_WORKFLOW_MAIN=pages.yml`.
+3. Verificar disparo E2E: publicar en el gestor → run de `pages.yml` en `main` en < 5 min.
+4. Confirmar que `main` es la única canónica indexable (sitemap de `main` sin URLs de `admin-dashboard`).
