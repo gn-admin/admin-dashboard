@@ -534,7 +534,9 @@ function handleGetPublico(endpoint, e) {
       res = webConfigPublica();
       break;
     case 'taxonomias':
-      res = _webConCache('pub_tax', function () { return webTaxonomias(); }, p.nocache === '1');
+      // `type` entra en la clave: sin él, la respuesta de un tipo se serviría a
+      // quien pide todos los vocabularios (y al revés) durante los 60 s de caché.
+      res = _webConCache('pub_tax_' + _webKeyParams(p), function () { return webTaxonomias(p); }, p.nocache === '1');
       break;
     case 'sitemap':
       res = _webConCache('pub_sitemap', function () { return webSitemap(); }, p.nocache === '1');

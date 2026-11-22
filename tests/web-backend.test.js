@@ -1771,7 +1771,7 @@ describe('canal público: destacados, orden editorial y contacto', () => {
     );
     b.estado.publicaciones.push(
       fila({ id: 'web_1', publicado_en: '2026-11-01T10:00:00.000Z', featured: 'false', orden: 2 }),
-      fila({ id: 'web_2', origen_id: 'ani_2', slug: 'milo', titulo: 'Milo', especie: 'gato', categoria: 'Gatos en adopción', publicado_en: '2026-11-05T10:00:00.000Z', featured: 'true', orden: 1 }),
+      fila({ id: 'web_2', origen_id: 'ani_2', slug: 'milo', titulo: 'Milo', especie: 'gato', categoria: 'Gatos en adopción', estado_publico: 'en_acogida', publicado_en: '2026-11-05T10:00:00.000Z', featured: 'true', orden: 1 }),
       fila({ id: 'web_3', tipo: 'evento', origen_id: '', slug: 'jornada', titulo: 'Jornada', categoria: 'Eventos', estado_publico: 'programado', animal_json: '', evento_json: '{"startDate":"2026-12-01"}', publicado_en: '2026-11-03T10:00:00.000Z', featured: 'true', orden: 0 })
     );
   });
@@ -1827,5 +1827,42 @@ describe('canal público: destacados, orden editorial y contacto', () => {
     } finally {
       delete b.ctx.CONFIG.CONTACTO_TELEFONO;
     }
+  });
+
+  // R5: las taxonomías no mezclan vocabularios de animal con los de evento.
+  it('taxonomias sin type mantiene la respuesta mezclada de siempre', () => {
+    const sin = b.ctx.webTaxonomias();
+    assert.deepEqual(plano(sin.data.status).sort(), ['en_acogida', 'en_adopcion', 'programado']);
+    assert.ok(sin.data.type.includes('evento'));
+  });
+
+  it('taxonomias&type=animal separa los estados de animal de los de evento', () => {
+    const animal = b.ctx.webTaxonomias({ type: 'animal' });
+    assert.deepEqual(plano(animal.data.status).sort(), ['en_acogida', 'en_adopcion']);
+    assert.equal(animal.data.status.includes('programado'), false);
+    assert.deepEqual(plano(animal.data.type), ['animal']);
+    assert.deepEqual(plano(animal.data.category).sort(), ['Gatos en adopción', 'Perros en adopción']);
+
+    const evento = b.ctx.webTaxonomias({ type: 'evento' });
+    assert.deepEqual(plano(evento.data.status), ['programado']);
+    assert.equal(evento.data.status.includes('en_adopcion'), false);
+  });
+
+  it('taxonomias cuenta también lo que no cabe en una página del feed', () => {
+    const b2 = crearBackend();
+    b2.estado.animales.push(animal({ id: 'ani_1' }));
+    // 60 publicaciones: más que el máximo de una página (50).
+    for (let i = 0; i < 60; i++) {
+      b2.estado.publicaciones.push(fila({ id: 'web_' + i, slug: 'animal-' + i }));
+    }
+    assert.equal(b2.ctx.webListarPublicas({ pageSize: 50 }).pagination.total, 60);
+    assert.deepEqual(plano(b2.ctx.webTaxonomias({ type: 'animal' }).data.status), ['en_adopcion']);
+  });
+
+  it('la caché de taxonomias usa el type en la clave', () => {
+    const ctx = cargarCodeGs();
+    assert.equal(ctx._webKeyParams({}), '');
+    assert.equal(ctx._webKeyParams({ type: 'animal' }), 'type=animal');
+    assert.match(CODE_GS, /'pub_tax_' \+ _webKeyParams\(p\)/);
   });
 });

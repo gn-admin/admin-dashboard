@@ -2386,28 +2386,38 @@ function webRetiradas() {
   return { status: 'success', data: out };
 }
 
+/**
+ * Publicaciones públicas construidas, todas y sin paginar: base única del feed y
+ * de las taxonomías, para que los dos cuenten lo mismo aunque haya más de una
+ * página de publicaciones.
+ */
+function webPublicacionesPublicas() {
+  var mapa = webMapaAnimales();
+  var mapaGrupos = webMapaGrupos();
+  return webPublicables().map(function (p) {
+    return webConstruirPublicacion(p, webOrigenDePublicacion(p, mapa, mapaGrupos));
+  });
+}
+
+/** Vocabularios disponibles (`type`/`category`/`status`/`species`) de un conjunto. */
+function webVocabularioPublico(publicaciones) {
+  var out = { type: [], category: [], status: [], species: [] };
+  var push = function (arr, v) { if (v && arr.indexOf(v) === -1) arr.push(v); };
+  (publicaciones || []).forEach(function (p) {
+    push(out.type, p.type);
+    push(out.category, p.category);
+    push(out.status, p.status);
+    if (p.animal && p.animal.species) push(out.species, String(p.animal.species).toLowerCase());
+  });
+  return out;
+}
+
 function webListarPublicas(params) {
   var diag = webDiagnostico();
   if (diag) return diag;
   params = params || {};
-  var mapa = webMapaAnimales();
-  var mapaGrupos = webMapaGrupos();
-  var pubs = webPublicables();
-  var todas = pubs.map(function (p) {
-    return webConstruirPublicacion(p, webOrigenDePublicacion(p, mapa, mapaGrupos));
-  });
-
-
-  var disponibles = {
-    type: [], category: [], status: [], species: []
-  };
-  var push = function (arr, v) { if (v && arr.indexOf(v) === -1) arr.push(v); };
-  todas.forEach(function (p) {
-    push(disponibles.type, p.type);
-    push(disponibles.category, p.category);
-    push(disponibles.status, p.status);
-    if (p.animal && p.animal.species) push(disponibles.species, String(p.animal.species).toLowerCase());
-  });
+  var todas = webPublicacionesPublicas();
+  var disponibles = webVocabularioPublico(todas);
 
   var f = {
     type: webTexto(params.type),
@@ -2621,18 +2631,22 @@ function webRedirects() {
   return { status: 'success', generatedAt: webAhora(), data: out };
 }
 
-function webTaxonomias() {
-  var lista = webListarPublicas({ pageSize: WEB_PAGE_SIZE_MAX });
-  if (lista.status === 'warning') return lista;
-  return {
-    status: 'success',
-    data: {
-      type: lista.filters.type,
-      category: lista.filters.category,
-      status: lista.filters.status,
-      species: lista.filters.species
-    }
-  };
+/**
+ * Valores disponibles para construir los filtros de la web.
+ *
+ * Sin `type` devuelve todos los vocabularios (contrato anterior, sin cambios).
+ * Con `type` acota a ese tipo, para que el listado de animales no pinte estados
+ * de evento (`programado`, `publicado`) ni al contrario (R5 del canal público).
+ * Un tipo desconocido devuelve listas vacías, igual que el feed con un `type`
+ * que no existe; no es un error de cliente.
+ */
+function webTaxonomias(params) {
+  var diag = webDiagnostico();
+  if (diag) return diag;
+  var tipo = webTexto((params || {}).type).toLowerCase();
+  var todas = webPublicacionesPublicas();
+  var elegidas = tipo ? todas.filter(function (p) { return String(p.type) === tipo; }) : todas;
+  return { status: 'success', data: webVocabularioPublico(elegidas) };
 }
 
 function webConfigPublica() {
