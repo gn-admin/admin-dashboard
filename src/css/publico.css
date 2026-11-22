@@ -148,6 +148,21 @@ a:hover { color: var(--pub-primary-dark); }
 .pub-titulo { font-size: clamp(2rem, 4.6vw, 3rem); line-height: 1.06; margin: 0 0 .6rem; max-width: 20ch; }
 .pub-lead { font-size: 1.05rem; color: var(--pub-muted); max-width: 62ch; margin: 0; }
 
+/* Secciones: una «página» por tipo, como en la web real */
+.pub-tabs {
+  display: flex; flex-wrap: wrap; gap: .35rem;
+  margin: 0 0 1rem; padding: .35rem;
+  background: #f1f7f3; border: 1px solid #dfeae4; border-radius: 999px;
+}
+.pub-tab {
+  padding: .55rem 1.05rem; border-radius: 999px;
+  font-weight: 600; font-size: .92rem; text-decoration: none;
+  color: var(--pub-primary-dark);
+}
+.pub-tab:hover { background: rgba(43, 143, 90, .12); }
+.pub-tab--activa { background: var(--pub-primary-dark); color: #fff; }
+.pub-tab:focus-visible { outline: 3px solid #9fd8b8; outline-offset: 2px; }
+
 /* Buscador */
 .pub-toolbar {
   display: grid; gap: .8rem;

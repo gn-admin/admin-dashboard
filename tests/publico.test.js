@@ -10,11 +10,19 @@ const path = require('node:path');
 const Publico = require('../src/js/publico.js');
 
 describe('Publico.rutaDesdeHash', () => {
-  it('lista por defecto', () => {
-    assert.deepEqual(Publico.rutaDesdeHash(''), { vista: 'lista', slug: '' });
-    assert.deepEqual(Publico.rutaDesdeHash('#'), { vista: 'lista', slug: '' });
-    assert.deepEqual(Publico.rutaDesdeHash('#/'), { vista: 'lista', slug: '' });
-    assert.deepEqual(Publico.rutaDesdeHash('#/cualquier-cosa'), { vista: 'lista', slug: '' });
+  it('lista por defecto: la portada es Animales', () => {
+    assert.deepEqual(Publico.rutaDesdeHash(''), { vista: 'lista', slug: '', tipo: 'animal' });
+    assert.deepEqual(Publico.rutaDesdeHash('#'), { vista: 'lista', slug: '', tipo: 'animal' });
+    assert.deepEqual(Publico.rutaDesdeHash('#/'), { vista: 'lista', slug: '', tipo: 'animal' });
+    assert.deepEqual(Publico.rutaDesdeHash('#/cualquier-cosa'), { vista: 'lista', slug: '', tipo: 'animal' });
+  });
+
+  it('cada sección tiene su ruta', () => {
+    assert.equal(Publico.rutaDesdeHash('#/animales').tipo, 'animal');
+    assert.equal(Publico.rutaDesdeHash('#/grupos').tipo, 'animal_grupo');
+    assert.equal(Publico.rutaDesdeHash('#/eventos').tipo, 'evento');
+    assert.equal(Publico.rutaDesdeHash('#/historias').tipo, 'historia');
+    assert.equal(Publico.rutaDesdeHash('#/eventos/2027').tipo, 'evento');
   });
 
   it('detalle por slug', () => {
@@ -26,7 +34,7 @@ describe('Publico.rutaDesdeHash', () => {
   });
 
   it('tolera entradas raras', () => {
-    assert.deepEqual(Publico.rutaDesdeHash(null), { vista: 'lista', slug: '' });
+    assert.deepEqual(Publico.rutaDesdeHash(null), { vista: 'lista', slug: '', tipo: 'animal' });
     assert.equal(Publico.rutaDesdeHash('#/publicacion/').slug, '');
   });
 });
@@ -524,5 +532,35 @@ describe('Publico: agenda de eventos (sort=startDate, desde, event.pasado)', () 
     assert.equal(agenda.type, 'evento');
     assert.equal(agenda.sort, 'startDate');
     assert.equal(agenda.desde, 'hoy');
+  });
+});
+
+describe('Publico: secciones con pestañas (una página por tipo)', () => {
+  const comoPublico = (tipo) => Object.assign(Object.create(Publico), { params: { type: tipo } });
+
+  it('enlaza las cuatro secciones y marca la activa', () => {
+    const html = Publico._tabs.call(comoPublico('evento'));
+    assert.match(html, /href="#\/animales"/);
+    assert.match(html, /href="#\/grupos"/);
+    assert.match(html, /href="#\/eventos"/);
+    assert.match(html, /href="#\/historias"/);
+    assert.match(html, /pub-tab pub-tab--activa" href="#\/eventos" data-pub-tab="evento" aria-current="page"/);
+    assert.equal((html.match(/pub-tab--activa/g) || []).length, 1);
+    assert.equal((html.match(/aria-current="page"/g) || []).length, 1);
+  });
+
+  it('sin tipo configurado la sección activa es Animales', () => {
+    assert.equal(Publico.seccionActiva.call(comoPublico('')).etiqueta, 'Animales');
+    assert.equal(Publico.seccionActiva.call(comoPublico('animaleS')).etiqueta, 'Animales');
+    assert.equal(Publico.seccionActiva.call(comoPublico('historia')).etiqueta, 'Historias');
+    assert.equal(Publico.seccionActiva.call(comoPublico('animal_grupo')).etiqueta, 'Grupos');
+  });
+
+  it('cada sección manda su `type` al canal', () => {
+    const params = (tipo) => Publico.parametrosCanal.call(comoPublico(tipo));
+    assert.equal(params('animal').type, 'animal');
+    assert.equal(params('animal_grupo').type, 'animal_grupo');
+    assert.equal(params('evento').type, 'evento');
+    assert.equal(params('historia').type, 'historia');
   });
 });

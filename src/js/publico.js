@@ -12,6 +12,16 @@
  * OG/Twitter y JSON-LD).
  */
 
+// Secciones del visor: cada tipo es una «página» del sitio real (`main`), con
+// su propia ruta en el hash para poder enlazarla, compartirla y probarla.
+const SECCIONES = [
+  { slug: 'animales', tipo: 'animal', etiqueta: 'Animales', singular: 'animal', lead: 'Animales en adopción y en acogida, con su ficha completa.' },
+  { slug: 'grupos', tipo: 'animal_grupo', etiqueta: 'Grupos', singular: 'grupo', lead: 'Camadas y parejas que se adoptan juntas.' },
+  { slug: 'eventos', tipo: 'evento', etiqueta: 'Eventos', singular: 'evento', lead: 'Jornadas y citas de la asociación, ordenadas por su fecha.' },
+  { slug: 'historias', tipo: 'historia', etiqueta: 'Historias', singular: 'historia', lead: 'Casos, finales felices y novedades de la asociación.' }
+];
+const SECCION_POR_DEFECTO = SECCIONES[0];
+
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23EAF5EE'/%3E%3Ccircle cx='200' cy='128' r='34' fill='%23cfe3d6'/%3E%3Cellipse cx='200' cy='206' rx='58' ry='42' fill='%23cfe3d6'/%3E%3C/svg%3E";
 
 // Runtime del vídeo click-to-load (C3). En el navegador se carga antes que este
@@ -31,7 +41,7 @@ const _FichaConfig = (typeof FichaConfig !== 'undefined' && FichaConfig)
     : null);
 
 const Publico = {
-  params: { type: '', category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 },
+  params: { type: SECCION_POR_DEFECTO.tipo, category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 },
   filtros: { type: [], category: [], status: [], species: [] },
   items: [],
   paginacion: null,
@@ -95,7 +105,10 @@ const Publico = {
     return m[estado] || String(estado || '').replace(/_/g, ' ');
   },
 
-  /** '#/publicacion/luna' -> { vista:'detalle', slug:'luna' }. */
+  /**
+   * '#/publicacion/luna' -> { vista:'detalle', slug:'luna' }.
+   * '#/eventos' -> { vista:'lista', tipo:'evento' }; lo desconocido, la portada.
+   */
   rutaDesdeHash(hash) {
     const h = String(hash || '').replace(/^#\/?/, '').trim();
     if (h.indexOf('publicacion/') === 0) {
@@ -103,7 +116,24 @@ const Publico = {
       try { slug = decodeURIComponent(slug); } catch (e) {}
       return { vista: 'detalle', slug: slug };
     }
-    return { vista: 'lista', slug: '' };
+    const seccion = SECCIONES.filter((s) => s.slug === h.split('/')[0])[0];
+    return { vista: 'lista', slug: '', tipo: (seccion || SECCION_POR_DEFECTO).tipo };
+  },
+
+  /** Sección activa (objeto de `SECCIONES`) según `params.type`. */
+  seccionActiva() {
+    return SECCIONES.filter((s) => s.tipo === this.params.type)[0] || SECCION_POR_DEFECTO;
+  },
+
+  /** Pestañas de sección: enlaces reales, así cada página tiene su URL. */
+  _tabs() {
+    const activa = this.seccionActiva();
+    const enlaces = SECCIONES.map((s) => {
+      const esActiva = s.tipo === activa.tipo;
+      return `<a class="pub-tab${esActiva ? ' pub-tab--activa' : ''}" href="#/${s.slug}" data-pub-tab="${s.tipo}"` +
+        (esActiva ? ' aria-current="page"' : '') + `>${this.esc(s.etiqueta)}</a>`;
+    }).join('');
+    return `<nav class="pub-tabs" aria-label="Secciones">${enlaces}</nav>`;
   },
 
   /** Slug vigente cuando el backend responde con `redirect` (301). */
@@ -240,8 +270,12 @@ const Publico = {
 
   rutear() {
     const r = this.rutaDesdeHash(typeof location !== 'undefined' ? location.hash : '');
-    if (r.vista === 'detalle') this.cargarDetalle(r.slug);
-    else this.cargarLista();
+    if (r.vista === 'detalle') { this.cargarDetalle(r.slug); return; }
+    if (r.tipo && r.tipo !== this.params.type) {
+      this.params.type = r.tipo;
+      this.params.page = 1;
+    }
+    this.cargarLista();
   },
 
   _contenedor() {
@@ -280,7 +314,8 @@ const Publico = {
       }
       const limpiar = e.target.closest('[data-pub-limpiar]');
       if (limpiar) {
-        this.params = { type: '', category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 };
+        // «Limpiar» vacía los filtros, no cambia de sección.
+        this.params = { type: this.params.type, category: '', species: '', q: '', desde: '', sort: '', page: 1, pageSize: 12 };
         this.cargarLista();
       }
     });
@@ -475,30 +510,25 @@ const Publico = {
     if (!cont) return;
     const total = this.paginacion ? this.paginacion.total : this.items.length;
     const pag = this.paginacion || { page: 1, totalPages: 1 };
+    const seccion = this.seccionActiva();
     const opciones = (lista, actual) => (lista || []).map(v => `<option value="${this.esc(v)}" ${actual === v ? 'selected' : ''}>${this.esc(this._etiquetaFiltro(v))}</option>`).join('');
 
-    const hayFiltros = !!(this.params.q || this.params.type || this.params.category || this.params.species || this.params.desde);
+    const hayFiltros = !!(this.params.q || this.params.category || this.params.species || this.params.desde);
     const tarjetas = this.items.length
       ? this.items.map(p => this._card(p)).join('')
-      : `<div class="pub-error"><h1>${hayFiltros ? 'Sin resultados' : 'Todavía no hay publicaciones'}</h1><p>${hayFiltros ? 'No hay contenido que coincida con estos filtros. Prueba a limpiarlos.' : 'Cuando se publique contenido desde el panel aparecerá aquí.'}</p></div>`;
+      : `<div class="pub-error"><h1>${hayFiltros ? 'Sin resultados' : 'Todavía no hay ' + this.esc(seccion.etiqueta.toLowerCase())}</h1><p>${hayFiltros ? 'No hay contenido que coincida con estos filtros. Prueba a limpiarlos.' : 'Cuando se publique contenido de este tipo aparecerá aquí.'}</p></div>`;
 
     cont.innerHTML = `
       <section class="pub-hero-lista">
         <p class="pub-eyebrow">Grupo Nebak</p>
-        <h1 class="pub-titulo">Publicaciones</h1>
-        <p class="pub-lead">Animales en adopción, acogidas, eventos e historias de Grupo Nebak.</p>
+        <h1 class="pub-titulo">${this.esc(seccion.etiqueta)}</h1>
+        <p class="pub-lead">${this.esc(seccion.lead)}</p>
       </section>
+      ${this._tabs()}
       <form class="pub-toolbar" data-pub-search role="search">
         <div class="pub-field" style="flex:2 1 240px">
           <label for="pub-q">Buscar</label>
           <input id="pub-q" type="search" name="q" value="${this.esc(this.params.q)}" placeholder="Título, texto, etiqueta...">
-        </div>
-        <div class="pub-field">
-          <label for="pub-type">Tipo</label>
-          <select id="pub-type" data-pub-filtro="type">
-            <option value="">Todos</option>
-            ${opciones(this.filtros.type, this.params.type)}
-          </select>
         </div>
         <div class="pub-field">
           <label for="pub-category">Categoría</label>
@@ -534,7 +564,7 @@ const Publico = {
           <button type="button" class="pub-btn pub-btn--ghost" data-pub-limpiar>Limpiar</button>
         </div>
       </form>
-      <p class="pub-count">${total} ${total === 1 ? 'publicación' : 'publicaciones'}</p>
+      <p class="pub-count">${total} ${total === 1 ? this.esc(seccion.singular) : this.esc(seccion.etiqueta.toLowerCase())}</p>
       <div class="pub-grid">${tarjetas}</div>
       ${pag.totalPages > 1 ? `<nav class="pub-pager" aria-label="Paginación">
         <button type="button" class="pub-btn pub-btn--ghost" data-pub-page="${pag.page - 1}" ${pag.page <= 1 ? 'disabled' : ''}>Anterior</button>
