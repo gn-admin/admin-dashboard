@@ -21,7 +21,9 @@ Portar a la web real lo ya validado en la simulación de `admin-dashboard`:
 
 Base URL del Web App: la configurada para el canal público. El token **no** aplica a endpoints públicos. El Web App responde `Access-Control-Allow-Origin: *`, así que **`fetch` funciona directamente**; **JSONP** (`&callback=`) queda solo como respaldo (despliegues antiguos o navegadores que bloquean scripts de terceros).
 
-Todas las respuestas son un sobre: `{ status, endpoint, applied, filters, pagination, data }`, con `status` ∈ `success | warning | error | gone`.
+No todas las respuestas tienen la misma forma: los **listados** devuelven `{ status, endpoint, applied, filters, pagination, data }`; el **detalle** devuelve `{ status, data }` (o `redirect`, o `gone`); `retiradas`, `redirects` y `sitemap` devuelven `{ status, generatedAt, data }`. `status` ∈ `success | warning | error | gone`.
+
+El Web App contesta **HTTP 200** también cuando `status` es `error` o `gone`: la decisión sale de `status`, no del código HTTP (la excepción es el límite de peticiones, que llega como `warning` con HTTP 429). Un `endpoint` desconocido no da 404: cae en la API privada y responde `{ status:"error", code:401, error:"Token no proporcionado" }`.
 
 **La vista no cambia.** Se mantienen las páginas de listado y de ficha, sus bloques, sus metas y su estética; lo que se adapta es **la fuente y los filtros**: donde antes había un JSON estático, ahora hay una o dos llamadas, y los filtros se llaman de otra forma.
 
@@ -34,13 +36,13 @@ Todas las respuestas son un sobre: `{ status, endpoint, applied, filters, pagina
 | `animales-publicos` | Atajo de `publicaciones&type=animal` | los mismos del listado |
 | `eventos-publicos` | Atajo de `publicaciones&type=evento` | los mismos + `desde`, `sort=startDate` (§A.2.2) |
 | `historias-publicas` | Atajo de `publicaciones&type=historia` | los mismos |
-| `taxonomias` | Vocabulario para los filtros (`type`, `category`, `status`, `species`) | `type` para acotarlo |
-| `config-publica` | Config del canal (`contact.phone`, canal activo…) | — |
-| `retiradas` | Slugs retirados con su lápida | Para 410/`noindex` y para excluir del sitemap |
-| `redirects` | Mapa 301 `from` → `to` | Reglas del hosting/build |
-| `sitemap` | Entradas del sitemap (fichas publicadas + `publico.html`) | El `sitemap.xml`/`robots.txt` **físicos** se generan en el dominio propio |
+| `taxonomias` | Vocabulario de los filtros, dentro de `data`: `data.type`, `data.category`, `data.status`, `data.species` | `type` para acotarlo |
+| `config-publica` | Config pública: `site` (`name`, `url`), `contact` (`email`, `phone`), `seo` (`defaultTitle`, `defaultDescription`, `robots`, `baseUrl`) y `locales` | — |
+| `retiradas` | Lápida de cada slug retirado (`slug`, `tipo`, `retiradoEn`) | Para 410/`noindex` y para excluir del sitemap |
+| `redirects` | Lista de 301: `{ from, to, status, type, slug, currentSlug, changedAt }` | Reglas del hosting/build |
+| `sitemap` | URLs de ficha indexables (`loc`, `lastmod`, `changefreq`, `priority`, `type`, `slug`, `title`) | Sin dominio público responde `data: []` con un `notice`; el `sitemap.xml`/`robots.txt` **físicos** se generan en el dominio propio |
 
-**Alias REST** (mismos datos, rutas limpias para `main`): `/api/publicaciones`, `/api/publicaciones/<slug>`, `/api/redirects`, `/v1/publicaciones`, `/v1/animales`, `/v1/eventos`, `/v1/historias` (y `/v1/blog`), `/v1/config`, `/v1/taxonomias`, `/v1/sitemap`, `sitemap.xml`.
+**Alias REST** (mismos datos, **como valor de `endpoint=`**, no como ruta): `?endpoint=api/publicaciones`, `?endpoint=api/publicaciones/<slug>` (y `v1/publicaciones/<slug>`), `?endpoint=v1/publicaciones`, `?endpoint=v1/animales`, `?endpoint=v1/eventos`, `?endpoint=v1/historias` (y `v1/blog`), `?endpoint=v1/config`, `?endpoint=v1/taxonomias`, `?endpoint=v1/sitemap`, `?endpoint=api/redirects`, `?endpoint=v1/redirects`, `?endpoint=sitemap.xml`. El backend normaliza mayúsculas y barras sobrantes (`API/Publicaciones`, `/v1/animales/`). **Las rutas de verdad (`/exec/api/publicaciones`) no sirven de forma anónima**: Google responde con un 302 a `accounts.google.com/ServiceLogin`, así que en `main` usad el parámetro `endpoint`, no la ruta.
 
 **Parámetros del listado:**
 
@@ -53,9 +55,9 @@ Todas las respuestas son un sobre: `{ status, endpoint, applied, filters, pagina
 - `page`, `pageSize` (tope 50).
 - `nocache=1`: solo para depurar. La caché normal es de ~60 s y su clave incluye **todos** los parámetros, así que dos filtros distintos nunca se mezclan.
 
-**Eco `applied`:** qué se aplicó de verdad (`type`, `category`, `status`, `featured`, `sponsor`, `desde`, `species`, `q`, `sort`). Sirve para pintar los filtros tal como los entendió el backend, sin duplicar la normalización en cliente.
+**Eco `applied`:** qué se aplicó de verdad (`type`, `category`, `status`, `featured`, `sponsor`, `desde`, `species`, `q`). **`sort`, `page`, `pageSize`, `fields` y `nocache` no salen en `applied`**: el orden y la página los da la propia respuesta. Sirve para pintar los filtros tal como los entendió el backend, sin duplicar la normalización en cliente.
 
-**Estados a manejar:** listado vacío, canal no configurado (`status:"warning"`), error de red/carga (con reintento), no disponible/404 lógico (`status:"error"`, `noindex,nofollow` + enlace al listado), retirada/gone (410 o página `noindex`).
+**Estados a manejar:** listado vacío, canal no configurado (`status:"warning"`), límite de peticiones (`warning` con HTTP 429), error de red/carga (con reintento), no disponible/404 lógico (`status:"error"`, `error:"Publicación no encontrada"`, `noindex,nofollow` + enlace al listado), retirada/gone (`status:"gone"`, `code:"gone"` y `data` con `slug`, `tipo` y `retirado_en`; 410 o página `noindex`).
 
 **Qué adaptar en cada vista (y qué no):**
 
@@ -109,10 +111,10 @@ GET ?endpoint=eventos-publicos&sort=-startDate
 
 Los filtros de la web salen del canal, no de listas escritas a mano.
 
-- **`?endpoint=taxonomias`** devuelve `{ type, category, status, species }` con lo que hay publicado. Con `&type=animal` acota a ese tipo (así la sección de animales no ofrece estados de evento). Es lo que rellena los `<select>`; si vuelve vacío, ese filtro no se pinta.
-- **`featured=1|0`**: `1` solo destacadas, `0` solo no destacadas. Suma exacta: `featured=1` + `featured=0` = total del canal. Se usa para la portada o un carrusel.
+- **`?endpoint=taxonomias`** devuelve `data` con `{ type, category, status, species }` (solo `status` + `data`, sin `applied`) y lo que hay publicado. Con `&type=animal` acota a ese tipo (así la sección de animales no ofrece estados de evento). Es lo que rellena los `<select>`; si vuelve vacío, ese filtro no se pinta.
+- **`featured=1|0`**: `1` solo destacadas, `0` solo no destacadas. Suma exacta: `featured=1` + `featured=0` = total del canal (comprobado en producción: 1 + 6 = 7). Se usa para la portada o un carrusel.
 - **`sponsor=1|0`**: publicaciones con apadrinamiento (`sponsor.available`), no las que solo tienen el bloque vacío. Suma exacta, como `featured`: `sponsor=1` + `sponsor=0` = total del canal (comprobado en producción: 2 + 5 = 7).
-- **`applied`** devuelve lo que el backend entendió (`featured: "1"`, `category: "Caso externo"`…). Si no coincide con lo pedido, manda `applied`: es la fuente de verdad para marcar el filtro activo.
+- **`applied`** devuelve lo que el backend entendió (`featured: "1"`, `category: "Caso externo"`, `desde: "2026-11-22"`…), sin `sort`. Si no coincide con lo pedido, manda `applied`: es la fuente de verdad para marcar el filtro activo.
 - **Categoría canónica «Caso externo»**: se guarda y se devuelve con esa grafía exacta. Si la web pide `CASO EXTERNO`, `caso externo` o `casos externos`, el backend normaliza y responde con la canónica; los chips de `taxonomias` listan la categoría **una sola vez**. No comparar categorías en cliente con `===` sobre el texto libre: usar `applied.category` o la lista de `taxonomias`.
 - **`fields=card`**: única forma admitida de recortar el listado. Devuelve `id`, `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt`, `updatedAt`, `coverImage`, `image`, `imageAlt`, `sponsor`, `url`, `featured`, `urgent` y un `animal` reducido a `{ species, age, sex }`; se van `contentHtml`, `tags`, `icons`, `gallery`, `videos`, `author`, `orden`, `listed`, `canonical`, `seo`, `dateFormatted` y `readTime`. Cualquier otro valor (`fields=slug,title`) **se ignora** y devuelve el payload completo; `fields` tampoco aparece en `applied`, así que no lo uses como filtro. Sin el parámetro, el payload es el completo.
 
