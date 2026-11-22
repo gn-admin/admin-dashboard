@@ -23,6 +23,26 @@ describe('Web.categoriasPublicas', () => {
   });
 });
 
+describe('Web.sponsorDeFormulario', () => {
+  it('acepta número y coma decimal', () => {
+    assert.equal(Web.sponsorDeFormulario('15', 'Apadrinas su comida').monthlyEur, 15);
+    assert.equal(Web.sponsorDeFormulario('15,5', '').monthlyEur, 15.5);
+    assert.equal(Web.sponsorDeFormulario(' 20 ', '').monthlyEur, 20);
+  });
+
+  it('vacía o inválida viaja como null, no como 0', () => {
+    assert.equal(Web.sponsorDeFormulario('', 'notas').monthlyEur, null);
+    assert.equal(Web.sponsorDeFormulario('mucho', '').monthlyEur, null);
+    assert.equal(Web.sponsorDeFormulario('-3', '').monthlyEur, null);
+  });
+
+  it('recorta las notas y las deja vacías si no hay', () => {
+    assert.equal(Web.sponsorDeFormulario('', '  hola  ').notes, 'hola');
+    assert.equal(Web.sponsorDeFormulario(null, null).notes, '');
+    assert.equal(Web.sponsorDeFormulario('', 'x'.repeat(300)).notes.length, 200);
+  });
+});
+
 describe('Web.normalizarSlug', () => {
   it('quita acentos, mayúsculas y signos', () => {
     assert.equal(Web.normalizarSlug('Luna en Adopción!!'), 'luna-en-adopcion');

@@ -117,6 +117,52 @@ function webCategoriaCanonica(valor) {
   return t;
 }
 
+/**
+ * Regla de apadrinamiento (R3), la misma que el gestor (`_esApadrinable`): hace
+ * falta el check interno y que el animal esté disponible o en acogida. Aquí se
+ * mira el estado PÚBLICO efectivo, para que la sección no ofrezca apadrinar a
+ * quien la ficha ya presenta como adoptado. La prueba de cada lado fija la
+ * misma tabla de casos.
+ */
+function webEsApadrinable(origen, estadoPublico) {
+  var e = webTexto(estadoPublico);
+  if (!webBool((origen || {}).apadrinable, false)) return false;
+  return e === 'en_adopcion' || e === 'en_acogida';
+}
+
+/**
+ * Bloque `sponsor` del canal (R3). Aditivo y siempre presente en las fichas de
+ * animal: `available:false` cuando no aplica, para que la web no tenga que
+ * distinguir entre «no existe» y «ahora no». Importe y notas son editoriales
+ * (bloque `animal.sponsor` de la publicación); `apadrinable` y el estado
+ * interno no salen nunca.
+ */
+function webBloqueSponsor(curado, origen, estadoPublico) {
+  var c = webSponsorEditorial((curado || {}).sponsor);
+  return {
+    available: webEsApadrinable(origen, estadoPublico),
+    monthlyEur: c.monthlyEur === undefined ? null : c.monthlyEur,
+    notes: c.notes || ''
+  };
+}
+
+/**
+ * Bloque editorial `sponsor` (R3): solo devuelve las claves con contenido real.
+ * Así un formulario a medio rellenar no deja un `{notes:''}` guardado en la
+ * hoja, y vaciar la cuota o las notas las borra de verdad, porque el bloque se
+ * recalcula entero. Compone y guarda usan la misma normalización.
+ */
+function webSponsorEditorial(valor) {
+  var c = (valor && typeof valor === 'object' && !Array.isArray(valor)) ? valor : {};
+  var out = {};
+  var crudo = c.monthlyEur;
+  var eur = (crudo === undefined || crudo === null || crudo === '') ? null : Number(crudo);
+  if (eur !== null && !isNaN(eur) && eur >= 0) out.monthlyEur = eur;
+  var notas = webTexto(c.notes).slice(0, 200);
+  if (notas) out.notes = notas;
+  return out;
+}
+
 /** Estado público derivado del estado interno del animal (D1). */
 function webEstadoPublicoDerivado(estadoInterno) {
   var e = webTexto(estadoInterno).toLowerCase();
@@ -1129,7 +1175,10 @@ function webConstruirPublicacion(publicacion, origen, opts) {
     var kindCta = webTexto(p.cta.kind).toLowerCase();
     if (WEB_FICHA_CTA_KINDS.indexOf(kindCta) !== -1) out.cta.kind = kindCta;
   }
-  if (p.tipo === 'animal') out.animal = webBloqueAnimal(p.animal || {}, origen || {});
+  if (p.tipo === 'animal') {
+    out.animal = webBloqueAnimal(p.animal || {}, origen || {});
+    out.sponsor = webBloqueSponsor(p.animal || {}, origen || {}, webEstadoPublicoEfectivo(p, origen));
+  }
   if (p.tipo === 'animal_grupo') {
     var miembros = (origen && origen.miembros) || [];
     var gInfo = origen || {};
@@ -1336,6 +1385,14 @@ function webUpsertAnimal(body) {
     return Object.keys(out).length ? out : undefined;
   }
   var animalCurado = webLimpio(body.animal || {}, true) || {};
+  // R3: el bloque `sponsor` viaja siempre desde el gestor, también vacío, para
+  // que borrar la cuota o las notas en el formulario las borre de verdad. Si no
+  // queda nada con contenido, no se guarda bloque alguno en la hoja.
+  if (body.animal && body.animal.sponsor !== undefined) {
+    var sponsorCurado = webSponsorEditorial(body.animal.sponsor);
+    if (Object.keys(sponsorCurado).length) animalCurado.sponsor = sponsorCurado;
+    else delete animalCurado.sponsor;
+  }
   // No persistir contacto vacío si solo caerá al de la asociación (se inyecta al componer).
   if (animalCurado.contact && !webTexto(animalCurado.contact.email) && !webTexto(animalCurado.contact.phone)) delete animalCurado.contact;
   var registro = {
@@ -2444,6 +2501,7 @@ function webListarPublicas(params) {
     category: webCategoriaCanonica(webTexto(params.category)),
     status: webTexto(params.status),
     featured: webTexto(params.featured),
+    sponsor: webTexto(params.sponsor),
     species: webTexto(params.species).toLowerCase(),
     q: webTexto(params.q)
   };
@@ -2453,6 +2511,8 @@ function webListarPublicas(params) {
     if (f.status && p.status !== f.status) return false;
     // `featured=1` / `featured=0`; sin parámetro no filtra (compatibilidad).
     if (f.featured !== '' && !!p.featured !== webBool(f.featured, true)) return false;
+    // `sponsor=1` / `sponsor=0` (R3); sin parámetro no filtra (compatibilidad).
+    if (f.sponsor !== '' && !!(p.sponsor && p.sponsor.available) !== webBool(f.sponsor, true)) return false;
     if (f.species && String((p.animal && p.animal.species) || '').toLowerCase() !== f.species) return false;
     if (f.q) {
       var heno = (p.title + ' ' + p.excerpt + ' ' + p.contentHtml + ' ' + (p.tags || []).join(' ')).toLowerCase();
@@ -2513,7 +2573,7 @@ function webProyeccionCard(p) {
   return {
     id: p.id, slug: p.slug, type: p.type, category: p.category, status: p.status,
     title: p.title, excerpt: p.excerpt, publishedAt: p.publishedAt, updatedAt: p.updatedAt,
-    coverImage: p.coverImage, image: p.image, imageAlt: p.imageAlt,
+    coverImage: p.coverImage, image: p.image, imageAlt: p.imageAlt, sponsor: p.sponsor,
     url: p.url, featured: p.featured, urgent: !!p.urgent,
     animal: p.animal ? { species: p.animal.species, age: p.animal.age, sex: p.animal.sex } : undefined
   };

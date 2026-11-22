@@ -554,9 +554,9 @@ function handleGetPublico(endpoint, e) {
 }
 
 function _webKeyParams(p) {
-  // `featured` entra en la clave: si no, una respuesta filtrada se sirve a quien
-  // pide el listado completo (y al revés) durante los 60 s de caché.
-  var claves = ['type', 'category', 'status', 'featured', 'species', 'q', 'page', 'pageSize', 'sort', 'fields'];
+  // `featured` y `sponsor` entran en la clave: si no, una respuesta filtrada se
+  // sirve a quien pide el listado completo (y al revés) durante los 60 s de caché.
+  var claves = ['type', 'category', 'status', 'featured', 'sponsor', 'species', 'q', 'page', 'pageSize', 'sort', 'fields'];
   var partes = [];
   for (var i = 0; i < claves.length; i++) {
     if (p && p[claves[i]] !== undefined && p[claves[i]] !== '') partes.push(claves[i] + '=' + p[claves[i]]);

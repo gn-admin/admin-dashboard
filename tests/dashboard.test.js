@@ -364,6 +364,7 @@ describe('_esApadrinable: check + estado', () => {
     assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'disponible' }), true);
     assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'en_acogida' }), true);
     assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'adoptado' }), false);
+    assert.equal(Dashboard._esApadrinable({ apadrinable: true, estado: 'reservado' }), false);
     assert.equal(Dashboard._esApadrinable({ apadrinable: false, estado: 'disponible' }), false);
     assert.equal(Dashboard._esApadrinable({ estado: 'disponible' }), false);
     assert.equal(Dashboard._esApadrinable(null), false);

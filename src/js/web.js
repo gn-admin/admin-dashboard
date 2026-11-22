@@ -36,6 +36,20 @@ const Web = {
     return CATEGORIAS_PUBLICAS.slice();
   },
 
+  /**
+   * Bloque `sponsor` del payload (R3). La cuota admite coma decimal; vacía o
+   * inválida viaja como `null` (el backend decide si se publica, según el check
+   * y el estado del animal) y las notas se acotan a lo que acepta el backend.
+   */
+  sponsorDeFormulario(eur, notas) {
+    const crudo = String(eur == null ? '' : eur).replace(',', '.').trim();
+    const n = Number(crudo);
+    return {
+      monthlyEur: (crudo === '' || !isFinite(n) || n < 0) ? null : n,
+      notes: String(notas == null ? '' : notas).trim().slice(0, 200)
+    };
+  },
+
   normalizarSlug(valor) {
     const mapa = { 'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'ã': 'a', 'å': 'a', 'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i', 'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'ñ': 'n', 'ç': 'c' };
     let s = String(valor == null ? '' : valor).toLowerCase().replace(/[áàäâãåéèëêíìïîóòöôõúùüûñç]/g, c => mapa[c] || c);
@@ -727,6 +741,7 @@ const Web = {
     const cta = d.cta || {};
     const compat = animal.compatibility || {};
     const adop = animal.adoption || {};
+    const sponsor = animal.sponsor || {};
     const foster = animal.foster || {};
     const loc = animal.location || {};
     const contacto = animal.contact || {};
@@ -821,6 +836,11 @@ const Web = {
             <div class="form-group"><label for="web-adop-fee">Tasa (€)</label><input type="text" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
           </div>
           <div class="form-group"><label for="web-adop-req">Requisitos de adopción</label><textarea id="web-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label for="web-sponsor-eur">Apadrinamiento · cuota mensual (€)</label><input type="text" id="web-sponsor-eur" class="form-input" value="${this._esc(sponsor.monthlyEur == null ? '' : sponsor.monthlyEur)}" inputmode="decimal" placeholder="Ej: 15"></div>
+            <div class="form-group"><label for="web-sponsor-notas">Apadrinamiento · notas públicas</label><input type="text" id="web-sponsor-notas" class="form-input" value="${this._esc(sponsor.notes || '')}" placeholder="Apadrinas su alimentación y cuidados"></div>
+          </div>
+          <p class="web-nota">El apadrinamiento solo se publica si el animal tiene marcado «apadrinable» y está disponible o en acogida.</p>
           <div class="form-row">
             <div class="form-group"><label for="web-foster-temp">Acogida temporal</label>
               <select id="web-foster-temp" class="form-input"><option value="no" ${foster.temporary ? '' : 'selected'}>No</option><option value="si" ${foster.temporary ? 'selected' : ''}>Sí</option></select></div>
@@ -936,6 +956,7 @@ const Web = {
         temperament: this.parseLista(txt('web-temperamento')),
         compatibility: { dogs: txt('web-compat-perros'), cats: txt('web-compat-gatos'), kids: txt('web-compat-ninos') },
         adoption: { mode: txt('web-adop-mode'), feeEur: txt('web-adop-fee'), requirements: txt('web-adop-req') },
+        sponsor: this.sponsorDeFormulario(txt('web-sponsor-eur'), txt('web-sponsor-notas')),
         foster: { temporary: txt('web-foster-temp') === 'si', durationLabel: txt('web-foster-dur') },
         location: { city: txt('web-loc-city'), province: txt('web-loc-prov') },
         contact: { email: txt('web-contact-email'), phone: txt('web-contact-tel') },

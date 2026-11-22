@@ -1865,6 +1865,14 @@ describe('canal público: destacados, orden editorial y contacto', () => {
     assert.equal(ctx._webKeyParams({ type: 'animal' }), 'type=animal');
     assert.match(CODE_GS, /'pub_tax_' \+ _webKeyParams\(p\)/);
   });
+
+  it('la caché de apadrinamiento usa sponsor en la clave', () => {
+    const ctx = cargarCodeGs();
+    // Si `sponsor` no entra en la clave, la respuesta filtrada se sirve a quien
+    // pide el listado completo durante los 60 s de caché.
+    assert.equal(ctx._webKeyParams({ sponsor: '1' }), 'sponsor=1');
+    assert.equal(ctx._webKeyParams({ sponsor: '1', type: 'animal' }), 'type=animal&sponsor=1');
+  });
 });
 
 // R2: «Caso externo» es una categoría editorial y el filtro compara exacto, así
@@ -1914,5 +1922,125 @@ describe('canal público: categoría canónica «Caso externo»', () => {
     b.estado.publicaciones.push(fila({ id: 'web_1', categoria: 'Historias', tipo: 'historia', origen_id: '', animal_json: '', evento_json: '{}' }));
     assert.deepEqual(plano(b.ctx.webListarPublicas({}).data.map(p => p.category)), ['Historias']);
     assert.equal(b.ctx.webCategoriaGrupoDerivada('en_acogida', [animal()]), 'Acogidas');
+  });
+});
+
+// R3: sección de apadrinamiento. El bloque `sponsor` se deriva de la ficha
+// interna con la misma regla que el gestor (`_esApadrinable`) y se filtra con
+// `sponsor=`, igual que `featured`.
+describe('canal público: apadrinamiento (R3)', () => {
+  function publicada(b, opts) {
+    const o = opts || {};
+    b.estado.animales.push(animal(Object.assign({ id: o.id || 'ani_1', apadrinable: true }, o.animal || {})));
+    const alta = b.ctx.webUpsertAnimal(Object.assign({
+      animal_id: o.id || 'ani_1', titulo: o.titulo || 'Luna busca padrino', slug: o.slug || 'luna',
+      estado_publicacion: 'publicado', categoria: 'Perros en adopción',
+      extracto: o.titulo || 'Luna busca padrino',
+      contenido_html: '<p>Luna busca padrino para su alimentación y sus cuidados.</p>',
+      media: { coverImage: { src: 'https://x/luna.jpg', alt: 'Luna' } }
+    }, o.body || {}));
+    assert.equal(alta.status, 'success', JSON.stringify(alta));
+    return alta.data;
+  }
+
+  it('un animal apadrinable y disponible sale con sponsor.available=true', () => {
+    const b = crearBackend();
+    publicada(b);
+    const p = b.ctx.webListarPublicas({}).data[0];
+    // El payload nace en el contexto del `.gs`: se compara por valor.
+    assert.equal(JSON.stringify(p.sponsor), JSON.stringify({ available: true, monthlyEur: null, notes: '' }));
+    assert.equal(JSON.stringify(b.ctx.webPublicacionPublica('luna').data.sponsor), JSON.stringify(p.sponsor));
+  });
+
+  it('no escapa ningún campo interno: ni el check ni el estado', () => {
+    const b = crearBackend();
+    publicada(b);
+    const p = b.ctx.webListarPublicas({}).data[0];
+    assert.equal(p.apadrinable, undefined);
+    assert.equal(p.animal.apadrinable, undefined);
+    assert.equal(p.animal.sponsor, undefined);
+    assert.equal(p.estado, undefined);
+  });
+
+  it('un adoptado con el check puesto no es apadrinable', () => {
+    const b = crearBackend();
+    publicada(b, { animal: { estado: 'adoptado' } });
+    assert.equal(b.ctx.webListarPublicas({}).data[0].sponsor.available, false);
+    assert.equal(b.ctx.webListarPublicas({ sponsor: '1' }).pagination.total, 0);
+    assert.equal(b.ctx.webListarPublicas({ sponsor: '0' }).pagination.total, 1);
+  });
+
+  it('un override manual a reservado tampoco: manda el estado publicado', () => {
+    const b = crearBackend();
+    publicada(b, { body: { estado_publico: 'reservado', estado_publico_modo: 'manual' } });
+    assert.equal(b.ctx.webListarPublicas({}).data[0].status, 'reservado');
+    assert.equal(b.ctx.webListarPublicas({}).data[0].sponsor.available, false);
+  });
+
+  it('sin el check no hay apadrinamiento, aunque esté en acogida', () => {
+    const b = crearBackend();
+    publicada(b, { animal: { estado: 'en_acogida', apadrinable: false } });
+    assert.equal(b.ctx.webListarPublicas({}).data[0].sponsor.available, false);
+  });
+
+  it('en acogida sí: la regla coincide con el gestor', () => {
+    const b = crearBackend();
+    publicada(b, { animal: { estado: 'en_acogida' } });
+    assert.equal(b.ctx.webListarPublicas({}).data[0].sponsor.available, true);
+  });
+
+  it('sponsor=1 trae solo apadrinables, sponsor=0 el resto y sin parámetro no filtra', () => {
+    const b = crearBackend();
+    publicada(b);
+    publicada(b, { id: 'ani_2', titulo: 'Nube', slug: 'nube', animal: { nombre: 'Nube', apadrinable: false } });
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 2);
+    assert.deepEqual(plano(b.ctx.webListarPublicas({ sponsor: '1' }).data.map(p => p.slug)), ['luna']);
+    assert.deepEqual(plano(b.ctx.webListarPublicas({ sponsor: '0' }).data.map(p => p.slug)), ['nube']);
+    assert.equal(b.ctx.webListarPublicas({ sponsor: '1' }).applied.sponsor, '1');
+  });
+
+  it('importe y notas son editoriales y se acotan', () => {
+    const b = crearBackend();
+    publicada(b, { body: { animal: { sponsor: { monthlyEur: 15.5, notes: 'Apadrinas su alimentación y cuidados' } } } });
+    const s = b.ctx.webListarPublicas({}).data[0].sponsor;
+    assert.equal(s.monthlyEur, 15.5);
+    assert.equal(s.notes, 'Apadrinas su alimentación y cuidados');
+
+    publicada(b, { id: 'ani_3', titulo: 'Otro', slug: 'otro', body: { animal: { sponsor: { monthlyEur: 'mucho', notes: 'x'.repeat(300) } } } });
+    const malo = b.ctx.webListarPublicas({}).data.find(p => p.slug === 'otro').sponsor;
+    assert.equal(malo.monthlyEur, null);
+    assert.equal(malo.notes.length, 200);
+  });
+
+  it('el formulario vacío no guarda un bloque sponsor fantasma', () => {
+    const b = crearBackend();
+    publicada(b, { body: { animal: { sponsor: { monthlyEur: null, notes: '   ' } } } });
+    // En la hoja no queda ni un `notes:''`: el bloque se recalcula desde lo relleno.
+    assert.equal(JSON.parse(b.estado.publicaciones[0].animal_json).sponsor, undefined);
+    // La ficha pública sigue llevando el bloque, con `available` derivado.
+    assert.equal(JSON.stringify(b.ctx.webListarPublicas({}).data[0].sponsor), JSON.stringify({ available: true, monthlyEur: null, notes: '' }));
+  });
+
+  it('una cuota inválida no se guarda y las notas se recortan al persistir', () => {
+    const b = crearBackend();
+    publicada(b, { body: { animal: { sponsor: { monthlyEur: 'mucho', notes: '  Apadrinas su comida  ' } } } });
+    const guardado = JSON.parse(b.estado.publicaciones[0].animal_json).sponsor;
+    assert.equal(JSON.stringify(guardado), JSON.stringify({ notes: 'Apadrinas su comida' }));
+  });
+
+  it('borrar la cuota o las notas en el gestor las borra de la ficha', () => {
+    const b = crearBackend();
+    publicada(b, { body: { animal: { sponsor: { monthlyEur: 15, notes: 'Apadrinas su comida' } } } });
+    assert.equal(b.ctx.webListarPublicas({}).data[0].sponsor.monthlyEur, 15);
+    publicada(b, { body: { animal: { sponsor: { monthlyEur: null, notes: '' } } } });
+    const s = b.ctx.webListarPublicas({}).data[0].sponsor;
+    assert.equal(s.monthlyEur, null);
+    assert.equal(s.notes, '');
+  });
+
+  it('`fields=card` también lleva el bloque (lista blanca)', () => {
+    const b = crearBackend();
+    publicada(b);
+    assert.equal(b.ctx.webListarPublicas({ fields: 'card' }).data[0].sponsor.available, true);
   });
 });

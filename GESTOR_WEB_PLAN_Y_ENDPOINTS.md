@@ -189,6 +189,14 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 }
 ```
 - **Reglas:** [x] solo contenido en estado publicable; [x] paginación acotada; [x] proyección ligera (`fields=card`); [x] `filters` devuelve los valores disponibles para construir la UI; [x] **una ficha por animal**: si el grupo está publicado, el feed sirve la del grupo (`animal_grupo`) y descarta la individual del miembro, aunque la hoja tenga las dos (`webPublicables`).
+- **Apadrinamiento (22/11, R3):** las fichas de animal llevan `sponsor: { available, monthlyEur, notes }`,
+  siempre presentes (`available:false` cuando no aplica). `available` se deriva de `Animales.apadrinable`
+  **y** del estado público efectivo (`en_adopcion`/`en_acogida`), con la misma regla que
+  `_esApadrinable` en el gestor; nunca se exponen el check ni el estado interno. Filtro
+  `sponsor=1|0` en `publicaciones`/`animales-publicos` (entra en `_webKeyParams` y en `applied`) y se
+  proyecta en `fields=card`. Importe y notas son editoriales: se editan en el formulario de la
+  publicación (`sponsor` dentro del bloque `animal`) y borrar el campo lo borra en la ficha: un
+  formulario sin cuota ni notas no guarda bloque alguno (ni un `{notes:''}` fantasma).
 - **Categoría canónica «Caso externo» (22/11):** el backend guarda y publica siempre `Caso externo`
   (`webCategoriaCanonica`), aunque llegue como `caso externo`, `Caso Externo` o `caso-externo`; el
   filtro `category` normaliza también lo que manda la web y el gestor sugiere el catálogo canónico
