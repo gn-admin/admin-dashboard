@@ -222,6 +222,8 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 
 **SEO por ficha:** `seo.metaTitle || title`, `seo.metaDescription || excerpt`, `seo.canonical || canonical` (si vacío: ni `<link rel="canonical">` ni `og:url`), `seo.ogImage || coverImage.src`, `seo.robots || 'index,follow'`. JSON-LD: `Article` (animal y grupo, con `about.name = group.groupName`), `Event` (evento, con `startDate`/`endDate`/`location`), `BlogPosting` (historia); nunca en `error`, `gone` ni listados.
 
+**Formularios:** hoy van por EmailJS (Parte A). El endpoint `forms-submit` de la Parte B **no está desplegado**: `POST {baseUrl}?endpoint=forms-submit` responde `401 Token no proporcionado` porque cae en la API privada. No lo llames desde `main` hasta que C4 se implemente y despliegue.
+
 **Estados en la UI:** `status:"warning"` → aviso de canal sin configurar; `status:"error"` → 404 con `noindex,nofollow` y enlace al listado; `status:"gone"` → «Publicación retirada», `noindex,nofollow`, sin canonical/JSON-LD y 410 si el hosting lo permite; fallo de red → mensaje con reintento. Recordar: el HTTP es 200 también en `error` y `gone`, así que **decidir por `status`**.
 
 ### A.3 Port de consumo y render (B1–B2)
@@ -349,6 +351,8 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 | **Hostname** | Dominios registrados | Validar en `siteverify`. |
 
 ### B.4 Contrato propuesto `forms/submit`
+
+**Estado:** propuesta C4, **no implementada** en el despliegue actual (el POST responde 401 «Token no proporcionado»). Mientras siga así, los formularios de `main` usan EmailJS (Parte A).
 
 **Request (form-urlencoded, plano; anidados `fields[...]`):** `endpoint=forms-submit`, `form_type`, `concepto` (opcional), `fields[...]`, `page_url`, `privacy_accepted`, `recaptcha_token`, `recaptcha_action`.
 
