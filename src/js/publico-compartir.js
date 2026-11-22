@@ -1,9 +1,9 @@
 /**
  * Compartir la ficha pública.
  *
- * Usa la Web Share API cuando está disponible y, si no, copia la URL
- * canónica (la página estática que genera el prerender). Se carga tanto en
- * el visor SPA como en las páginas estáticas, que no ejecutan `publico.js`.
+ * Abre el panel de redes de la ficha y copia la URL canónica (la página
+ * estática que genera el prerender). Se carga tanto en el visor SPA como en
+ * las páginas estáticas, que no ejecutan `publico.js`.
  */
 (() => {
   'use strict';
@@ -52,21 +52,6 @@
     temporizador = setTimeout(() => { aviso.textContent = ''; }, 4000);
   }
 
-  function compartir(btn) {
-    const url = btn.getAttribute('data-url') || location.href;
-    const title = btn.getAttribute('data-title') || document.title;
-    const confirmar = () => avisar(btn, 'Enlace copiado');
-    const fallar = () => avisar(btn, 'No se pudo copiar');
-    if (navigator.share) {
-      navigator.share({ title, url }).catch(err => {
-        if (err && err.name === 'AbortError') return; // cancelado por la persona
-        copiar(url).then(confirmar, fallar);
-      });
-      return;
-    }
-    copiar(url).then(confirmar, fallar);
-  }
-
   /** Abre o cierra el panel de redes junto al botón «Compartir». */
   function alternarPanel(btn) {
     const cont = btn.parentElement;
@@ -102,12 +87,6 @@
     if (hay('[data-share-toggle]')) {
       evento.preventDefault();
       alternarPanel(el.closest('[data-share-toggle]'));
-      return;
-    }
-
-    if (hay('[data-compartir]')) {
-      evento.preventDefault();
-      compartir(el.closest('[data-compartir]'));
       return;
     }
 

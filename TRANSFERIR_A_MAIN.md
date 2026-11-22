@@ -29,7 +29,7 @@ Todas las respuestas son un sobre: `{ status, endpoint, applied, filters, pagina
 
 | `endpoint=` | Devuelve | Parámetros |
 |---|---|---|
-| `publicaciones` | Todo el canal (animales, grupos, eventos, historias) | `type`, `category`, `status`, `species`, `q`, `featured`, `sponsor`, `desde`, `sort`, `fields`, `page`, `pageSize` (máx. 50) |
+| `publicaciones` | Todo el canal (animales, grupos, eventos, historias) | `type`, `category`, `status`, `species`, `q`, `featured`, `sponsor`, `desde`, `sort`, `fields=card`, `page`, `pageSize` (máx. 50) |
 | `publicacion&slug=<slug>` | Ficha completa por slug | `slug`; puede responder `redirect` (301 lógico) o `gone` (retirada) |
 | `animales-publicos` | Atajo de `publicaciones&type=animal` | los mismos del listado |
 | `eventos-publicos` | Atajo de `publicaciones&type=evento` | los mismos + `desde`, `sort=startDate` (§A.2.2) |
@@ -49,7 +49,7 @@ Todas las respuestas son un sobre: `{ status, endpoint, applied, filters, pagina
 - `q`: búsqueda de texto libre.
 - `featured=1|0` y `sponsor=1|0`: destacados y apadrinados.
 - `desde` y `sort`: agenda de eventos (§A.2.2). `sort` admite `orden`, `-orden`, `startDate`, `-startDate`; por defecto `-publishedAt`.
-- `fields`: recorta los campos del listado si `main` solo necesita unos pocos.
+- `fields=card`: proyecta el listado a los campos de tarjeta (ver §A.2.3). Sin el parámetro, el payload es el completo.
 - `page`, `pageSize` (tope 50).
 - `nocache=1`: solo para depurar. La caché normal es de ~60 s y su clave incluye **todos** los parámetros, así que dos filtros distintos nunca se mezclan.
 
@@ -111,10 +111,10 @@ Los filtros de la web salen del canal, no de listas escritas a mano.
 
 - **`?endpoint=taxonomias`** devuelve `{ type, category, status, species }` con lo que hay publicado. Con `&type=animal` acota a ese tipo (así la sección de animales no ofrece estados de evento). Es lo que rellena los `<select>`; si vuelve vacío, ese filtro no se pinta.
 - **`featured=1|0`**: `1` solo destacadas, `0` solo no destacadas. Suma exacta: `featured=1` + `featured=0` = total del canal. Se usa para la portada o un carrusel.
-- **`sponsor=1|0`**: publicaciones con apadrinamiento.
+- **`sponsor=1|0`**: publicaciones con apadrinamiento (`sponsor.available`), no las que solo tienen el bloque vacío. Suma exacta, como `featured`: `sponsor=1` + `sponsor=0` = total del canal (comprobado en producción: 2 + 5 = 7).
 - **`applied`** devuelve lo que el backend entendió (`featured: "1"`, `category: "Caso externo"`…). Si no coincide con lo pedido, manda `applied`: es la fuente de verdad para marcar el filtro activo.
 - **Categoría canónica «Caso externo»**: se guarda y se devuelve con esa grafía exacta. Si la web pide `CASO EXTERNO`, `caso externo` o `casos externos`, el backend normaliza y responde con la canónica; los chips de `taxonomias` listan la categoría **una sola vez**. No comparar categorías en cliente con `===` sobre el texto libre: usar `applied.category` o la lista de `taxonomias`.
-- **`fields`**: recorta el listado (`fields=slug,title,coverImage,publishedAt`) cuando la tarjeta solo necesita unos campos. Es aditivo: sin el parámetro, el payload es el completo.
+- **`fields=card`**: única forma admitida de recortar el listado. Devuelve `id`, `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt`, `updatedAt`, `coverImage`, `image`, `imageAlt`, `sponsor`, `url`, `featured`, `urgent` y un `animal` reducido a `{ species, age, sex }`; se van `contentHtml`, `tags`, `icons`, `gallery`, `videos`, `author`, `orden`, `listed`, `canonical`, `seo`, `dateFormatted` y `readTime`. Cualquier otro valor (`fields=slug,title`) **se ignora** y devuelve el payload completo; `fields` tampoco aparece en `applied`, así que no lo uses como filtro. Sin el parámetro, el payload es el completo.
 
 ### A.3 Port de consumo y render (B1–B2)
 

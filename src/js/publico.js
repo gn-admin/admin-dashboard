@@ -550,7 +550,7 @@ const Publico = {
         <p class="pub-lead">${this.esc(seccion.lead)}</p>
       </section>
       ${this._tabs()}
-      <form class="pub-toolbar" data-pub-search role="search"${esFavoritos ? ' style="display:none"' : ''}>
+      ${esFavoritos ? '' : `<form class="pub-toolbar" data-pub-search role="search">
         <div class="pub-field" style="flex:2 1 240px">
           <label for="pub-q">Buscar</label>
           <input id="pub-q" type="search" name="q" value="${this.esc(this.params.q)}" placeholder="Título, texto, etiqueta...">
@@ -588,7 +588,7 @@ const Publico = {
           <button type="submit" class="pub-btn">Buscar</button>
           <button type="button" class="pub-btn pub-btn--ghost" data-pub-limpiar>Limpiar</button>
         </div>
-      </form>
+      </form>`}
       <p class="pub-count">${total} ${total === 1 ? this.esc(seccion.uno) : this.esc(seccion.varios)}</p>
       <div class="pub-grid">${tarjetas}</div>
       ${pag.totalPages > 1 ? `<nav class="pub-pager" aria-label="Paginación">
