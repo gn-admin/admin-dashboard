@@ -1141,7 +1141,7 @@ describe('deploy automático (workflow_dispatch desde Apps Script)', () => {
     assert.equal(con.data.configurado, true);
     assert.equal(JSON.stringify(con).indexOf('ghp_prueba'), -1);
     // Marcador para detectar implementaciones antiguas desde el panel.
-    assert.equal(con.data.version, '2026-11-15.6');
+    assert.equal(con.data.version, '2026-11-15.7');
   });
 });
 

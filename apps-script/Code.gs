@@ -453,6 +453,13 @@ function _webAnotarDeploy(respuesta, forzar) {
   } catch (err) {
     respuesta.data.deploy = { ok: false, disparado: false, error: 'No se pudo disparar el deploy: ' + ((err && err.message) || err) };
   }
+  // Segundo destino opcional: web SEO (main). No rompe la respuesta si no
+  // está configurado.
+  try {
+    respuesta.data.deployMain = webDispararDeployMain('estado');
+  } catch (err) {
+    respuesta.data.deployMain = { ok: false, disparado: false, error: 'No se pudo disparar el deploy de main: ' + ((err && err.message) || err) };
+  }
   return respuesta;
 }
 

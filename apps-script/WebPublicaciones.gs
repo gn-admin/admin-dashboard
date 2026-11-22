@@ -2386,9 +2386,13 @@ function webCarpetaEnArbolMedia(carpeta, raizId, nivel) {
 // vive en las propiedades del script (`GITHUB_DEPLOY_TOKEN`), nunca en el repo.
 
 var WEB_DEPLOY_DEFECTOS = { repo: 'gn-admin/admin-dashboard', ref: 'main', workflow: 'deploy.yml' };
+// Segundo destino opcional: la web SEO (`main`). Solo se dispara si se
+// configura `GITHUB_DEPLOY_REPO_MAIN` (o sus equivalentes) en las
+// propiedades del script; así no se rompe el despliegue del gestor.
+var WEB_DEPLOY_DEFECTOS_MAIN = { repo: 'gn-admin/main', ref: 'main', workflow: 'pages.yml' };
 // Marcador de versión del backend: `web-deploy-estado` lo devuelve para poder
 // distinguir si el panel habla con una implementación antigua.
-var WEB_DEPLOY_VERSION = '2026-11-15.6';
+var WEB_DEPLOY_VERSION = '2026-11-15.7';
 var WEB_DEPLOY_DEDUPE_SEG = 60;
 
 function webDeployPropiedades() {
@@ -2410,6 +2414,26 @@ function webDeployConfig() {
   };
 }
 
+// Configuración del segundo destino (web SEO). Devuelve `null` si no está
+// configurado explícitamente, para no disparar deploys no deseados.
+function webDeployConfigMain() {
+  var props = webDeployPropiedades();
+  if (!props) return null;
+  var leer = function (clave) {
+    var v = '';
+    try { v = props ? webTexto(props.getProperty(clave)) : ''; } catch (err) { v = ''; }
+    return v;
+  };
+  var repo = leer('GITHUB_DEPLOY_REPO_MAIN');
+  if (!repo) return null;
+  return {
+    token: leer('GITHUB_DEPLOY_TOKEN_MAIN') || leer('GITHUB_DEPLOY_TOKEN'),
+    repo: repo,
+    ref: leer('GITHUB_DEPLOY_REF_MAIN') || WEB_DEPLOY_DEFECTOS_MAIN.ref,
+    workflow: leer('GITHUB_DEPLOY_WORKFLOW_MAIN') || WEB_DEPLOY_DEFECTOS_MAIN.workflow
+  };
+}
+
 /** Estado de la configuración del deploy (nunca devuelve el token). */
 function webDeployEstado() {
   var cfg = webDeployConfig();
@@ -2421,16 +2445,24 @@ function webDeployEstado() {
  * falta el token o GitHub falla se devuelve el motivo y la acción principal
  * (publicar, guardar, retirar) sigue siendo un éxito.
  */
-function webDispararDeploy(motivo, opciones) {
-  opciones = opciones || {};
-  var cfg = webDeployConfig();
-  if (!cfg.token) return { ok: false, disparado: false, error: 'Deploy automático sin configurar (falta GITHUB_DEPLOY_TOKEN)' };
+function webDispararDeployMain(motivo, opciones) {
+  var cfg = webDeployConfigMain();
+  if (!cfg) return { ok: false, disparado: false, error: 'Deploy de main no configurado (falta GITHUB_DEPLOY_REPO_MAIN)' };
+  return webDispararDeploy(motivo, opciones, cfg);
+}
 
+function webDispararDeploy(motivo, opciones, cfg) {
+  opciones = opciones || {};
+  cfg = cfg || webDeployConfig();
+  if (!cfg || !cfg.token) return { ok: false, disparado: false, error: 'Deploy automático sin configurar (falta GITHUB_DEPLOY_TOKEN)' };
+
+  var cacheKey = (cfg.repo === WEB_DEPLOY_DEFECTOS.repo && cfg.workflow === WEB_DEPLOY_DEFECTOS.workflow)
+    ? 'web-deploy' : 'web-deploy-main';
   try {
     var cache = CacheService.getScriptCache();
     if (cache && !opciones.forzar) {
-      if (cache.get('web-deploy')) return { ok: true, disparado: false, motivo: 'en_cola' };
-      cache.put('web-deploy', '1', WEB_DEPLOY_DEDUPE_SEG);
+      if (cache.get(cacheKey)) return { ok: true, disparado: false, motivo: 'en_cola' };
+      cache.put(cacheKey, '1', WEB_DEPLOY_DEDUPE_SEG);
     }
   } catch (err) { /* sin caché se sigue: mejor un deploy de más que ninguno */ }
 

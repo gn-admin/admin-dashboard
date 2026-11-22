@@ -108,7 +108,7 @@ describe('un solo sitio dispara el deploy', () => {
     // Sin llamadas al hook antiguo (el diagnóstico solo lo nombra como texto).
     assert.doesNotMatch(WEB, /webConDeploy\s*\(/);
     // Solo la definición y la prueba manual del editor llaman al disparador.
-    assert.equal((WEB.match(/webDispararDeploy\s*\(/g) || []).length, 2);
+    assert.equal((WEB.match(/webDispararDeploy\s*\(/g) || []).length, 3);
   });
 });
 
