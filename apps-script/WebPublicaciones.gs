@@ -698,14 +698,17 @@ function webNormalizarFicha(valor) {
   return out;
 }
 
-function webMapaAnimales() {
+function webMapaAnimalesDe(filas) {
   var mapa = {};
-  var cfg = CONFIG.sheets && CONFIG.sheets.animales;
-  if (!cfg) return mapa;
-  readSheet(cfg).forEach(function (a) {
+  (filas || []).forEach(function (a) {
     if (a && a.id !== undefined && a.id !== null) mapa[String(a.id)] = a;
   });
   return mapa;
+}
+
+function webMapaAnimales() {
+  var cfg = CONFIG.sheets && CONFIG.sheets.animales;
+  return webMapaAnimalesDe(cfg ? readSheet(cfg) : []);
 }
 
 /** Foto del animal como cover por defecto (misma normalización que el panel). */
@@ -725,9 +728,9 @@ function webFotoOrigen(animal) {
 
 // ==================== GRUPOS / CAMADAS (adopción conjunta, G1) ====================
 
-function webMapaGrupos() {
+function webMapaGruposDe(filas) {
   var grupos = {};
-  readSheet(CONFIG.sheets.animales).forEach(function (a) {
+  (filas || []).forEach(function (a) {
     if (!a || a.id === undefined || a.id === null) return;
     var gid = webTexto(a.grupo_id || a.grupo);
     if (!gid) return;
@@ -745,6 +748,10 @@ function webMapaGrupos() {
     grupos[key].miembros.push(a);
   });
   return grupos;
+}
+
+function webMapaGrupos() {
+  return webMapaGruposDe(readSheet(CONFIG.sheets.animales));
 }
 
 function webMiembrosDeGrupo(grupoId, mapaAnimales) {
@@ -1347,6 +1354,24 @@ function webGetAnimal(animalId) {
   };
 }
 
+// ==================== ESCRITURA CON INVALIDACIÓN ====================
+// Todo guardado del gestor sobre `WebPublicaciones` pasa por aquí: la fila se
+// escribe y la instantánea pública se invalida en el mismo paso, así que el
+// canal no puede quedarse sirviendo lo anterior. El deploy sigue decidiéndose
+// solo en `_webAnotarDeploy` (`Code.gs`): aquí no se llama a GitHub.
+
+function webGuardarFilaPublicacion(cfg, id, registro) {
+  var guardado = id ? updateSheetRow(cfg, id, registro) : appendToSheet(cfg, registro);
+  if (guardado) webInvalidarCachePublico();
+  return guardado;
+}
+
+function webBorrarFilaPublicacion(cfg, id) {
+  var ok = deleteSheetRow(cfg, id);
+  if (ok) webInvalidarCachePublico();
+  return ok;
+}
+
 function webUpsertAnimal(body) {
   var cfg = webSheetConfig();
   if (!cfg) return webDiagnostico();
@@ -1470,12 +1495,8 @@ function webUpsertAnimal(body) {
 
   var guardado;
   try {
-    if (previa && previa.id) {
-      guardado = updateSheetRow(cfg, previa.id, registro);
-      if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
-    } else {
-      guardado = appendToSheet(cfg, registro);
-    }
+    guardado = webGuardarFilaPublicacion(cfg, previa && previa.id, registro);
+    if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   } catch (err) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
@@ -1507,7 +1528,7 @@ function webEstadoAnimal(body, user) {
   }
   var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
-  var ok = updateSheetRow(webSheetConfig(), previa.id, cambios);
+  var ok = webGuardarFilaPublicacion(webSheetConfig(), previa.id, cambios);
   if (!ok) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_animales', previa.id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
   // Ocultar, publicar o retirar cambia las páginas estáticas: el deploy lo
@@ -1529,7 +1550,7 @@ function webEliminarAnimal(body, user) {
     return { status: 'error', error: 'No se puede eliminar una publicación retirada.' };
   }
   var slug = previa.slug;
-  var ok = deleteSheetRow(cfg, previa.id);
+  var ok = webBorrarFilaPublicacion(cfg, previa.id);
   if (!ok) return { status: 'error', error: 'No se pudo eliminar la publicación web' };
   try { registrarAuditoria('eliminar_publicacion', 'web_animal', previa.id, user, { slug: slug, animal_id: animalId }); } catch (e) {}
   return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, eliminado: true } };
@@ -1545,7 +1566,7 @@ function webArchivarAnimal(body, user) {
   }
   // Lápida 410: se conserva la fila y el slug para que el enlace no vuelva a usarse.
   var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
-  if (!updateSheetRow(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
+  if (!webGuardarFilaPublicacion(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
   try { registrarAuditoria('retirar_publicacion', 'web_animal', previa.id, user, { slug: previa.slug, animal_id: animalId }); } catch (e) {}
   return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: 'retirado', slug: previa.slug } };
 }
@@ -1559,7 +1580,7 @@ function webRestaurarAnimal(body, user) {
     return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: previa.estado_publicacion, slug: previa.slug } };
   }
   var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
-  if (!updateSheetRow(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
+  if (!webGuardarFilaPublicacion(webSheetConfig(), previa.id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
   try { registrarAuditoria('restaurar_publicacion', 'web_animal', previa.id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
   return { status: 'success', success: true, data: { id: previa.id, animal_id: animalId, estado_publicacion: 'borrador', slug: previa.slug } };
 }
@@ -1726,8 +1747,8 @@ function webUpsertGrupo(body) {
   }
   var guardado;
   try {
-    if (previa && previa.id) { guardado = updateSheetRow(cfg, previa.id, registro); if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' }; }
-    else { guardado = appendToSheet(cfg, registro); }
+    guardado = webGuardarFilaPublicacion(cfg, previa && previa.id, registro);
+    if (!guardado) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   } catch (err) { return { status: 'error', error: 'No se pudo guardar la publicación: ' + String(err && err.message || err) }; }
   return { status: 'success', data: guardado, completitud: webValidarPublicacion(webFilaAPublicacion(guardado), origen) };
 }
@@ -1756,7 +1777,7 @@ function webEstadoGrupoPub(body, user) {
   }
   var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
-  return { status: 'success', data: updateSheetRow(cfg, previa.id, cambios) };
+  return { status: 'success', data: webGuardarFilaPublicacion(cfg, previa.id, cambios) };
 }
 function webArchivarGrupo(body, user) { return webEstadoGrupoPub(Object.assign({}, body || {}, { estado_publicacion: 'retirado' }), user); }
 function webRestaurarGrupo(body, user) {
@@ -1768,7 +1789,7 @@ function webRestaurarGrupo(body, user) {
   if (!previa) return { status: 'error', error: 'Publicación no encontrada' };
   if (previa.tipo !== 'animal_grupo') return { status: 'error', error: 'Solo las publicaciones de grupo se restauran desde aquí' };
   if (previa.estado_publicacion !== 'retirado') return { status: 'error', error: 'Solo se puede restaurar una publicación retirada' };
-  var guardado = updateSheetRow(cfg, previa.id, { estado_publicacion: 'borrador', actualizado_en: webAhora() });
+  var guardado = webGuardarFilaPublicacion(cfg, previa.id, { estado_publicacion: 'borrador', actualizado_en: webAhora() });
   return { status: 'success', success: true, data: { id: previa.id, estado_publicacion: 'borrador', slug: previa.slug } };
 }
 function webEliminarGrupo(body, user) {
@@ -1778,7 +1799,7 @@ function webEliminarGrupo(body, user) {
   var previa = webPublicacionDeOrigen('animal_grupo', grupoId);
   if (!previa) return { status: 'error', error: 'El grupo no tiene publicación web' };
   if (previa.estado_publicacion === 'publicado' || previa.estado_publicacion === 'retirado') return { status: 'error', error: 'No se puede eliminar una publicación publicada o retirada' };
-  try { deleteSheetRow(cfg, previa.id); } catch (e) { return { status: 'error', error: 'No se pudo eliminar' }; }
+  try { webBorrarFilaPublicacion(cfg, previa.id); } catch (e) { return { status: 'error', error: 'No se pudo eliminar' }; }
   return { status: 'success', success: true };
 }
 function webPreviewGrupo(grupoId) {
@@ -1914,11 +1935,7 @@ function webUpsertEvento(body, user) {
   }
 
   try {
-    if (previa && previa.id) {
-      if (!updateSheetRow(cfg, previa.id, registro)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
-    } else {
-      appendToSheet(cfg, registro);
-    }
+    if (!webGuardarFilaPublicacion(cfg, previa && previa.id, registro)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   } catch (err) {
     return { status: 'error', error: 'No se pudo guardar la publicación', detail: err.message };
   }
@@ -1948,7 +1965,7 @@ function webEstadoEvento(body, user) {
   }
   var cambios = { estado_publicacion: estado, actualizado_en: webAhora() };
   if (estado === 'publicado' && !previa.publicado_en) cambios.publicado_en = webAhora();
-  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
+  if (!webGuardarFilaPublicacion(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a actualizar' };
   try { registrarAuditoria('publicacion_web', 'web_' + previa.tipo, id, user, { estado: estado, slug: previa.slug }); } catch (e) {}
   return { status: 'success', data: { id: id, estado_publicacion: estado } };
 }
@@ -1965,7 +1982,7 @@ function webArchivarEvento(body, user) {
   // No se borra la fila: el slug queda como lapida para responder 410 (gone)
   // y para que no se pueda reutilizar en otra publicacion.
   var cambios = { estado_publicacion: 'retirado', listed: false, indexable: false, actualizado_en: webAhora() };
-  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
+  if (!webGuardarFilaPublicacion(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a retirar' };
   try { registrarAuditoria('retirar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug }); } catch (e) {}
   return { status: 'success', success: true, data: { id: id, estado_publicacion: 'retirado', slug: previa.slug } };
 }
@@ -1980,7 +1997,7 @@ function webRestaurarEvento(body, user) {
     return { status: 'success', success: true, data: { id: id, estado_publicacion: previa.estado_publicacion, slug: previa.slug } };
   }
   var cambios = { estado_publicacion: 'borrador', listed: true, indexable: true, actualizado_en: webAhora() };
-  if (!updateSheetRow(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
+  if (!webGuardarFilaPublicacion(webSheetConfig(), id, cambios)) return { status: 'error', error: 'No se encontró la publicación a restaurar' };
   try { registrarAuditoria('restaurar_publicacion', 'web_' + previa.tipo, id, user, { slug: previa.slug, estado: 'borrador' }); } catch (e) {}
   // Restaurar quita la lápida: el router lo trata como cambio de lo publicado
   // aunque el estado resultante sea `borrador`.
@@ -2415,7 +2432,7 @@ function webDeployProbar() {
 
 // ==================== CANAL PÚBLICO ====================
 
-function webPublicables() {
+function webPublicables(mapaAnimales) {
   var publicadas = webFilasWeb().filter(function (p) {
     return p.estado_publicacion === 'publicado' && p.listed !== false;
   });
@@ -2432,10 +2449,10 @@ function webPublicables() {
     }
   }
   if (!hayGrupo) return publicadas;
-  var mapaAnimales = webMapaAnimales();
+  var mapa = mapaAnimales || webMapaAnimales();
   return publicadas.filter(function (p) {
     if (p.tipo !== 'animal') return true;
-    var a = mapaAnimales[String(p.origen_id)];
+    var a = mapa[String(p.origen_id)];
     if (!a) return true;
     var gid = webTexto(a.grupo_id || a.grupo);
     return !(gid && gruposVigentes[String(gid)]);
@@ -2463,16 +2480,121 @@ function webRetiradas() {
   return { status: 'success', data: out };
 }
 
+// ==================== INSTANTÁNEA PÚBLICA (una lectura por ventana) ====================
+// El canal se lee mucho más de lo que se edita: cada visita a un listado, a una
+// ficha o al sitemap volvía a leer `Animales` y `WebPublicaciones` (y a veces
+// las dos veces). Aquí se leen UNA vez por ventana y se guardan en la caché del
+// script las FILAS y los MAPAS de origen, no el payload compuesto: filtrar,
+// paginar y componer se hace en memoria, así que un filtro nuevo no añade
+// lecturas. Cada guardado del gestor invalida con un token de versión nuevo
+// (`webGuardarFilaPublicacion`), de modo que publicar sigue viéndose al
+// instante; la ventana solo afecta a cambios hechos fuera del gestor.
+
+var WEB_SNAP_TTL = 60;            // ventana (s); un guardado del gestor invalida antes
+var WEB_SNAP_TROZO = 80000;       // por clave; el máximo de la caché de Apps Script es 100 KB
+var WEB_SNAP_MAX_TROZOS = 8;      // ~640 KB: por encima no se cachea y se lee en cada petición
+var WEB_SNAP_VERSION_TTL = 21600; // 6 h (el máximo): el token no debe caducar antes que la instantánea
+
+/** Token de versión vigente (ver `webInvalidarCachePublico`). */
+function webVersionInstantanea() {
+  var cache;
+  try { cache = CacheService.getScriptCache(); } catch (err) { return ''; }
+  var v = '';
+  try { v = String(cache.get('pub_snap_ver') || ''); } catch (errLeer) { return ''; }
+  if (v) return v;
+  v = webNuevaVersion();
+  try { cache.put('pub_snap_ver', v, WEB_SNAP_VERSION_TTL); } catch (errEscribir) { return ''; }
+  return v;
+}
+
+function webNuevaVersion() {
+  return String(new Date().getTime()) + '-' + String(Math.random()).slice(2, 10);
+}
+
+/**
+ * Invalida el canal entero. Un token nuevo gana siempre: una lectura que empezó
+ * antes del guardado escribe bajo la versión vieja, que ya nadie consulta.
+ */
+function webInvalidarCachePublico() {
+  try {
+    CacheService.getScriptCache().put('pub_snap_ver', webNuevaVersion(), WEB_SNAP_VERSION_TTL);
+    return true;
+  } catch (err) { return false; }
+}
+
+/**
+ * Lee una instantánea troceada hasta el primer trozo que falta. No hace falta
+ * marcador de fin: un JSON truncado no deserializa, así que nunca se sirve a medias.
+ */
+function webLeerInstantanea(clave) {
+  var cache;
+  try { cache = CacheService.getScriptCache(); } catch (err) { return null; }
+  var partes = [];
+  for (var i = 0; i < WEB_SNAP_MAX_TROZOS; i++) {
+    var trozo = null;
+    try { trozo = cache.get(clave + '_' + i); } catch (errLeer) { return null; }
+    if (trozo === null || trozo === undefined || trozo === '') break;
+    partes.push(trozo);
+  }
+  if (!partes.length) return null;
+  try { return JSON.parse(partes.join('')); } catch (errJson) { return null; }
+}
+
+/** Guarda una instantánea troceada; `false` si no cabe o la caché falla. */
+function webEscribirInstantanea(clave, valor) {
+  var cache;
+  try { cache = CacheService.getScriptCache(); } catch (err) { return false; }
+  var json = '';
+  try { json = JSON.stringify(valor); } catch (errJson) { return false; }
+  if (!json) return false;
+  var total = Math.ceil(json.length / WEB_SNAP_TROZO);
+  if (total > WEB_SNAP_MAX_TROZOS) return false;
+  try {
+    for (var i = 0; i < total; i++) {
+      cache.put(clave + '_' + i, json.substring(i * WEB_SNAP_TROZO, (i + 1) * WEB_SNAP_TROZO), WEB_SNAP_TTL);
+    }
+    // Un `nocache=1` puede reescribir la misma clave con menos trozos: el primero
+    // que sobra se borra, y el lector se detiene justo ahí.
+    cache.remove(clave + '_' + total);
+    return true;
+  } catch (errEscribir) { return false; }
+}
+
+/**
+ * Filas publicables + mapas de origen, leídos una vez por ventana. `forzar`
+ * (`nocache=1`) salta la lectura, recompone con lo que hay ahora y reescribe la
+ * instantánea, para que la comprobación de aceptación siga viendo el canal al día.
+ */
+function webInstantaneaPublica(forzar) {
+  var version = webVersionInstantanea();
+  // El prefijo incluye la forma (`snap3`): si cambia lo que se guarda, se sube y
+  // las instantáneas anteriores dejan de leerse aunque sigan en la caché.
+  var clave = version ? ('pub_snap3_' + version) : '';
+  if (clave && !forzar) {
+    var guardada = webLeerInstantanea(clave);
+    if (guardada) return guardada;
+  }
+  var cfg = CONFIG.sheets && CONFIG.sheets.animales;
+  var animales = cfg ? readSheet(cfg) : [];
+  var mapa = webMapaAnimalesDe(animales);
+  var snap = {
+    publicaciones: webPublicables(mapa),
+    animales: mapa,
+    grupos: webMapaGruposDe(animales)
+  };
+  if (clave) webEscribirInstantanea(clave, snap);
+  return snap;
+}
+
 /**
  * Publicaciones públicas construidas, todas y sin paginar: base única del feed y
  * de las taxonomías, para que los dos cuenten lo mismo aunque haya más de una
- * página de publicaciones.
+ * página. Se compone sobre la instantánea y sin `ficha` (es de listados).
  */
-function webPublicacionesPublicas() {
-  var mapa = webMapaAnimales();
-  var mapaGrupos = webMapaGrupos();
-  return webPublicables().map(function (p) {
-    return webConstruirPublicacion(p, webOrigenDePublicacion(p, mapa, mapaGrupos));
+function webPublicacionesPublicas(forzar) {
+  var snap = webInstantaneaPublica(forzar);
+  return snap.publicaciones.map(function (p) {
+    return webConstruirPublicacion(p, webOrigenDePublicacion(p, snap.animales, snap.grupos));
   });
 }
 
@@ -2493,7 +2615,7 @@ function webListarPublicas(params) {
   var diag = webDiagnostico();
   if (diag) return diag;
   params = params || {};
-  var todas = webPublicacionesPublicas();
+  var todas = webPublicacionesPublicas(webTexto(params.nocache) === '1');
   var disponibles = webVocabularioPublico(todas);
 
   var f = {
@@ -2579,14 +2701,15 @@ function webProyeccionCard(p) {
   };
 }
 
-function webPublicacionPublica(slug) {
+function webPublicacionPublica(slug, forzar) {
   var diag = webDiagnostico();
   if (diag) return diag;
   var s = webNormalizarSlug(slug);
   if (!s) return { status: 'error', error: 'Falta slug' };
-  var mapa = webMapaAnimales();
-  var mapaGrupos = webMapaGrupos();
-  var pubs = webPublicables();
+  var snap = webInstantaneaPublica(forzar);
+  var mapa = snap.animales;
+  var mapaGrupos = snap.grupos;
+  var pubs = snap.publicaciones;
   for (var i = 0; i < pubs.length; i++) {
     if (pubs[i].slug === s) {
       return { status: 'success', data: webConstruirPublicacion(pubs[i], webOrigenDePublicacion(pubs[i], mapa, mapaGrupos), { ficha: true }) };
@@ -2661,7 +2784,8 @@ function webRedirects() {
   if (diag) return diag;
   var base = webDominioPublico();
   var out = [];
-  var servidas = webPublicables();
+  var snap = webInstantaneaPublica(false);
+  var servidas = snap.publicaciones;
   var vistos = {};
   servidas.forEach(function (p) {
     (p.slug_historial || []).forEach(function (h) {
@@ -2682,7 +2806,7 @@ function webRedirects() {
   // conserva el enlace con una 301 al grupo (mismo tratamiento que un slug
   // antiguo) en lugar de servir al animal dos veces.
   var filas = webFilasWeb();
-  var mapaAnimales = webMapaAnimales();
+  var mapaAnimales = snap.animales;
   var individuales = {};
   filas.forEach(function (p) { if (p.tipo === 'animal') individuales[String(p.origen_id)] = p; });
   servidas.forEach(function (g) {
@@ -2724,7 +2848,7 @@ function webTaxonomias(params) {
   var diag = webDiagnostico();
   if (diag) return diag;
   var tipo = webTexto((params || {}).type).toLowerCase();
-  var todas = webPublicacionesPublicas();
+  var todas = webPublicacionesPublicas(webTexto((params || {}).nocache) === '1');
   var elegidas = tipo ? todas.filter(function (p) { return String(p.type) === tipo; }) : todas;
   return { status: 'success', data: webVocabularioPublico(elegidas) };
 }
@@ -2752,7 +2876,7 @@ function webConfigPublica() {
   };
 }
 
-function webSitemap() {
+function webSitemap(forzar) {
   var diag = webDiagnostico();
   if (diag) return diag;
   var base = webDominioPublico();
@@ -2760,11 +2884,10 @@ function webSitemap() {
     // Sin dominio real no hay URLs de ficha válidas: mejor un sitemap vacío.
     return { status: 'success', generatedAt: webAhora(), data: [], notice: 'Sin dominio público: la base actual es la demo de GitHub Pages' };
   }
-  var mapa = webMapaAnimales();
-  // Sale de `webPublicables` (publicado + listado + sin duplicados por grupo):
-  // si se leyera la hoja entera, la ficha individual superada por su grupo
-  // seguiría entrando en el sitemap y las estáticas duplicarían el animal.
-  var urls = webPublicables()
+  // Sale de la instantánea pública (publicado + listado + sin duplicados por
+  // grupo): si se leyera la hoja entera, la ficha individual superada por su
+  // grupo seguiría entrando en el sitemap y las estáticas duplicarían al animal.
+  var urls = webInstantaneaPublica(forzar).publicaciones
     .filter(function (p) { return p.indexable; })
     .map(function (p) {
       var ruta = webRutaPublica(p.tipo, p.slug);

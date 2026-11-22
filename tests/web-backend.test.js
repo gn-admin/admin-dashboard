@@ -2044,3 +2044,123 @@ describe('canal público: apadrinamiento (R3)', () => {
     assert.equal(b.ctx.webListarPublicas({ fields: 'card' }).data[0].sponsor.available, true);
   });
 });
+
+// Instantánea única del feed: una lectura de hojas por ventana, filtrado y
+// paginación en memoria, e invalidación inmediata en cada guardado del gestor.
+describe('canal público: instantánea única del feed', () => {
+  function conLecturas(b) {
+    const original = b.ctx.readSheet;
+    let lecturas = 0;
+    b.ctx.readSheet = (cfg) => { lecturas++; return original(cfg); };
+    return () => lecturas;
+  }
+
+  it('dos listados seguidos leen las hojas una sola vez', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    const lecturas = conLecturas(b);
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+    const primera = lecturas();
+    assert.ok(primera >= 1, 'la primera consulta lee las hojas');
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+    assert.equal(lecturas(), primera, 'la segunda sale de la instantánea');
+  });
+
+  it('ocultar invalida: el feed lo refleja en la siguiente petición', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'oculto' });
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 0);
+  });
+
+  it('publicar invalida: el borrador entra sin esperar la ventana', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila({ estado_publicacion: 'borrador', publicado_en: '' }));
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 0);
+    const r = b.ctx.webEstadoAnimal({ animal_id: 'ani_1', estado_publicacion: 'publicado' });
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+  });
+
+  it('retirar invalida: feed vacío y detalle `gone`', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    assert.equal(b.ctx.webPublicacionPublica('luna').status, 'success');
+    const r = b.ctx.webArchivarAnimal({ animal_id: 'ani_1' });
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 0);
+    assert.equal(b.ctx.webPublicacionPublica('luna').status, 'gone');
+  });
+
+  it('guardar la ficha se ve al momento, sin `nocache`', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    assert.equal(b.ctx.webListarPublicas({ fields: 'card' }).data[0].title, 'Luna busca familia');
+    const r = b.ctx.webUpsertAnimal({
+      animal_id: 'ani_1', titulo: 'Luna busca familia numerosa', slug: 'luna', estado_publicacion: 'publicado',
+      extracto: 'Perra sociable',
+      contenido_html: '<p>Luna sigue buscando una familia responsable que la acompañe todos los días.</p>',
+      seo: { metaDescription: 'Luna, perra sociable en adopción' }, categoria: 'Perros en adopción'
+    });
+    assert.equal(r.status, 'success', JSON.stringify(r));
+    assert.equal(b.ctx.webListarPublicas({ fields: 'card' }).data[0].title, 'Luna busca familia numerosa');
+  });
+
+  it('`nocache=1` salta la instantánea y la reescribe al día', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+    // Cambio directo en la hoja (fuera del gestor): la instantánea aún no lo sabe.
+    b.estado.publicaciones[0].estado_publicacion = 'oculto';
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 1);
+    assert.equal(b.ctx.webListarPublicas({ nocache: '1' }).pagination.total, 0);
+    // Y la reescritura deja ya el canal al día.
+    assert.equal(b.ctx.webListarPublicas({}).pagination.total, 0);
+  });
+
+  it('una instantánea grande se trocea y se recupera igual', () => {
+    const b = crearBackend();
+    assert.equal(b.ctx.webEscribirInstantanea('snap_prueba', { texto: 'x'.repeat(200000), total: 3 }), true);
+    const leida = b.ctx.webLeerInstantanea('snap_prueba');
+    assert.equal(leida.texto.length, 200000);
+    assert.equal(leida.total, 3);
+    // Sin el último trozo el JSON queda truncado: no se sirve una instantánea a medias.
+    b.cache.remove('snap_prueba_2');
+    assert.equal(b.ctx.webLeerInstantanea('snap_prueba'), null);
+  });
+
+  it('sin caché el canal sigue respondiendo (fail-open)', () => {
+    const b = crearBackend();
+    b.estado.animales.push(animal());
+    b.estado.publicaciones.push(fila());
+    b.ctx.CacheService = { getScriptCache() { throw new Error('sin caché'); } };
+    const r = b.ctx.webListarPublicas({});
+    assert.equal(r.status, 'success');
+    assert.equal(r.pagination.total, 1);
+    assert.equal(b.ctx.webInvalidarCachePublico(), false);
+  });
+
+  it('ningún guardado puede saltarse la invalidación', () => {
+    // Guarda estructural: las tres únicas escrituras de la hoja viven en los dos
+    // helpers. Si alguien añade un guardado directo (o quita la invalidación de
+    // un helper), esta prueba cae y obliga a decidir a conciencia.
+    const escrituras = FUENTE.match(/\b(?:updateSheetRow|appendToSheet|deleteSheetRow)\s*\(/g) || [];
+    assert.equal(escrituras.length, 3, 'solo las tres escrituras de los helpers');
+    const desde = FUENTE.indexOf('function webGuardarFilaPublicacion(');
+    const hasta = FUENTE.indexOf('function webUpsertAnimal(');
+    assert.ok(desde !== -1 && hasta > desde, 'los helpers existen antes de los guardados');
+    const helpers = FUENTE.slice(desde, hasta);
+    assert.equal((helpers.match(/webInvalidarCachePublico\(\)/g) || []).length, 2, 'los dos helpers invalidan');
+    ['updateSheetRow', 'appendToSheet', 'deleteSheetRow'].forEach((fn) => {
+      assert.match(helpers, new RegExp(fn + '\\s*\\('));
+    });
+  });
+});

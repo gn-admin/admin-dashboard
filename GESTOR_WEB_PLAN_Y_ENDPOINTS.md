@@ -197,6 +197,18 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
   proyecta en `fields=card`. Importe y notas son editoriales: se editan en el formulario de la
   publicación (`sponsor` dentro del bloque `animal`) y borrar el campo lo borra en la ficha: un
   formulario sin cuota ni notas no guarda bloque alguno (ni un `{notes:''}` fantasma).
+- **Instantánea pública y caché (22/11):** el canal lee `Animales` y `WebPublicaciones` **una vez por
+  ventana** (60 s, lo mismo que ya tardaba la caché por consulta: nada queda más viejo que antes) y
+  guarda en la caché del script las filas publicables y los mapas de animal y de
+  grupo, **no** el payload compuesto: filtrar, paginar y componer se hace en memoria, así que un
+  filtro nuevo no añade lecturas. Se guarda troceada (80.000 caracteres por clave, máximo 8 trozos
+  ≈ 640 KB; por encima no se cachea y se lee en cada petición) y solo se sirve completa: los trozos
+  se leen hasta el primero que falta y un JSON truncado no deserializa, así que nunca llega a medias. Cada guardado del gestor pasa por `webGuardarFilaPublicacion` /
+  `webBorrarFilaPublicacion`, que escribe la fila e invalida con un token de versión nuevo; el token
+  va también en las claves por consulta (`_webConCache`), así que publicar, ocultar, retirar y
+  restaurar se ven en la siguiente petición. `nocache=1` salta la instantánea, recompone fresca y la
+  reescribe (es la vía de la comprobación de aceptación); un cambio hecho a mano en la hoja puede
+  tardar hasta la ventana. Sin caché disponible el canal responde igual (fail-open).
 - **Categoría canónica «Caso externo» (22/11):** el backend guarda y publica siempre `Caso externo`
   (`webCategoriaCanonica`), aunque llegue como `caso externo`, `Caso Externo` o `caso-externo`; el
   filtro `category` normaliza también lo que manda la web y el gestor sugiere el catálogo canónico

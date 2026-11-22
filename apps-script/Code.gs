@@ -519,7 +519,7 @@ function handleGetPublico(endpoint, e) {
       res = _webConCache('pub_list_' + _webKeyParams(p), function () { return webListarPublicas(p); }, p.nocache === '1');
       break;
     case 'publicacion':
-      res = webPublicacionPublica(p.slug);
+      res = webPublicacionPublica(p.slug, p.nocache === '1');
       break;
     case 'animales-publicos':
       res = _webConCache('pub_animal_' + _webKeyParams(p), function () { return webListarPublicas(_webParamsConTipo(p, 'animal')); }, p.nocache === '1');
@@ -539,7 +539,7 @@ function handleGetPublico(endpoint, e) {
       res = _webConCache('pub_tax_' + _webKeyParams(p), function () { return webTaxonomias(p); }, p.nocache === '1');
       break;
     case 'sitemap':
-      res = _webConCache('pub_sitemap', function () { return webSitemap(); }, p.nocache === '1');
+      res = _webConCache('pub_sitemap', function () { return webSitemap(p.nocache === '1'); }, p.nocache === '1');
       break;
     case 'redirects':
       res = _webConCache('pub_redirects', function () { return webRedirects(); }, p.nocache === '1');
@@ -572,14 +572,19 @@ function _webConCache(clave, fn, sinCache) {
   if (sinCache) return fn();
   var cache;
   try { cache = CacheService.getScriptCache(); } catch (err) { return fn(); }
+  // La versión de la instantánea entra en la clave: un guardado del gestor deja
+  // huérfanas de golpe todas las respuestas por consulta, no solo la instantánea.
+  var version = '';
+  try { version = webVersionInstantanea(); } catch (errVersion) {}
+  var k = version ? (version + ':' + clave) : clave;
   try {
-    var guardado = cache.get(clave);
+    var guardado = cache.get(k);
     if (guardado) return JSON.parse(guardado);
   } catch (errLeer) {}
   var res = fn();
   try {
     var json = JSON.stringify(res);
-    if (json && json.length < 90000) cache.put(clave, json, 60);
+    if (json && json.length < 90000) cache.put(k, json, 60);
   } catch (errEscribir) {}
   return res;
 }

@@ -111,3 +111,44 @@ describe('un solo sitio dispara el deploy', () => {
     assert.equal((WEB.match(/webDispararDeploy\s*\(/g) || []).length, 2);
   });
 });
+
+/** Extrae `_webConCache` para probar la invalidación por versión sin cargar el router. */
+function cargarConCache(version) {
+  const fuente = CODE.replace(/\r\n/g, '\n');
+  const inicio = fuente.indexOf('function _webConCache(');
+  assert.notEqual(inicio, -1, 'Code.gs debe definir _webConCache');
+  const fin = fuente.indexOf('\n}\n', inicio);
+  assert.notEqual(fin, -1, 'No se pudo delimitar _webConCache');
+  const datos = {};
+  const cache = {
+    get: (k) => (k in datos ? datos[k] : null),
+    put: (k, v) => { datos[k] = v; }
+  };
+  return new Function(
+    'CacheService', 'webVersionInstantanea',
+    fuente.slice(inicio, fin + 3) + '\nreturn _webConCache;'
+  )({ getScriptCache: () => cache }, () => version.v);
+}
+
+// La caché por consulta también se invalida: la versión del canal entra en la
+// clave, así que un guardado del gestor no deja respuestas viejas servidas.
+describe('_webConCache: invalidación por versión', () => {
+  it('un guardado deja sin efecto las respuestas por consulta', () => {
+    const version = { v: 'v1' };
+    const conCache = cargarConCache(version);
+    let llamadas = 0;
+    const responder = () => { llamadas++; return { status: 'success', total: llamadas }; };
+    assert.equal(conCache('pub_list_x', responder).total, 1);
+    assert.equal(conCache('pub_list_x', responder).total, 1, 'sin cambios sale de la caché');
+    version.v = 'v2';
+    assert.equal(conCache('pub_list_x', responder).total, 2, 'con versión nueva se recompone');
+  });
+
+  it('`nocache=1` no lee ni escribe la caché', () => {
+    const conCache = cargarConCache({ v: 'v1' });
+    let llamadas = 0;
+    const responder = () => ({ status: 'success', total: ++llamadas });
+    assert.equal(conCache('pub_list_x', responder, true).total, 1);
+    assert.equal(conCache('pub_list_x', responder, true).total, 2);
+  });
+});
