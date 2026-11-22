@@ -118,9 +118,114 @@ Los filtros de la web salen del canal, no de listas escritas a mano.
 - **Categoría canónica «Caso externo»**: se guarda y se devuelve con esa grafía exacta. Si la web pide `CASO EXTERNO`, `caso externo` o `casos externos`, el backend normaliza y responde con la canónica; los chips de `taxonomias` listan la categoría **una sola vez**. No comparar categorías en cliente con `===` sobre el texto libre: usar `applied.category` o la lista de `taxonomias`.
 - **`fields=card`**: única forma admitida de recortar el listado. Devuelve `id`, `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt`, `updatedAt`, `coverImage`, `image`, `imageAlt`, `url`, `featured`, `urgent`, más `sponsor` **solo si la ficha lo trae** (no viene en eventos, historias ni grupos) y un `animal` reducido a `{ species, age, sex }` (tampoco en eventos/historias); se van `contentHtml`, `tags`, `icons`, `gallery`, `videos`, `author`, `orden`, `listed`, `canonical`, `seo`, `dateFormatted` y `readTime`. Cualquier otro valor (`fields=slug,title`) **se ignora** y devuelve el payload completo; `fields` tampoco aparece en `applied`, así que no lo uses como filtro. Sin el parámetro, el payload es el completo.
 
+### A.2.4 Recetas por página (llamadas exactas)
+
+Todo lo de arriba se reduce a **una** función de acceso. Copiar tal cual en `main` (vanilla o como módulo; no necesita dependencias):
+
+```js
+// canal.js
+export function crearCanal({ baseUrl, dominio = '' }) {
+  const base = String(baseUrl || '').replace(/\/+$/, '');
+  const canonica = (ruta) => (dominio ? dominio.replace(/\/+$/, '') + ruta : ruta);
+
+  function url(endpoint, params = {}) {
+    const u = new URL(base);
+    u.searchParams.set('endpoint', endpoint);
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null || v === '') continue;
+      u.searchParams.set(k, v);
+    }
+    return u;
+  }
+
+  // Respaldo para despliegues antiguos o navegadores que bloquean scripts de terceros.
+  function jsonp(endpoint, params = {}) {
+    const nombre = 'gnCanal_' + Math.random().toString(36).slice(2);
+    const u = url(endpoint, { ...params, callback: nombre });
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      const cerrar = (fn, valor) => { clearTimeout(t); delete window[nombre]; s.remove(); fn(valor); };
+      const t = setTimeout(() => cerrar(reject, new Error('JSONP sin respuesta')), 15000);
+      window[nombre] = (data) => cerrar(resolve, data);
+      s.onerror = () => cerrar(reject, new Error('JSONP no cargó'));
+      s.src = u.toString();
+      document.head.appendChild(s);
+    });
+  }
+
+  // Devuelve el sobre tal cual (success/error/gone); el HTTP siempre es 200.
+  async function pedir(endpoint, params = {}, { respaldo = true } = {}) {
+    try {
+      const r = await fetch(url(endpoint, params), { credentials: 'omit' });
+      const data = await r.json();
+      if (!data || !data.status) throw new Error('Canal sin envoltorio');
+      return data;
+    } catch (err) {
+      if (!respaldo) throw err;
+      return jsonp(endpoint, params);
+    }
+  }
+
+  return {
+    url, pedir, jsonp, canonica,
+    listado: (params = {}) => pedir('publicaciones', { pageSize: 12, ...params }),
+    seccion: (tipo, params = {}) => pedir('publicaciones', { type: tipo, pageSize: 12, ...params }),
+    ficha: (slug) => pedir('publicacion', { slug }),
+    taxonomias: (type = '') => pedir('taxonomias', type ? { type } : {}),
+    config: () => pedir('config-publica'),
+
+    // Build/prerender: recorre el listado completo (máx. 50 por página).
+    async mapaPublicaciones() {
+      const todo = [];
+      for (let page = 1; page <= 50; page++) {
+        const r = await pedir('publicaciones', { page, pageSize: 50 }, { respaldo: false });
+        if (r.status !== 'success') break;
+        todo.push(...(r.data || []));
+        if (!r.pagination || r.pagination.totalPages <= page) break;
+      }
+      return todo;
+    },
+    retiradas: () => pedir('retiradas', {}, { respaldo: false }),
+    redirects: () => pedir('redirects', {}, { respaldo: false }),
+    sitemap: () => pedir('sitemap', {}, { respaldo: false })
+  };
+}
+```
+
+**Recetas** (siempre `GET {baseUrl}?…`; `pageSize` ≤ 50, 12 por defecto):
+
+| Página de `main` | Llamada | Qué pintar |
+|---|---|---|
+| **Portada / destacados** | `canal.listado({ featured: 1, pageSize: 6 })` | Tarjetas con `title`, `excerpt`, `coverImage.src/alt`, `url`, `urgent`. |
+| **Animales** | `canal.seccion('animal', { category, species, status, q, page, pageSize: 12 })` | Igual que portada; `animal.species`, `animal.age.label`. Opciones de filtro desde `canal.taxonomias('animal')`. |
+| **Grupos** | `canal.seccion('animal_grupo', { … })` | Tarjeta normal; en ficha, `group.groupName`, `group.count`, `group.members[]` y `group.adoption`/`contact`. |
+| **Eventos (próximos)** | `canal.seccion('evento', { desde: 'hoy', sort: 'startDate', pageSize: 12 })` | Fecha con `event.startDate`/`endDate`, lugar con `event.location.name/address`; `event.pasado` para marcar el archivo. |
+| **Eventos (archivo)** | `canal.seccion('evento', { sort: '-startDate', pageSize: 12 })` | Mismo render; separar con `event.pasado`. |
+| **Historias** | `canal.seccion('historia', { q, page, pageSize: 12 })` | Tarjeta normal (`coverImage`, `excerpt`, `dateFormatted`). |
+| **Buscador global** | `canal.listado({ q, page: 1 })` | Resultados mezclados; `pagination.total` para el contador. |
+| **Ficha (cualquier tipo)** | `canal.ficha(slug)` | Una sola llamada. `status: 'success'` → pintar `data`; `'gone'` → 410/`noindex`; `'error'` → 404; `redirect` → `history.replaceState` al `redirect.to`. |
+| **Filtros** | `canal.taxonomias('animal' \| 'animal_grupo' \| 'evento' \| 'historia')` | Rellenar los `<select>`; si vuelve vacío, no pintar ese filtro. |
+| **Contacto / pie** | `canal.config()` | `contact.email`, `contact.phone`, `site.name`, `seo.defaultTitle/Description`. Una vez por layout. |
+| **Sitemap/robots/301 (build)** | `canal.mapaPublicaciones()` + `canal.ficha(slug)` + `canal.retiradas()` + `canal.redirects()` + `canal.sitemap()` | Ver §A.5. |
+
+**Campos que usa cada ficha** (nombres reales del payload, no inventar):
+
+- **Común:** `slug`, `type`, `category`, `status`, `title`, `excerpt`, `publishedAt`, `updatedAt`, `dateFormatted`, `readTime`, `coverImage { src, alt }`, `contentHtml`, `tags[]`, `icons[]`, `gallery[{ src, alt, caption, order }]`, `videos[]`, `featured`, `urgent`, `url` (ruta), `canonical`, `seo { metaTitle, metaDescription, ogImage, canonical, robots, og, twitter }`.
+- **Animal:** `animal { names[], species, breed, sex[], age { value, unit, label }, size, color, health { vaccinated, dewormed, neutered, microchipped, specialNeeds }, temperament[], compatibility, adoption, foster, location, contact }` y `sponsor { available, monthlyEur, notes }` (solo si existe).
+- **Grupo:** `group { groupName, count, members[{ nombre, especie, raza, sexo, edad, size, foto }], species, sex, age, size, color, health, temperament, compatibility, adoption, foster, location, contact }`; `isGroup: true`.
+- **Evento:** `event { kind, startDate, endDate, timezone, location { name, address }, organizer, audience[], agenda[], registration, milestone, pasado }`.
+- **Historia:** los comunes; sin `animal`/`group`/`event`.
+- **`ficha` (solo detalle, opcional):** `plantilla`, `bloques { datos, etiquetas, contenido, galeria, videos, fichaAnimal, cta }`, `orden[]`, `videoModo`, `mostrarLectura`, `icons`, `gallery`, `videos`, `tags`, `cta`. Si no viene, render actual sin cambios.
+
+**URL y canónica:** `data.url` es una **ruta** (`/animales/<slug>`, `/eventos/<slug>`…), no una URL absoluta; la canónica se compone con el dominio de `main` (y solo se emite si hay dominio configurado). El `canonical` del payload puede venir vacío en la demo: en ese caso, no emitir canonical/`og:url`.
+
+**SEO por ficha:** `seo.metaTitle || title`, `seo.metaDescription || excerpt`, `seo.canonical || canonical` (si vacío: ni `<link rel="canonical">` ni `og:url`), `seo.ogImage || coverImage.src`, `seo.robots || 'index,follow'`. JSON-LD: `Article` (animal y grupo, con `about.name = group.groupName`), `Event` (evento, con `startDate`/`endDate`/`location`), `BlogPosting` (historia); nunca en `error`, `gone` ni listados.
+
+**Estados en la UI:** `status:"warning"` → aviso de canal sin configurar; `status:"error"` → 404 con `noindex,nofollow` y enlace al listado; `status:"gone"` → «Publicación retirada», `noindex,nofollow`, sin canonical/JSON-LD y 410 si el hosting lo permite; fallo de red → mensaje con reintento. Recordar: el HTTP es 200 también en `error` y `gone`, así que **decidir por `status`**.
+
 ### A.3 Port de consumo y render (B1–B2)
 
-1. **Sustituir fuente estática:** reemplazar `blog-posts.json` / `HistoriasAPI` (o equivalente) por consumo del canal (`publicaciones` + `publicacion&slug=`) vía JSONP en cliente y/o fetch en build según arquitectura de `main`.
+1. **Sustituir fuente estática:** reemplazar `blog-posts.json` / `HistoriasAPI` (o equivalente) por consumo del canal (`publicaciones` + `publicacion&slug=`). Usar `crearCanal` de §A.2.4 (fetch con respaldo JSONP) tanto en cliente como en build; las recetas por página están en esa misma sección.
 2. **Listado:** filtros, búsqueda, paginación (respetar `pageSize` máx. y total), tarjetas con datos de lista; enlaces a la ruta canónica de ficha.
 3. **Detalle por slug:** render de `title`, `excerpt`, `publishedAt`/`updatedAt`, `coverImage`/`image`, `contentHtml`, `tags`, `icons`/datos destacados, `gallery` (`alt`/`caption`), `videos`, `animal`/`event`, `cta`, autor/tiempo de lectura según disponibilidad.
 4. **Redirect de slug histórico:** si hay `redirect`, reescribir URL sin recargar (`history.replaceState`) y mostrar ficha vigente (y/o redirect en prerender/hosting según `redirects`).
