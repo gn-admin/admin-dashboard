@@ -19,10 +19,22 @@
 | 8 | Decisiones abiertas | No | §6 |
 | 9 | UI/UX | No | §7 |
 
+## 0.1 Evidencia del cierre del gate (2026-11-23)
+
+- [x] Token temporal de admin de prueba obtenido para la ejecución; no se guardó en el repositorio.
+- [x] `EXPECTED_BACKEND_VERSION=2026-11-15.7` y `CONTRACT_RETIRED_SLUG=demo-lua`.
+- [x] `test-results/columnas.json`: `WebPublicaciones` verificado por round-trip de escritura/lectura; `Animales` verificado por cabeceras reales tras añadir las columnas aditivas.
+- [x] Historia temporal `caso-externo-gate` publicada con categoría exacta `Caso externo`.
+- [x] Gate ejecutado dos veces: **28 PASS · 0 WARN · 1 SKIP · 0 FAIL**.
+- [x] Roles: `consulta` y usuario revocado reciben 403 lógico en escritura y gestor.
+- [x] UI de producción a 360/768/1280 sin overflow; sin nombres accesibles vacíos ni imágenes sin alt.
+- [ ] Revisar media/Drive (`P0-09`) y deploy/estática (`P0-10`) en la interfaz real.
+- [ ] Retirar el fixture `caso-externo-gate` cuando ya no haga falta para reproducir `P0-07`.
+
 ## 1. Verificación F0–F5 en producción
 
 > **Origen:** `CHECKLIST_PRODUCCION_F0_F5.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual:** el lote actual de `.gs` ya está desplegado; las fases están cerradas en código local y falta ejecutar el gate P0 y la verificación funcional en producción. El checklist siguiente es el documento íntegro.
+> **Estado actual (2026-11-23):** el gate P0 se ejecutó dos veces en producción con **28 PASS, 0 WARN, 1 SKIP (`P0-09b` demo), 0 FAIL**. Evidencias: `test-results/contract-after.json` y `contract-after-2.json`. El fixture temporal `caso-externo-gate` sigue publicado para que `P0-07` sea reproducible; retirarlo cuando se cierre la verificación. Queda revisión manual de media/Drive (`P0-09`), deploy/estática (`P0-10`) y retirada del fixture.
 
 **Además del checklist original (operativo, 2026-11-23):**
 
