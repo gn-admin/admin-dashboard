@@ -224,6 +224,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
   filtro `category` normaliza también lo que manda la web y el gestor sugiere el catálogo canónico
   en el formulario de historia/evento. Sirve para que la sección no se parta en dos por una errata.
 - **Destacados y orden editorial (22/11):** `featured=1`/`featured=0` filtra por la bandera y `featured` entra en la clave de caché (`_webKeyParams`). `sort=orden` ordena por el orden manual del gestor y **no** antepone los urgentes (con `-publishedAt` se mantiene D2). El payload expone `orden` y `config-publica` devuelve `contact.phone` desde `CONFIG.CONTACTO_TELEFONO`; sin esa propiedad sale `""`, como antes.
+- **R1 · acogidas con grupos (23/11):** `main` usará `?endpoint=publicaciones&status=en_acogida` como puente. `animales-publicos` conserva `type=animal` para no romper consumidores; `groups=1` queda como mejora futura. La instantánea pública deduplica la ficha individual superada por el grupo, así que el puente devuelve grupos e individuos sin duplicar al animal.
 
 ### 5.2 Detalle de publicación — implementado
 - [x] **`GET /api/publicaciones/:slug`** → `?endpoint=publicaciones/{slug}` o `?endpoint=publicacion&slug=...`: publicación completa (`icons`, `gallery`, `videos[]/video`, `contentHtml`, `animal`/`event`, `seo`).

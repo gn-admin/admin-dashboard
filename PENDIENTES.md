@@ -22,17 +22,67 @@
 ## 1. Verificación F0–F5 en producción
 
 > **Origen:** `CHECKLIST_PRODUCCION_F0_F5.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual:** las fases están cerradas en código local; falta la verificación funcional en producción y subir el lote actual de `.gs` con versión nueva. El checklist siguiente es el documento íntegro.
+> **Estado actual:** el lote actual de `.gs` ya está desplegado; las fases están cerradas en código local y falta ejecutar el gate P0 y la verificación funcional en producción. El checklist siguiente es el documento íntegro.
 
 **Además del checklist original (operativo, 2026-11-23):**
 
 - [ ] `CONTACTO_TELEFONO` en el `Config.gs` del despliegue para que `config-publica` no lo devuelva vacío.
 - [ ] `DRIVE_WEB_FOLDER_ID` en el `Config.gs` desplegado: sin esa carpeta la media del gestor no tiene destino.
 
-### Checklist de verificación en producción — plan F0–F5
+### Gate P0 F0–F5 (bloqueante) — preparado 2026-11-23
 
-> Las fases F0–F5 están **cerradas en código local**. Lo único que falta es validarlas
-> sobre el entorno real (el lote actual de `.gs` sigue pendiente de subir con versión nueva).
+> **Objetivo:** convertir la verificación en una decisión binaria. El gate no sustituye a la matriz completa: la reduce a 15 comprobaciones que deben pasar antes de decir que F0–F5 están verificadas en producción. La matriz completa sigue debajo como P1.
+>
+> **Regla:** P0 se ejecuta **dos veces** (caché fría con `nocache=1` y después del deploy de la estática). Un `FAIL` bloquea el cierre; un `WARN` **también**: no hay modo de PASS con warnings. Token e informe de columnas son obligatorios; `SKIP` solo se admite en P0-09b (demo sin dominio), mientras P0-12/13/14 fallan si faltan token o columnas.
+>
+> **Antes de empezar:** `npm run smoke:contract -- --expected-version "<VERSION>" --retired-slug "<SLUG_RETIRADO>" --columns-report test-results/columnas.json`. El detalle del despliegue y el rollback está en [`DEPLOY_GS.md`](DEPLOY_GS.md).
+
+| ID | Fase | Comprobación P0 | Evidencia | Criterio |
+|---|---|---|---|---|
+| P0-01 | Preflight | Versión desplegada esperada, `config-publica` con `site/contact/seo`, `config` legado en 401 y columnas aditivas completas | `contract-after.json` + `columnas.json` | PASS |
+| P0-02 | F0 | `publicaciones` solo devuelve publicadas; sin `borrador`, `oculto` ni `retirado`; el listado no lleva `ficha` | smoke `P0-02` | PASS |
+| P0-03 | F0 | Estados internos→públicos, `urgent` como bandera, modo `auto/manual` y animal `fallecido` no publicable | JSON + caso real | PASS |
+| P0-04 | F0 | Exclusividad 1:1/grupo: un animal con grupo no publica ficha suelta; el grupo no duplica miembros; una ficha superada responde 301 | fixture + `redirects` | PASS |
+| P0-05 | F1 | Pestañas/contadores, selectores de publicación, herencia en solo lectura y acciones coherentes con el estado | captura + notas | PASS |
+| P0-06 | F1 | Responsive real a 360, 768 y 1280: sin scroll horizontal, dianas ≥44 px y teclado | 3 capturas | PASS |
+| P0-07 | F2 | Detalle sin IDs internos, microchip, documentos privados ni datos de familia; contacto público correcto | smoke `P0-03` | PASS |
+| P0-08 | F2 | `preview` y `detalle` coinciden; el estado se recalcula sin republicar; `ficha` C3 solo viaja en detalle/preview y respeta el límite | JSON comparado | PASS |
+| P0-09 | F3 | Media: carpeta por slug, documentos privados, enlaces normalizados y carpetas rechazadas | nota + Drive | PASS |
+| P0-10 | F3 | Publicar/ocultar/retirar/restaurar dispara deploy; la estática tarda 2–4 min; `410` y sitemap correctos | logs + URL | PASS |
+| P0-11 | F4 | Grupo: miembros y agregados, grupo inválido no publica, cambio de miembro se refleja y no hay duplicados | fixture | PASS |
+| P0-12 | F4 | Filtros R2–R5: `featured=1/0`, `sponsor=1`, `category=Caso externo`, `taxonomias&type` y `sort=orden` | smoke `P0-04`…`P0-08` | PASS |
+| P0-13 | F5 | Sin token 401, rol sin permiso 403, `config` 401, sin secretos en payload y versión del backend correcta | smoke `P0-01b`, `P0-12`, `P0-13` | PASS |
+| P0-14 | F5 | Caché/invalidación: guardar cambia la respuesta en ≤60 s o con `nocache=1`; no se sirve una ficha vieja | JSON antes/después | PASS |
+| P0-15 | F5 | A11y/móvil: skip link, foco, labels, contraste, estados vacío/error y sin scroll horizontal | captura + teclado | PASS |
+
+#### Plantilla de evidencia P0
+
+**Ejecución:** fecha/hora · commit `<COMMIT>` · versión backend `<VERSION>` · URL sin `token` · operador · entorno (local/producción) · caché (fría/caliente)
+
+| ID | Resultado | Evidencia (ruta, URL sin token, hora) | Notas / incidencia |
+|---|---|---|---|
+| P0-01 |  |  |  |
+| P0-02 |  |  |  |
+| P0-03 |  |  |  |
+| P0-04 |  |  |  |
+| P0-05 |  |  |  |
+| P0-06 |  |  |  |
+| P0-07 |  |  |  |
+| P0-08 |  |  |  |
+| P0-09 |  |  |  |
+| P0-10 |  |  |  |
+| P0-11 |  |  |  |
+| P0-12 |  |  |  |
+| P0-13 |  |  |  |
+| P0-14 |  |  |  |
+| P0-15 |  |  |  |
+
+**Cierre:** P0-01…P0-15 en PASS en las dos pasadas, **sin WARN**. Guardar la plantilla rellenada en `test-results/p0-<fecha>.md`. No adjuntar tokens, IDs de hojas ni claves.
+
+### Matriz completa P1 — checklist F0–F5
+
+> Las fases F0–F5 están **cerradas en código local**. El lote actual de `.gs` ya está
+> desplegado; lo que falta es validarlo sobre el entorno real con el gate P0 y la matriz completa.
 > Contrato, grupos y plan: [`memory.md`](memory.md).
 >
 > **Sin secretos:** aquí se usan `<API_URL>` y `<token>`, que se toman del entorno
@@ -44,12 +94,12 @@
       (las rutas del front son relativas: `/admin-dashboard/`).
 - [ ] Login con un usuario **admin/coordinador** real y con un usuario **sin permisos** para
       comprobar el 403 (los endpoints del gestor exigen token y rol).
-- [ ] `GET <API_URL>?endpoint=web-deploy-estado` → responde `version` y el deploy está
-      configurado; en el gestor se ve el chip «Deploy automático activo · repo (main)».
-- [ ] Columnas aditivas presentes (el backend las crea al vuelo, confirma en el diagnóstico
-      del resumen): `WebPublicaciones` → `ficha_json`, `documents_json`, `media_folder_id`,
-      `origen_tipo`; `Animales` → `portada_url`, `portada_alt`, `galeria`, `videos`,
-      `documentos_internos`.
+- [ ] `POST <API_URL>?endpoint=web-deploy-estado` con token de admin/coordinación → responde
+      `version` y el deploy está configurado; en el gestor se ve el chip «Deploy automático activo · repo (main)».
+- [ ] Columnas aditivas presentes: ejecutar `scripts/diagnostico-columnas.gs` en Apps Script y pasar
+      el JSON a `npm run smoke:contract -- --columns-report ...`. `WebPublicaciones` → `ficha_json`,
+      `documents_json`, `media_folder_id`, `origen_tipo`; `Animales` → `portada_url`, `portada_alt`,
+      `galeria`, `videos`, `documentos_internos`. Un campo vacío no demuestra que falte la columna.
 - [ ] Preparado **contenido de prueba** (un animal con grupo obligatorio, un animal suelto y
       un evento/historia) con slugs que no existan ya en la web pública.
 - [ ] Anotar la hora de inicio: cada publicación dispara deploy y la estática tarda **2–4 min**.
@@ -696,7 +746,7 @@ Hay dos enfoques complementarios (según disponibilidad):
 ## 3. Requisitos del canal público para `main`
 
 > **Origen:** `REQUISITOS_WEB_CANAL_PUBLICO.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual (2026-11-23):** R2 (categoría canónica «Caso externo»), R3 (apadrinamiento), R4 (`featured`/orden/teléfono) y R5 (taxonomías por tipo) están implementados en código local y pendientes de subir el lote `.gs`; R1 (grupos en acogidas) sigue pendiente, aunque el puente `publicaciones&status=en_acogida` ya devuelve grupos; R6 (transporte) está cubierto por fetch/JSONP. El documento siguiente conserva el detalle original de cada petición y sus pruebas de aceptación.
+> **Estado actual (2026-11-23):** R2 (categoría canónica «Caso externo»), R3 (apadrinamiento), R4 (`featured`/orden/teléfono) y R5 (taxonomías por tipo) están implementados y desplegados; falta verificarlos con el gate P0. R1 (grupos en acogidas) se cierra con la decisión de usar el puente `publicaciones&status=en_acogida` en `main`; R6 (transporte) está cubierto por fetch/JSONP. El documento siguiente conserva el detalle original de cada petición y sus pruebas de aceptación.
 
 ### Requisitos de la web (`main`) al canal público
 
@@ -732,7 +782,7 @@ Consultas en vivo contra el Web App (2026-11-21, `nocache=1`):
 
 #### 2. Estado por sección de la web
 
-> **Actualización 2026-11-23:** R2, R3, R4 y R5 están **implementados en código local** y pendientes de subir el lote `.gs`; R1 sigue pendiente. La tabla y las notas siguientes reflejan ese estado, no solo la verificación original del 2026-11-21.
+> **Actualización 2026-11-23:** R2, R3, R4 y R5 están **implementados y desplegados**; falta verificarlos con el gate P0. R1 se cierra con el puente `publicaciones&status=en_acogida` en `main`. La tabla y las notas siguientes reflejan ese estado, no solo la verificación original del 2026-11-21.
 
 | Sección (`main`) | Consulta que usaría hoy | Resultado | Estado |
 |---|---|---|---|
@@ -741,16 +791,16 @@ Consultas en vivo contra el Web App (2026-11-21, `nocache=1`):
 | Gatos en adopción | `animales-publicos&species=gato&status=en_adopcion` | 1 | ✅ Cubierta |
 | Perros en adopción | `animales-publicos&species=perro&status=en_adopcion` | 2 | ✅ Cubierta |
 | Eventos | `eventos-publicos` | 1 | ✅ Cubierta |
-| Acogidas | `animales-publicos&status=en_acogida` | 0 y **excluye grupos** | ⚠️ Pendiente → **R1** (puente: `publicaciones&status=en_acogida`) |
+| Acogidas | `animales-publicos&status=en_acogida` | 0 y **excluye grupos** | ✅ Cubierta en `main` con el puente `publicaciones&status=en_acogida` (R1) |
 | Adoptados | `animales-publicos&status=adoptado` | 0 | ✅ Cubierta (sin datos) |
-| Casos externos | `publicaciones&category=Caso externo` | 0 (sin datos) | ✅ Implementado en código (R2; pendiente deploy) |
-| Home (destacados) | `publicaciones&featured=1` | 1 (6 sin destacar) | ✅ Implementado en código (R4; pendiente deploy) |
-| Apadrinamiento | `animales-publicos&sponsor=1` | 2 | ✅ Implementado en código (R3; pendiente deploy) |
-| Taxonomías por tipo | `taxonomias&type=animal` (y `animal_grupo`, `evento`, `historia`) | acotado por tipo | ✅ Implementado en código (R5; pendiente deploy) |
+| Casos externos | `publicaciones&category=Caso externo` | 0 (sin datos) | ✅ Implementado y desplegado (R2; pendiente gate P0) |
+| Home (destacados) | `publicaciones&featured=1` | 1 (6 sin destacar) | ✅ Implementado y desplegado (R4; pendiente gate P0) |
+| Apadrinamiento | `animales-publicos&sponsor=1` | 2 | ✅ Implementado y desplegado (R3; pendiente gate P0) |
+| Taxonomías por tipo | `taxonomias&type=animal` (y `animal_grupo`, `evento`, `historia`) | acotado por tipo | ✅ Implementado y desplegado (R5; pendiente gate P0) |
 
 Notas de la verificación:
 
-- `animal_grupo` **solo** aparece en `?endpoint=publicaciones`; los alias `animales-publicos` / `v1/animales` fuerzan `type=animal` (`_webParamsConTipo` en `Code.gs`). Por eso R1 sigue pendiente: para acogidas con grupos hay que usar el puente `publicaciones&status=en_acogida` o añadir `groups=1`.
+- `animal_grupo` **solo** aparece en `?endpoint=publicaciones`; los alias `animales-publicos` / `v1/animales` fuerzan `type=animal` (`_webParamsConTipo` en `Code.gs`). Por eso `main` usa el puente `publicaciones&status=en_acogida`; `groups=1` queda como mejora futura.
 - El grupo en `en_acogida` (`demo-camada-otono-2026`) lleva categoría `Perros en adopción`, no `Acogidas`: la categoría es editorial, no siempre derivada del estado.
 - **R5 resuelto:** `?endpoint=taxonomias&type=…` acota el vocabulario a ese tipo; sin `type` la respuesta es idéntica a la anterior (los estados siguen mezclados solo si no se pide el tipo).
 - Hay 0 filas en acogidas, adoptados y casos externos; apadrinamiento tiene 2 con `sponsor=1` y home tiene 1 destacada. Aunque la consulta exista, encender una sección sin filas daría listados vacíos.
@@ -860,22 +910,23 @@ GET ?endpoint=publicaciones&featured=1&pageSize=6&sort=-publishedAt
 
 **Necesita la web:** una sección de acogidas que muestre tanto animales individuales como camadas/grupos en acogida.
 
-**Situación actual:** `?endpoint=animales-publicos` fuerza `type=animal`, así que el grupo `demo-camada-otono-2026` (estado `en_acogida`) **no** aparece. La web podría obtenerlo con `?endpoint=publicaciones&status=en_acogida` (sin `type`), que sí lo incluye; es un rodeo, no un bloqueo.
+**Situación actual:** `?endpoint=animales-publicos` fuerza `type=animal`, así que el grupo `demo-camada-otono-2026` (estado `en_acogida`) **no** aparece. `?endpoint=publicaciones&status=en_acogida` (sin `type`) sí lo incluye, porque la instantánea pública ya deduplica la ficha individual superada por el grupo.
 
-**Lo que se pide (una de las dos):**
+**Decisión (2026-11-23):** `main` usa `?endpoint=publicaciones&status=en_acogida` como **puente R1**. No se añade `groups=1` ahora: `animales-publicos` mantiene `type=animal` para no romper consumidores ni abrir otro deploy del gestor. El puente devuelve grupos e individuos sin duplicar al animal. `groups=1` queda como mejora futura si `main` necesita un endpoint tipado o paginación propia.
+
+**Opciones evaluadas (no implementadas):**
 
 1. Que `animales-publicos` / `v1/animales` incluya también `animal_grupo`, o
 2. Un parámetro explícito: `?endpoint=animales-publicos&groups=1`.
 
-Mantener el comportamiento actual si el parámetro no se envía, para no romper consumidores.
+**Criterios de aceptación del puente:**
 
-**Criterios de aceptación:**
+- [x] Decisión: `main` consume `publicaciones&status=en_acogida` (2026-11-23).
+- [ ] Verificar en producción que devuelve grupo + individuos y no duplica al miembro (P0).
+- [x] `animales-publicos` conserva `type=animal`; no hay cambio de contrato.
+- [ ] `groups=1` queda como mejora futura, no bloqueante.
 
-- [ ] `animales-publicos&status=en_acogida` (opción 1) o `...&groups=1` (opción 2) devuelve el grupo además de los individuos.
-- [ ] Sin el parámetro, la respuesta actual no cambia (opción 2).
-- [ ] El payload del grupo sigue usando `group` + `animal` de compatibilidad.
-
-**Mientras tanto en la web:** acogidas en `fake`; cuando se encienda, puede usar `publicaciones&status=en_acogida` como puente.
+**En `main`:** acogidas se enciende con el puente; no se espera a `groups=1`. El payload del grupo sigue usando `group` + `animal` de compatibilidad.
 
 ---
 
@@ -913,10 +964,10 @@ La web consume el canal con `fetch` y **cae a JSONP** (`&callback=`) porque `Con
 | 1 | **R3** apadrinamiento | Única sección sin ninguna vía hoy; requiere decisión de modelo | Medio (compositor + filtro + gestor/override) |
 | 2 | **R2** casos externos | Desbloquea la sección con una decisión editorial | Bajo (documentar + verificar) |
 | 3 | **R4** `featured` | Home sin descargar el catálogo | Bajo (filtro + clave de caché) |
-| 4 | **R1** grupos en acogidas | Hay puente con `publicaciones&status=…` | Bajo |
+| 4 | **R1** grupos en acogidas | Resuelto en `main` con el puente `publicaciones&status=en_acogida` | — |
 | 5 | **R5** taxonomías por tipo | Mejora de UI; hay workaround | Bajo |
 
-> **Estado 2026-11-23:** R2, R3, R4 y R5 ya están implementados en código local y pendientes de subir el lote `.gs`; de esta lista solo queda **R1** como decisión funcional.
+> **Estado 2026-11-23:** R2, R3, R4 y R5 ya están implementados y desplegados; falta el gate P0. R1 queda cerrado como decisión de consumo en `main` con el puente; no bloquea el gestor.
 
 ---
 
@@ -927,7 +978,7 @@ BASE="https://script.google.com/macros/s/<DEPLOY_ID>/exec"
 
 curl -sSL "$BASE?endpoint=taxonomias&nocache=1"
 curl -sSL "$BASE?endpoint=publicaciones&featured=1&nocache=1"          # R4
-curl -sSL "$BASE?endpoint=animales-publicos&status=en_acogida&nocache=1" # R1
+curl -sSL "$BASE?endpoint=publicaciones&status=en_acogida&nocache=1" # R1 (puente; el alias animales-publicos excluye grupos)
 curl -sSL "$BASE?endpoint=publicaciones&category=Caso%20externo&nocache=1" # R2
 curl -sSL "$BASE?endpoint=animales-publicos&sponsor=1&nocache=1"        # R3
 ```
@@ -950,7 +1001,7 @@ sections: {
 }
 ```
 
-No hay que tocar renderizadores: `js/publicaciones-api.js` ya traduce el envelope y compone `publication`. Antes de encender cada sección se comprobará el conteo real: hoy `animales-publicos&status=en_acogida` devuelve 0 porque el único caso es un grupo (R1), y adoptados, apadrinamiento y casos externos no tienen ninguna fila publicada; esas secciones no se activarán hasta que el gestor tenga datos.
+No hay que tocar renderizadores: `js/publicaciones-api.js` ya traduce el envelope y compone `publication`. Antes de encender cada sección se comprobará el conteo real: `main` usará `publicaciones&status=en_acogida` para acogidas (puente R1, que sí incluye grupos); adoptados, apadrinamiento y casos externos siguen sin filas publicadas, así que esas secciones no se activarán hasta que el gestor tenga datos.
 
 ---
 
@@ -963,7 +1014,7 @@ No hay que tocar renderizadores: `js/publicaciones-api.js` ya traduce el envelop
 ## 4. Port y formularios en `main`
 
 > **Origen:** `TRANSFERIR_A_MAIN.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual:** M1–M4 y M6 ejecutados y verificados en `main`; M5 (subir el lote `.gs` y configurar `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`, verificar el disparo E2E) sigue pendiente. El plan siguiente es el documento íntegro.
+> **Estado actual:** M1–M4 y M6 ejecutados y verificados en `main`; el lote `.gs` ya está desplegado. De M5 sigue pendiente configurar `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN` y verificar el disparo E2E. El plan siguiente es el documento íntegro.
 
 **Además del plan (operativo, 2026-11-23):**
 
@@ -1411,7 +1462,7 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 - [ ] **H-4 — importar desde ficha / refresco manual:** la propagación solo va de publicación → ficha; falta el sentido inverso y un refresco manual.
 - [ ] **H-5 — publicación desactualizada:** cambiar un miembro no regenera la estática; falta aviso y acción de refresco/deploy.
 - [x] **H-8 — documentación desalineada:** cerrado en la consolidación de 2026-11-23. `memory.md` ya separa entregado y pendiente, `PENDIENTES.md` recoge la verificación real de F0–F5 y `GESTOR_WEB_PLAN_Y_ENDPOINTS.md` ya no lista `config` como público (es `config-publica`; el antiguo responde 401).
-- [ ] **R1 — grupos en acogidas:** pendiente de decidir entre incluir `animal_grupo` en `animales-publicos` o añadir `groups=1`; mientras tanto, `publicaciones&status=en_acogida` es el puente. Detalle completo en §3.
+- [x] **R1 — grupos en acogidas:** decidido (2026-11-23) que `main` use `publicaciones&status=en_acogida`; `animales-publicos` mantiene `type=animal` y `groups=1` queda como mejora futura. Detalle completo en §3.
 
 **Hallazgos H-4…H-8 de la auditoría de funciones (texto completo):**
 
