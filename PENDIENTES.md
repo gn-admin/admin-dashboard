@@ -32,6 +32,62 @@
 - [x] Ciclo publicar/ocultar/retirar/restaurar: `publicado → oculto → publicado → retirado → borrador → retirado`; el primer cambio disparó deploy (`codigo: 204`) y el resto se agrupó en cola.
 - [x] Fixture `caso-externo-gate` retirado: listado público 0, detalle `gone`, lápida `noindex` y fuera del sitemap.
 
+## 0.2 Qué falta para volver a cerrar el gate de contrato en PASS (2026-11-23)
+
+> **Situación:** el gate se cerró el 2026-11-23 con **28 PASS · 0 WARN · 1 SKIP · 0 FAIL** (§0.1). Repetido contra el canal real el 2026-11-23 23:10, con token válido, da **25 PASS · 2 WARN · 1 FAIL · 1 SKIP** (`test-results/smoke-token-20261123-2310.json`): no hay ninguna regresión del canal, faltan solo **dos insumos** — el informe de columnas (`P0-14`, el único `FAIL`) y una publicación «Caso externo» (`P0-07`, `WARN`). Aportados esos dos, el gate vuelve a `Gate: PASS`.
+
+**Token de lectura: resuelto.** Generado y verificado el 2026-11-23 con la cuenta de prueba `gn.test.admin@example.test` (la misma que cita [`memory.md`](memory.md)) y cacheado en `test-results/.token`, ignorado por git. Caduca a la hora; se regenera con el helper interno:
+
+```bash
+GN_ADMIN_EMAIL='<email del usuario>' GN_ADMIN_PASS='<contraseña>' \
+  node .internal-docs/token-admin.js > test-results/.token
+export API_TOKEN="$(cat test-results/.token)"
+```
+
+Si `P0-12b` vuelve a `FAIL`, el token ha caducado y basta con regenerarlo; no hay nada más que corregir ahí. Ni el token ni la contraseña se pegan en este documento, en un commit o en un informe: el repo es público.
+
+### 1. Informe de columnas `test-results/columnas.json` (`P0-14`)
+
+- **Falla con:** `Falta --columns-report`; es el único `FAIL` que queda en la pasada.
+- **Se genera** ejecutando `diagnosticoColumnasWeb` en el editor de Apps Script del despliegue (`scripts/diagnostico-columnas.gs`; solo lectura) y guardando el JSON de *Executions → Logs* en `test-results/columnas.json`.
+- Debe contener `WebPublicaciones` (`ficha_json`, `documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`) sin `missing`, y un objeto `sheets` no vacío.
+- El canal público no distingue una columna vacía de una ausente: sin este informe el gate no puede afirmar que las columnas aditivas están completas.
+
+### 2. Una publicación de categoría «Caso externo» (`P0-07`)
+
+- **Avisa con:** `WARN P0-07 — Sin filas: no se puede confirmar el filtro con datos actuales`.
+- **Causa:** el fixture `caso-externo-gate` se retiró al cerrar el gate (§0.1), así que `publicaciones&category=Caso externo` devuelve 0 filas.
+- **Qué hacer:** publicar desde el gestor una historia temporal con categoría exacta `Caso externo` (sirve el fixture `caso-externo-gate`: portada, título y meta), mantenerla **publicada durante la pasada del gate** y retirarla después (`410`, `noindex`, fuera del sitemap).
+- Mientras esté retirada, `P0-07` volverá a `WARN`: no hay forma de cerrar el gate sin al menos una fila publicada de esa categoría.
+- Publicar dispara deploy en `main`, así que se hace justo antes de la pasada, no días antes.
+
+### Comando exacto
+
+```bash
+cd admin-dashboard
+export API_TOKEN="$(cat test-results/.token)"   # token vigente; se regenera si caducó
+npm run smoke:contract -- \
+  --expected-version "2026-11-15.7" \
+  --retired-slug demo-lua \
+  --columns-report test-results/columnas.json
+```
+
+Para guardar la evidencia (el JSON no incluye el token):
+
+```bash
+npm run smoke:contract -- --json \
+  --expected-version "2026-11-15.7" \
+  --retired-slug demo-lua \
+  --columns-report test-results/columnas.json \
+  > "test-results/contract-$(date +%Y%m%d).json"
+```
+
+- **Criterio de PASS:** `0 FAIL` y `0 WARN`; el único `SKIP` admitido es `P0-09b` (sitemap en la demo de Pages hasta configurar el dominio propio). La salida debe terminar en `Gate: PASS`.
+- `--retired-slug demo-lua` mantiene `P0-11b` en `PASS` (lápida `410` lógica ya verificada).
+- `--expected-version` cierra `P0-13b`; la versión desplegada observada el 2026-11-23 es `2026-11-15.7`. Sin ella el gate emite un `WARN` informativo con la versión que encuentra.
+- Pasada de referencia con token (2026-11-23 23:10, sin columnas ni «Caso externo»): 25 PASS · 2 WARN (`P0-07`, `P0-13b`) · 1 FAIL (`P0-14`) · 1 SKIP (`P0-09b`). Con los dos insumos pendientes y `--expected-version`, el resultado esperado es `Gate: PASS`.
+- Con token y columnas la pasada da 27–29 comprobaciones: el número varía con el muestreo por tipo del listado.
+
 ## 1. Verificación F0–F5 en producción
 
 > **Origen:** `CHECKLIST_PRODUCCION_F0_F5.md` (retirado el 2026-11-23). Texto completo, sin resumir.
