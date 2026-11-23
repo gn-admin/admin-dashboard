@@ -176,6 +176,43 @@ const Web = {
     return meta || String(p.titulo || '').trim();
   },
 
+  /** Guía para rellenar el SEO sin conocimientos técnicos. */
+  _seoGuiaHtml(d) {
+    const p = d || {};
+    const titulo = this._esc(String(p.titulo || 'Título público').slice(0, 70));
+    const extracto = this._esc(String(p.extracto || 'Resumen de la ficha').slice(0, 160));
+    return `<div class="web-seo-guia">
+      <p class="web-seo-guia-titulo">${Icons.search} SEO básico: no hace falta tocar nada</p>
+      <p>La web ya genera estos datos sola. Si no sabes qué poner, deja los campos vacíos o con el valor automático:</p>
+      <ul>
+        <li><b>Título SEO</b> → título público: <i>${titulo}</i></li>
+        <li><b>Descripción SEO</b> → extracto: <i>${extracto}</i></li>
+        <li><b>URL canónica</b> → dominio + slug de la ficha.</li>
+        <li><b>Imagen para redes</b> → portada de la publicación.</li>
+        <li><b>Robots</b> → indexable si está marcada «Indexable»; si no, noindex.</li>
+      </ul>
+      <p>Escribe en los campos solo si quieres cambiar el resultado automático. Evita repetir palabras clave, listas de términos o textos genéricos.</p>
+    </div>`;
+  },
+
+  /** Separador visual entre lo imprescindible y los datos opcionales. */
+  _avanzadoIntroHtml() {
+    return `<div class="web-avanzado-intro">
+      <p class="web-avanzado-titulo">Avanzado <span class="web-avanzado-pill">Opcional</span></p>
+      <p class="web-nota">Para publicar basta con lo de arriba. Abre solo lo que necesites: media extra, ficha, CTA, etiquetas o SEO.</p>
+    </div>`;
+  },
+
+  /** Portada en la zona básica: URL, alt y subida directa. */
+  _portadaBasicaHtml(prefix, cover, id, hint) {
+    const c = cover || {};
+    return `<div class="form-row">
+      <div class="form-group"><label for="${prefix}-cover">Portada (URL)</label><input type="text" id="${prefix}-cover" class="form-input" value="${this._esc(c.src || '')}" placeholder="https://..."><p class="web-slug-hint">Opcional: ${this._esc(hint || 'si está vacía, la publicación se muestra sin portada nueva.')}</p></div>
+      <div class="form-group"><label for="${prefix}-cover-alt">Texto alternativo</label><input type="text" id="${prefix}-cover-alt" class="form-input" value="${this._esc(c.alt || '')}" placeholder="Ej: Luna, perra mestiza, sentada en el jardín"><p class="web-slug-hint">Describe la imagen en una frase.</p></div>
+    </div>
+    <div class="form-group"><label for="${prefix}-file-portada">Subir portada</label><input type="file" id="${prefix}-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="${prefix}" data-carg2="${this._esc(id || '')}"></div>`;
+  },
+
   estadoLabel(estado) {
     const m = { publicado: 'Publicado', borrador: 'Borrador', oculto: 'Oculto', retirado: 'Retirado', sin_publicar: 'Sin publicar' };
     return m[estado] || 'Sin publicar';
@@ -270,16 +307,30 @@ const Web = {
         <button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" data-action="loadPage" data-arg0="web">Reintentar</button>
       </div>`;
     }
+    const t = (this.resumen && this.resumen.totales) || {};
+    const pendientes = Number(t.incompletas) || 0;
     const c = this._contadoresTab();
     return `<div class="page-list-container">
+      <section class="web-page-head">
+        <div class="web-page-copy">
+          <span class="web-page-eyebrow">Contenido público</span>
+          <h2 class="web-page-title">Publicaciones</h2>
+          <p class="web-page-sub">Cura las fichas que ve la web: animal, grupo, evento o historia. Lo que no publicas no sale del canal.</p>
+        </div>
+        <div class="web-page-summary" aria-label="Resumen de publicaciones">
+          <span class="web-summary-pill is-live"><b>${Number(t.publicados) || 0}</b> visibles</span>
+          <span class="web-summary-pill"><b>${Number(t.borradores) || 0}</b> borradores</span>
+          <span class="web-summary-pill ${pendientes ? 'is-warn' : ''}"><b>${pendientes}</b> con pendientes</span>
+        </div>
+      </section>
       ${this._statsHtml()}
       <div class="web-tabs" role="tablist" aria-label="Contenido publicable">
-        <button type="button" role="tab" id="web-tab-animal" aria-controls="web-panel" class="web-tab ${this.tab === 'animal' ? 'active' : ''}" aria-selected="${this.tab === 'animal'}" data-action="cambiarTabWeb" data-arg0="animal">Animales <span class="web-tab-count" aria-hidden="true">${c.animal.total}</span><span class="sr-only">, ${c.animal.total} ${c.animal.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
-        <button type="button" role="tab" id="web-tab-grupo" aria-controls="web-panel" class="web-tab ${this.tab === 'grupo' ? 'active' : ''}" aria-selected="${this.tab === 'grupo'}" data-action="cambiarTabWeb" data-arg0="grupo">Grupos <span class="web-tab-count" aria-hidden="true">${c.grupo.total}</span><span class="sr-only">, ${c.grupo.total} ${c.grupo.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
-        <button type="button" role="tab" id="web-tab-evento" aria-controls="web-panel" class="web-tab ${this.tab === 'evento' ? 'active' : ''}" aria-selected="${this.tab === 'evento'}" data-action="cambiarTabWeb" data-arg0="evento">Eventos e historias <span class="web-tab-count" aria-hidden="true">${c.evento.total}</span><span class="sr-only">, ${c.evento.total} ${c.evento.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
+        <button type="button" role="tab" id="web-tab-animal" aria-controls="web-panel" class="web-tab ${this.tab === 'animal' ? 'active' : ''}" aria-selected="${this.tab === 'animal'}" data-action="cambiarTabWeb" data-arg0="animal"><span class="web-tab-icon" aria-hidden="true">${Icons.paw}</span><span class="web-tab-label">Animales</span><span class="web-tab-count" aria-hidden="true">${c.animal.total}</span><span class="sr-only">, ${c.animal.total} ${c.animal.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
+        <button type="button" role="tab" id="web-tab-grupo" aria-controls="web-panel" class="web-tab ${this.tab === 'grupo' ? 'active' : ''}" aria-selected="${this.tab === 'grupo'}" data-action="cambiarTabWeb" data-arg0="grupo"><span class="web-tab-icon" aria-hidden="true">${Icons.users || Icons.paw}</span><span class="web-tab-label">Grupos</span><span class="web-tab-count" aria-hidden="true">${c.grupo.total}</span><span class="sr-only">, ${c.grupo.total} ${c.grupo.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
+        <button type="button" role="tab" id="web-tab-evento" aria-controls="web-panel" class="web-tab ${this.tab === 'evento' ? 'active' : ''}" aria-selected="${this.tab === 'evento'}" data-action="cambiarTabWeb" data-arg0="evento"><span class="web-tab-icon" aria-hidden="true">${Icons.calendar}</span><span class="web-tab-label">Eventos e historias</span><span class="web-tab-count" aria-hidden="true">${c.evento.total}</span><span class="sr-only">, ${c.evento.total} ${c.evento.total === 1 ? 'publicación' : 'publicaciones'}</span></button>
       </div>
       <div class="web-panel" id="web-panel" role="tabpanel" aria-labelledby="web-tab-${this.tab}">
-      <div class="filters-bar">
+      <div class="filters-bar web-toolbar">
         <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar publicación" placeholder="${this.tab === 'animal' ? 'Buscar por nombre, título o slug...' : (this.tab === 'grupo' ? 'Buscar por grupo, título, miembros o slug...' : 'Buscar por título, slug o categoría...')}" value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
         <div class="filter-row">
           <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
@@ -301,7 +352,7 @@ const Web = {
       ${this._avisoPublicados()}
       <div id="web-deploy-estado" class="web-deploy-estado" aria-live="polite"></div>
       <div id="web-listado" class="web-lista">${this._tabla()}</div>
-      <p class="web-nota">Los campos SEO son los metadatos que la web pública usará al renderizar cada ficha (title, description, canonical, robots, OG). La previsualización muestra exactamente el payload que entregará el canal público.</p>
+      <p class="web-nota">La guía SEO de cada ficha explica qué se rellena solo. La previsualización muestra exactamente el payload que entregará el canal público.</p>
       </div>
     </div>
     <div class="page-detail-container"></div>`;
@@ -397,14 +448,24 @@ const Web = {
 
   _statsHtml() {
     const t = (this.resumen && this.resumen.totales) || {};
-    const card = (label, valor, icono, extra) => `<div class="stat-card"><div class="stat-card-icon green">${icono}</div><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value">${Number(valor) || 0}</div>${extra ? `<div class="stat-card-change">${extra}</div>` : ''}</div></div>`;
+    const card = (label, valor, icono, extra, tone) => `<div class="stat-card web-stat web-stat--${tone || 'green'}"><div class="stat-card-icon ${tone || 'green'}">${icono}</div><div class="stat-card-info"><div class="stat-card-label">${label}</div><div class="stat-card-value">${Number(valor) || 0}</div>${extra ? `<div class="stat-card-change">${extra}</div>` : ''}</div></div>`;
     return `<div class="stats-grid web-stats" style="margin-bottom:16px">
-      ${card('Publicados', t.publicados, Icons.checkCircle, 'Visibles en la web')}
-      ${card('Borradores', t.borradores, Icons.fileText, 'Sin publicar todavía')}
-      ${card('Ocultos', t.ocultos, Icons.eye, 'Fuera de la web temporalmente')}
-      ${card('Retiradas', t.retirados, Icons.trash, 'Enlace retirado (410)')}
-      ${card('Sin configurar', t.sin_publicar, Icons.alertTriangle, 'Animales sin ficha web')}
-      ${card('Incompletos', t.incompletas, Icons.alertTriangle, (Number(t.sin_seo) || 0) + ' sin SEO/descripción')}
+      ${card('Publicados', t.publicados, Icons.checkCircle, 'Visibles en la web', 'green')}
+      ${card('Borradores', t.borradores, Icons.fileText, 'En preparación', 'blue')}
+      ${card('Ocultos', t.ocultos, Icons.eye, 'Fuera de la web', 'gray')}
+      ${card('Retiradas', t.retirados, Icons.trash, 'Enlace retirado (410)', 'red')}
+      ${card('Sin configurar', t.sin_publicar, Icons.alertTriangle, 'Animales sin ficha web', 'amber')}
+      ${card('Incompletos', t.incompletas, Icons.alertTriangle, (Number(t.sin_seo) || 0) + ' sin SEO/descripción', 'amber')}
+    </div>`;
+  },
+
+  _tablaCard(titulo, sub, total, tabla) {
+    return `<div class="card web-table-card">
+      <div class="web-list-head">
+        <div><h3 class="web-list-title">${this._esc(titulo)}</h3><p class="web-list-sub">${this._esc(sub)}</p></div>
+        <span class="web-list-count" aria-label="${total} ${total === 1 ? 'publicación' : 'publicaciones'}">${total}</span>
+      </div>
+      <div class="card-body-flush">${tabla}</div>
     </div>`;
   },
 
@@ -417,7 +478,7 @@ const Web = {
         return ((a.nombre || '') + ' ' + (a.titulo || '') + ' ' + (a.slug || '') + ' ' + (a.especie || '')).toLowerCase().includes(q);
       });
       if (!filas.length) return this._sinPublicaciones();
-      return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th scope="col">Animal</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table></div></div>`;
+      return this._tablaCard('Animales publicables', 'Fichas individuales con o sin publicación web.', filas.length, `<table class="data-table web-tabla"><thead><tr><th scope="col">Animal</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(a => this._filaAnimal(a)).join('')}</tbody></table>`);
     }
     if (this.tab === 'grupo') {
       const filas = (this.grupos || []).filter(g => {
@@ -428,7 +489,7 @@ const Web = {
         return ((g.nombre || '') + ' ' + (g.titulo || '') + ' ' + (g.slug || '') + ' ' + (g.miembros_nombres || []).join(' ')).toLowerCase().includes(q);
       });
       if (!filas.length) return this._vacio('No hay grupos de adopción conjunta', 'Crea una publicación para un grupo con adopción conjunta.', 'nuevaPublicacionGrupoWeb', 'Publicar grupo');
-      return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th scope="col">Grupo</th><th scope="col">Miembros</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(g => this._filaGrupo(g)).join('')}</tbody></table></div></div>`;
+      return this._tablaCard('Grupos de adopción conjunta', 'Publicaciones que agrupan varios animales.', filas.length, `<table class="data-table web-tabla"><thead><tr><th scope="col">Grupo</th><th scope="col">Miembros</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(g => this._filaGrupo(g)).join('')}</tbody></table>`);
     }
     const filas = this.eventos.filter(e => {
       if (this._filtros.estado && e.estado_publicacion !== this._filtros.estado) return false;
@@ -436,7 +497,7 @@ const Web = {
       return ((e.titulo || '') + ' ' + (e.slug || '') + ' ' + (e.categoria || '')).toLowerCase().includes(q);
     });
     if (!filas.length) return this._vacio('No hay eventos ni historias', 'Crea el primero con el botón "Nuevo evento/historia".', 'abrirEventoWeb', 'Nuevo evento/historia');
-    return `<div class="card"><div class="card-body-flush"><table class="data-table web-tabla"><thead><tr><th scope="col">Título</th><th scope="col">Tipo</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table></div></div>`;
+    return this._tablaCard('Eventos e historias', 'Agenda, noticias y relatos del refugio.', filas.length, `<table class="data-table web-tabla"><thead><tr><th scope="col">Título</th><th scope="col">Tipo</th><th scope="col">Estado web</th><th scope="col">Slug</th><th scope="col">Completitud</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${filas.map(e => this._filaEvento(e)).join('')}</tbody></table>`);
   },
 
   _filaAnimal(a) {
@@ -532,7 +593,7 @@ const Web = {
 
   _chips(faltan) {
     if (!faltan || !faltan.length) return `<span class="estado-badge aprobada">Completa</span>`;
-    return faltan.map(f => `<span class="web-chip-missing">${this._esc(this._campoLabel(f))}</span>`).join(' ');
+    return `<span class="web-chips">${faltan.map(f => `<span class="web-chip-missing">${this._esc(this._campoLabel(f))}</span>`).join('')}</span>`;
   },
 
   /** Etiqueta legible de un campo que impide publicar. */
@@ -749,6 +810,7 @@ const Web = {
     this._webFichaForm = d.ficha || d.ficha_json || null;
 
     const html = `<form data-submit="saveWebAnimal" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
+      <p class="web-form-nivel"><span>Básico</span> Datos para publicar</p>
       <p class="web-nota">Ficha pública de <b>${this._esc(origen.nombre || '')}</b>. Los datos de identidad y salud salen de la ficha interna y no se editan aquí; puedes sobrescribir lo que admite override.</p>
       <div class="form-row">
         <div class="form-group"><label for="web-estado">Estado de publicación *</label>
@@ -776,21 +838,15 @@ const Web = {
       </div>
       <div class="form-group"><label for="web-extracto">Extracto</label><textarea id="web-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
       <div class="form-group"><label for="web-contenido">Descripción pública * (admite HTML)</label><textarea id="web-contenido" class="form-input" rows="6" placeholder="<p>Texto de la ficha pública...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+      ${this._portadaBasicaHtml('web', cover, d.id, 'si está vacía se usa la foto de la ficha del animal.')}
+      ${this._avanzadoIntroHtml()}
 
-      <details class="detail-collapse" ${cover.src ? '' : 'open'}><summary>${Icons.fileText} Media (portada, galería, vídeos, iconos)</summary>
+      <details class="detail-collapse"><summary>${Icons.fileText} Media extra (galería, vídeos, iconos)</summary>
         <div class="detail-collapse-body">
-          <div class="form-row">
-            <div class="form-group"><label for="web-cover">Portada (URL)</label><input type="text" id="web-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
-            <div class="form-group"><label for="web-cover-alt">Texto alternativo</label><input type="text" id="web-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
-          </div>
-          ${!cover.src && origen.foto ? `<div class="web-heredado-nota"><span class="web-heredado-pill">Heredada de la ficha</span><img src="${this._esc(origen.foto)}" alt="" class="web-heredado-foto"><span>Se usará la foto del animal como portada. Si quieres otra, indica la URL de portada o sube un archivo.</span></div>` : ''}
           <div class="form-group"><label for="web-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="web-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
           <div class="form-group"><label for="web-videos">Vídeos (título|url por línea)</label><textarea id="web-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
           <div class="form-group"><label for="web-iconos">Iconos (icono|etiqueta|valor por línea)</label><textarea id="web-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea><p class="web-slug-hint">Claves de icono: edad, ubicacion, caracter, salud, adopcion, acogida, contacto, urgente, hogar.</p></div>
-          <div class="form-row">
-            <div class="form-group"><label for="web-file-portada">Subir portada</label><input type="file" id="web-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
-            <div class="form-group"><label for="web-file-galeria">Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
-          </div>
+          <div class="form-group"><label for="web-file-galeria">Subir a la galería</label><input type="file" id="web-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
           <div class="form-row">
             <div class="form-group"><label for="web-file-video">Subir vídeo</label><input type="file" id="web-file-video" class="form-input" accept="video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="video" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
             <div class="form-group"><label for="web-file-doc">Subir documento</label><input type="file" id="web-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="web" data-carg2="${this._esc(d.id || '')}"></div>
@@ -801,7 +857,7 @@ const Web = {
         </div>
       </details>
 
-      <details class="detail-collapse" open><summary>${Icons.paw} Ficha pública del animal</summary>
+      <details class="detail-collapse"><summary>${Icons.paw} Ficha pública del animal</summary>
         <div class="detail-collapse-body">
           <div class="web-heredado">
             <p class="web-heredado-titulo">Datos heredados de la ficha interna (solo lectura)</p>
@@ -869,7 +925,7 @@ const Web = {
         <div class="detail-collapse-body">${this._fichaPresentacionHtml('web-', this._webFichaForm)}</div>
       </details>
 
-      <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} CTA y etiquetas</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
             <div class="form-group"><label for="web-cta-label">CTA · etiqueta</label><input type="text" id="web-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar"></div>
@@ -881,15 +937,25 @@ const Web = {
               </select></div>
           </div>
           <div class="form-group"><label for="web-tags">Etiquetas (separadas por comas)</label><input type="text" id="web-tags" class="form-input" value="${this._esc((d.tags || []).join(', '))}" placeholder="perro, adopcion"></div>
-          <div class="form-group"><label for="web-seo-title">Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
-          <div class="form-group"><label for="web-seo-desc">Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
-          <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
-          <div class="form-row">
-            <div class="form-group"><label><input type="checkbox" id="web-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
-            <div class="form-group"><label><input type="checkbox" id="web-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
-            <div class="form-group"><label><input type="checkbox" id="web-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
-            <div class="form-group"><label for="web-orden">Orden</label><input type="number" id="web-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
-          </div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.search} SEO (opcional)</summary>
+        <div class="detail-collapse-body">
+          ${this._seoGuiaHtml(d)}
+          <div class="form-group"><label for="web-seo-title">Meta title</label><input type="text" id="web-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}" maxlength="70" placeholder="${this._esc(d.titulo || 'Título público')}"><p class="web-slug-hint">Vacío = título público. Ideal: 50–60 caracteres.</p></div>
+          <div class="form-group"><label for="web-seo-desc">Meta description</label><textarea id="web-seo-desc" class="form-input" rows="2" maxlength="160" placeholder="${this._esc(String(d.extracto || 'Ej: Luna busca una familia tranquila. Adopción responsable en Bizkaia.').slice(0, 160))}">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Vacío = extracto. Ideal: 140–160 caracteres.</p></div>
+          <details class="detail-collapse detail-collapse-inner"><summary>Avanzado SEO · indexación, visibilidad y orden</summary>
+            <div class="detail-collapse-body">
+              <p class="web-nota">Déjalo como está salvo que necesites ocultar la ficha de Google o de los listados.</p>
+              <div class="form-row">
+                <div class="form-group"><label><input type="checkbox" id="web-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
+                <div class="form-group"><label><input type="checkbox" id="web-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
+                <div class="form-group"><label><input type="checkbox" id="web-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
+                <div class="form-group"><label for="web-orden">Orden</label><input type="number" id="web-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
@@ -1298,6 +1364,7 @@ const Web = {
     this._webFichaForm = d.ficha || d.ficha_json || null;
 
     const html = `<form data-submit="saveWebEvento" data-sarg0="${this._esc(d.id || '')}">
+      <p class="web-form-nivel"><span>Básico</span> Datos para publicar</p>
       <div class="form-row">
         <div class="form-group"><label for="we-tipo">Tipo de contenido *</label>
           <select id="we-tipo" class="form-input" data-change="onWebTipoChange" data-cpass="value">
@@ -1319,23 +1386,23 @@ const Web = {
       </div>
       <div class="form-group"><label for="we-extracto">Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>
       <div class="form-group"><label for="we-contenido">Contenido * (admite HTML)</label><textarea id="we-contenido" class="form-input" rows="6">${this._esc(d.contenido_html || '')}</textarea></div>
-      <div class="form-row">
-        <div class="form-group"><label for="we-cover">Portada (URL)</label><input type="text" id="we-cover" class="form-input" value="${this._esc(cover.src || '')}"></div>
-        <div class="form-group"><label for="we-cover-alt">Texto alternativo</label><input type="text" id="we-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
-      </div>
-      <div class="form-group"><label for="we-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
-      <div class="form-row">
-        <div class="form-group"><label for="we-file-portada">Subir portada</label><input type="file" id="we-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
-        <div class="form-group"><label for="we-file-galeria">Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label for="we-file-doc">Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
-      </div>
-      <div class="form-group"><label for="we-docs">Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
-      <div class="web-media-lista" id="we-media-lista" aria-live="polite"></div>
-      <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
+      ${this._portadaBasicaHtml('we', cover, d.id, 'si está vacía, no se añade una portada nueva.')}
+      ${this._avanzadoIntroHtml()}
 
-      <details class="detail-collapse" ${d.tipo === 'historia' ? '' : 'open'}><summary>${Icons.calendar} Datos del evento</summary>
+      <details class="detail-collapse"><summary>${Icons.fileText} Media extra (galería y documentos)</summary>
+        <div class="detail-collapse-body">
+          <div class="form-group"><label for="we-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="we-galeria" class="form-input" rows="2">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
+          <div class="form-row">
+            <div class="form-group"><label for="we-file-galeria">Subir a la galería</label><input type="file" id="we-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+            <div class="form-group"><label for="we-file-doc">Subir documento</label><input type="file" id="we-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="we" data-carg2="${this._esc(d.id || '')}"></div>
+          </div>
+          <div class="form-group"><label for="we-docs">Documentos (nombre|url por línea)</label><textarea id="we-docs" class="form-input" rows="2">${this._esc(docsTexto)}</textarea></div>
+          <div class="web-media-lista" id="we-media-lista" aria-live="polite"></div>
+          <p class="web-nota">Los archivos se guardan en Drive, en la carpeta «${this._esc(carpetaFicha)}». Se comparten las imágenes y los vídeos, no la carpeta; los documentos quedan privados. Los enlaces de carpeta de Drive se ignoran: pega el enlace del archivo.${d.id ? '' : ' Guarda la publicación para poder subir archivos.'}</p>
+        </div>
+      </details>
+
+      <details class="detail-collapse" id="we-event-details"><summary>${Icons.calendar} Datos del evento</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
             <div class="form-group"><label for="we-kind">Modalidad / tipo</label><input type="text" id="we-kind" class="form-input" value="${this._esc(ev.kind || '')}" placeholder="jornada, mercadillo, puertas abiertas"></div>
@@ -1369,7 +1436,7 @@ const Web = {
         <div class="detail-collapse-body">${this._fichaPresentacionHtml('we-', this._webFichaForm, false)}</div>
       </details>
 
-      <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} CTA y etiquetas</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
             <div class="form-group"><label for="we-cta-label">CTA · etiqueta</label><input type="text" id="we-cta-label" class="form-input" value="${this._esc(cta.label || '')}"></div>
@@ -1381,14 +1448,24 @@ const Web = {
               </select></div>
           </div>
           <div class="form-group"><label for="we-tags">Etiquetas (separadas por comas)</label><input type="text" id="we-tags" class="form-input" value="${this._esc((d.tags || []).join(', '))}"></div>
-          <div class="form-group"><label for="we-seo-title">Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
-          <div class="form-group"><label for="we-seo-desc">Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
-          <p class="web-nota">El canonical (dominio + ruta), la imagen OG (la portada) y los robots (según «Indexable») se generan solos.</p>
-          <div class="form-row">
-            <div class="form-group"><label><input type="checkbox" id="we-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable</label></div>
-            <div class="form-group"><label><input type="checkbox" id="we-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
-            <div class="form-group"><label><input type="checkbox" id="we-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
-          </div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.search} SEO (opcional)</summary>
+        <div class="detail-collapse-body">
+          ${this._seoGuiaHtml(d)}
+          <div class="form-group"><label for="we-seo-title">Meta title</label><input type="text" id="we-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}" maxlength="70" placeholder="${this._esc(d.titulo || 'Título público')}"><p class="web-slug-hint">Vacío = título público. Ideal: 50–60 caracteres.</p></div>
+          <div class="form-group"><label for="we-seo-desc">Meta description</label><textarea id="we-seo-desc" class="form-input" rows="2" maxlength="160" placeholder="${this._esc(String(d.extracto || 'Ej: Jornada de puertas abiertas para conocer a los animales del refugio.').slice(0, 160))}">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Vacío = extracto. Ideal: 140–160 caracteres.</p></div>
+          <details class="detail-collapse detail-collapse-inner"><summary>Avanzado SEO · indexación y visibilidad</summary>
+            <div class="detail-collapse-body">
+              <p class="web-nota">Déjalo como está salvo que necesites ocultar la ficha de Google o de los listados.</p>
+              <div class="form-row">
+                <div class="form-group"><label><input type="checkbox" id="we-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable</label></div>
+                <div class="form-group"><label><input type="checkbox" id="we-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
+                <div class="form-group"><label><input type="checkbox" id="we-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
@@ -1567,6 +1644,7 @@ const Web = {
     this._webFichaForm = d.ficha || d.ficha_json || null;
 
     const html = `<form data-submit="guardarGrupoWeb" data-sarg0="${this._esc(d.origen_id || origen.id || '')}">
+      <p class="web-form-nivel"><span>Básico</span> Datos para publicar</p>
       <p class="web-nota">Ficha pública del grupo <b>${this._esc(origen.nombre || d.titulo || '')}</b> · ${Number(origen.miembros_count) || miembros.length} miembro${(Number(origen.miembros_count) || miembros.length) === 1 ? '' : 's'}. Los datos de cada animal salen de su ficha interna y aquí solo se edita la presentación conjunta.</p>
       <div class="form-row">
         <div class="form-group"><label for="wg-estado">Estado de publicación *</label>
@@ -1594,21 +1672,15 @@ const Web = {
       </div>
       <div class="form-group"><label for="wg-extracto">Extracto</label><textarea id="wg-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
       <div class="form-group"><label for="wg-contenido">Descripción pública * (admite HTML)</label><textarea id="wg-contenido" class="form-input" rows="6" placeholder="<p>Historia del grupo, cómo son y qué buscan...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+      ${this._portadaBasicaHtml('wg', cover, d.id, 'si está vacía se usa la primera foto disponible de los miembros.')}
+      ${this._avanzadoIntroHtml()}
 
-      <details class="detail-collapse" ${cover.src ? '' : 'open'}><summary>${Icons.fileText} Media (portada, galería, vídeos, iconos)</summary>
+      <details class="detail-collapse"><summary>${Icons.fileText} Media extra (galería, vídeos, iconos)</summary>
         <div class="detail-collapse-body">
-          <div class="form-row">
-            <div class="form-group"><label for="wg-cover">Portada (URL)</label><input type="text" id="wg-cover" class="form-input" value="${this._esc(cover.src || '')}" placeholder="https://..."></div>
-            <div class="form-group"><label for="wg-cover-alt">Texto alternativo</label><input type="text" id="wg-cover-alt" class="form-input" value="${this._esc(cover.alt || '')}"></div>
-          </div>
-          ${!cover.src ? `<div class="web-heredado-nota"><span class="web-heredado-pill">Heredada del grupo</span><span>Se usará la primera foto disponible de los miembros como portada. Si quieres otra, indica la URL o sube un archivo.</span></div>` : ''}
           <div class="form-group"><label for="wg-galeria">Galería (url|alt|pie por línea; alt y pie opcionales)</label><textarea id="wg-galeria" class="form-input" rows="3">${this._esc(this.mediaTextoGaleria(gallery))}</textarea></div>
           <div class="form-group"><label for="wg-videos">Vídeos (título|url por línea)</label><textarea id="wg-videos" class="form-input" rows="2">${this._esc(videos.map(v => (v.title || '') + '|' + (v.url || '')).join('\n'))}</textarea></div>
           <div class="form-group"><label for="wg-iconos">Iconos (icono|etiqueta|valor por línea)</label><textarea id="wg-iconos" class="form-input" rows="2" placeholder="vacuna|Vacunado|Sí">${this._esc(icons.map(i => (i.icon || '') + '|' + (i.label || '') + '|' + (i.value || '')).join('\n'))}</textarea><p class="web-slug-hint">Claves de icono: edad, ubicacion, caracter, salud, adopcion, acogida, contacto, urgente, hogar.</p></div>
-          <div class="form-row">
-            <div class="form-group"><label for="wg-file-portada">Subir portada</label><input type="file" id="wg-file-portada" class="form-input" accept="image/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="portada" data-carg1="wg" data-carg2="${this._esc(d.id || '')}"></div>
-            <div class="form-group"><label for="wg-file-galeria">Subir a la galería</label><input type="file" id="wg-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="wg" data-carg2="${this._esc(d.id || '')}"></div>
-          </div>
+          <div class="form-group"><label for="wg-file-galeria">Subir a la galería</label><input type="file" id="wg-file-galeria" class="form-input" accept="image/*" multiple data-change="subirMediaWeb" data-cpass="el" data-carg0="galeria" data-carg1="wg" data-carg2="${this._esc(d.id || '')}"></div>
           <div class="form-row">
             <div class="form-group"><label for="wg-file-video">Subir vídeo</label><input type="file" id="wg-file-video" class="form-input" accept="video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="video" data-carg1="wg" data-carg2="${this._esc(d.id || '')}"></div>
             <div class="form-group"><label for="wg-file-doc">Subir documento</label><input type="file" id="wg-file-doc" class="form-input" accept="application/pdf,image/*,video/*" data-change="subirMediaWeb" data-cpass="el" data-carg0="documento" data-carg1="wg" data-carg2="${this._esc(d.id || '')}"></div>
@@ -1619,7 +1691,7 @@ const Web = {
         </div>
       </details>
 
-      <details class="detail-collapse" open><summary>${Icons.users || Icons.paw} Miembros del grupo (solo lectura)</summary>
+      <details class="detail-collapse"><summary>${Icons.users || Icons.paw} Miembros del grupo (solo lectura)</summary>
         <div class="detail-collapse-body">
           <div class="web-heredado">
             <p class="web-heredado-titulo">Resumen público de los miembros (sale de la ficha interna)</p>
@@ -1664,7 +1736,7 @@ const Web = {
         <div class="detail-collapse-body">${this._fichaPresentacionHtml('wg-', this._webFichaForm, false)}</div>
       </details>
 
-      <details class="detail-collapse"><summary>${Icons.search} CTA y SEO de la publicación</summary>
+      <details class="detail-collapse"><summary>${Icons.settings || Icons.fileText} CTA y etiquetas</summary>
         <div class="detail-collapse-body">
           <div class="form-row">
             <div class="form-group"><label for="wg-cta-label">CTA · etiqueta</label><input type="text" id="wg-cta-label" class="form-input" value="${this._esc(cta.label || '')}" placeholder="Quiero adoptar al grupo"></div>
@@ -1676,14 +1748,25 @@ const Web = {
               </select></div>
           </div>
           <div class="form-group"><label for="wg-tags">Etiquetas (separadas por comas)</label><input type="text" id="wg-tags" class="form-input" value="${this._esc((d.tags || []).join(', '))}" placeholder="camada, adopcion conjunta"></div>
-          <div class="form-group"><label for="wg-seo-title">Meta title</label><input type="text" id="wg-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}"><p class="web-slug-hint">Si lo dejas así, se usa el título público.</p></div>
-          <div class="form-group"><label for="wg-seo-desc">Meta description</label><textarea id="wg-seo-desc" class="form-input" rows="2">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Si la dejas vacía se usa el extracto.</p></div>
-          <div class="form-row">
-            <div class="form-group"><label><input type="checkbox" id="wg-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
-            <div class="form-group"><label><input type="checkbox" id="wg-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
-            <div class="form-group"><label><input type="checkbox" id="wg-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
-            <div class="form-group"><label for="wg-orden">Orden</label><input type="number" id="wg-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
-          </div>
+        </div>
+      </details>
+
+      <details class="detail-collapse"><summary>${Icons.search} SEO (opcional)</summary>
+        <div class="detail-collapse-body">
+          ${this._seoGuiaHtml(d)}
+          <div class="form-group"><label for="wg-seo-title">Meta title</label><input type="text" id="wg-seo-title" class="form-input" value="${this._esc(this.seoTitle(d))}" maxlength="70" placeholder="${this._esc(d.titulo || 'Título público')}"><p class="web-slug-hint">Vacío = título público. Ideal: 50–60 caracteres.</p></div>
+          <div class="form-group"><label for="wg-seo-desc">Meta description</label><textarea id="wg-seo-desc" class="form-input" rows="2" maxlength="160" placeholder="${this._esc(String(d.extracto || 'Ej: Camada Luna, tres cachorros sociables que buscan familia.').slice(0, 160))}">${this._esc(seo.metaDescription || '')}</textarea><p class="web-slug-hint">Vacío = extracto. Ideal: 140–160 caracteres.</p></div>
+          <details class="detail-collapse detail-collapse-inner"><summary>Avanzado SEO · indexación, visibilidad y orden</summary>
+            <div class="detail-collapse-body">
+              <p class="web-nota">Déjalo como está salvo que necesites ocultar la ficha de Google o de los listados.</p>
+              <div class="form-row">
+                <div class="form-group"><label><input type="checkbox" id="wg-indexable" ${d.indexable !== false ? 'checked' : ''}> Indexable (aparece en sitemap)</label></div>
+                <div class="form-group"><label><input type="checkbox" id="wg-listed" ${d.listed !== false ? 'checked' : ''}> Visible en listados</label></div>
+                <div class="form-group"><label><input type="checkbox" id="wg-featured" ${d.featured ? 'checked' : ''}> Destacado</label></div>
+                <div class="form-group"><label for="wg-orden">Orden</label><input type="number" id="wg-orden" class="form-input" value="${Number(d.orden) || 0}"></div>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
@@ -2149,7 +2232,7 @@ const Web = {
   },
 
   onChangeTipo(valor) {
-    const det = document.querySelector('#form-body details.detail-collapse');
+    const det = document.querySelector('#form-body #we-event-details') || document.querySelector('#form-body details.detail-collapse');
     if (det) {
       if (valor === 'historia') det.removeAttribute('open');
       else det.setAttribute('open', '');

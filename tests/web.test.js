@@ -561,6 +561,10 @@ describe('Web: ficha interna como fuente (F2)', () => {
     assert.match(html, /Datos heredados de la ficha interna/);
     assert.match(html, /Estado web automático/);
     assert.match(html, /Heredado: Sí/);
+    assert.match(html, /web-form-nivel/);
+    assert.match(html, /web-avanzado-intro/);
+    assert.match(html, /SEO básico/);
+    assert.match(html, /id="web-cover"/);
   });
 });
 

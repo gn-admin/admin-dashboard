@@ -2052,6 +2052,14 @@ const Dashboard = {
     const puedeEdit = (m) => (typeof this.puedeEditar === 'function' ? this.puedeEditar(m) : true);
     const rol = (typeof this._rolActual === 'function') ? this._rolActual() : 'consulta';
     const isAdmin = rol === 'admin';
+    const roleLabel = this._roleLabel(rol);
+    const roleInfo = {
+      admin: 'Control completo: operación, personas, finanzas y contenido público.',
+      coordinador: 'Operación diaria, adopciones, socios, reportes y publicaciones web.',
+      voluntario: 'Animales, reportes y actividad del equipo. Sin acceso a finanzas ni contenido.',
+      tesoreria: 'Donaciones, gastos y almacén; consulta de animales sin edición.',
+      consulta: 'Consulta de animales y fichas. Sin edición ni acceso a datos sensibles.'
+    }[rol] || 'Resumen adaptado a los permisos de tu cuenta.';
     const showEncuestas = puede('encuestas') || puede('encuestas-perros') || puede('encuestas-gatos') || puede('encuestas-acogida');
     const showAdopciones = puede('adopciones');
     const showAnimales = puede('animales');
@@ -2061,6 +2069,7 @@ const Dashboard = {
     const showAlmacen = puede('almacen');
     const showReportes = puede('reportes');
     const showActividad = puede('actividad');
+    const showWeb = puede('web');
     const showTesoreriaPanel = showDonaciones || showAlmacen || (isAdmin && (showDonaciones || showAlmacen || showReportes));
 
     const all = Object.values(this.responses || {}).flat();
@@ -2104,8 +2113,10 @@ const Dashboard = {
     }
 
     const heroBtns = [];
+    if (showWeb) heroBtns.push(`<a class="dash-hero-btn" href="#web">${Icons.eye} Publicaciones</a>`);
     if (showAnimales) heroBtns.push(`<a class="dash-hero-btn" href="#animales">${Icons.paw} Ver animales</a>`);
     if (showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>`);
+    if (showDonaciones && !showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#donaciones">${Icons.trendingUp} Donaciones</a>`);
     if (!heroBtns.length && showActividad) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#actividad">${Icons.activity} Actividad</a>`);
     if (!heroBtns.length) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#dashboard">${Icons.dashboard} Inicio</a>`);
 
@@ -2153,18 +2164,20 @@ const Dashboard = {
 
     const canAddRecordatorio = puedeEdit('reportes') || puedeEdit('actividad');
     const quickLinks = [];
+    if (showEncuestas) quickLinks.push(`<a class="dash-quick-card" href="#encuestas"><span class="dash-quick-icon">${Icons.clipboard}</span><span class="dash-quick-label">Encuestas</span></a>`);
     if (showDonaciones) quickLinks.push(`<a class="dash-quick-card" href="#donaciones"><span class="dash-quick-icon">${Icons.trendingUp}</span><span class="dash-quick-label">Donaciones</span></a>`);
     if (showAlmacen) quickLinks.push(`<a class="dash-quick-card" href="#almacen"><span class="dash-quick-icon">${Icons.box}</span><span class="dash-quick-label">Almacén</span></a>`);
     if (showActividad) quickLinks.push(`<a class="dash-quick-card" href="#actividad"><span class="dash-quick-icon">${Icons.activity}</span><span class="dash-quick-label">Actividad</span></a>`);
     if (showAcogidas) quickLinks.push(`<a class="dash-quick-card" href="#acogidas-activas"><span class="dash-quick-icon">${Icons.home}</span><span class="dash-quick-label">Acogidas</span></a>`);
     if (showAnimales && !quickLinks.some(q => q.includes('#animales'))) quickLinks.push(`<a class="dash-quick-card" href="#animales"><span class="dash-quick-icon">${Icons.paw || Icons.heart}</span><span class="dash-quick-label">Animales</span></a>`);
     if (showReportes && !quickLinks.some(q => q.includes('#reportes'))) quickLinks.push(`<a class="dash-quick-card" href="#reportes"><span class="dash-quick-icon">${Icons.barChart}</span><span class="dash-quick-label">Reportes</span></a>`);
+    if (showWeb) quickLinks.push(`<a class="dash-quick-card" href="#web"><span class="dash-quick-icon">${Icons.eye}</span><span class="dash-quick-label">Publicaciones</span></a>`);
 
     const showChart = showEncuestas;
     const showFunnel = showEncuestas || showAdopciones;
     const showRecent = showEncuestas;
     const showActionPanel = showEncuestas || showReportes || showActividad || vencidos > 0;
-    const hoyResumen = showEncuestas ? (pendientes + vencidos + enProceso) : (vencidos + (showAnimales ? 0 : 0));
+    const hoyResumen = showEncuestas ? (pendientes + vencidos + enProceso) : vencidos;
 
     el.innerHTML = `
       <section class="dash-hero">
@@ -2176,6 +2189,11 @@ const Dashboard = {
         </div>
         <div class="dash-hero-stats">${heroStats.join('')}</div>
       </section>
+
+      <div class="dash-role-strip">
+        <span class="dash-role-badge">${this._esc(roleLabel)}</span>
+        <span class="dash-role-text">${this._esc(roleInfo)}</span>
+      </div>
 
       ${kpis.length ? `<div class="dash-kpis">${kpis.join('')}</div>` : ''}
 

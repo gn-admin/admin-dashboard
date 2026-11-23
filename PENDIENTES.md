@@ -1535,6 +1535,10 @@ Severidades:
 - **Propuesta:** abrir por defecto solo los bloques con cambios o incompletos,
   resumen de una línea por bloque cerrado e índice pegajoso; alternativa:
   dividir en 2–3 pasos.
+- **Estado 2026-11-23:** aplicado el primer paso: datos imprescindibles y portada
+  en **Básico**, y media extra, ficha, presentación, CTA, etiquetas y SEO dentro
+  de **Avanzado** plegado; SEO con guía y valores automáticos. Queda medir el
+  scroll real a 390 px y valorar índice pegajoso o pasos.
 - **Ojo:** cambia el orden de tabulación y el estado de foco; hacerlo junto con
   la validación (B1).
 
@@ -1557,6 +1561,10 @@ Severidades:
   queda en ~152 px y los botones caen en vertical, estirando la fila.
 - **Propuesta:** menú de acciones (botón «⋯» con `aria-expanded`) para las
   secundarias y dejar visible solo la principal.
+- **Estado 2026-11-23:** resuelto en el gestor web sin menú: a 768–1023 px la
+  tabla pasa a tarjetas de dos columnas y las acciones a una rejilla de dos, con
+  la última a ancho completo; a ≤720 px las tarjetas son de una columna. Se
+  elimina la columna estrecha de ~152 px.
 
 ##### A4 · Etiquetas del modo tarjeta a ancho fijo — S2 · coste S
 
@@ -1565,6 +1573,10 @@ Severidades:
   configurar» en tres líneas). El contador de grupo ya está arreglado aparte.
 - **Propuesta:** etiqueta encima del valor (lista de dos líneas) o
   `flex: 0 1 auto` con `min-width: 30%`.
+- **Estado 2026-11-23:** en el gestor web la etiqueta baja al 36 % en móvil y
+  los chips de completitud se agrupan en `.web-chips` con `flex-wrap`, así que
+  «Portada» y «Meta descripción» ya no se parten dentro del chip; los valores
+  largos siguen pudiendo ocupar varias líneas.
 
 ##### A5 · Estadísticas del gestor ocupan casi dos pantallas — S2 · coste S
 
@@ -1574,6 +1586,10 @@ Severidades:
   Incompletos empujan la lista de publicaciones por debajo del primer scroll.
 - **Propuesta:** fila horizontal desplazable o chip compacto con el número
   primero.
+- **Estado 2026-11-23:** parcialmente resuelto: a 360 px las seis tarjetas
+  ocupan 219 px en dos columnas (antes casi dos pantallas), con icono de 34 px y
+  sin subtítulo; la lista sigue quedando por debajo del primer scroll. Queda
+  valorar la fila horizontal o el chip compacto.
 
 ##### A6 · Preview del JSON con mucho scroll vertical — S2 · coste S/M
 
