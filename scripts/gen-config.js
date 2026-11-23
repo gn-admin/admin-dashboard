@@ -138,6 +138,8 @@ const backendConfig = `var CONFIG = {
   // Alias verificado en Gmail ("Enviar como") para el remitente del contrato.
   // Vacio = se envia desde la cuenta propietaria del despliegue de Apps Script.
   CONTRATO_FROM_EMAIL: '${env('CONTRATO_FROM_EMAIL', '')}',
+  // Teléfono que aparece en los contratos y en los correos. Vacío = no se pinta.
+  CONTACTO_TELEFONO: '${env('CONTACTO_TELEFONO', '')}',
   PUBLIC_WEB_BASE_URL: '${env('PUBLIC_WEB_BASE_URL', 'https://gn-admin.github.io/admin-dashboard')}',
   ROLES: { ADMIN: 'admin', USER: 'usuario', COORDINADOR: 'coordinador', VOLUNTARIO: 'voluntario', TESORERIA: 'tesoreria', CONSULTA: 'consulta' },
   MAX_UPLOAD_BYTES: ${env('MAX_UPLOAD_BYTES', String(5 * 1024 * 1024))},
@@ -152,27 +154,27 @@ const backendConfig = `var CONFIG = {
       name: 'Encuesta Pre-Adopcion Perros',
       formId: '${env('FORM_PERROS_ID')}',
       sheetId: '${env('SHEET_PERROS_ID')}',
-      sheetName: 'Respuestas de formulario 1',
+      sheetName: '${env('SHEET_PERROS_TAB', 'Respuestas de formulario 1')}',
       visible: true
     },
     'pre-adopcion-gatos': {
       name: 'Encuesta Pre-Adopcion Gatos',
       formId: '${env('FORM_GATOS_ID')}',
       sheetId: '${env('SHEET_GATOS_ID')}',
-      sheetName: 'Respuestas de formulario 1',
+      sheetName: '${env('SHEET_GATOS_TAB', 'Respuestas de formulario 1')}',
       visible: true
     },
     'pre-acogida': {
       name: 'Solicitud de Acogida',
       formId: '${env('FORM_ACOGIDA_ID')}',
       sheetId: '${env('SHEET_ACOGIDA_ID')}',
-      sheetName: 'Respuestas de formulario 1',
+      sheetName: '${env('SHEET_ACOGIDA_TAB', 'Respuestas de formulario 1')}',
       visible: true
     }
   },
 
   sheets: {
-    animales: { sheetId: '${env('SHEET_ANIMALES_ID')}', sheetName: 'Animales' },
+    animales: { sheetId: '${env('SHEET_ANIMALES_ID')}', sheetName: '${env('SHEET_ANIMALES_TAB', 'Animales')}' },
     familias: { sheetId: '${env('SHEET_FAMILIAS_ID')}', sheetName: 'Familias' },
     adopciones: { sheetId: '${env('SHEET_ADOPCIONES_ID')}', sheetName: 'Adopciones' },
     socios: { sheetId: '${env('SHEET_SOCIOS_ID')}', sheetName: 'Socios' },
