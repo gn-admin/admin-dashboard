@@ -59,6 +59,17 @@
 
    Columnas exigidas: `WebPublicaciones` → `ficha_json`, `documents_json`, `media_folder_id`, `origen_tipo`; `Animales` → `portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`.
 
+   El mismo JSON trae `pestanas` y `resumen_pestanas` (informativo: el gate solo lee `sheets`). Para cada hoja de `CONFIG.sheets` y cada encuesta informa de la pestaña **esperada** según `Config.gs` y de la(s) **real(es)** del documento, sin abrir cada Sheet:
+
+   | `resultado` | Significado |
+   |---|---|
+   | `nombre` | Existe una pestaña con el nombre configurado |
+   | `unica_pestana` | No coincide, pero el documento tiene una sola pestaña y `getSheet()` la acepta (caso de «Hoja 1») |
+   | `ambigua` | Varias pestañas y ninguna coincide: el backend falla a propósito en vez de escribir en la primera |
+   | `sin_configurar` / `error` | Falta el ID o el documento no se pudo abrir |
+
+   `resumen_pestanas.desajustadas` cuenta las que no coinciden por nombre: con eso se revisan de una pasada las 20 pestañas por defecto y el caso de `Animales` (pestaña real «Hoja 1»). El diagnóstico **no escribe** y no cambia el resultado del gate.
+
    > **Pestaña con otro nombre.** El backend acepta un documento de una sola pestaña aunque se llame «Hoja 1» (`getSheet`), y el diagnóstico actual hace lo mismo: no exige el nombre si no hay ambigüedad. Si sale `"error": "No existe la pestaña …"` con `ok:false`, se ejecutó una versión antigua del script, que buscaba el nombre exacto.
    >
    > **Varias pestañas y ninguna con el nombre configurado.** El informe devuelve `error` y todas las columnas en `missing`: renombrar la pestaña o corregir `sheetName` en `Config.gs`. Nunca se lee la primera a ciegas.
