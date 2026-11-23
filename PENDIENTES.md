@@ -21,7 +21,7 @@
 
 ## 0.1 Evidencia del cierre del gate (2026-11-23)
 
-> **Reabierto el mismo día:** la repetición del 2026-11-23 23:10 con token da **25 PASS · 2 WARN · 1 FAIL · 1 SKIP**; lo que falta para volver a PASS está en §0.2. Lo que sigue es la evidencia de aquel cierre, no el estado vigente.
+> **Reabierto el mismo día:** la última pasada, con token y `--expected-version`, da **26 PASS · 1 WARN · 1 FAIL · 1 SKIP**; lo que falta para volver a PASS está en §0.2. Lo que sigue es la evidencia de aquel cierre, no el estado vigente.
 
 - [x] Token temporal de admin de prueba obtenido para la ejecución; no se guardó en el repositorio.
 - [x] `EXPECTED_BACKEND_VERSION=2026-11-15.7` y `CONTRACT_RETIRED_SLUG=demo-lua`.
@@ -36,7 +36,7 @@
 
 ## 0.2 Qué falta para volver a cerrar el gate de contrato en PASS (2026-11-23)
 
-> **Situación:** el gate se cerró el 2026-11-23 con **28 PASS · 0 WARN · 1 SKIP · 0 FAIL** (§0.1). Repetido contra el canal real el 2026-11-23 23:10, con token válido, da **25 PASS · 2 WARN · 1 FAIL · 1 SKIP** (`test-results/smoke-token-20261123-2310.json`): no hay ninguna regresión del canal, faltan solo **dos insumos** — el informe de columnas (`P0-14`, el único `FAIL`) y una publicación «Caso externo» (`P0-07`, `WARN`). Aportados esos dos, el gate vuelve a `Gate: PASS`.
+> **Situación:** el gate se cerró el 2026-11-23 con **28 PASS · 0 WARN · 1 SKIP · 0 FAIL** (§0.1). La última pasada, contra el canal real y con token válido, da **26 PASS · 1 WARN · 1 FAIL · 1 SKIP** (`test-results/contract-20261123.json`): no hay ninguna regresión del canal, faltan solo **dos insumos** — el informe de columnas (`P0-14`, el único `FAIL`) y una publicación «Caso externo» (`P0-07`, `WARN`). Aportados esos dos, el gate vuelve a `Gate: PASS`.
 
 **Token de lectura: resuelto.** Generado y verificado el 2026-11-23 con la cuenta de prueba `gn.test.admin@example.test` (la misma que cita [`memory.md`](memory.md)) y cacheado en `test-results/.token`, ignorado por git. Caduca a la hora; se regenera con el helper interno:
 
@@ -87,13 +87,13 @@ npm run smoke:contract -- --json \
 - **Criterio de PASS:** `0 FAIL` y `0 WARN`; el único `SKIP` admitido es `P0-09b` (sitemap en la demo de Pages hasta configurar el dominio propio). La salida debe terminar en `Gate: PASS`.
 - `--retired-slug demo-lua` mantiene `P0-11b` en `PASS` (lápida `410` lógica ya verificada).
 - `--expected-version` cierra `P0-13b`; la versión desplegada observada el 2026-11-23 es `2026-11-15.7`. Sin ella el gate emite un `WARN` informativo con la versión que encuentra.
-- Pasada de referencia con token (2026-11-23 23:10, sin columnas ni «Caso externo»): 25 PASS · 2 WARN (`P0-07`, `P0-13b`) · 1 FAIL (`P0-14`) · 1 SKIP (`P0-09b`). Con los dos insumos pendientes y `--expected-version`, el resultado esperado es `Gate: PASS`.
+- Pasada de referencia con token, `--expected-version "2026-11-15.7"` y `--retired-slug demo-lua` (sin columnas ni «Caso externo»): **26 PASS · 1 WARN (`P0-07`) · 1 FAIL (`P0-14`) · 1 SKIP (`P0-09b`)**; evidencia `test-results/contract-20261123.json`. Con los dos insumos pendientes, el resultado esperado es `Gate: PASS`.
 - Con token y columnas la pasada da 27–29 comprobaciones: el número varía con el muestreo por tipo del listado.
 
 ## 1. Verificación F0–F5 en producción
 
 > **Origen:** `CHECKLIST_PRODUCCION_F0_F5.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado del cierre (2026-11-23, antes de la repetición):** el gate P0 se ejecutó dos veces en producción con **28 PASS, 0 WARN, 1 SKIP (`P0-09b` demo), 0 FAIL**. El estado vigente es el de §0.2: la repetición con token da **25 PASS · 2 WARN · 1 FAIL · 1 SKIP** y el gate está reabierto hasta aportar el informe de columnas y una publicación «Caso externo». Evidencias: `test-results/contract-after.json` y `contract-after-2.json`. El fixture temporal `caso-externo-gate` quedó **retirado** (lápida 410, fuera de listado y sitemap). Media/Drive y el ciclo publicar/ocultar/retirar/restaurar están verificados. Queda el dominio final para `P0-09b` y la revisión visual de la lápida.
+> **Estado del cierre (2026-11-23, antes de la repetición):** el gate P0 se ejecutó dos veces en producción con **28 PASS, 0 WARN, 1 SKIP (`P0-09b` demo), 0 FAIL**. El estado vigente es el de §0.2: la última pasada con token da **26 PASS · 1 WARN · 1 FAIL · 1 SKIP** y el gate está reabierto hasta aportar el informe de columnas y una publicación «Caso externo». Evidencias: `test-results/contract-after.json` y `contract-after-2.json`. El fixture temporal `caso-externo-gate` quedó **retirado** (lápida 410, fuera de listado y sitemap). Media/Drive y el ciclo publicar/ocultar/retirar/restaurar están verificados. Queda el dominio final para `P0-09b` y la revisión visual de la lápida.
 
 **Además del checklist original (operativo, 2026-11-23):**
 
