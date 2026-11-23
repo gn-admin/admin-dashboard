@@ -84,7 +84,7 @@ function mockFetch(overrides = {}) {
           }
         });
       case 'config':
-        return reply({ error: 'Token no proporcionado' }, 401);
+        return reply({ status: 'error', code: 401, error: 'Token no proporcionado' }, 200);
       case 'publicaciones':
       case 'animales-publicos': {
         let data = endpoint === 'animales-publicos'
@@ -112,7 +112,7 @@ function mockFetch(overrides = {}) {
       case 'web-resumen':
         return u.searchParams.get('token')
           ? reply({ status: 'success', data: { totales: { publicados: 5 } } })
-          : reply({ error: 'Token no proporcionado' }, 401);
+          : reply({ status: 'error', code: 401, error: 'Token no proporcionado' }, 200);
       case 'web-deploy-estado':
         return reply({ status: 'success', data: { configurado: true, version: VERSION, repo: 'x', ref: 'main', workflow: 'deploy.yml' } });
       case 'web-deploy-cuerpo':
@@ -174,6 +174,33 @@ test('contract-smoke: sin token ni columnas no hay PASS', async () => {
   assert.ok(result.results.some((r) => r.id === 'P0-12b' && r.status === 'FAIL'));
   assert.ok(result.results.some((r) => r.id === 'P0-13' && r.status === 'FAIL'));
   assert.ok(result.results.some((r) => r.id === 'P0-14' && r.status === 'FAIL'));
+});
+
+test('contract-smoke: acepta 401 HTTP o lógico en config y gestor', async () => {
+  const runSmoke = await load();
+  const report = columnsReport();
+  const fetchImpl = mockFetch({
+    config: () => reply({ error: 'Token no proporcionado' }, 401),
+    'web-resumen': (u) => u.searchParams.get('token')
+      ? reply({ status: 'success', data: { totales: { publicados: 5 } } })
+      : reply({ error: 'Token no proporcionado' }, 401)
+  });
+  try {
+    const result = await runSmoke({
+      base: BASE,
+      fetchImpl,
+      env: {},
+      token: 'token-de-prueba',
+      columnsReport: report.file,
+      retiredSlug: 'retirada',
+      expectedVersion: VERSION
+    });
+    assert.equal(result.ok, true);
+    assert.ok(result.results.some((r) => r.id === 'P0-01b' && r.status === 'PASS'));
+    assert.ok(result.results.some((r) => r.id === 'P0-12a' && r.status === 'PASS'));
+  } finally {
+    fs.rmSync(report.dir, { recursive: true, force: true });
+  }
 });
 
 test('contract-smoke: un WARN bloquea el PASS aunque se pida allowWarnings', async () => {
