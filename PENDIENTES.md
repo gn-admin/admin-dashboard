@@ -28,13 +28,14 @@
 - [x] Gate ejecutado dos veces: **28 PASS · 0 WARN · 1 SKIP · 0 FAIL**.
 - [x] Roles: `consulta` y usuario revocado reciben 403 lógico en escritura y gestor.
 - [x] UI de producción a 360/768/1280 sin overflow; sin nombres accesibles vacíos ni imágenes sin alt.
-- [ ] Revisar media/Drive (`P0-09`) y deploy/estática (`P0-10`) en la interfaz real.
-- [ ] Retirar el fixture `caso-externo-gate` cuando ya no haga falta para reproducir `P0-07`.
+- [x] Media/Drive: subida de `portada-gate-media-*.png` a `historias/caso-externo-gate` y borrado posterior; respuesta `eliminado: true`.
+- [x] Ciclo publicar/ocultar/retirar/restaurar: `publicado → oculto → publicado → retirado → borrador → retirado`; el primer cambio disparó deploy (`codigo: 204`) y el resto se agrupó en cola.
+- [x] Fixture `caso-externo-gate` retirado: listado público 0, detalle `gone`, lápida `noindex` y fuera del sitemap.
 
 ## 1. Verificación F0–F5 en producción
 
 > **Origen:** `CHECKLIST_PRODUCCION_F0_F5.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual (2026-11-23):** el gate P0 se ejecutó dos veces en producción con **28 PASS, 0 WARN, 1 SKIP (`P0-09b` demo), 0 FAIL**. Evidencias: `test-results/contract-after.json` y `contract-after-2.json`. El fixture temporal `caso-externo-gate` sigue publicado para que `P0-07` sea reproducible; retirarlo cuando se cierre la verificación. Queda revisión manual de media/Drive (`P0-09`), deploy/estática (`P0-10`) y retirada del fixture.
+> **Estado actual (2026-11-23):** el gate P0 se ejecutó dos veces en producción con **28 PASS, 0 WARN, 1 SKIP (`P0-09b` demo), 0 FAIL**. Evidencias: `test-results/contract-after.json` y `contract-after-2.json`. El fixture temporal `caso-externo-gate` quedó **retirado** (lápida 410, fuera de listado y sitemap). Media/Drive y el ciclo publicar/ocultar/retirar/restaurar están verificados. Queda el dominio final para `P0-09b` y la revisión visual de la lápida.
 
 **Además del checklist original (operativo, 2026-11-23):**
 
