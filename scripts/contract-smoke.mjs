@@ -88,13 +88,15 @@ function isPublishedStatus(value) {
   return !!value && !['borrador', 'oculto', 'retirado'].includes(String(value).toLowerCase());
 }
 
-// Apps Script responde a los endpoints privados con HTTP 200 y un envelope
-// lógico (`status: "error"`, `code: 401`). Ambas formas son un 401 válido.
-function isLogicalUnauthorized(result) {
-  if (!result || !result.json || typeof result.json !== 'object') return false;
-  const code = result.json.code;
-  return code === 401 || String(code || '').trim() === '401'
-    || /token no proporcionado/i.test(String(result.json.error || ''));
+// Apps Script puede responder a los endpoints privados con HTTP 401 o con
+// HTTP 200 y un envelope lógico (`status: "error"`, `code: 401`).
+function isUnauthorized(result) {
+  if (!result) return false;
+  if (result.http === 401) return true;
+  const json = result.json;
+  if (result.http !== 200 || !json || typeof json !== 'object') return false;
+  return json.status === 'error'
+    && (Number(json.code) === 401 || /token no proporcionado/i.test(String(json.error || '')));
 }
 
 function findPrivateFields(value, trail = '') {
@@ -290,7 +292,7 @@ export async function runSmoke(options = {}) {
   }
 
   const legacy = await call('config', { nocache: '1' }, { token: '' });
-  if (legacy.http === 401 || (legacy.http === 200 && isLogicalUnauthorized(legacy))) {
+  if (isUnauthorized(legacy)) {
     pass('P0-01b', 'config legado cerrado', '401 sin token', legacy.url);
   } else {
     fail('P0-01b', 'config legado cerrado', 'Se esperaba 401 y llegó HTTP ' + legacy.http, legacy.url);
@@ -440,7 +442,7 @@ export async function runSmoke(options = {}) {
 
   /* P0-12 · autenticación y lectura de gestor */
   const noToken = await call('web-resumen', {}, { token: '' });
-  if (noToken.http === 401 || (noToken.http === 200 && isLogicalUnauthorized(noToken))) {
+  if (isUnauthorized(noToken)) {
     pass('P0-12a', 'gestor sin token', '401 sin token', noToken.url);
   } else {
     fail('P0-12a', 'gestor sin token', 'Se esperaba 401 y llegó HTTP ' + noToken.http, noToken.url);
