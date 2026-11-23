@@ -5,7 +5,9 @@
 > **Nota importante (SEO):** los campos/metadatos de SEO se gestionan aquí como parte de las **publicaciones** para que la **otra web** los use al renderizarlas (metas, OG, canonical, indexación, sitemap, etc.); no se refieren al SEO del gestor/admin.
 > **Base de planificación:** este documento ya incorpora la información analizada sobre el proyecto web (contratos, consumo esperado y requisitos de publicación/SEO) y debe tratarse como fuente autosuficiente para la implementación. No depende de documentación externa adicional.
 >
-> **Notas:** seguridad/privacidad del módulo tratada aparte en `PLAN_SEGURIDAD.md` (no incluida aquí). Dependencias externas: Apps Script (`.gs`), hojas/Sheets, despliegue del canal público y estrategia de render/SEO de la web.
+> **Notas:** seguridad/privacidad del módulo tratada aparte en [`PENDIENTES.md`](PENDIENTES.md) §2 (no incluida aquí). Dependencias externas: Apps Script (`.gs`), hojas/Sheets, despliegue del canal público y estrategia de render/SEO de la web.
+>
+> **Contrato de referencia:** el trabajo pendiente y su estado se siguen en [`PENDIENTES.md`](PENDIENTES.md); este documento conserva el contrato y el histórico de fases.
 
 ---
 
@@ -26,7 +28,7 @@
 | Service worker | `src/sw.js` | `- [x]` `CACHE_NAME` → `v267`, assets `js/web.js`, `js/publico.js`, `js/publico-embed.js` y `css/publico.css` |
 | Pruebas | `tests/web.test.js`, `tests/web-backend.test.js`, `tests/publico.test.js`, `tests/publico-embed.test.js`, `tests/sheets.test.js` | `- [x]` 793 en local / 783 en CI (incluye cabeceras en hoja vacía, canonical condicional, pestaña única, prerender SEO, páginas de retirada, 410, ficha configurable v1.1 y vídeo click-to-load) |
 | Ficha configurable desde la publicación | §7.3 | `- [x]` contrato aditivo v1.1 **implementado en local** (sin desplegar): backend validado (orden, `videoModo`, `tags`, `contenido`), precedencia `ficha > base`, controles estructurados con orden, visor/prerender y pruebas; queda el despliegue de `.gs`/Pages y el port |
-| Port a la web (`main`) | externo | Planificación trasladada a `TRANSFERIR_A_MAIN.md` |
+| Port a la web (`main`) | externo | Planificación trasladada a [`PENDIENTES.md`](PENDIENTES.md) |
 
 **Pasos manuales pendientes (fuera de git):**
 
@@ -231,9 +233,11 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 - [x] **Ficha individual superada por su grupo → 301:** si el slug —**el actual o cualquiera de su historial**— pertenece a una publicación `animal` en estado `publicado` cuyo grupo tiene publicación publicada y servida, el detalle **no devuelve esa ficha**: responde `status:"success"` con `redirect:{from,to,slug,permanent:true,motivo:"ficha_en_grupo"}` apuntando a la ruta del grupo (`/animales/<slug del grupo>`) y el `data` de esa ficha de grupo. Así un enlace antiguo del animal nunca acaba en 404 y el canal no sirve al mismo animal dos veces. La lápida manda: una publicación `retirado` sigue respondiendo `gone`.
 
 ### 5.3 Compatibilidad y endpoints adicionales (`/v1/*`) — implementado
+
+> **Cómo se usan:** estos alias se pasan como valor de `?endpoint=…` (p. ej. `?endpoint=/v1/config-publica`); pedirlos como ruta (`/exec/v1/...`) da 302 al login de Google.
 - [x] `GET /v1/publicaciones` y `GET /v1/publicaciones/:slug` como alias.
 - [x] Alias por tipo: `GET /v1/animales`, `GET /v1/eventos`, `GET /v1/blog|historias`.
-- [x] Soporte: `GET /v1/config`, `GET /v1/taxonomias`, `GET /v1/sitemap` (URLs + `lastmod`; también `sitemap.xml`).
+- [x] Soporte: `GET /v1/config-publica` (el antiguo `config` es privado y responde 401 sin token), `GET /v1/taxonomias`, `GET /v1/sitemap` (URLs + `lastmod`; también `sitemap.xml`).
 - [x] **Taxonomías por tipo (22/11):** `?endpoint=taxonomias&type=animal|animal_grupo|evento|historia` devuelve el mismo payload (`type`, `category`, `status`, `species`) acotado a las publicaciones de ese tipo, para que la web no mezcle estados de animal (`en_adopcion`, `en_acogida`…) con los de evento (`programado`, `publicado`). Sin `type` la respuesta es **idéntica** a la anterior. `type` entra en la clave de caché (`pub_tax_…`); un tipo desconocido devuelve listas vacías, no un error.
 - [x] `GET /v1/redirects` (o `?endpoint=redirects`): mapa 301 `{from,to,status,type,slug,currentSlug,changedAt}` para generar redirecciones en el hosting. Cubre dos casos: slugs antiguos por `slug_historial` y, con `motivo:"ficha_en_grupo"`, el **slug actual y cada slug histórico** de una ficha individual superada por la publicación de su grupo, con `to` en la ruta del grupo y `changedAt` tomado del cambio de slug que corresponda.
 - [x] `?endpoint=retiradas` (público): slugs retirados y sus slugs históricos (`{slug,tipo,retiradoEn}`), para que la web publique una página de retirada `noindex` en la canónica antigua en vez de un 404.
@@ -294,7 +298,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 ### Fase 3 — Canal público de contenido para la web — completada
 **Objetivo:** que la web pueda consultar publicaciones y fichas.
 - [x] `GET /api/publicaciones` y `GET /api/publicaciones/:slug` con filtros/paginación y payload normalizado (solo publicables).
-- [x] Alias/capa `/v1/*` y soporte (`config`, `taxonomias`, `sitemap`) según alcance.
+- [x] Alias/capa `/v1/*` y soporte (`config-publica`, `taxonomias`, `sitemap`) según alcance.
 - [x] Caché interna, paginación, consistencia con `preview`; error lógico para no disponibles.
 - [x] Validado con el visor público de este repo (`src/publico.html`): listado con filtros/paginación, detalle, 404 y SEO. La validación dentro de `nueva-version` queda en Fase 4.
 
@@ -303,7 +307,7 @@ Campos según §3.4 y contrato `event`; soporte `media.coverImage` y `gallery`. 
 **Criterio de aceptación:** el **100% de las comprobaciones se hace sobre `src/publico.html` + `src/js/publico.js`**. `proyecto web (`C:\Users\JonEg\Documents\proyectos\main`)` se actualiza **después**, replicando lo ya validado (mismo contrato, mismas metas, mismos estados).
 - [x] Consumo del canal sin JSON estático, con filtros/búsqueda/paginación y estados vacío/error.
 - [x] Metas/OG/canonical/robots y JSON-LD (`Article`/`Event`/`BlogPosting`) aplicados desde la publicación, validados en el visor (§7.1).
-- [x] **Port a `main` trasladado.** Planificación y guía movidas a `TRANSFERIR_A_MAIN.md` para ejecución en el proyecto `main` (fuera del alcance de este repo).
+- [x] **Port a `main` trasladado.** Planificación y guía movidas a [`PENDIENTES.md`](PENDIENTES.md) §4 para ejecución en el proyecto `main` (fuera del alcance de este repo).
 - [x] **Prerender por slug y `sitemap.xml`/`robots.txt` físicos aplicados en la simulación** (`scripts/prerender-publico.js`, §7.4): una página estática por ficha con metas/JSON-LD, sitemap con `lastmod` y robots con `Sitemap:`. En la web se replica en su build; aquí queda además el **mapa 301** (`GET /v1/redirects`).
 - [~] **Auditoría formal de rendimiento/accesibilidad → tarea del proyecto web:** aquí está medido lo básico (sin desbordes a 360/1280, 1 y 3 columnas, labels, `alt`, roles).
 
@@ -333,7 +337,7 @@ Pruebas de comportamiento con el canal **simulado** en el navegador (sin escribi
 
 ### 7.2 Port al proyecto `main` — trasladado
 
-La guía de port, consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y criterios de ejecución para la web real se han **trasladado a [`TRANSFERIR_A_MAIN.md`](TRANSFERIR_A_MAIN.md)** para su ejecución en `C:\Users\JonEg\Documents\proyectos\main` (fuera del alcance de este repositorio).
+La guía de port, consumo del canal, SEO/metadatos, prerender/sitemap/robots/301/410 y criterios de ejecución para la web real se han **trasladado a [`PENDIENTES.md`](PENDIENTES.md) §4** para su ejecución en `C:\Users\JonEg\Documents\proyectos\main` (fuera del alcance de este repositorio).
 
 ### 7.3 Ficha de animal configurable desde la publicación — C3 v1.1 implementada en local
 
@@ -511,7 +515,7 @@ Reglas:
 ## 10. Registro de avance (implementación)
 | Fecha | Fase/Tarea | Cambio | Responsable | Evidencia/Notas |
 |---|---|---|---|---|
-| 2026-11-14 | 0 | Documento único creado: plan por fases del Gestor web y endpoints para la web (autosuficiente, seguridad en `PLAN_SEGURIDAD.md`) | — | Este documento |
+| 2026-11-14 | 0 | Documento único creado: plan por fases del Gestor web y endpoints para la web (autosuficiente, seguridad en `PENDIENTES.md` §2) | — | Este documento |
 | 2026-11-14 | 0 | Decisiones de modelo/taxonomía/transporte cerradas | — | §0 |
 | 2026-11-14 | 1 | `WebPublicaciones.gs`: hoja única, slug único, validaciones, compositor `Publicacion`, endpoints gestor y canal público | — | `tests/web-backend.test.js` |
 | 2026-11-14 | 1 | `Code.gs`: rutas `web-*`, permisos admin/coordinación, canal público sin token con alias y JSONP | — | `tests/web-backend.test.js` |
