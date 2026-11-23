@@ -16,6 +16,8 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_PATH = path.join(ROOT, '.env');
+// Los tests generan a un directorio temporal para no tocar los ficheros reales.
+const OUT = process.env.GEN_CONFIG_OUT_DIR ? path.resolve(process.env.GEN_CONFIG_OUT_DIR) : ROOT;
 
 function loadEnv() {
   const out = {};
@@ -43,7 +45,7 @@ const env = (k, def = '') => {
 };
 
 function writeFile(rel, content) {
-  const p = path.join(ROOT, rel);
+  const p = path.join(OUT, rel);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, content, 'utf8');
   console.log('Generado: ' + rel);
@@ -107,7 +109,9 @@ function sheetsBlock() {
     ['historialFasesAdopcion', 'SHEET_HISTORIAL_FASES_ID', 'HistorialFasesAdopcion', 'REEMPLAZAR_CON_ID_HOJA_HISTORIAL_FASES_ADOPCION'],
     ['auditoria', 'SHEET_AUDITORIA_ID', 'Auditoria', 'REEMPLAZAR_CON_ID_HOJA_AUDITORIA']
   ];
-  return rows.map(([key, envK, name, def]) => `    ${key}: { sheetId: '${env(envK, def || '')}', sheetName: '${name}' }`).join(',\n');
+  // La pestaña también sale de .env (SHEET_<CLAVE>_TAB) con el nombre actual
+  // como valor por defecto: un renombrado se corrige sin tocar el código.
+  return rows.map(([key, envK, name, def]) => `    ${key}: { sheetId: '${env(envK, def || '')}', sheetName: '${env(envK.replace(/_ID$/, '_TAB'), name)}' }`).join(',\n');
 }
 
 /** Lista separada por comas -> array de strings en minúsculas. */
@@ -175,22 +179,22 @@ const backendConfig = `var CONFIG = {
 
   sheets: {
     animales: { sheetId: '${env('SHEET_ANIMALES_ID')}', sheetName: '${env('SHEET_ANIMALES_TAB', 'Animales')}' },
-    familias: { sheetId: '${env('SHEET_FAMILIAS_ID')}', sheetName: 'Familias' },
-    adopciones: { sheetId: '${env('SHEET_ADOPCIONES_ID')}', sheetName: 'Adopciones' },
-    socios: { sheetId: '${env('SHEET_SOCIOS_ID')}', sheetName: 'Socios' },
-    blacklist: { sheetId: '${env('SHEET_BLACKLIST_ID')}', sheetName: 'Blacklist' },
-    actividad: { sheetId: '${env('SHEET_ACTIVIDAD_ID')}', sheetName: 'Actividad' },
-    candidaturas: { sheetId: '${env('SHEET_CANDIDATURAS_ID')}', sheetName: 'Candidaturas' },
-    acogidas: { sheetId: '${env('SHEET_ACOGIDAS_ID')}', sheetName: 'Acogidas' },
-    contratos: { sheetId: '${env('SHEET_CONTRATOS_ID')}', sheetName: 'Contratos' },
-    apadrinamientos: { sheetId: '${env('SHEET_APADRINAMIENTOS_ID')}', sheetName: 'Apadrinamientos' },
-    gastos: { sheetId: '${env('SHEET_GASTOS_ID')}', sheetName: 'Gastos' },
-    recordatorios: { sheetId: '${env('SHEET_RECORDATORIOS_ID')}', sheetName: 'Recordatorios' },
-    donaciones: { sheetId: '${env('SHEET_DONACIONES_ID')}', sheetName: 'Donaciones' },
-    seguimientos: { sheetId: '${env('SHEET_SEGUIMIENTOS_ID')}', sheetName: 'Seguimientos' },
-    documentos: { sheetId: '${env('SHEET_DOCUMENTOS_ID')}', sheetName: 'Documentos' },
-    inventario: { sheetId: '${env('SHEET_INVENTARIO_ID')}', sheetName: 'Inventario' },
-    grupos: { sheetId: '${env('SHEET_GRUPOS_ID')}', sheetName: 'Grupos' },
+    familias: { sheetId: '${env('SHEET_FAMILIAS_ID')}', sheetName: '${env('SHEET_FAMILIAS_TAB', 'Familias')}' },
+    adopciones: { sheetId: '${env('SHEET_ADOPCIONES_ID')}', sheetName: '${env('SHEET_ADOPCIONES_TAB', 'Adopciones')}' },
+    socios: { sheetId: '${env('SHEET_SOCIOS_ID')}', sheetName: '${env('SHEET_SOCIOS_TAB', 'Socios')}' },
+    blacklist: { sheetId: '${env('SHEET_BLACKLIST_ID')}', sheetName: '${env('SHEET_BLACKLIST_TAB', 'Blacklist')}' },
+    actividad: { sheetId: '${env('SHEET_ACTIVIDAD_ID')}', sheetName: '${env('SHEET_ACTIVIDAD_TAB', 'Actividad')}' },
+    candidaturas: { sheetId: '${env('SHEET_CANDIDATURAS_ID')}', sheetName: '${env('SHEET_CANDIDATURAS_TAB', 'Candidaturas')}' },
+    acogidas: { sheetId: '${env('SHEET_ACOGIDAS_ID')}', sheetName: '${env('SHEET_ACOGIDAS_TAB', 'Acogidas')}' },
+    contratos: { sheetId: '${env('SHEET_CONTRATOS_ID')}', sheetName: '${env('SHEET_CONTRATOS_TAB', 'Contratos')}' },
+    apadrinamientos: { sheetId: '${env('SHEET_APADRINAMIENTOS_ID')}', sheetName: '${env('SHEET_APADRINAMIENTOS_TAB', 'Apadrinamientos')}' },
+    gastos: { sheetId: '${env('SHEET_GASTOS_ID')}', sheetName: '${env('SHEET_GASTOS_TAB', 'Gastos')}' },
+    recordatorios: { sheetId: '${env('SHEET_RECORDATORIOS_ID')}', sheetName: '${env('SHEET_RECORDATORIOS_TAB', 'Recordatorios')}' },
+    donaciones: { sheetId: '${env('SHEET_DONACIONES_ID')}', sheetName: '${env('SHEET_DONACIONES_TAB', 'Donaciones')}' },
+    seguimientos: { sheetId: '${env('SHEET_SEGUIMIENTOS_ID')}', sheetName: '${env('SHEET_SEGUIMIENTOS_TAB', 'Seguimientos')}' },
+    documentos: { sheetId: '${env('SHEET_DOCUMENTOS_ID')}', sheetName: '${env('SHEET_DOCUMENTOS_TAB', 'Documentos')}' },
+    inventario: { sheetId: '${env('SHEET_INVENTARIO_ID')}', sheetName: '${env('SHEET_INVENTARIO_TAB', 'Inventario')}' },
+    grupos: { sheetId: '${env('SHEET_GRUPOS_ID')}', sheetName: '${env('SHEET_GRUPOS_TAB', 'Grupos')}' },
     webPublicaciones: { sheetId: '${env('SHEET_WEB_PUBLICACIONES_ID', 'REEMPLAZAR_CON_ID_HOJA_WEB_PUBLICACIONES')}', sheetName: '${env('SHEET_WEB_PUBLICACIONES_TAB', 'WebPublicaciones')}' },
 ${sheetsBlock()}
   }
