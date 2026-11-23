@@ -48,6 +48,8 @@ export API_TOKEN="$(cat test-results/.token)"
 
 Si `P0-12b` vuelve a `FAIL`, el token ha caducado y basta con regenerarlo; no hay nada más que corregir ahí. Ni el token ni la contraseña se pegan en este documento, en un commit o en un informe: el repo es público.
 
+> **Traslado de dominio aplazado a propósito.** `gruponebak.net` sigue en Wix y será el proyecto **`main`** (la web pública) el que se mueva al dominio cuando esta verificación termine; **el gestor no se traslada**: seguirá en `gn-admin.github.io/admin-dashboard/`. El «visor público» del gestor (`src/publico.html`, con `robots: noindex,nofollow`) es **solo verificación**: sirve para comprobar que los elementos que después irán a `main` cargan bien. Por eso `P0-09b` (sitemap de la demo de Pages) es un `SKIP` admitido y no una regresión, y los 404 de las rutas migradas en `gruponebak.net` son esperados mientras el dominio apunte a Wix.
+
 ### 1. Informe de columnas `test-results/columnas.json` (`P0-14`)
 
 - **Falla con:** `Falta --columns-report`; es el único `FAIL` que queda en la pasada.
