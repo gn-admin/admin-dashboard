@@ -4422,10 +4422,10 @@ const Dashboard = {
       : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><button type="button" class="btn btn-outline-green btn-sm" data-action="exportAnimalesCsv">${Icons.download} CSV</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div>
+        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><div class="list-header-actions"><button type="button" class="btn-icon" title="Exportar a CSV" aria-label="Exportar animales a CSV" data-action="exportAnimalesCsv">${Icons.download}</button><button type="button" class="btn btn-outline-green btn-sm" data-action="showCamadaForm">${Icons.plus} Alta de camada</button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div></div>
         <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
           <select aria-label="Filtrar animales por estado" data-change="onAnimalEstadoFilterChange" data-cpass="el">
-            <option value="all" ${filter==='all'?'selected':''}>Todos (${counts.all})</option>
+            <option value="all" ${filter==='all'?'selected':''}>Estado: Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
             <option value="en_acogida" ${filter==='en_acogida'?'selected':''}>En acogida (${counts.en_acogida})</option>
             <option value="en_adopcion" ${filter==='en_adopcion'?'selected':''}>Reservados (${counts.en_adopcion})</option>

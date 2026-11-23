@@ -1067,10 +1067,25 @@ body {
 
 .sidebar.collapsed .sidebar-brand,
 .sidebar.collapsed .sidebar-section-title,
-.sidebar.collapsed .sidebar-link-text,
 .sidebar.collapsed .sidebar-user-info,
 .sidebar.collapsed .logout-text {
   display: none;
+}
+
+/* El texto del enlace se oculta a la vista pero sigue en el árbol de
+   accesibilidad: con el menú colapsado el enlace no puede quedarse sin nombre
+   (solo icono) para lectores de pantalla. El tooltip de hover sigue siendo el
+   ::after de datos. */
+.sidebar.collapsed .sidebar-link-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .sidebar.collapsed .sidebar-collapse-btn {
@@ -1475,6 +1490,30 @@ body {
   justify-content: space-between;
   margin-bottom: 12px;
   padding: 0 4px;
+}
+
+/* Acciones del listado agrupadas a la derecha: el contador queda solo a la
+   izquierda y los botones no se reparten por todo el ancho. */
+.list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* En móvil el contador va arriba y las acciones comparten una sola fila a la
+   derecha, en vez de repartirse por el ancho y dejar el icono suelto. */
+@media (max-width: 600px) {
+  .list-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .list-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .list-header h2 {
@@ -8242,14 +8281,54 @@ body.modal-open { overflow: hidden; }
   .sidebar:not(.open) {
     width: 60px;
   }
-  .sidebar:not(.open) .sidebar-link-text,
+  /* La barra se auto-colapsa en este rango: si el contenido no la sigue,
+     quedan 200 px de hueco muerto a la izquierda. */
+  .sidebar:not(.open) ~ .main-wrapper {
+    margin-left: 60px;
+  }
   .sidebar:not(.open) .sidebar-brand,
   .sidebar:not(.open) .sidebar-section-title span,
   .sidebar:not(.open) .logout-text {
     display: none;
   }
+  /* El texto del enlace se oculta a la vista pero conserva el nombre
+     accesible (mismo criterio que .sidebar.collapsed). */
+  .sidebar:not(.open) .sidebar-link-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .sidebar:not(.open) .sidebar-link {
     justify-content: center;
+  }
+  /* Tooltip de icono también en el modo auto-colapsado. */
+  .sidebar:not(.open) .sidebar-link::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--gray-900);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 300;
+  }
+  .sidebar:not(.open) .sidebar-link:hover::after,
+  .sidebar:not(.open) .sidebar-link:focus-visible::after {
+    opacity: 1;
   }
 }
 
