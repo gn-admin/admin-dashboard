@@ -51,7 +51,7 @@ Si `P0-12b` vuelve a `FAIL`, el token ha caducado y basta con regenerarlo; no ha
 ### 1. Informe de columnas `test-results/columnas.json` (`P0-14`)
 
 - **Falla con:** `Falta --columns-report`; es el único `FAIL` que queda en la pasada.
-- **Se genera** ejecutando `diagnosticoColumnasWeb` en el editor de Apps Script del despliegue (`scripts/diagnostico-columnas.gs`; solo lectura) y guardando el JSON de *Executions → Logs* en `test-results/columnas.json`.
+- **Se genera** ejecutando `diagnosticoColumnasWeb` en el editor de Apps Script del despliegue (`scripts/diagnostico-columnas.gs`; solo lectura) y guardando el JSON de *Executions → Logs* en `test-results/columnas.json`. Runbook completo, con validación y errores frecuentes, en [`DEPLOY_GS.md`](DEPLOY_GS.md) §2 paso 3.
 - Debe contener `WebPublicaciones` (`ficha_json`, `documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`) sin `missing`, y un objeto `sheets` no vacío.
 - El canal público no distingue una columna vacía de una ausente: sin este informe el gate no puede afirmar que las columnas aditivas están completas.
 
@@ -59,9 +59,22 @@ Si `P0-12b` vuelve a `FAIL`, el token ha caducado y basta con regenerarlo; no ha
 
 - **Avisa con:** `WARN P0-07 — Sin filas: no se puede confirmar el filtro con datos actuales`.
 - **Causa:** el fixture `caso-externo-gate` se retiró al cerrar el gate (§0.1), así que `publicaciones&category=Caso externo` devuelve 0 filas.
-- **Qué hacer:** publicar desde el gestor una historia temporal con categoría exacta `Caso externo` (sirve el fixture `caso-externo-gate`: portada, título y meta), mantenerla **publicada durante la pasada del gate** y retirarla después (`410`, `noindex`, fuera del sitemap).
-- Mientras esté retirada, `P0-07` volverá a `WARN`: no hay forma de cerrar el gate sin al menos una fila publicada de esa categoría.
-- Publicar dispara deploy en `main`, así que se hace justo antes de la pasada, no días antes.
+- **Campos mínimos para que el backend la acepte** (`webValidarPublicacion`, el mismo criterio que `Web.completitud` en el gestor):
+  - `titulo`: título público no vacío.
+  - `slug`: `^[a-z0-9]+(?:-[a-z0-9]+)*$`, máximo 80 (p. ej. `caso-externo-gate`).
+  - `categoria`: exactamente `Caso externo` (grafía canónica del backend).
+  - `contenido_html`: descripción de 40 caracteres o más.
+  - Portada (`coverImage.src`): imagen del animal, de la publicación o un archivo subido.
+  - `seo.metaDescription` o, en su defecto, `extracto`.
+  - `estado_publico` lo fija el propio publicar; no hay que escribirlo a mano.
+- **Pasos en el gestor, sin publicar:**
+  1. Publicaciones → pestaña **Historias** → **Crear** (alta de historia).
+  2. Bloque **Básico**: `Título público`, `Slug`, `Categoría` = `Caso externo` (datalist de categorías públicas), `Extracto`, `Descripción` (≥ 40 caracteres) y `Portada`.
+  3. Bloque **Avanzado** (opcional): media, CTA, etiquetas y SEO con su propia `metaDescription`.
+  4. **Guardar como borrador.** La fila debe quedar en estado `Borrador`, sin chips en la columna «Completitud» («Antes de publicar falta: …» solo aparece si falta algo).
+  - Un borrador no sale en `publicaciones` ni dispara deploy: se puede preparar con días de antelación.
+- **El día de la pasada:** pulsar **Publicar** en la fila (dispara deploy en `main`), ejecutar el gate y, al terminar, **Retirar** la publicación (`410`, `noindex`, fuera del sitemap).
+- Mientras esté retirada, `P0-07` vuelve a `WARN`: no hay forma de cerrar el gate sin al menos una fila publicada de esa categoría en el momento de la pasada.
 
 ### Comando exacto
 

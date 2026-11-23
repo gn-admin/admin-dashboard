@@ -27,13 +27,43 @@
    ```
    Genera `src/js/config.js` y `apps-script/Config.gs` (ignorados por git). No imprime secretos.
 
-3. **Verificar las columnas aditivas reales**
-   - Abrir el proyecto de Apps Script del despliegue.
-   - Pegar `scripts/diagnostico-columnas.gs` en un archivo nuevo y ejecutar `diagnosticoColumnasWeb`.
-   - Copiar el JSON de Logs a `test-results/columnas.json`.
-   - El informe debe traer `missing: []` para `WebPublicaciones` (`ficha_json`, `documents_json`, `media_folder_id`, `origen_tipo`) y `Animales` (`portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`).
+3. **Generar el informe de columnas aditivas (`test-results/columnas.json`)**
+   Es la evidencia que consume `P0-14` del gate. Solo lectura: abre las hojas y lee la fila 1; no escribe, no publica y no despliega.
 
-   > El canal público no puede distinguir una columna vacía de una columna ausente; por eso el informe se obtiene de la cabecera real de la hoja y se pasa al gate con `--columns-report`.
+   1. Abrir el proyecto de Apps Script del despliegue (`script.google.com` → `GN-Backend`).
+   2. **Archivo → Nuevo → Secuencia de comandos**, nombre `DiagnosticoColumnas`, y pegar íntegro `scripts/diagnostico-columnas.gs`.
+   3. Guardar (Ctrl+S) y ejecutar `diagnosticoColumnasWeb` desde el selector de la barra. Aceptar la autorización de Sheets si la pide.
+   4. Abrir **Ejecuciones → última ejecución → Registros** y copiar el JSON completo (de `{` a `}`).
+   5. Guardarlo como `test-results/columnas.json`, en UTF-8 **sin BOM** (la carpeta está ignorada por git).
+   6. Borrar el archivo `DiagnosticoColumnas` del proyecto (menú ⋮ → Eliminar) cuando ya esté el JSON guardado.
+
+   Validación local antes de usarlo:
+
+   ```bash
+   node -e "const r=require('./test-results/columnas.json');console.log(r.ok, Object.keys(r.sheets), Object.values(r.sheets).map(s=>s.missing.length))"
+   ```
+
+   Debe imprimir `true [ 'WebPublicaciones', 'Animales' ] [ 0, 0 ]`. Forma esperada del informe:
+
+   ```json
+   {
+     "ok": true,
+     "generado_en": "2026-11-23T…",
+     "diagnostico": "columnas-aditivas",
+     "sheets": {
+       "WebPublicaciones": { "pestana": "Hoja 1", "presentes": ["…"], "missing": [] },
+       "Animales":         { "pestana": "Hoja 1", "presentes": ["…"], "missing": [] }
+     }
+   }
+   ```
+
+   Columnas exigidas: `WebPublicaciones` → `ficha_json`, `documents_json`, `media_folder_id`, `origen_tipo`; `Animales` → `portada_url`, `portada_alt`, `galeria`, `videos`, `documentos_internos`.
+
+   > **Pestaña con otro nombre.** El backend acepta un documento de una sola pestaña aunque se llame «Hoja 1» (`getSheet`), y el diagnóstico actual hace lo mismo: no exige el nombre si no hay ambigüedad. Si sale `"error": "No existe la pestaña …"` con `ok:false`, se ejecutó una versión antigua del script, que buscaba el nombre exacto.
+   >
+   > **Varias pestañas y ninguna con el nombre configurado.** El informe devuelve `error` y todas las columnas en `missing`: renombrar la pestaña o corregir `sheetName` en `Config.gs`. Nunca se lee la primera a ciegas.
+   >
+   > Lo que se comprueba es la **cabecera** de la hoja, no los datos: el canal público no distingue una columna vacía de una ausente. El JSON no lleva IDs ni filas, solo nombres de columna, así que puede adjuntarse a una incidencia.
 
 4. **Smoke de línea base (solo lectura)**
    ```bash
