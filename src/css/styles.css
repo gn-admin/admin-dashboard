@@ -7233,10 +7233,11 @@ body {
   box-shadow: 0 -10px 24px -18px rgba(15, 23, 42, 0.38);
 }
 
-/* En táctil el pie sticky ocupa más (botones apilados y área segura). */
+/* En táctil el pie sticky ocupa más (botones apilados y área segura). El
+   relleno va en el propio pie: con padding en el contenedor se colaba una
+   franja del formulario por debajo. */
 @media (max-width: 1023px), (pointer: coarse) {
   .modal-body--form {
-    padding-bottom: 16px;
     scroll-padding-bottom: 150px;
   }
 }
