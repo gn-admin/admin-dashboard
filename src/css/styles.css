@@ -9388,6 +9388,15 @@ a.dash-kpi:focus-visible, a.dash-action:focus-visible { outline: 2px solid var(-
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
+/* El selector dentro del editor: la regla general .form-group select fija
+   width:100% y lo estiraba a toda la fila;
+   aqui manda el tamano natural del control para que la barra quepa en una o
+   dos filas. */
+.form-group .html-editor-select {
+  width: auto;
+  max-width: 180px;
+  flex: 0 0 auto;
+}
 .html-editor-surface {
   min-height: 180px;
   max-height: min(42vh, 360px);
