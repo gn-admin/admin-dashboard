@@ -1846,12 +1846,12 @@ const Web = {
           </div>
           <div class="form-row">
             <div class="form-group"><label for="wg-adop-mode">Modalidad de adopción</label><input type="text" id="wg-adop-mode" class="form-input" value="${this._esc(adop.mode || '')}" placeholder="conjunta / presencial"></div>
-            <div class="form-group"><label for="wg-adop-fee">Tasa (€)</label><input type="text" id="wg-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
+            <div class="form-group"><label for="wg-adop-fee">Tasa (€)</label><input type="number" id="wg-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" step="0.01" min="0" inputmode="decimal"></div>
           </div>
           <div class="form-group"><label for="wg-adop-req">Requisitos de adopción</label><textarea id="wg-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
           <div class="form-row">
             <div class="form-group"><label for="wg-foster-temp">Acogida temporal</label>
-              <select id="wg-foster-temp" class="form-input"><option value="no" ${foster.temporary ? '' : 'selected'}>No</option><option value="si" ${foster.temporary ? 'selected' : ''}>Sí</option></select></div>
+              <input type="checkbox" id="wg-foster-temp" ${foster.temporary ? 'checked' : ''}></div>
             <div class="form-group"><label for="wg-foster-dur">Duración de la acogida</label><input type="text" id="wg-foster-dur" class="form-input" value="${this._esc(foster.durationLabel || '')}" placeholder="Ej: 3 meses"></div>
           </div>
           <div class="form-row">
@@ -1959,7 +1959,7 @@ const Web = {
         temperament: this.parseLista(txt('wg-temperamento')),
         compatibility: { dogs: txt('wg-compat-perros'), cats: txt('wg-compat-gatos'), kids: txt('wg-compat-ninos') },
         adoption: { mode: txt('wg-adop-mode'), feeEur: txt('wg-adop-fee'), requirements: txt('wg-adop-req') },
-        foster: { temporary: txt('wg-foster-temp') === 'si', durationLabel: txt('wg-foster-dur') },
+        foster: { temporary: checked('wg-foster-temp'), durationLabel: txt('wg-foster-dur') },
         location: { city: txt('wg-loc-city'), province: txt('wg-loc-prov') },
         contact: { email: txt('wg-contact-email'), phone: txt('wg-contact-tel') }
       }

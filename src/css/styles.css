@@ -8876,8 +8876,8 @@ body.modal-open { overflow: hidden; }
 
 /* Acciones de la barra de filtros (nueva publicación, actualizar, ver web) */
 .web-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.web-tabla td.table-actions { white-space: nowrap; text-align: left; vertical-align: top; }
-.web-tabla td.table-actions .btn { justify-content: flex-start; }
+.web-tabla td.table-actions { white-space: nowrap; text-align: right; vertical-align: top; }
+.web-tabla td.table-actions .btn { justify-content: flex-end; }
 .web-tabla code { overflow-wrap: anywhere; word-break: break-word; }
 
 /* Selector "Nueva publicación": solo animales sin publicación web */
@@ -9045,7 +9045,7 @@ body.web-picker-abierto { overflow: hidden; }
   }
   .web-table-card .web-tabla td.table-actions .btn {
     width: 100%; min-height: 40px; padding: 8px 10px;
-    justify-content: flex-start; white-space: normal;
+    justify-content: flex-end; white-space: normal;
   }
   .web-table-card .web-tabla td.table-actions .web-sub { grid-column: 1 / -1; }
   .web-tabla td.table-actions { white-space: normal; }
