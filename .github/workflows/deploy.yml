@@ -73,6 +73,11 @@ jobs:
         with:
           path: src
 
+      # GitHub Actions tarda unos segundos en hacer visible el artefacto
+      # recién subido; sin esta espera deploy-pages ve "0 artifacts".
+      - name: Esperar a que el artefacto esté disponible
+        run: sleep 15
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
