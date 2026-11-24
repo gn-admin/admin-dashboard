@@ -868,6 +868,9 @@ const Web = {
   // ==================== FORMULARIO: ANIMAL ====================
 
   async abrirAnimal(animalId) {
+    if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) {
+      Dashboard.showFormModal('Publicación web', '<div class="modal-loading" role="status" aria-label="Cargando"><div class="page-skeleton"></div><p class="web-sub" style="text-align:center;margin-top:12px">Cargando la publicación…</p></div>');
+    }
     try {
       const res = await API.getWebAnimal(animalId);
       const d = res.data || {};
@@ -875,6 +878,7 @@ const Web = {
       const faltan = (res.completitud && res.completitud.faltan) ? res.completitud.faltan.map(f => f.campo) : [];
       this._mostrarFormAnimal(d, origen, faltan);
     } catch (err) {
+      if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
       this._snackErr(err, 'No se pudo abrir la publicación web');
     }
   },
@@ -1010,17 +1014,17 @@ const Web = {
           </div>
           <div class="form-row">
             <div class="form-group"><label for="web-adop-mode">Modalidad de adopción</label><input type="text" id="web-adop-mode" class="form-input" value="${this._esc(adop.mode || '')}" placeholder="presencial / a distancia"></div>
-            <div class="form-group"><label for="web-adop-fee">Tasa (€)</label><input type="text" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" inputmode="decimal"></div>
+            <div class="form-group"><label for="web-adop-fee">Tasa (€)</label><input type="number" id="web-adop-fee" class="form-input" value="${this._esc(adop.feeEur == null ? '' : adop.feeEur)}" step="0.01" min="0" inputmode="decimal"></div>
           </div>
           <div class="form-group"><label for="web-adop-req">Requisitos de adopción</label><textarea id="web-adop-req" class="form-input" rows="2">${this._esc(adop.requirements || '')}</textarea></div>
           <div class="form-row">
-            <div class="form-group"><label for="web-sponsor-eur">Apadrinamiento · cuota mensual (€)</label><input type="text" id="web-sponsor-eur" class="form-input" value="${this._esc(sponsor.monthlyEur == null ? '' : sponsor.monthlyEur)}" inputmode="decimal" placeholder="Ej: 15"></div>
+            <div class="form-group"><label for="web-sponsor-eur">Apadrinamiento · cuota mensual (€)</label><input type="number" id="web-sponsor-eur" class="form-input" value="${this._esc(sponsor.monthlyEur == null ? '' : sponsor.monthlyEur)}" step="0.01" min="0" inputmode="decimal" placeholder="Ej: 15"></div>
             <div class="form-group"><label for="web-sponsor-notas">Apadrinamiento · notas públicas</label><input type="text" id="web-sponsor-notas" class="form-input" value="${this._esc(sponsor.notes || '')}" placeholder="Apadrinas su alimentación y cuidados"></div>
           </div>
           <p class="web-nota">El apadrinamiento solo se publica si el animal tiene marcado «apadrinable» y está disponible o en acogida.</p>
           <div class="form-row">
             <div class="form-group"><label for="web-foster-temp">Acogida temporal</label>
-              <select id="web-foster-temp" class="form-input"><option value="no" ${foster.temporary ? '' : 'selected'}>No</option><option value="si" ${foster.temporary ? 'selected' : ''}>Sí</option></select></div>
+              <input type="checkbox" id="web-foster-temp" ${foster.temporary ? 'checked' : ''}></div>
             <div class="form-group"><label for="web-foster-dur">Duración de la acogida</label><input type="text" id="web-foster-dur" class="form-input" value="${this._esc(foster.durationLabel || '')}" placeholder="Ej: 3 meses"></div>
           </div>
           <div class="form-row">
@@ -1144,7 +1148,7 @@ const Web = {
         compatibility: { dogs: txt('web-compat-perros'), cats: txt('web-compat-gatos'), kids: txt('web-compat-ninos') },
         adoption: { mode: txt('web-adop-mode'), feeEur: txt('web-adop-fee'), requirements: txt('web-adop-req') },
         sponsor: this.sponsorDeFormulario(txt('web-sponsor-eur'), txt('web-sponsor-notas')),
-        foster: { temporary: txt('web-foster-temp') === 'si', durationLabel: txt('web-foster-dur') },
+        foster: { temporary: checked('web-foster-temp'), durationLabel: txt('web-foster-dur') },
         location: { city: txt('web-loc-city'), province: txt('web-loc-prov') },
         contact: { email: txt('web-contact-email'), phone: txt('web-contact-tel') },
         health: (() => {
@@ -1460,10 +1464,14 @@ const Web = {
       this._mostrarFormEvento({ tipo: 'evento', categoria: 'Eventos' });
       return;
     }
+    if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) {
+      Dashboard.showFormModal('Publicación web', '<div class="modal-loading" role="status" aria-label="Cargando"><div class="page-skeleton"></div><p class="web-sub" style="text-align:center;margin-top:12px">Cargando la publicación…</p></div>');
+    }
     try {
       const res = await API.getWebEvento(id);
       this._mostrarFormEvento(res.data || {}, (res.completitud && res.completitud.faltan) ? res.completitud.faltan.map(f => f.campo) : []);
     } catch (err) {
+      if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
       this._snackErr(err, 'No se pudo abrir la publicación');
     }
   },
@@ -1731,6 +1739,9 @@ const Web = {
   },
 
   async abrirGrupo(grupoId) {
+    if (typeof Dashboard !== 'undefined' && Dashboard.showFormModal) {
+      Dashboard.showFormModal('Publicación web', '<div class="modal-loading" role="status" aria-label="Cargando"><div class="page-skeleton"></div><p class="web-sub" style="text-align:center;margin-top:12px">Cargando la publicación…</p></div>');
+    }
     try {
       const res = await API.getWebGrupo(grupoId);
       const d = res.data || {};
@@ -1738,6 +1749,7 @@ const Web = {
       const faltan = (res.completitud && res.completitud.faltan) ? res.completitud.faltan.map(f => f.campo) : [];
       this._mostrarFormGrupo(d, origen, faltan);
     } catch (err) {
+      if (typeof Dashboard !== 'undefined' && Dashboard.closeFormModal) Dashboard.closeFormModal();
       this._snackErr(err, 'No se pudo abrir la publicación del grupo');
     }
   },
