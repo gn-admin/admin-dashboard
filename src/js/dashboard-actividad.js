@@ -37,7 +37,16 @@
     const cuerpo = this._renderActividadTabla(rows);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        ${this._screenHead({
+          eyebrow: 'Auditoría',
+          title: 'Actividad',
+          sub: 'Quién hizo cada cambio y cuándo. El historial se conserva aunque cambie el registro.',
+          pills: [
+            this._screenPill(rows.length, 'movimientos'),
+            this._screenPill(tipos.length, 'tipos de acción')
+          ]
+        })}
+        <div class="filters-bar screen-toolbar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>
@@ -47,7 +56,7 @@
             <button type="button" class="btn btn-outline-green btn-sm" data-action="exportActividadCsv">${Icons.download} CSV</button>
           </div>
         </div>
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${rows.length} registros</span></div>
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${rows.length} registros</span></div>
         <div class="card"><div class="card-body card-body-flush actividad-tabla" id="actividad-tabla">${cuerpo}</div></div>
       </div>
       <div class="page-detail-container"></div>`;

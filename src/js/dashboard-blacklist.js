@@ -15,8 +15,19 @@ async renderBlacklist(el) {
   }
   await this._loadList('blacklist', () => API.getBlacklist());
   el.innerHTML = `
-    <div class="list-header"><div class="search-box" style="flex:1"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en lista negra" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
-    <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>`;
+    <div class="page-list-container">
+      ${this._screenHead({
+        eyebrow: 'Seguridad',
+        title: 'Lista negra',
+        sub: 'Personas que no deben recibir animales. Se comprueba al revisar solicitudes.',
+        pills: [
+          this._screenPill((this.blacklist || []).length, 'registros'),
+          this._screenPill((this.blacklist || []).filter(b => b && b.origen === 'manual').length, 'manuales')
+        ]
+      })}
+      <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${(this.blacklist || []).length} personas</span><div class="search-box" style="flex:1"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en lista negra" placeholder="Buscar..." data-input="onBlacklistSearchInput"></div><button type="button" class="btn btn-primary btn-sm" data-action="showAddBlacklist">${Icons.plus} Anadir</button></div>
+      <div id="blacklist-list-container">${this._renderBlacklistCards()}</div><div id="blacklist-form-container"></div>
+    </div>`;
   this._animaListado(document.getElementById('blacklist-list-container'));
 },
 

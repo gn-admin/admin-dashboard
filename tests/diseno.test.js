@@ -277,3 +277,151 @@ describe('CSP: sin handlers inline en el HTML generado', () => {
     assert.match(fuente('src/css/styles.css'), /\.dash-chart-tooltip\.is-visible/);
   });
 });
+
+describe('menú de acciones (overflow): contrato de UI', () => {
+  const js = [
+    leer('js/dashboard.js'), leer('js/web.js'),
+    leer('js/dashboard-finanzas.js'), leer('js/dashboard-blacklist.js')
+  ].join('\n');
+
+  it('el CSS lo oculta cerrado y mantiene objetivos táctiles de 44px en móvil', () => {
+    assert.match(CSS, /\.action-menu\s*\{\s*position:\s*relative/);
+    assert.match(CSS, /\.action-menu:not\(\[open\]\)\s+\.action-menu-list\s*\{\s*display:\s*none/);
+    assert.match(CSS, /@media \(max-width:\s*767px\)[\s\S]{0,500}?\.action-menu-list \.btn,[\s\S]{0,200}?min-height:\s*44px/);
+  });
+
+  it('los menús usan details/summary con etiqueta accesible y lista de acciones', () => {
+    const bloques = js.match(/<details class="action-menu">[\s\S]*?<\/details>/g) || [];
+    assert.ok(bloques.length >= 8, 'menús encontrados: ' + bloques.length);
+    bloques.forEach((b, i) => {
+      assert.match(b, /<summary[^>]*aria-label="Más acciones"/, 'menú ' + i + ' sin etiqueta accesible');
+      assert.match(b, /<div class="action-menu-list">/, 'menú ' + i + ' sin lista');
+      assert.match(b, /data-action=/, 'menú ' + i + ' sin acciones');
+    });
+  });
+
+  it('el cierre global cubre clics en enlaces y botones dentro del menú', () => {
+    const web = leer('js/web.js');
+    assert.match(web, /querySelectorAll\('details\.action-menu\[open\]'\)/);
+    assert.match(web, /list\.contains\(e\.target\)/);
+    assert.match(web, /removeAttribute\('open'\)/);
+  });
+
+  it('un menú sin acciones visibles se oculta completo', () => {
+    assert.match(leer('js/dashboard.js'),
+      /details\.action-menu'\)\.forEach\(menu =>[\s\S]{0,400}?menu\.style\.display = visibles\.length \? '' : 'none'/);
+  });
+});
+
+describe('armonía visual: cabeceras de pantalla y dashboard por rol', () => {
+  const js = leer('js/dashboard.js');
+  const fuentes = js + leer('js/dashboard-finanzas.js') + leer('js/dashboard-blacklist.js') + leer('js/dashboard-actividad.js');
+
+  it('el CSS comparte cabecera, píldoras, toolbar y cabecera de listado', () => {
+    assert.match(CSS, /\.screen-head\s*\{/);
+    assert.match(CSS, /\.screen-eyebrow\s*\{/);
+    assert.match(CSS, /\.screen-title\s*\{/);
+    assert.match(CSS, /\.screen-pill\s*\{/);
+    assert.match(CSS, /\.screen-toolbar\s*\{/);
+    assert.match(CSS, /\.screen-list-head\s*\{/);
+    assert.match(CSS, /\.screen-stat--blue/);
+  });
+
+  it('las pantallas de gestión usan la cabecera y el resumen compartidos', () => {
+    const cabeceras = (fuentes.match(/_screenHead\(\{/g) || []).length;
+    assert.ok(cabeceras >= 9, 'cabeceras encontradas: ' + cabeceras);
+    assert.match(js, /_screenPill\(this\.animales\.length/);
+    assert.match(fuentes, /screen-list-head/);
+    assert.match(fuentes, /screen-toolbar/);
+  });
+
+  it('cada rol tiene su composición, no solo secciones ocultas', () => {
+    ['_paintCoordinadorHome', '_paintVoluntarioHome', '_paintTesoreriaHome', '_paintConsultaHome'].forEach(m => {
+      assert.ok(js.includes(m + '(el)'), 'falta ' + m);
+    });
+    assert.match(js, /rol === 'coordinador'/);
+    assert.match(js, /rol === 'voluntario'/);
+    assert.match(js, /rol === 'tesoreria'/);
+    assert.match(js, /rol === 'consulta'/);
+    assert.match(js, /dash-hero--coordinador/);
+    assert.match(js, /Prioridad de hoy/);
+    assert.match(js, /Movimientos recientes/);
+    assert.match(js, /Fichas disponibles/);
+    assert.doesNotMatch(js, /dash-role-strip/);
+  });
+
+  it('las tablas de gestión se convierten en tarjetas en tablet', () => {
+    assert.match(CSS, /@media \(min-width: 768px\) and \(max-width: 1023px\)[\s\S]{0,300}\.card \.data-table:not\(\.web-tabla\)/);
+    assert.match(CSS, /\.card \.data-table:not\(\.web-tabla\) td::before/);
+  });
+
+  it('los modales no desbordan en horizontal por culpa de un control ancho', () => {
+    assert.match(CSS, /\.form-row,\s*\.form-row > \.form-group,\s*\.form-group\s*\{\s*min-width:\s*0/);
+    assert.match(CSS, /\.form-group input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\)[\s\S]{0,160}?min-width:\s*0/);
+    assert.match(CSS, /\.modal-body\s*\{\s*overflow-x:\s*hidden/);
+    assert.match(CSS, /\.modal-footer\s*\{[\s\S]{0,160}?flex-wrap:\s*wrap/);
+  });
+});
+
+describe('editor visual de descripciones HTML de Publicaciones', () => {
+  const js = leer('js/dashboard.js');
+  const web = leer('js/web.js');
+
+  it('las tres descripciones usan el editor y no un textarea visible', () => {
+    ['web-contenido', 'we-contenido', 'wg-contenido'].forEach(id => {
+      assert.match(web, new RegExp("_editorHtml\\('" + id + "'"), 'falta el editor de ' + id);
+    });
+    assert.match(web, /contenteditable="true"/);
+    assert.match(web, /class="form-input html-editor-source"[^>]*hidden/);
+    assert.doesNotMatch(web, /<textarea id="(?:web|we|wg)-contenido"/);
+  });
+
+  it('la barra escribe en el contenteditable y sincroniza el textarea al guardar', () => {
+    assert.match(js, /htmlEditorCmd\(btn, cmd, id, arg\)/);
+    assert.match(js, /htmlEditorToggle\(btn, id\)/);
+    assert.match(js, /_syncHtmlEditors\(form\)/);
+    assert.match(js, /_initHtmlEditors\(body\)/);
+    assert.match(js, /_sanitizePastedHtml\(html\)/);
+    assert.match(web, /data-action="htmlEditorCmd"/);
+    assert.match(web, /data-input="htmlEditorInput"/);
+  });
+
+  it('el editor tiene estilos propios y modo HTML', () => {
+    ['.html-editor-toolbar', '.html-editor-btn', '.html-editor-surface', '.html-editor-source', '.html-editor.is-source']
+      .forEach(sel => assert.match(CSS, new RegExp(sel.replace(/\./g, '\\.'))));
+    assert.match(CSS, /\.html-editor-surface:empty::before/);
+  });
+});
+
+describe('editor HTML: piezas simplificadas y tactiles', () => {
+  const js = leer('js/dashboard.js');
+  const web = leer('js/web.js');
+
+  it('el formato de parrafo es un solo selector', () => {
+    assert.match(web, /data-change="htmlEditorBlock"/);
+    assert.doesNotMatch(web, /data-arg0="formatBlock"/);
+    assert.match(js, /htmlEditorBlock\(block, id\)/);
+  });
+
+  it('hay una sola ayuda y cambia con el modo', () => {
+    assert.match(web, /class="html-editor-help" data-html-editor-help/);
+    assert.doesNotMatch(web, /html-editor-hint/);
+    assert.match(js, /querySelector\('\.html-editor-help'\)/);
+  });
+
+  it('la seleccion se recupera al tocar la barra', () => {
+    assert.match(js, /addEventListener\('selectionchange'/);
+    assert.match(js, /_recordarSeleccion\(surface\)/);
+    assert.match(js, /_seleccionEditor\(surface\)/);
+  });
+
+  it('un editor vacio no guarda relleno como contenido', () => {
+    assert.match(js, /_valorHtml\(/);
+    assert.match(js, /const soloRelleno = /);
+  });
+
+  it('la barra tactil crece a 40px y el texto a 16px', () => {
+    assert.match(CSS, /\.html-editor-select\s*\{[\s\S]{0,400}?touch-action: manipulation/);
+    assert.match(CSS, /@media \(max-width: 767px\)[\s\S]{0,300}\.html-editor-btn\s*\{[\s\S]{0,80}?min-height: 40px/);
+  });
+});

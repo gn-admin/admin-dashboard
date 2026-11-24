@@ -879,6 +879,36 @@ const Web = {
     }
   },
 
+  /** Editor visual reutilizable para las descripciones HTML de Publicaciones. */
+  _editorHtml(id, label, value, placeholder) {
+    const contenido = String(value || '');
+    const visualId = id + '-visual';
+    const labelId = id + '-label';
+    return `<div class="form-group html-editor-field">
+      <div class="html-editor-head">
+        <label class="form-label" id="${labelId}" for="${visualId}">${label}</label>
+        <button type="button" class="html-editor-btn html-editor-mode" data-pass="el" data-action="htmlEditorToggle" data-arg0="${id}" aria-pressed="false" aria-controls="${visualId}" title="Ver el código HTML">HTML</button>
+      </div>
+      <div class="html-editor" data-html-editor data-editor-id="${id}">
+        <div class="html-editor-toolbar" role="toolbar" aria-label="Formato de la descripción">
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="bold" data-arg1="${id}" title="Negrita (Ctrl+B)" aria-label="Negrita"><strong>B</strong></button>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="italic" data-arg1="${id}" title="Cursiva (Ctrl+I)" aria-label="Cursiva"><em>I</em></button>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="underline" data-arg1="${id}" title="Subrayado (Ctrl+U)" aria-label="Subrayado"><u>U</u></button>
+          <span class="html-editor-sep" aria-hidden="true"></span>
+          <select class="html-editor-select" data-change="htmlEditorBlock" data-cpass="value" data-carg0="${id}" aria-label="Formato del párrafo" title="Formato del párrafo"><option value="">Formato</option><option value="p">Texto normal</option><option value="h2">Título</option><option value="h3">Subtítulo</option></select>
+          <span class="html-editor-sep" aria-hidden="true"></span>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="insertUnorderedList" data-arg1="${id}" title="Lista con viñetas" aria-label="Lista con viñetas">• Lista</button>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="insertOrderedList" data-arg1="${id}" title="Lista numerada" aria-label="Lista numerada">1. Lista</button>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="createLink" data-arg1="${id}" title="Insertar enlace" aria-label="Insertar enlace">Enlace</button>
+          <button type="button" class="html-editor-btn" data-pass="el" data-action="htmlEditorCmd" data-arg0="removeFormat" data-arg1="${id}" title="Quitar formato" aria-label="Quitar formato">Limpiar</button>
+        </div>
+        <div id="${visualId}" class="html-editor-surface" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="${labelId}" data-placeholder="${this._esc(placeholder || '')}" data-input="htmlEditorInput" data-arg0="${id}" spellcheck="true"></div>
+        <textarea id="${id}" class="form-input html-editor-source" rows="8" hidden aria-label="${label} en HTML">${this._esc(contenido)}</textarea>
+      </div>
+      <p class="html-editor-help" data-html-editor-help>Selecciona texto y usa la barra. El botón «HTML» muestra el código.</p>
+    </div>`;
+  },
+
   _mostrarFormAnimal(d, origen, faltan) {
     const media = d.media || {};
     const seo = d.seo || {};
@@ -928,7 +958,7 @@ const Web = {
         </div>
       </div>
       <div class="form-group"><label for="web-extracto">Extracto</label><textarea id="web-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
-      <div class="form-group"><label for="web-contenido">Descripción pública * (admite HTML)</label><textarea id="web-contenido" class="form-input" rows="6" placeholder="<p>Texto de la ficha pública...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+      ${this._editorHtml('web-contenido', 'Descripción pública *', d.contenido_html, '<p>Texto de la ficha pública...</p>')}
       ${this._portadaBasicaHtml('web', cover, d.id, 'si está vacía se usa la foto de la ficha del animal.')}
       ${this._avanzadoIntroHtml()}
 
@@ -1476,7 +1506,7 @@ const Web = {
         <div class="form-group"><label for="we-estado-publico">Estado público</label><input type="text" id="we-estado-publico" class="form-input" value="${this._esc(d.estado_publico || (d.tipo === 'historia' ? 'publicado' : 'programado'))}" placeholder="programado / activo / finalizado"></div>
       </div>
       <div class="form-group"><label for="we-extracto">Extracto</label><textarea id="we-extracto" class="form-input" rows="2">${this._esc(d.extracto || '')}</textarea></div>
-      <div class="form-group"><label for="we-contenido">Contenido * (admite HTML)</label><textarea id="we-contenido" class="form-input" rows="6">${this._esc(d.contenido_html || '')}</textarea></div>
+      ${this._editorHtml('we-contenido', 'Contenido *', d.contenido_html, '<p>Cuenta la historia, el evento o la novedad...</p>')}
       ${this._portadaBasicaHtml('we', cover, d.id, 'si está vacía, no se añade una portada nueva.')}
       ${this._avanzadoIntroHtml()}
 
@@ -1762,7 +1792,7 @@ const Web = {
         </div>
       </div>
       <div class="form-group"><label for="wg-extracto">Extracto</label><textarea id="wg-extracto" class="form-input" rows="2" placeholder="Resumen corto para listados y buscador">${this._esc(d.extracto || '')}</textarea></div>
-      <div class="form-group"><label for="wg-contenido">Descripción pública * (admite HTML)</label><textarea id="wg-contenido" class="form-input" rows="6" placeholder="<p>Historia del grupo, cómo son y qué buscan...</p>">${this._esc(d.contenido_html || '')}</textarea></div>
+      ${this._editorHtml('wg-contenido', 'Descripción pública *', d.contenido_html, '<p>Historia del grupo, cómo son y qué buscan...</p>')}
       ${this._portadaBasicaHtml('wg', cover, d.id, 'si está vacía se usa la primera foto disponible de los miembros.')}
       ${this._avanzadoIntroHtml()}
 

@@ -97,6 +97,7 @@ const Dashboard = {
     const k = String(key || '');
     const can = (p) => this.puedeAccederPagina(p);
     const any = (...ps) => ps.some(can);
+    const rol = typeof this._rolActual === 'function' ? this._rolActual() : '';
     const map = {
       donaciones: () => can('donaciones'),
       inventario: () => can('almacen'),
@@ -110,11 +111,11 @@ const Dashboard = {
       contratos: () => can('adopciones'),
       seguimientos: () => any('adopciones', 'acogidas', 'acogidas-activas'),
       historialFasesAdopcion: () => can('adopciones'),
-      grupos: () => can('animales'),
-      documentos: () => any('animales', 'adopciones'),
-      apadrinamientos: () => can('animales'),
-      recordatorios: () => can('animales'),
-      gastos: () => any('donaciones', 'reportes', 'animales'),
+      grupos: () => can('animales') && rol !== 'tesoreria' && rol !== 'consulta',
+      documentos: () => any('animales', 'adopciones') && rol !== 'tesoreria' && rol !== 'consulta',
+      apadrinamientos: () => can('socios'),
+      recordatorios: () => can('animales') && rol !== 'consulta' && rol !== 'tesoreria',
+      gastos: () => can('donaciones'),
       actividad: () => any('actividad', 'reportes')
     };
     if (Object.prototype.hasOwnProperty.call(map, k)) {
@@ -543,9 +544,16 @@ const Dashboard = {
         return /^(save|delete|remove|anular|finalizar|separar|convertir|guardar|eliminar|descartar|add|create)/i.test(a);
       };
 
+      // Borrados de registros: el backend los reserva a estos roles.
+      const borradoPorRol = {
+        deleteAnimal: ['admin', 'coordinador'], deleteFamilia: ['admin', 'coordinador'],
+        deleteAdopcion: ['admin', 'coordinador'], deleteAcogida: ['admin', 'coordinador'],
+        deleteSocio: ['admin']
+      };
       document.querySelectorAll('[data-action]').forEach(el => {
         const a = el.getAttribute('data-action') || '';
         if (!a) return;
+        if (borradoPorRol[a] && borradoPorRol[a].indexOf(rol) === -1) { hideEl(el); return; }
         const mod = actionToMod[a] || null;
         if (mod) {
           if (!puedeEditMod(mod)) hideEl(el);
@@ -583,6 +591,14 @@ const Dashboard = {
         });
         document.querySelectorAll('button[type="submit"]').forEach(el => { if (!inLogin(el)) hideEl(el); });
       }
+
+      // Un menú sin acciones visibles no debe quedar como un ⋮ vacío.
+      document.querySelectorAll('details.action-menu').forEach(menu => {
+        const items = [...menu.querySelectorAll('.action-menu-list button, .action-menu-list a')];
+        const visibles = items.filter(el => el.style.display !== 'none' && !el.disabled && !el.hasAttribute('aria-hidden'));
+        menu.style.display = visibles.length ? '' : 'none';
+        if (!visibles.length) menu.removeAttribute('open');
+      });
     } catch (e) { /* ignore */ }
   },
 
@@ -1044,6 +1060,11 @@ const Dashboard = {
   },
 
   async _loadListBestEffort(key, apiFn, force) {
+    // Defensa final: ningún rol pide listas que no puede leer, venga la llamada
+    // del dashboard, de una pantalla o de un refresco en segundo plano.
+    if (typeof this._puedeCargarListaKey === 'function' && !this._puedeCargarListaKey(key)) {
+      return Array.isArray(this[key]) ? this[key] : [];
+    }
     try { await this._loadList(key, apiFn, force); } catch (err) { console.warn('Load local-only:', key, err); }
   },
 
@@ -1332,6 +1353,7 @@ const Dashboard = {
       e.preventDefault();
       const d = form.dataset || {};
       try {
+        this._syncHtmlEditors(form);
         const args = [e];
         for (let i = 0; i < 8; i++) {
           const k = 'sarg' + i;
@@ -1377,7 +1399,44 @@ const Dashboard = {
       if (!action || typeof this[action] !== 'function') return;
       try { this[action].call(this, el); } catch (err) { console.error('Input delegado fallido:', action, err); }
     });
+    // El pegado en el editor visual se limpia: conserva negritas, listas y
+    // enlaces, pero no estilos de Word ni etiquetas peligrosas.
+    document.addEventListener('paste', (e) => {
+      const surface = e.target && e.target.closest ? e.target.closest('.html-editor-surface') : null;
+      if (!surface || !e.clipboardData) return;
+      e.preventDefault();
+      const html = e.clipboardData.getData('text/html');
+      const texto = e.clipboardData.getData('text/plain');
+      const limpio = html ? this._sanitizePastedHtml(html) : '';
+      if (limpio) document.execCommand('insertHTML', false, limpio);
+      else if (texto) document.execCommand('insertText', false, texto);
+      this.htmlEditorInput(surface);
+    });
+    // El rango dentro del editor se recuerda: al tocar la barra o el selector
+    // de formato el foco sale del contenteditable y el rango se perdería.
+    document.addEventListener('selectionchange', () => {
+      const sel = document.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const nodo = sel.anchorNode;
+      const host = nodo && (nodo.nodeType === 1 ? nodo : nodo.parentElement);
+      const surface = host && host.closest ? host.closest('.html-editor-surface') : null;
+      if (surface) this._recordarSeleccion(surface);
+    });
+
+    // En ratón se evita que el botón robe el foco; en táctil no se puede (anularía
+    // el tap), así que se guarda el rango antes de que el foco salga del editor.
+    document.addEventListener('pointerdown', (e) => {
+      const dentro = e.target && e.target.closest ? e.target.closest('.html-editor-surface') : null;
+      if (dentro) this._htmlCursorUsuario = true;
+      const btn = e.target && e.target.closest ? e.target.closest('.html-editor-btn, .html-editor-select') : null;
+      if (!btn) return;
+      const editor = btn.closest('[data-html-editor]');
+      const surface = editor && editor.querySelector('.html-editor-surface');
+      if (surface) this._recordarSeleccion(surface);
+      if (e.pointerType === 'mouse') e.preventDefault();
+    });
     document.addEventListener('keydown', (e) => {
+      if (e.target && e.target.closest && e.target.closest('.html-editor-surface')) this._htmlCursorUsuario = true;
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const el = e.target.closest('[data-action]');
       if (!el) return;
@@ -1956,6 +2015,7 @@ const Dashboard = {
       </div>
       ${contentHTML}`;
       this.injectIcons();
+      try { if (typeof this.aplicarPermisosUI === 'function') this.aplicarPermisosUI(); } catch (e) {}
       window.scrollTo({ top: 0, behavior: 'auto' });
     });
   },
@@ -2014,6 +2074,25 @@ const Dashboard = {
   _hasHomeCache() {
     return this._homeDataReady();
   },
+  // Cabecera comun de pantalla: mismo lenguaje visual que Publicaciones.
+  _screenHead(opts) {
+    const o = opts || {};
+    const pills = (o.pills || []).filter(Boolean).join('');
+    return `<section class="screen-head">
+      <div class="screen-copy">
+        ${o.eyebrow ? `<span class="screen-eyebrow">${this._esc(o.eyebrow)}</span>` : ''}
+        <h2 class="screen-title">${this._esc(o.title || '')}</h2>
+        ${o.sub ? `<p class="screen-sub">${this._esc(o.sub)}</p>` : ''}
+      </div>
+      ${pills ? `<div class="screen-summary" aria-label="Resumen de ${this._esc(o.title || 'la pantalla')}">${pills}</div>` : ''}
+    </section>`;
+  },
+
+  _screenPill(valor, etiqueta, tono) {
+    const t = tono ? ' is-' + tono : '';
+    return `<span class="screen-pill${t}"><b>${this._esc(String(valor == null ? 0 : valor))}</b> ${this._esc(etiqueta || '')}</span>`;
+  },
+
   _nombreVisible(profile, user) {
     // Solo se usa un nombre real. Del email no se inventa uno ("gn.test.admin"
     // acababa saludando como "Gn"); sin nombre, el saludo va sin destinatario.
@@ -2046,20 +2125,28 @@ const Dashboard = {
   },
   async _refreshHomeTier2(force) {
     if (this._rolEsSinAcceso && this._rolEsSinAcceso()) return;
-    // Datos secundarios (best-effort): no bloquean el primer pintado.
+    // Datos secundarios (best-effort): solo los que necesita el dashboard del
+    // rol. Así consulta no pide endpoints que el backend le deniega y tesorería
+    // no espera encuestas que no va a mostrar.
     const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
-    const jobs = [
-      this._loadListBestEffort('recordatorios', () => API.getRecordatorios(), force),
-      this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos(), force),
-      this._loadListBestEffort('gastos', () => API.getGastos(), force),
-    ];
+    const rol = typeof this._rolActual === 'function' ? this._rolActual() : '';
+    const jobs = [];
+    // Recordatorios y apadrinamientos son datos de gestión: consulta y
+    // tesorería no los muestran, así que tampoco se piden por ellos.
+    if (puede('animales') && rol !== 'consulta' && rol !== 'tesoreria') {
+      jobs.push(this._loadListBestEffort('recordatorios', () => API.getRecordatorios(), force));
+      if (puede('socios')) jobs.push(this._loadListBestEffort('apadrinamientos', () => API.getApadrinamientos(), force));
+    }
+    if (puede('donaciones')) jobs.push(this._loadListBestEffort('gastos', () => API.getGastos(), force));
     if (puede('donaciones')) jobs.push(this._loadListBestEffort('donaciones', () => API.getDonaciones(), force));
+    if (puede('almacen')) jobs.push(this._loadListBestEffort('inventario', () => API.getInventario(), force));
     if (puede('socios')) jobs.push(this._loadListBestEffort('socios', () => API.getSocios(), force));
     if (puede('adopciones')) jobs.push(this._loadListBestEffort('contratos', () => API.getContratos(), force));
     const listas = [];
     if (puede('adopciones')) listas.push('candidaturas');
     if (puede('acogidas') || puede('acogidas-activas')) listas.push('acogidas');
     if (listas.length) jobs.push(this._ensureListas(listas, force));
+    if (puede('actividad')) jobs.push(this._loadListBestEffort('actividad', () => API.getActividad(), force));
     await Promise.all(jobs);
   },
   async _refreshHome(force) {
@@ -2074,15 +2161,13 @@ const Dashboard = {
     const puede = (p) => (typeof this.puedeAccederPagina === 'function' ? this.puedeAccederPagina(p) : true);
     const puedeEdit = (m) => (typeof this.puedeEditar === 'function' ? this.puedeEditar(m) : true);
     const rol = (typeof this._rolActual === 'function') ? this._rolActual() : 'consulta';
+    if (rol === 'sin_acceso') { this._sinPermisoPage(el); return; }
+    if (rol === 'coordinador') { this._paintCoordinadorHome(el); return; }
+    if (rol === 'voluntario') { this._paintVoluntarioHome(el); return; }
+    if (rol === 'tesoreria') { this._paintTesoreriaHome(el); return; }
+    if (rol === 'consulta') { this._paintConsultaHome(el); return; }
     const isAdmin = rol === 'admin';
-    const roleLabel = this._roleLabel(rol);
-    const roleInfo = {
-      admin: 'Control completo: operación, personas, finanzas y contenido público.',
-      coordinador: 'Operación diaria, adopciones, socios, reportes y publicaciones web.',
-      voluntario: 'Animales, reportes y actividad del equipo. Sin acceso a finanzas ni contenido.',
-      tesoreria: 'Donaciones, gastos y almacén; consulta de animales sin edición.',
-      consulta: 'Consulta de animales y fichas. Sin edición ni acceso a datos sensibles.'
-    }[rol] || 'Resumen adaptado a los permisos de tu cuenta.';
+    const isCoord = rol === 'coordinador';
     const showEncuestas = puede('encuestas') || puede('encuestas-perros') || puede('encuestas-gatos') || puede('encuestas-acogida');
     const showAdopciones = puede('adopciones');
     const showAnimales = puede('animales');
@@ -2128,18 +2213,21 @@ const Dashboard = {
     if (showAnimales) {
       heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enAcogida}</span><span class="dash-hero-stat-label">En acogida</span></div>`);
     }
-    if (showReportes || showActividad || isAdmin) {
+    if (isAdmin) {
       heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>`);
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${euro(balance)}</span><span class="dash-hero-stat-label">Balance mes</span></div>`);
+    } else if (isCoord) {
+      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${adopMes.cur}</span><span class="dash-hero-stat-label">Adopciones mes</span></div>`);
     }
     if (!heroStats.length) {
       heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${(this.animales || []).length}</span><span class="dash-hero-stat-label">Animales</span></div>`);
     }
 
     const heroBtns = [];
+    if (isCoord && showEncuestas) heroBtns.push(`<a class="dash-hero-btn" href="#encuestas">${Icons.clipboard} Solicitudes</a>`);
     if (showWeb) heroBtns.push(`<a class="dash-hero-btn" href="#web">${Icons.eye} Publicaciones</a>`);
-    if (showAnimales) heroBtns.push(`<a class="dash-hero-btn" href="#animales">${Icons.paw} Ver animales</a>`);
-    if (showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>`);
-    if (showDonaciones && !showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#donaciones">${Icons.trendingUp} Donaciones</a>`);
+    if (showAnimales) heroBtns.push(`<a class="dash-hero-btn ${isCoord ? 'dash-hero-btn--ghost' : ''}" href="#animales">${Icons.paw} Ver animales</a>`);
+    if (isAdmin && showReportes) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>`);
     if (!heroBtns.length && showActividad) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#actividad">${Icons.activity} Actividad</a>`);
     if (!heroBtns.length) heroBtns.push(`<a class="dash-hero-btn dash-hero-btn--ghost" href="#dashboard">${Icons.dashboard} Inicio</a>`);
 
@@ -2203,20 +2291,15 @@ const Dashboard = {
     const hoyResumen = showEncuestas ? (pendientes + vencidos + enProceso) : vencidos;
 
     el.innerHTML = `
-      <section class="dash-hero">
+      <section class="dash-hero${isCoord ? ' dash-hero--coordinador' : ''}">
         <div class="dash-hero-copy">
-          <span class="dash-hero-eyebrow">Panel de gestión · Grupo Nebak</span>
+          <span class="dash-hero-eyebrow">${isAdmin ? 'Administración' : 'Coordinación'} · Grupo Nebak</span>
           <h2 class="dash-hero-title">${this._saludo()}${nombre ? `, ${this._esc(nombre)}` : ''}</h2>
-          <p class="dash-hero-sub">${this._esc(fechaHoy)} · ${hoyResumen ? `${hoyResumen} ${hoyResumen === 1 ? 'asunto' : 'asuntos'} por revisar` : 'Resumen disponible según tu rol'}</p>
+          <p class="dash-hero-sub">${this._esc(fechaHoy)} · ${isAdmin ? 'Control completo de operación, personas, finanzas y contenido público' : `${hoyResumen} ${hoyResumen === 1 ? 'asunto' : 'asuntos'} de operación por revisar`}</p>
           <div class="dash-hero-actions">${heroBtns.join('')}</div>
         </div>
         <div class="dash-hero-stats">${heroStats.join('')}</div>
       </section>
-
-      <div class="dash-role-strip">
-        <span class="dash-role-badge">${this._esc(roleLabel)}</span>
-        <span class="dash-role-text">${this._esc(roleInfo)}</span>
-      </div>
 
       ${kpis.length ? `<div class="dash-kpis">${kpis.join('')}</div>` : ''}
 
@@ -2297,6 +2380,271 @@ const Dashboard = {
           <div class="dash-recent">${this._recentListHtml()}</div>
         </section>` : ''}
       </div>`;
+  },
+
+  // ==================== DASHBOARD POR ROL ====================
+  // Cada rol tiene su propia composicion. No es el dashboard de admin con
+  // secciones ocultas: cambian el hero, los indicadores y los paneles.
+  _homeKpi(href, icono, tono, valor, etiqueta, pie) {
+    return `<a class="dash-kpi" href="#${this._esc(href)}">
+      <span class="dash-kpi-top"><span class="dash-kpi-icon ${tono || 'green'}">${icono || Icons.clipboard}</span></span>
+      <span class="dash-kpi-value">${this._esc(String(valor == null ? 0 : valor))}</span>
+      <span class="dash-kpi-label">${this._esc(etiqueta || '')}</span>
+      <span class="dash-kpi-foot">${this._esc(pie || '')}</span>
+    </a>`;
+  },
+
+  _homePanel(opts) {
+    const o = opts || {};
+    const cls = 'dash-panel' + (o.wide ? ' dash-panel--wide' : '') + (o.full ? ' dash-panel--full' : '');
+    return `<section class="${cls}">
+      <header class="dash-panel-head"><div><h3 class="dash-panel-title">${this._esc(o.title || '')}</h3>${o.sub ? `<p class="dash-panel-sub">${this._esc(o.sub)}</p>` : ''}</div>${o.action || ''}</header>
+      ${o.body || ''}
+    </section>`;
+  },
+
+  _homeQuick(links) {
+    return `<div class="dash-quick">${(links || []).map(l => `<a class="dash-quick-card" href="#${this._esc(l.href)}"><span class="dash-quick-icon">${l.icon || Icons.clipboard}</span><span class="dash-quick-label">${this._esc(l.label)}</span></a>`).join('')}</div>`;
+  },
+
+  _homeShell(opts) {
+    const o = opts || {};
+    const stats = (o.stats || []).join('');
+    const actions = (o.actions || []).join('');
+    const kpis = (o.kpis || []).filter(Boolean);
+    return `<section class="dash-hero dash-hero--${this._esc(o.rol || 'consulta')}">
+      <div class="dash-hero-copy">
+        <span class="dash-hero-eyebrow">${this._esc(o.eyebrow || 'Panel')} · Grupo Nebak</span>
+        <h2 class="dash-hero-title">${this._saludo()}${o.nombre ? `, ${this._esc(o.nombre)}` : ''}</h2>
+        <p class="dash-hero-sub">${this._esc(o.sub || '')}</p>
+        <div class="dash-hero-actions">${actions}</div>
+      </div>
+      <div class="dash-hero-stats">${stats}</div>
+    </section>
+    ${kpis.length ? `<div class="dash-kpis">${kpis.join('')}</div>` : ''}
+    <div class="dash-grid">${(o.panels || []).join('')}</div>`;
+  },
+
+  _homeAnimalList(list, limite) {
+    const vistos = new Set();
+    const items = (list || []).filter(a => a && a.id != null && !vistos.has(String(a.id)) && vistos.add(String(a.id)))
+      .slice(0, limite || 6);
+    if (!items.length) return `<div class="home-list-empty">No hay animales que necesiten atención ahora mismo.</div>`;
+    return `<div class="home-list">${items.map(a => {
+      const urgente = this._esPrioritario(a);
+      return `<a class="dash-action" href="#animales">
+        <span class="dash-action-icon ${urgente ? 'orange' : ''}">${Icons.paw || Icons.heart}</span>
+        <span class="dash-action-main"><span class="dash-action-title">${this._esc(a.nombre || 'Animal')}</span><span class="dash-action-sub">${this._esc(a.especie || '')} · ${this._esc(this._animalEstadoLabel(a.estado))}</span></span>
+        <span class="home-list-value">${urgente ? 'Urgente' : ''}</span>
+        <span class="dash-action-chevron">${Icons.chevronRight}</span>
+      </a>`;
+    }).join('')}</div>`;
+  },
+
+  _homeActividadList(limite) {
+    const tv = f => { const d = Date.parse(String(f || '').replace(' ', 'T')); return isNaN(d) ? 0 : d; };
+    const rows = [...(this.actividad || [])].sort((a, b) => tv(b.fecha) - tv(a.fecha)).slice(0, limite || 6);
+    if (!rows.length) return `<div class="home-list-empty">Todavía no hay movimientos registrados.</div>`;
+    return `<div class="home-list">${rows.map(r => `<a class="dash-action" href="#actividad">
+      <span class="dash-action-icon">${Icons.activity}</span>
+      <span class="dash-action-main"><span class="dash-action-title">${this._esc(r.detalle || r.descripcion || 'Movimiento')}</span><span class="dash-action-sub">${this._esc(r.usuario || '—')} · ${this._esc(this._fmtLogFecha(r.fecha))}</span></span>
+      <span class="estado-badge ${this._tipoLogCls(r.tipo)}">${this._esc(this._tipoLogLabel(r.tipo))}</span>
+    </a>`).join('')}</div>`;
+  },
+
+  _homeFinanceList(limite) {
+    const movs = [
+      ...(this.donaciones || []).map(d => ({ fecha: d.fecha, nombre: d.donante || 'Donación', tipo: 'Donación', importe: parseFloat(String(d.importe).replace(',', '.')) || 0, signo: 1 })),
+      ...(this.gastos || []).map(g => ({ fecha: g.fecha, nombre: g.concepto || g.descripcion || g.categoria || 'Gasto', tipo: 'Gasto', importe: parseFloat(String(g.importe).replace(',', '.')) || 0, signo: -1 }))
+    ].filter(m => m.fecha).sort((a, b) => this._tsFecha(b.fecha) - this._tsFecha(a.fecha)).slice(0, limite || 6);
+    if (!movs.length) return `<div class="home-list-empty">No hay movimientos registrados.</div>`;
+    return `<div class="home-list">${movs.map(m => `<div class="dash-action">
+      <span class="dash-action-icon ${m.signo > 0 ? '' : 'orange'}">${Icons.trendingUp}</span>
+      <span class="dash-action-main"><span class="dash-action-title">${this._esc(m.nombre)}</span><span class="dash-action-sub">${this._esc(m.tipo)} · ${this._esc(this._fmtFecha(m.fecha))}</span></span>
+      <span class="home-list-value ${m.signo > 0 ? 'home-list-value--pos' : 'home-list-value--neg'}">${m.signo > 0 ? '+' : '−'}${this._esc(this._eur(m.importe))}</span>
+    </div>`).join('')}</div>`;
+  },
+
+  _homeStockList(limite) {
+    const items = (this.inventario || []).filter(it => this._bajoStock(it)).slice(0, limite || 6);
+    if (!items.length) return `<div class="home-list-empty">Todo el almacén está por encima del mínimo.</div>`;
+    return `<div class="home-list">${items.map(it => `<a class="dash-action" href="#almacen">
+      <span class="dash-action-icon orange">${Icons.box}</span>
+      <span class="dash-action-main"><span class="dash-action-title">${this._esc(it.nombre || 'Artículo')}</span><span class="dash-action-sub">Mínimo ${this._esc(String(it.minimo ?? 0))} ${this._esc(it.unidad || '')}</span></span>
+      <span class="home-list-value home-list-value--neg">${this._esc(String(it.cantidad ?? 0))}</span>
+    </a>`).join('')}</div>`;
+  },
+
+  _homeConsultaGrid(limite) {
+    const items = (this.animales || []).filter(a => a && a.estado === 'disponible').slice(0, limite || 6);
+    if (!items.length) return `<div class="home-list-empty">No hay fichas disponibles en este momento.</div>`;
+    return `<div class="home-consulta-grid">${items.map(a => {
+      const foto = this._fotoSrc(a, 'w200');
+      return `<a class="home-consulta-animal" href="#animales">
+        ${foto ? `<img class="home-consulta-foto" src="${this._esc(foto)}" alt="${this._esc(a.nombre || 'Animal')}" loading="lazy">` : `<span class="home-consulta-foto">${this._esc(String(a.nombre || '?').charAt(0).toUpperCase())}</span>`}
+        <span class="home-consulta-datos"><span class="home-consulta-nombre">${this._esc(a.nombre || 'Animal')}</span><span class="home-consulta-meta">${this._esc(a.especie || '')}${a.raza ? ' · ' + this._esc(a.raza) : ''}</span></span>
+      </a>`;
+    }).join('')}</div>`;
+  },
+
+  _paintCoordinadorHome(el) {
+    const activas = Object.values(this.responses || {}).flat().filter(r => this.getEstado(r.id, r._surveyId) !== 'descartada');
+    const pendientes = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'pendiente').length;
+    const enProceso = activas.filter(r => this.getEstado(r.id, r._surveyId) === 'en_proceso').length;
+    const animales = this.animales || [];
+    const enAcogida = animales.filter(a => a.estado === 'en_acogida');
+    const familiasLibres = (this.familias || []).filter(f => f.capacidad === 'Libre').length;
+    const tareas = (this.recordatorios || []).filter(r => !r.hecho);
+    const vencidos = tareas.filter(r => (this._diasHasta(r.fecha) ?? 99) < 0).length;
+    const adopMes = this._cuentaMes(this._contratosAdopcion(), c => c.fecha);
+    const prioridad = animales.filter(a => this._esPrioritario(a) || a.estado === 'en_acogida');
+    const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    const fecha = this._fechaCorta(new Date(), false);
+    el.innerHTML = this._homeShell({
+      rol: 'coordinador', eyebrow: 'Coordinación', nombre,
+      sub: `${fecha} · ${pendientes} ${pendientes === 1 ? 'solicitud pendiente' : 'solicitudes pendientes'} y ${vencidos} ${vencidos === 1 ? 'vencimiento por revisar' : 'vencimientos por revisar'}`,
+      stats: [
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${pendientes ? ' dash-hero-stat-value--alert' : ''}">${pendientes}</span><span class="dash-hero-stat-label">Pendientes</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enAcogida.length}</span><span class="dash-hero-stat-label">En acogida</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${adopMes.cur}</span><span class="dash-hero-stat-label">Adopciones mes</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>`
+      ],
+      actions: [
+        `<a class="dash-hero-btn" href="#encuestas">${Icons.clipboard} Solicitudes</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#acogidas-activas">${Icons.home} Acogidas</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#animales">${Icons.paw || Icons.heart} Animales</a>`
+      ],
+      kpis: [
+        this._homeKpi('encuestas', Icons.clipboard, 'green', pendientes, 'Solicitudes pendientes', `${enProceso} en proceso`),
+        this._homeKpi('acogidas-activas', Icons.home, 'blue', enAcogida.length, 'Animales en acogida', `${familiasLibres} familias libres`),
+        this._homeKpi('adopciones', Icons.checkCircle, 'green', adopMes.cur, 'Adopciones este mes', `${adopMes.prev} el mes pasado`),
+        this._homeKpi('actividad', Icons.alertTriangle, vencidos ? 'orange' : 'green', vencidos, 'Tareas vencidas', `${tareas.length} ${tareas.length === 1 ? 'abierta' : 'abiertas'}`)
+      ],
+      panels: [
+        this._homePanel({ title: 'Cola de trabajo', sub: 'Solicitudes y vencimientos que requieren acción', body: this._accionListHtml(), wide: true }),
+        this._homePanel({ title: 'Acogidas y urgencias', sub: 'Seguimiento operativo del equipo', body: this._homeAnimalList(prioridad) }),
+        this._homePanel({ title: 'Actividad reciente', sub: 'Últimos movimientos del equipo', body: this._homeActividadList(5) }),
+        this._homePanel({ title: 'Accesos rápidos', sub: 'Operación diaria', body: this._homeQuick([
+          { href: 'encuestas', label: 'Encuestas', icon: Icons.clipboard },
+          { href: 'animales', label: 'Animales', icon: Icons.paw || Icons.heart },
+          { href: 'acogidas-activas', label: 'Acogidas', icon: Icons.home },
+          { href: 'adopciones', label: 'Adopciones', icon: Icons.checkCircle },
+          { href: 'socios', label: 'Socios', icon: Icons.users },
+          { href: 'actividad', label: 'Actividad', icon: Icons.activity }
+        ]) }),
+        this._homePanel({ title: 'Solicitudes recientes', sub: 'Últimas entradas de las encuestas', body: this._recentListHtml(), full: true })
+      ]
+    });
+  },
+
+  _paintVoluntarioHome(el) {
+    const animales = this.animales || [];
+    const enAcogida = animales.filter(a => a.estado === 'en_acogida');
+    const disponibles = animales.filter(a => a.estado === 'disponible');
+    const urgentes = animales.filter(a => this._esPrioritario(a));
+    const tareas = (this.recordatorios || []).filter(r => !r.hecho);
+    const vencidos = tareas.filter(r => (this._diasHasta(r.fecha) ?? 99) < 0).length;
+    const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    const fecha = this._fechaCorta(new Date(), false);
+    el.innerHTML = this._homeShell({
+      rol: 'voluntario', eyebrow: 'Voluntariado', nombre,
+      sub: `${fecha} · ${urgentes.length} ${urgentes.length === 1 ? 'urgente' : 'urgentes'} y ${tareas.length} ${tareas.length === 1 ? 'tarea abierta' : 'tareas abiertas'}`,
+      stats: [
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${urgentes.length ? ' dash-hero-stat-value--alert' : ''}">${urgentes.length}</span><span class="dash-hero-stat-label">Urgentes</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enAcogida.length}</span><span class="dash-hero-stat-label">En acogida</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${disponibles.length}</span><span class="dash-hero-stat-label">Disponibles</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${tareas.length}</span><span class="dash-hero-stat-label">Tareas</span></div>`
+      ],
+      actions: [
+        `<a class="dash-hero-btn" href="#animales">${Icons.paw || Icons.heart} Ver animales</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#actividad">${Icons.activity} Actividad</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#reportes">${Icons.barChart} Reportes</a>`
+      ],
+      kpis: [
+        this._homeKpi('animales', Icons.heart, 'blue', enAcogida.length, 'Animales en acogida', `${disponibles.length} disponibles`),
+        this._homeKpi('animales', Icons.alertTriangle, 'orange', urgentes.length, 'Urgentes', 'Prioridad de acogida'),
+        this._homeKpi('actividad', Icons.activity, 'green', tareas.length, 'Tareas abiertas', `${vencidos} ${vencidos === 1 ? 'vencida' : 'vencidas'}`),
+        this._homeKpi('animales', Icons.paw || Icons.heart, 'green', animales.length, 'Animales en el refugio', 'Fichas activas')
+      ],
+      panels: [
+        this._homePanel({ title: 'Prioridad de hoy', sub: 'Urgentes y animales en acogida', body: this._homeAnimalList([...urgentes, ...enAcogida]), wide: true }),
+        this._homePanel({ title: 'Actividad reciente', sub: 'Últimos movimientos del equipo', body: this._homeActividadList(5) }),
+        this._homePanel({ title: 'Accesos rápidos', sub: 'Tu trabajo diario', body: this._homeQuick([
+          { href: 'animales', label: 'Animales', icon: Icons.paw || Icons.heart },
+          { href: 'actividad', label: 'Actividad', icon: Icons.activity },
+          { href: 'reportes', label: 'Reportes', icon: Icons.barChart }
+        ]) })
+      ]
+    });
+  },
+
+  _paintTesoreriaHome(el) {
+    const donMes = this._sumaMes(this.donaciones, d => d.fecha, d => d.importe);
+    const gastoMes = this._sumaMes(this.gastos, g => g.fecha, g => g.importe);
+    const balance = donMes.cur - gastoMes.cur;
+    const bajo = (this.inventario || []).filter(it => this._bajoStock(it));
+    const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    const fecha = this._fechaCorta(new Date(), false);
+    el.innerHTML = this._homeShell({
+      rol: 'tesoreria', eyebrow: 'Tesorería', nombre,
+      sub: `${fecha} · ${this._eur(donMes.cur)} donados y ${this._eur(gastoMes.cur)} gastados este mes`,
+      stats: [
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${this._esc(this._eur(donMes.cur))}</span><span class="dash-hero-stat-label">Donado</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${this._esc(this._eur(gastoMes.cur))}</span><span class="dash-hero-stat-label">Gastado</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${balance < 0 ? ' dash-hero-stat-value--alert' : ''}">${this._esc(this._eur(balance))}</span><span class="dash-hero-stat-label">Balance</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value${bajo.length ? ' dash-hero-stat-value--alert' : ''}">${bajo.length}</span><span class="dash-hero-stat-label">Bajo mínimo</span></div>`
+      ],
+      actions: [
+        `<a class="dash-hero-btn" href="#donaciones">${Icons.trendingUp} Donaciones</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#almacen">${Icons.box} Almacén</a>`,
+        `<a class="dash-hero-btn dash-hero-btn--ghost" href="#actividad">${Icons.activity} Actividad</a>`
+      ],
+      kpis: [
+        this._homeKpi('donaciones', Icons.trendingUp, 'green', this._eur(donMes.cur), 'Donaciones este mes', `${donMes.prev.toFixed(2)} € el mes pasado`),
+        this._homeKpi('donaciones', Icons.trendingUp, 'orange', this._eur(gastoMes.cur), 'Gastos este mes', `${gastoMes.prev.toFixed(2)} € el mes pasado`),
+        this._homeKpi('donaciones', Icons.trendingUp, balance >= 0 ? 'green' : 'orange', this._eur(balance), 'Balance del mes', balance >= 0 ? 'Positivo' : 'Negativo'),
+        this._homeKpi('almacen', Icons.box, bajo.length ? 'orange' : 'green', bajo.length, 'Artículos bajo mínimo', `${(this.inventario || []).length} ${(this.inventario || []).length === 1 ? 'artículo' : 'artículos'} en total`)
+      ],
+      panels: [
+        this._homePanel({ title: 'Movimientos recientes', sub: 'Donaciones y gastos', body: this._homeFinanceList(7), wide: true }),
+        this._homePanel({ title: 'Almacén bajo mínimo', sub: 'Repón antes de quedarte sin stock', body: this._homeStockList(6) }),
+        this._homePanel({ title: 'Accesos rápidos', sub: 'Finanzas y recursos', body: this._homeQuick([
+          { href: 'donaciones', label: 'Donaciones', icon: Icons.trendingUp },
+          { href: 'almacen', label: 'Almacén', icon: Icons.box },
+          { href: 'actividad', label: 'Actividad', icon: Icons.activity }
+        ]) })
+      ]
+    });
+  },
+
+  _paintConsultaHome(el) {
+    const animales = this.animales || [];
+    const disponibles = animales.filter(a => a.estado === 'disponible');
+    const enAcogida = animales.filter(a => a.estado === 'en_acogida');
+    const adoptados = animales.filter(a => a.estado === 'adoptado');
+    const nombre = this._nombreVisible(this.userProfile, typeof Auth !== 'undefined' ? Auth.currentUser : null);
+    const fecha = this._fechaCorta(new Date(), false);
+    el.innerHTML = this._homeShell({
+      rol: 'consulta', eyebrow: 'Consulta', nombre,
+      sub: `${fecha} · Catálogo en solo lectura. Puedes consultar fichas, no editarlas.`,
+      stats: [
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${animales.length}</span><span class="dash-hero-stat-label">Animales</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${disponibles.length}</span><span class="dash-hero-stat-label">Disponibles</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${enAcogida.length}</span><span class="dash-hero-stat-label">En acogida</span></div>`,
+        `<div class="dash-hero-stat"><span class="dash-hero-stat-value">${adoptados.length}</span><span class="dash-hero-stat-label">Adoptados</span></div>`
+      ],
+      actions: [`<a class="dash-hero-btn" href="#animales">${Icons.paw || Icons.heart} Ver animales</a>`],
+      kpis: [
+        this._homeKpi('animales', Icons.paw || Icons.heart, 'green', animales.length, 'Fichas de animales', 'Catálogo completo'),
+        this._homeKpi('animales', Icons.checkCircle, 'green', disponibles.length, 'Disponibles', 'Buscan hogar'),
+        this._homeKpi('animales', Icons.home, 'blue', enAcogida.length, 'En acogida', 'Seguimiento temporal'),
+        this._homeKpi('animales', Icons.heart, 'orange', adoptados.length, 'Adoptados', 'Con su familia')
+      ],
+      panels: [
+        this._homePanel({ title: 'Fichas disponibles', sub: 'Animales que buscan hogar', body: this._homeConsultaGrid(6), full: true }),
+        this._homePanel({ title: 'Acceso de consulta', sub: 'Solo lectura', body: `<p class="home-note">Tu cuenta puede consultar el catálogo y las fichas de los animales, pero no crear, editar ni eliminar registros. Si necesitas colaborar, pide a administración que amplíe tu rol.</p>`, full: true })
+      ]
+    });
   },
 
   // Serie de solicitudes de los ultimos 12 meses (sin descartadas).
@@ -2690,6 +3038,7 @@ const Dashboard = {
       { surveyId: 'pre-adopcion-gatos', page: 'encuestas-gatos', icon: Icons.cat, title: 'Pre-adopción Gatos' },
       { surveyId: 'pre-acogida', page: 'encuestas-acogida', icon: Icons.home, title: 'Solicitudes de Acogida' }
     ];
+    const totalPend = defs.reduce((n, d) => n + (this.responses[d.surveyId] || []).filter(r => this.getEstado(r.id, d.surveyId) === 'pendiente').length, 0);
     const cards = defs.map(d => {
       const list = this.responses[d.surveyId] || [];
       const activas = list.filter(r => this.getEstado(r.id, d.surveyId) !== 'descartada');
@@ -2707,17 +3056,47 @@ const Dashboard = {
         <span class="hub-card-chevron">${Icons.chevronRight}</span>
       </a>`;
     }).join('');
-    el.innerHTML = `<div class="page-list-container"><div class="hub-grid">${cards}</div></div>`;
+    el.innerHTML = `<div class="page-list-container">
+      ${this._screenHead({
+        eyebrow: 'Encuestas',
+        title: 'Solicitudes recibidas',
+        sub: 'Pre-adopción de perros y gatos, y solicitudes de acogida.',
+        pills: [
+          this._screenPill(defs.length, 'encuestas activas'),
+          this._screenPill(totalPend, 'pendientes', totalPend ? 'warn' : 'live')
+        ]
+      })}
+      <div class="hub-grid">${cards}</div>
+    </div>`;
   },
 
   async renderEncuesta(el, surveyId) {
     await Promise.all([this._loadSurveys(), this._loadResponses(surveyId), this.loadEstados()]);
     const responses = this._sortEncuestas((this.responses[surveyId]||[]).filter(r=>!this.checkBlacklist(r.nombre,r.email)));
     this._shown[surveyId] = 20;
+    const meta = {
+      'pre-adopcion-perros': { eyebrow: 'Pre-adopción', title: 'Solicitudes · Perros' },
+      'pre-adopcion-gatos': { eyebrow: 'Pre-adopción', title: 'Solicitudes · Gatos' },
+      'pre-acogida': { eyebrow: 'Acogida', title: 'Solicitudes de acogida' }
+    }[surveyId] || { eyebrow: 'Encuestas', title: 'Solicitudes' };
+    const pendientesEnc = responses.filter(r => this.getEstado(r.id, surveyId) === 'pendiente').length;
+    const procesoEnc = responses.filter(r => this.getEstado(r.id, surveyId) === 'en_proceso').length;
+    const aprobadasEnc = responses.filter(r => this.getEstado(r.id, surveyId) === 'aprobada').length;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
+        ${this._screenHead({
+          eyebrow: meta.eyebrow,
+          title: meta.title,
+          sub: 'Revisa cada solicitud, cambia su estado y exporta el listado cuando lo necesites.',
+          pills: [
+            this._screenPill(responses.length, 'solicitudes'),
+            this._screenPill(pendientesEnc, 'pendientes', pendientesEnc ? 'warn' : 'live'),
+            this._screenPill(procesoEnc, 'en proceso'),
+            this._screenPill(aprobadasEnc, 'aprobadas')
+          ]
+        })}
+        <div class="filters-bar screen-toolbar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar nombre o email" placeholder="Buscar nombre o email..." data-input="onEncuestaSearchInput" data-survey="${surveyId}"></div><div class="filter-row"><select aria-label="Filtrar por estado" data-change="onEncuestaFilterChange" data-cpass="el" data-survey="${surveyId}"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="en_proceso">En proceso</option><option value="aprobada">Aprobadas</option><option value="descartada">Descartadas</option></select></div></div>
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${responses.length} solicitudes</span><button type="button" class="btn btn-primary btn-sm" data-action="exportSurvey" data-arg0="${surveyId}">${Icons.download} Exportar</button></div>
         <div class="response-list" id="response-list-${surveyId}">${this._renderResponseList(responses,surveyId)}</div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -3195,6 +3574,7 @@ const Dashboard = {
     if (!modal || !body) return;
     if (titleEl) titleEl.textContent = title || 'Formulario';
     body.innerHTML = html;
+    this._initHtmlEditors(body);
     body.classList.add('modal-body--form');
     const opening = modal.style.display !== 'flex';
     if (opening) this._modalCaptureFocus('form-modal');
@@ -3215,6 +3595,189 @@ const Dashboard = {
     this._modalScrollLock(false);
     this._modalRemove('form-modal');
     this._modalRestoreFocus('form-modal');
+  },
+
+  // ==================== EDITOR VISUAL DE HTML ====================
+  // Componente local (sin CDN) para las descripciones de Publicaciones: la
+  // barra escribe HTML en un contenteditable y el textarea oculto conserva el
+  // contrato de guardado que ya espera el backend.
+
+  _htmlSeleccion: new Map(),
+  _htmlCursorUsuario: false,
+
+  _htmlEditor(id) {
+    return document.querySelector('[data-html-editor][data-editor-id="' + String(id || '').replace(/"/g, '') + '"]');
+  },
+
+  _initHtmlEditors(root) {
+    const scope = root || document;
+    scope.querySelectorAll('[data-html-editor]').forEach(editor => {
+      if (editor.dataset.ready === '1') return;
+      const surface = editor.querySelector('.html-editor-surface');
+      const source = editor.querySelector('.html-editor-source');
+      if (!surface || !source) return;
+      if (!this._valorHtml(surface.innerHTML)) surface.innerHTML = source.value;
+      editor.dataset.ready = '1';
+    });
+  },
+
+  _syncHtmlEditors(root) {
+    const scope = root || document;
+    scope.querySelectorAll('[data-html-editor]').forEach(editor => {
+      if (editor.classList.contains('is-source')) return;
+      const surface = editor.querySelector('.html-editor-surface');
+      const source = editor.querySelector('.html-editor-source');
+      if (surface && source) source.value = this._valorHtml(surface.innerHTML);
+    });
+  },
+
+  htmlEditorInput(el) {
+    if (!el) return;
+    const editor = el.closest('[data-html-editor]');
+    const source = editor && editor.querySelector('.html-editor-source');
+    if (source) source.value = this._valorHtml(el.innerHTML);
+  },
+
+  htmlEditorToggle(btn, id) {
+    const editor = this._htmlEditor(id);
+    if (!editor) return;
+    const surface = editor.querySelector('.html-editor-surface');
+    const source = editor.querySelector('.html-editor-source');
+    if (!surface || !source) return;
+    const aCodigo = !editor.classList.contains('is-source');
+    if (aCodigo) source.value = this._valorHtml(surface.innerHTML);
+    else surface.innerHTML = source.value;
+    editor.classList.toggle('is-source', aCodigo);
+    surface.hidden = aCodigo;
+    source.hidden = !aCodigo;
+    const campo = editor.closest('.html-editor-field');
+    const hint = campo && campo.querySelector('.html-editor-help');
+    if (hint) hint.textContent = aCodigo ? 'Modo código: aquí editas el HTML tal cual.' : 'Selecciona texto y usa la barra. El botón «HTML» muestra el código.';
+    if (btn) {
+      btn.textContent = aCodigo ? 'Visual' : 'HTML';
+      btn.title = aCodigo ? 'Volver al editor visual' : 'Ver el código HTML';
+      btn.setAttribute('aria-pressed', aCodigo ? 'true' : 'false');
+    }
+    try {
+      if (aCodigo) { source.focus(); source.setSelectionRange(0, 0); }
+      else surface.focus();
+    } catch (e) {}
+  },
+
+  htmlEditorCmd(btn, cmd, id, arg) {
+    const editor = this._htmlEditor(id);
+    if (!editor || editor.classList.contains('is-source')) return;
+    const surface = editor.querySelector('.html-editor-surface');
+    if (!surface) return;
+    surface.focus();
+    this._seleccionEditor(surface);
+    try {
+      if (cmd === 'createLink') {
+        const sel = window.getSelection();
+        const haySeleccion = sel && sel.rangeCount > 0 && !sel.isCollapsed;
+        const pedida = window.prompt('Dirección del enlace', 'https://');
+        if (!pedida) return;
+        const url = pedida.trim();
+        const href = /^(https?:|mailto:|tel:|\/|#)/i.test(url) ? url : 'https://' + url;
+        if (haySeleccion) document.execCommand('createLink', false, href);
+        else document.execCommand('insertHTML', false, '<a href="' + this._esc(href) + '">' + this._esc(href) + '</a>');
+      } else if (cmd === 'removeFormat') {
+        document.execCommand('removeFormat', false, null);
+        document.execCommand('formatBlock', false, 'p');
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+    } catch (e) {
+      console.error('Editor HTML:', e);
+    }
+    this.htmlEditorInput(surface);
+    this._recordarSeleccion(surface, true);
+  },
+
+  _sanitizePastedHtml(html) {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const permitidas = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'H2', 'H3', 'UL', 'OL', 'LI', 'A', 'DIV']);
+    const bloquesPeligrosos = new Set(['SCRIPT', 'STYLE', 'LINK', 'META', 'BASE', 'IFRAME', 'OBJECT', 'EMBED', 'IMG', 'VIDEO', 'AUDIO', 'FORM', 'INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'TEMPLATE', 'NOSCRIPT', 'SVG', 'MATH']);
+    const limpiar = nodo => {
+      [...nodo.childNodes].forEach(hijo => {
+        if (hijo.nodeType === 3) return;
+        if (hijo.nodeType !== 1) { hijo.remove(); return; }
+        if (bloquesPeligrosos.has(hijo.tagName)) { hijo.remove(); return; }
+        if (!permitidas.has(hijo.tagName)) {
+          limpiar(hijo);
+          hijo.replaceWith(...hijo.childNodes);
+          return;
+        }
+        [...hijo.attributes].forEach(attr => {
+          if (hijo.tagName === 'A' && attr.name.toLowerCase() === 'href') {
+            if (!/^(https?:|mailto:|tel:|\/|#)/i.test(attr.value)) hijo.removeAttribute(attr.name);
+            else {
+              hijo.setAttribute('target', '_blank');
+              hijo.setAttribute('rel', 'noopener noreferrer');
+            }
+          } else {
+            hijo.removeAttribute(attr.name);
+          }
+        });
+        limpiar(hijo);
+      });
+    };
+    limpiar(doc.body);
+    return doc.body.innerHTML.trim();
+  },
+
+  // La selección se recuerda por editor: al tocar la barra (o el selector de
+  // formato) el foco sale del contenteditable y el rango se perdería.
+  _recordarSeleccion(surface, forzar) {
+    const sel = document.getSelection();
+    if (!surface || !sel || !sel.rangeCount) return;
+    const nodo = sel.anchorNode;
+    const host = nodo && (nodo.nodeType === 1 ? nodo : nodo.parentElement);
+    if (!host || !host.closest || host.closest('.html-editor-surface') !== surface) return;
+    const rango = sel.getRangeAt(0);
+    // Un cursor vacío no pisa una selección de texto: solo lo hace si viene de
+    // un gesto del usuario (clic o tecla) o de un comando recién aplicado.
+    const guardada = this._htmlSeleccion.get(surface);
+    if (!forzar && rango.collapsed && guardada && !guardada.collapsed && !this._htmlCursorUsuario) return;
+    this._htmlCursorUsuario = false;
+    this._htmlSeleccion.set(surface, rango.cloneRange());
+  },
+
+  _seleccionEditor(surface) {
+    const sel = document.getSelection();
+    if (!surface || !sel) return;
+    const guardada = this._htmlSeleccion.get(surface);
+    if (!guardada || !surface.contains(guardada.startContainer)) return;
+    const viva = sel.rangeCount ? sel.getRangeAt(0) : null;
+    const dentroViva = !!(viva && sel.anchorNode && surface.contains(sel.anchorNode));
+    // Una selección viva manda: el rango guardado solo vuelve cuando el foco
+    // del botón la ha colapsado o la ha dejado fuera del editor.
+    if (dentroViva && !viva.collapsed) return;
+    if (dentroViva && guardada.collapsed) return;
+    sel.removeAllRanges();
+    sel.addRange(guardada);
+  },
+
+  // Un contenteditable vacío devuelve `<br>` o `&nbsp;`; para el contrato de
+  // guardado eso no es contenido y se normaliza a cadena vacía.
+  _valorHtml(html) {
+    const texto = String(html || '');
+    const soloRelleno = /^(?:\s|&nbsp;|<br\s*\/?>|<p>(?:\s|<br\s*\/?>)*<\/p>|<div>(?:\s|<br\s*\/?>)*<\/div>)*$/i;
+    return soloRelleno.test(texto) ? '' : texto.trim();
+  },
+
+  htmlEditorBlock(block, id) {
+    const editor = this._htmlEditor(id);
+    if (!editor || editor.classList.contains('is-source')) return;
+    const surface = editor.querySelector('.html-editor-surface');
+    if (!surface) return;
+    const select = editor.querySelector('.html-editor-select');
+    if (select) select.value = '';
+    surface.focus();
+    this._seleccionEditor(surface);
+    try { document.execCommand('formatBlock', false, block || 'p'); } catch (e) {}
+    this.htmlEditorInput(surface);
+    this._recordarSeleccion(surface, true);
   },
 
   async viewCuestionarioModal(surveyId, responseId) {
@@ -4445,8 +5008,19 @@ const Dashboard = {
       : `<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">${Icons.dog}</div><h3>Aun no hay animales</h3><p>Registra el primer animal o usa el alta de camada.</p></div>`);
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><div class="list-header-actions"><button type="button" class="btn-icon" title="Exportar a CSV" aria-label="Exportar animales a CSV" data-action="exportAnimalesCsv">${Icons.download}</button><button type="button" class="btn btn-outline-green btn-sm" aria-label="Alta de camada" title="Alta de camada" data-action="showCamadaForm">${Icons.plus}<span class="btn-text">Alta de camada</span></button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div></div>
-        <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
+        ${this._screenHead({
+          eyebrow: 'Gestión de animales',
+          title: 'Animales',
+          sub: 'Fichas, estados, grupos y acogidas. Los urgentes se muestran primero.',
+          pills: [
+            this._screenPill(this.animales.length, 'en total'),
+            this._screenPill(counts.disponible, 'disponibles', counts.disponible ? 'live' : ''),
+            this._screenPill(nUrgentes, 'urgentes', nUrgentes ? 'warn' : ''),
+            this._screenPill(counts.en_acogida, 'en acogida')
+          ]
+        })}
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} animales</span><div class="list-header-actions"><button type="button" class="btn-icon" title="Exportar a CSV" aria-label="Exportar animales a CSV" data-action="exportAnimalesCsv">${Icons.download}</button><button type="button" class="btn btn-outline-green btn-sm" aria-label="Alta de camada" title="Alta de camada" data-action="showCamadaForm">${Icons.plus}<span class="btn-text">Alta de camada</span></button><button type="button" class="btn btn-primary btn-sm" data-action="showAnimalForm">${Icons.plus} Nuevo</button></div></div>
+        <div class="filters-bar screen-toolbar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar animal por nombre, raza, especie o microchip" placeholder="Buscar por nombre, raza, especie o microchip..." value="${this._esc(this._currentAnimalSearch||'')}" data-input="onAnimalesSearchInput"></div><div class="filter-row">
           <select aria-label="Filtrar animales por estado" data-change="onAnimalEstadoFilterChange" data-cpass="el">
             <option value="all" ${filter==='all'?'selected':''}>Estado: Todos (${counts.all})</option>
             <option value="disponible" ${filter==='disponible'?'selected':''}>Disponibles (${counts.disponible})</option>
@@ -5472,8 +6046,18 @@ const Dashboard = {
     const counts = {all:this.familias.length, Libre:this.familias.filter(f=>capacidadDe(f)==='Libre').length, Ocupada:this.familias.filter(f=>capacidadDe(f)==='Ocupada').length};
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaForm">${Icons.plus} Nueva</button></div>
-      <div class="filters-bar"><div class="filter-row">
+        ${this._screenHead({
+          eyebrow: 'Acogidas',
+          title: 'Familias de acogida',
+          sub: 'Capacidad, especialidad y disponibilidad de cada familia colaboradora.',
+          pills: [
+            this._screenPill(counts.all, 'familias'),
+            this._screenPill(counts.Libre, 'libres', counts.Libre ? 'live' : ''),
+            this._screenPill(counts.Ocupada, 'ocupadas', counts.Ocupada ? 'warn' : '')
+          ]
+        })}
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${filtered.length} familias</span><button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaForm">${Icons.plus} Nueva</button></div>
+      <div class="filters-bar screen-toolbar"><div class="filter-row">
         <select aria-label="Filtrar familias de acogida" data-change="onFosterFilterChange" data-cpass="el">
           <option value="all" ${filter==='all'?'selected':''}>Todas (${counts.all})</option>
           <option value="Libre" ${filter==='Libre'?'selected':''}>Libres (${counts.Libre})</option>
@@ -5688,7 +6272,9 @@ const Dashboard = {
         ${!cerrada && c.fase === 'entrega' ? `<button type="button" class="btn btn-sm btn-outline-green" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${c.id}">${Icons.checkCircle} En casa</button>` : ''}
         ${!cerrada ? `<button type="button" class="btn btn-sm ${c.fase === 'en_casa' ? 'btn-primary' : 'btn-outline-green'}" data-action="showCerrarAcogidaForm" data-arg0="${c.id}">${Icons.check} Cerrar acogida</button>` : ''}
         <button type="button" class="btn btn-sm btn-outline-green" data-action="viewAcogida" data-arg0="${this._esc(c.id)}">${Icons.eye} Ver caso</button>
-        <button type="button" class="btn btn-sm btn-outline-green" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
+        <details class="action-menu"><summary class="btn btn-sm btn-outline-green" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+          <button type="button" class="btn btn-sm btn-outline-green" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${snapshot ? Icons.checkCircle : Icons.fileText} ${snapshot ? 'Contrato guardado' : 'Contrato de acogida'}</button>
+        </div></details>
         ${c.notas ? `<span class="acogida-card-nota">${this._esc(c.notas)}</span>` : ''}
       </div>
     </div>`;
@@ -5711,8 +6297,18 @@ const Dashboard = {
     const faseLabel = { entrega: 'Entrega', en_casa: 'En casa' };
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
-        <div class="filters-bar"><div class="filter-row">
+        ${this._screenHead({
+          eyebrow: 'Seguimiento',
+          title: 'Acogidas activas',
+          sub: 'Casos en curso, cierres y contratos de acogida.',
+          pills: [
+            this._screenPill(abiertas.length, 'en curso', abiertas.length ? 'live' : ''),
+            this._screenPill(cerradas.length, 'cerradas'),
+            this._screenPill(casos.length, 'casos en total')
+          ]
+        })}
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} casos</span><button type="button" class="btn btn-sm btn-outline-green" data-action="showTutorial">${Icons.helpCircle} Guia</button></div>
+        <div class="filters-bar screen-toolbar"><div class="filter-row">
           <select aria-label="Filtrar casos de acogida" data-change="onAcogidaFilterChange" data-cpass="el">
             <option value="abiertas" ${filtro==='abiertas'?'selected':''}>En curso (${abiertas.length})</option>
             <option value="cerradas" ${filtro==='cerradas'?'selected':''}>Cerradas (${cerradas.length})</option>
@@ -6319,9 +6915,20 @@ const Dashboard = {
       this._ensureListas(['contratos', 'animales'])
     ]);
     const fases = this._fasesAdopcion();
+    const adopcionados = this.adopciones.filter(p => p.fase === 'Entrega' || p.fase === 'Prueba' || p.fase === 'Seguimiento').length;
     el.innerHTML = `
       <div class="page-list-container">
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${this.adopciones.length} procesos</span><button type="button" class="btn btn-primary btn-sm" data-action="showAdopcionForm">${Icons.plus} Nueva</button></div>
+        ${this._screenHead({
+          eyebrow: 'Adopciones',
+          title: 'Procesos de adopción',
+          sub: 'Embudo completo: desde la solicitud hasta el seguimiento post-adopción.',
+          pills: [
+            this._screenPill(this.adopciones.length, 'procesos'),
+            this._screenPill(adopcionados, 'en entrega o seguimiento', adopcionados ? 'live' : ''),
+            this._screenPill(this.adopciones.length - adopcionados, 'en fases previas')
+          ]
+        })}
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${this.adopciones.length} procesos</span><button type="button" class="btn btn-primary btn-sm" data-action="showAdopcionForm">${Icons.plus} Nueva</button></div>
       <div class="card pipeline-card" style="margin-bottom:16px"><div class="card-body">
         <div class="pipeline" role="list" aria-label="Procesos por fase">${fases.map(f=>{
           const count = this.adopciones.filter(p=>p.fase===f).length;
@@ -8779,13 +9386,23 @@ const Dashboard = {
     if (qSocio) visibles = visibles.filter(s => [s.nombre, s.email, s.area, s.tipo].join(' ').toLowerCase().includes(qSocio));
     el.innerHTML = `
       <div class="page-list-container">
+        ${this._screenHead({
+          eyebrow: 'Personas',
+          title: 'Socios y voluntariado',
+          sub: 'Altas, cuotas, áreas de colaboración y horas de voluntariado.',
+          pills: [
+            this._screenPill(this.socios.length, 'personas'),
+            this._screenPill(activos, 'activas', activos ? 'live' : ''),
+            this._screenPill(this.socios.filter(esVol).length, 'voluntarias')
+          ]
+        })}
         <div class="stats-grid" style="margin-bottom:16px">
-          <div class="stat-card"><div class="stat-card-icon green">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Total Socios</div><div class="stat-card-value">${this.socios.length}</div></div></div>
-          <div class="stat-card"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div></div></div>
-          <div class="stat-card"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div></div></div>
+          <div class="stat-card screen-stat"><div class="stat-card-icon green">${Icons.users}</div><div class="stat-card-info"><div class="stat-card-label">Total Socios</div><div class="stat-card-value">${this.socios.length}</div><div class="stat-card-change">Altas registradas</div></div></div>
+          <div class="stat-card screen-stat screen-stat--blue"><div class="stat-card-icon blue">${Icons.checkCircle}</div><div class="stat-card-info"><div class="stat-card-label">Activos</div><div class="stat-card-value">${activos}</div><div class="stat-card-change">${this.socios.length - activos} inactivos</div></div></div>
+          <div class="stat-card screen-stat screen-stat--amber"><div class="stat-card-icon orange">${Icons.calendar}</div><div class="stat-card-info"><div class="stat-card-label">Areas</div><div class="stat-card-value">${areas.length}</div><div class="stat-card-change">Áreas con voluntariado</div></div></div>
         </div>
-        <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
-      <div class="filters-bar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
+        <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${visibles.length} registros</span><button type="button" class="btn btn-primary btn-sm" data-action="showSocioForm">${Icons.plus} Nuevo</button></div>
+      <div class="filters-bar screen-toolbar"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar por nombre, email o área" placeholder="Buscar por nombre, email o area..." value="${this._esc(this._currentSocioSearch||'')}" data-input="onSociosSearchInput"></div><div class="filter-row">
         <select aria-label="Filtrar por tipo de socio" data-change="onSocioTipoFilterChange" data-cpass="el">
           <option value="all" ${tipoF==='all'?'selected':''}>Todos (${this.socios.length})</option>
           <option value="Socio" ${tipoF==='Socio'?'selected':''}>Socios (${this.socios.filter(s=>s.tipo==='Socio'||s.tipo==='Ambos').length})</option>
@@ -8990,9 +9607,11 @@ const Dashboard = {
     this._showDetail('socios', s.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showSocioFormById" data-arg0="${s.id}">${Icons.pencil} Editar</button>
-        <button type="button" class="btn btn-danger btn-sm" data-action="deleteSocio" data-arg0="${s.id}">${Icons.trash} Eliminar</button>
         <button type="button" class="btn btn-sm ${s.activo?'btn-outline-green':'btn-primary'}" data-action="toggleSocio" data-arg0="${s.id}">${s.activo?'Desactivar':'Activar'}</button>
-        <button type="button" class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" data-action="showCarnet" data-arg0="${s.id}">${Icons.download} Ver Carnet</button>
+        <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+          <button type="button" class="btn btn-sm" style="background:var(--gray-900);color:var(--white)" data-action="showCarnet" data-arg0="${s.id}">${Icons.download} Ver Carnet</button>
+          <button type="button" class="btn btn-danger btn-sm" data-action="deleteSocio" data-arg0="${s.id}">${Icons.trash} Eliminar</button>
+        </div></details>
       </div>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
         ${fotoHero}
@@ -9142,10 +9761,20 @@ const Dashboard = {
     const tasaConversion = total ? Math.round(enProceso/total*100) : 0;
 
     el.innerHTML = `
+      ${this._screenHead({
+        eyebrow: 'Analítica',
+        title: 'Reportes y actividad',
+        sub: 'Resultados de adopción, solicitudes, memoria anual y registro de cambios.',
+        pills: [
+          this._screenPill(total, 'solicitudes activas'),
+          this._screenPill(adoptados, 'animales adoptados', adoptados ? 'live' : ''),
+          this._screenPill(sociosActivos, 'socios activos')
+        ]
+      })}
       <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Tasa de Adopcion</div><div class="stat-card-value">${tasaAdopcion}%</div><div class="stat-card-change">${adoptados} adoptados / ${this.animales.length} total</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon blue">${Icons.clipboard}</div><div class="stat-card-info"><div class="stat-card-label">Total Encuestas</div><div class="stat-card-value">${total}</div><div class="stat-card-change">${perros} perros · ${gatos} gatos · ${acogida} acogida</div></div></div>
-        <div class="stat-card"><div class="stat-card-icon orange">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Tasa de Conversion</div><div class="stat-card-value">${tasaConversion}%</div><div class="stat-card-change">${enProceso} en proceso de ${total}</div></div></div>
+        <div class="stat-card screen-stat"><div class="stat-card-icon green">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Tasa de Adopcion</div><div class="stat-card-value">${tasaAdopcion}%</div><div class="stat-card-change">${adoptados} adoptados / ${this.animales.length} total</div></div></div>
+        <div class="stat-card screen-stat screen-stat--blue"><div class="stat-card-icon blue">${Icons.clipboard}</div><div class="stat-card-info"><div class="stat-card-label">Total Encuestas</div><div class="stat-card-value">${total}</div><div class="stat-card-change">${perros} perros · ${gatos} gatos · ${acogida} acogida</div></div></div>
+        <div class="stat-card screen-stat screen-stat--amber"><div class="stat-card-icon orange">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Tasa de Conversion</div><div class="stat-card-value">${tasaConversion}%</div><div class="stat-card-change">${enProceso} en proceso de ${total}</div></div></div>
       </div>
       <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Resumen por Entidad</h3></div><div class="card-body">
         <div class="alert-item info">${Icons.dog} <span>${perros} encuestas perros</span></div>
@@ -9157,7 +9786,7 @@ const Dashboard = {
       </div></div>
       ${this._cardAnalitica()}
       <div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Memoria anual</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="filter-row">
+        <div class="filters-bar screen-toolbar" style="margin-bottom:12px"><div class="filter-row">
           <select id="mem-anio" data-change="_pintarMemoria">${this._memoriaAnios().map(y => `<option value="${y}" ${y === new Date().getFullYear() ? 'selected' : ''}>Ejercicio ${y}</option>`).join('')}</select>
           <button type="button" class="btn btn-primary btn-sm" data-action="exportMemoria">${Icons.download} Descargar memoria (PDF)</button>
         </div></div>
@@ -9172,7 +9801,7 @@ const Dashboard = {
         <div class="alert-item warning" style="cursor:pointer" role="button" tabindex="0" data-action="descartar2025">${Icons.alertTriangle} <span>Descartar todas las solicitudes de 2025 (${this._restantes2025().length} pendientes)</span></div>
       </div></div>
       <div class="card" style="margin-top:16px"><div class="card-header"><h3>Registro de actividad</h3></div><div class="card-body">
-        <div class="filters-bar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
+        <div class="filters-bar screen-toolbar" style="margin-bottom:12px"><div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar en el registro de actividad" placeholder="Buscar en el registro..." data-input="onActividadSearchInput"></div>
           <div class="filter-row">
             <select data-change="onActividadFilterChange" data-cpass="el" aria-label="Filtrar por tipo">
               <option value="">Todos los tipos</option>

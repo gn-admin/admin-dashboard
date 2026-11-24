@@ -24,13 +24,25 @@ async renderDonaciones(el) {
   }
   await this._loadList('donaciones', () => API.getDonaciones());
   const total = this._totalDonaciones(this.donaciones);
+  const mes = this._sumaMes(this.donaciones, d => d.fecha, d => d.importe);
   const items = (this.donaciones || []).slice().reverse();
   el.innerHTML = `
     <div class="page-list-container">
+      ${this._screenHead({
+        eyebrow: 'Finanzas',
+        title: 'Donaciones',
+        sub: 'Aportaciones puntuales y donaciones recurrentes de particulares y empresas.',
+        pills: [
+          this._screenPill(total.toFixed(2) + ' €', 'en total', 'live'),
+          this._screenPill(this.donaciones.length, 'donaciones'),
+          this._screenPill(mes.cur.toFixed(2) + ' €', 'este mes')
+        ]
+      })}
       <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones</div></div></div>
+        <div class="stat-card screen-stat"><div class="stat-card-icon green">${Icons.heart}</div><div class="stat-card-info"><div class="stat-card-label">Total donado</div><div class="stat-card-value">${total.toFixed(2)} €</div><div class="stat-card-change">${this.donaciones.length} donaciones registradas</div></div></div>
+        <div class="stat-card screen-stat screen-stat--blue"><div class="stat-card-icon blue">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Este mes</div><div class="stat-card-value">${mes.cur.toFixed(2)} €</div><div class="stat-card-change">${mes.prev.toFixed(2)} € el mes pasado</div></div></div>
       </div>
-      <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
+      <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
       <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Donante</th><th scope="col">Importe</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
     </div>
     <div class="page-detail-container"></div>`;
@@ -102,14 +114,26 @@ async renderAlmacen(el) {
   }
   await this._loadList('inventario', () => API.getInventario());
   const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
+  const bajo = items.filter(it => this._bajoStock(it)).length;
+  const unidades = items.reduce((n, it) => n + (parseFloat(it.cantidad) || 0), 0);
   el.innerHTML = `
     <div class="page-list-container">
+      ${this._screenHead({
+        eyebrow: 'Recursos',
+        title: 'Almacén',
+        sub: 'Pienso, medicación, limpieza y material de la asociación.',
+        pills: [
+          this._screenPill(items.length, 'artículos'),
+          this._screenPill(bajo, 'bajo mínimo', bajo ? 'warn' : 'live'),
+          this._screenPill(unidades, 'unidades')
+        ]
+      })}
       <div class="card" style="margin-bottom:16px"><div class="card-body" style="padding:16px">
         <div style="font-weight:700;margin-bottom:6px">${Icons.box} Que se guarda aqui</div>
         <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
         <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
       </div></div>
-      <div class="list-header"><span class="response-count" aria-live="polite" aria-atomic="true">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
+      <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
       <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Artículo</th><th scope="col">Stock</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td data-label="Artículo">${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td data-label="Stock"><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button> <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list"><button type="button" class="btn btn-outline-green btn-sm" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button><button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash} Eliminar</button></div></details></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
     </div>
     <div class="page-detail-container"></div>`;
