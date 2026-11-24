@@ -361,6 +361,16 @@ describe('armonía visual: cabeceras de pantalla y dashboard por rol', () => {
     assert.match(CSS, /\.modal-body\s*\{\s*overflow-x:\s*hidden/);
     assert.match(CSS, /\.modal-footer\s*\{[\s\S]{0,160}?flex-wrap:\s*wrap/);
   });
+
+  it('el relleno del modal vive en una sola regla por ancho y el formulario no depende del final de la hoja', () => {
+    // Escritorio y móvil: dos reglas, sin duplicados posteriores.
+    const conRelleno = (CSS_LIMPIO.match(/\.modal-body\s*\{[^}]*padding:/g) || []).length;
+    assert.equal(conRelleno, 2, 'reglas con relleno: ' + conRelleno);
+    // Selector compuesto (0,2,0): gana a `.modal-body` aunque vaya antes.
+    assert.match(CSS_LIMPIO, /\.modal-body\.modal-body--form\s*\{[\s\S]{0,120}?padding-bottom:\s*0/);
+    // Ni reglas sueltas de relleno inferior para el formulario.
+    assert.doesNotMatch(CSS_LIMPIO, /(^|})\s*\.modal-body--form\s*\{[\s\S]{0,40}?padding-bottom/);
+  });
 });
 
 describe('editor visual de descripciones HTML de Publicaciones', () => {
