@@ -351,7 +351,7 @@ npx --no-install serve src -l 8099 --no-clipboard
   - Deploy de `main` en verde (`pages.yml`, run `a4ef048`). Verificado en vivo: `sitemap.xml` (15 URLs), `robots.txt`, fichas (`laia`, `demo-nube`, `caso-externo-gate` lápida con `noindex,nofollow`), `data/publicaciones.json` recién generado (2026-11-24T21:37Z), `adopciones/` y `404` con `noindex`.
   - `main` tests: **72/72** en verde. Plan de fuente de datos (`docs/plan-fuente-datos-fake-endpoint.md`) cerrado salvo apadrinamiento (D2, decisión de backend abierta).
   - Formularios de `main` activos (`enabled: true`) y verificados end-to-end (EmailJS 200 + recepción confirmada).
-- **Queda (externo / no ejecutable desde aquí):**
-  - `P0-14` (`test-results/columnas.json`): requiere ejecutar `diagnosticoColumnasWeb` en el editor de GAS. El intento guardado (`columnas-intento-1.json`) demuestra que la hoja `WebPublicaciones`/`Animales` no existían en ese despliegue; hay que reejecutar tras confirmar el despliegue.
-  - `P0-07` (categoría `Caso externo`): requiere publicar una historia con esa categoría durante la pasada y retirarla al terminar.
-  - Configuración GAS: `CONTACTO_TELEFONO`, `DRIVE_WEB_FOLDER_ID`, `PUBLIC_WEB_BASE_URL`, `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`, `ROLES_USUARIOS`/`ADMIN_EMAILS`, MFA/App Check, dominio + Search Console, prueba de impresora real de contratos, numeración de páginas PDF, contrato de acogida por correo.
+- **Queda (externo / no ejecutable desde aquí, dado por bueno hasta definir dominio):**
+  - `P0-14` y `P0-07` se aceptan sin prueba final; se revalidarán cuando el dominio propio de `main` esté definido.
+  - Configuración GAS: `CONTACTO_TELEFONO`, `DRIVE_WEB_FOLDER_ID`, `PUBLIC_WEB_BASE_URL`, `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`, `ROLES_USUARIOS`/`ADMIN_EMAILS`, MFA/App Check, dominio + Search Console, prueba de impresora real de contratos, numeración de páginas PDF, contrato de acogida por correo, apadrinamiento (D2).
+  - Chatbot y formularios de `main` quedan implementados y desplegados (chat con auditoría 752f34f; formularios activos y verificados end-to-end).

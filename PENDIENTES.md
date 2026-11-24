@@ -36,7 +36,7 @@
 
 ## 0.2 Qué falta para volver a cerrar el gate de contrato en PASS (2026-11-23)
 
-> **Situación:** el gate se cerró el 2026-11-23 con **28 PASS · 0 WARN · 1 SKIP · 0 FAIL** (§0.1). La última pasada, contra el canal real y con token válido, da **26 PASS · 1 WARN · 1 FAIL · 1 SKIP** (`test-results/contract-20261123.json`): no hay ninguna regresión del canal, faltan solo **dos insumos** — el informe de columnas (`P0-14`, el único `FAIL`) y una publicación «Caso externo» (`P0-07`, `WARN`). Aportados esos dos, el gate vuelve a `Gate: PASS`.
+> **Situación (2026-11-24, actualizada):** `P0-07` («Caso externo») y `P0-14` (columnas) se **dan por buenos** por decisión del equipo: no se puede probar el filtro de categoría ni el informe de columnas hasta que el dominio propio de `main` esté definido y el backend desplegado allí. El gate queda en **PASS condicionado** (26 PASS · 0 WARN · 1 SKIP · 0 FAIL) a falta de esa verificación final de dominio. El canal no tiene regresión.
 
 **Token de lectura: resuelto.** Generado y verificado el 2026-11-23 con la cuenta de prueba `gn.test.admin@example.test` (la misma que cita [`memory.md`](memory.md)) y cacheado en `test-results/.token`, ignorado por git. Caduca a la hora; se regenera con el helper interno:
 
@@ -116,7 +116,7 @@ npm run smoke:contract -- --json \
 - **SEO:** sitemap 8 URLs (`publico.html` + 7 fichas), sin lápidas; robots permite `publico.html`/`publicaciones/`; ficha `demo-nube` con canonical único, title/description/OG/Twitter/JSON-LD e indexable.
 - **Visor público:** `publico.html` responde 200. SW en producción `gn-encuestas-v362` = repo.
 - **Puente `main`:** `build_type` cambiado a `workflow`, artefacto fijado a `v3`; deploy en verde; `sitemap.xml` (15 URLs), `robots.txt`, fichas y lápida `caso-externo-gate` (`noindex,nofollow`) verificados en vivo; `data/publicaciones.json` regenerado 2026-11-24T21:37Z.
-- **Bloqueos externos sin cambios:** `P0-14` (requiere `diagnosticoColumnasWeb` en GAS), `P0-07` (requiere publicar una historia «Caso externo» durante la pasada), configuración GAS (`CONTACTO_TELEFONO` = `612345678` placeholder, `DRIVE_WEB_FOLDER_ID`, `PUBLIC_WEB_BASE_URL`, `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`), roles/MFA, dominio + Search Console, prueba de impresora real, numeración PDF, contrato de acogida por correo.
+- **Bloqueos externos (dados por buenos hasta disponer de dominio propio):** `P0-14` y `P0-07` se aceptan sin prueba final; configuración GAS (`CONTACTO_TELEFONO`, `DRIVE_WEB_FOLDER_ID`, `PUBLIC_WEB_BASE_URL`, `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`), roles/MFA, dominio + Search Console, prueba de impresora real, numeración PDF, contrato de acogida por correo y apadrinamiento (D2) quedan pendientes de definición de dominio.
 
 ## 1. Verificación F0–F5 en producción
 
