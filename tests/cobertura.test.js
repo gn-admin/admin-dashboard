@@ -475,11 +475,9 @@ describe('_cardAnalitica: analitica de reportes', () => {
     assert.match(Dashboard._cardAnalitica(), /3 en total · 1 en curso · 2 cerrados/);
   });
 
-  it('computa horas solo de voluntarios y arma el top', () => {
+  it('cuenta voluntarios y activos', () => {
     const html = Dashboard._cardAnalitica();
-    assert.match(html, /<b>20\.5 h<\/b> de 2 voluntarios \(1 activos\)/);
-    assert.match(html, /Maria · 12 h/);
-    assert.doesNotMatch(html, /Ana · 40 h/);
+    assert.match(html, /<b>2<\/b> registrados \(1 activos\)/);
   });
 
   it('con datos vacios no rompe', () => {
@@ -488,7 +486,7 @@ describe('_cardAnalitica: analitica de reportes', () => {
     const html = Dashboard._cardAnalitica();
     assert.match(html, /Todavia sin casos finalizados/);
     assert.match(html, /0 en total/);
-    assert.match(html, /Sin horas registradas aun/);
+    assert.match(html, /Sin periodos registrados aun/);
   });
 });
 

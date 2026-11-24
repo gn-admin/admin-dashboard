@@ -3443,8 +3443,8 @@ const Dashboard = {
       ${this._guideStep(Icons.barChart, '6. Memoria anual', 'En <b>Reportes</b>, tarjeta <b>Memoria anual</b>: elige ejercicio y revisa adopciones, altas, donaciones, gastos, balance, socios y apadrinamientos.', 'Reportes', false)}
       ${this._guideStep(Icons.clipboard, '7. Almacén', 'Pantalla <b>Almacén</b>: <b>Nuevo</b> con nombre, unidad, cantidad y minimo. Los botones <b>+1/−1</b> descuentan al momento (compartido entre dispositivos). En rojo lo que esta bajo minimo. <b>Editar</b> corrige datos, la papelera elimina.', 'Almacén', false)}
       ${this._guideStep(Icons.clipboard, '8. Registro de actividad', 'La pantalla <b>Actividad</b> guarda una traza de los cambios importantes (estados, fases, contratos, voluntariado) con filtro y <b>exportacion CSV</b>.', 'Más > Registro de actividad', false)}
-      ${this._guideStep(Icons.users, '9. Horas de voluntariado', 'En la ficha de un socio <b>Voluntario</b> o <b>Ambos</b>, <b>Registrar horas</b> suma al mes y sella la ultima actividad; <b>Reiniciar mes</b> lo pone a cero. La lista de Socios muestra las horas/mes.', 'Socios > ficha', false)}
-      ${this._guideStep(Icons.barChart, '10. Analitica', 'En <b>Reportes</b>, la tarjeta de analitica resume respuestas por encuesta y estado, duracion media de acogidas y horas de voluntariado con el top del mes.', 'Reportes', false)}`;
+       ${this._guideStep(Icons.users, '9. Voluntariado', 'En la ficha de un socio <b>Voluntario</b> o <b>Ambos</b>, se registran las fechas de inicio y fin del voluntariado y las anotaciones. La lista de Socios muestra el periodo.', 'Socios > ficha', false)}
+      ${this._guideStep(Icons.barChart, '10. Analitica', 'En <b>Reportes</b>, la tarjeta de analitica resume respuestas por encuesta y estado, duracion media de acogidas y voluntariado con periodos registrados.', 'Reportes', false)}`;
   },
 
   _contratoEjemploHtml() {
@@ -3576,6 +3576,14 @@ const Dashboard = {
     body.innerHTML = html;
     this._initHtmlEditors(body);
     body.classList.add('modal-body--form');
+    // Sombra del pie sticky solo cuando hay contenido por encima (pie 'pegado').
+    if (!body._faScrollBound) {
+      body._faScrollBound = true;
+      body.addEventListener('scroll', () => {
+        const fa = body.querySelector('.form-actions');
+        if (fa) fa.classList.toggle('is-stuck', body.scrollTop > 0);
+      }, { passive: true });
+    }
     const opening = modal.style.display !== 'flex';
     if (opening) this._modalCaptureFocus('form-modal');
     if (opening) this._modalScrollLock(true);
@@ -9389,7 +9397,7 @@ const Dashboard = {
         ${this._screenHead({
           eyebrow: 'Personas',
           title: 'Socios y voluntariado',
-          sub: 'Altas, cuotas, áreas de colaboración y horas de voluntariado.',
+          sub: 'Altas, cuotas, áreas de colaboración y periodos de voluntariado.',
           pills: [
             this._screenPill(this.socios.length, 'personas'),
             this._screenPill(activos, 'activas', activos ? 'live' : ''),
@@ -9411,8 +9419,8 @@ const Dashboard = {
       </div></div>
       <div id="socios-form-container"></div>
       <div class="card"><div class="card-body-flush"><table class="data-table">
-        <thead><tr><th scope="col">Nombre</th><th scope="col">Email</th><th scope="col">Tipo</th><th scope="col">Area</th><th scope="col">Horas/mes</th><th scope="col">Estado</th></tr></thead>
-        <tbody>${visibles.length ? visibles.map(s=>`<tr role="button" tabindex="0" data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td data-label="Nombre">${this._esc(s.nombre)}</td><td data-label="Email">${this._esc(s.email)}</td><td data-label="Tipo"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td data-label="Área">${this._esc(s.area)||'—'}</td><td data-label="Horas/mes">${(esVol(s)?(s.horas_mes||0)+'h':'—')}</td><td data-label="Estado"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
+        <thead><tr><th scope="col">Nombre</th><th scope="col">Email</th><th scope="col">Tipo</th><th scope="col">Area</th><th scope="col">Voluntariado</th><th scope="col">Estado</th></tr></thead>
+        <tbody>${visibles.length ? visibles.map(s=>`<tr role="button" tabindex="0" data-action="viewSocio" data-arg0="${s.id}" style="cursor:pointer"><td data-label="Nombre">${this._esc(s.nombre)}</td><td data-label="Email">${this._esc(s.email)}</td><td data-label="Tipo"><span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span></td><td data-label="Área">${this._esc(s.area)||'—'}</td><td data-label="Voluntariado">${esVol(s) ? (s.voluntariado_inicio ? this._fmtFecha(s.voluntariado_inicio) + (s.voluntariado_fin ? ' → ' + this._fmtFecha(s.voluntariado_fin) : ' (en curso)') : 'sin inicio') : '—'}</td><td data-label="Estado"><span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span></td></tr>`).join('') : `<tr><td colspan="6" class="table-empty">Aun no hay socios registrados</td></tr>`}</tbody>
       </table></div></div>
       </div>
       <div class="page-detail-container"></div>`;
@@ -9466,15 +9474,17 @@ const Dashboard = {
     // Si el area guardada ya no esta en la lista (p. ej. «Cuidado de acogida»,
     // que paso a gestionarse en su propia pestana), se conserva como opcion
     // para no bloquear el guardado del registro existente.
-    const areasDisp = ['Paseos de perros', 'Socializacion de gatos', 'Transporte de animales', 'Eventos y captacion', 'Fotografia', 'Administracion'];
+    const areasDisp = ['Paseos de perros', 'Socializacion de gatos', 'Transporte de animales', 'Eventos y captacion', 'Fotografia', 'Administracion', 'Acogida de animales', 'Formacion', 'Veterinaria', 'Difusion y redes', 'Mantenimiento', 'Otros'];
     const areaActual = data?.area || '';
     const areaExtra = areaActual && areasDisp.indexOf(areaActual) === -1 ? `<option value="${this._esc(areaActual)}" selected>${this._esc(areaActual)}</option>` : '';
     this._renderForm('socios', `<div class="form-card" style="margin-bottom:16px"><h3>${isEdit?'Editar':'Nuevo'} Socio</h3><form data-submit="saveSocio" data-sarg0="${isEdit?'true':'false'}" data-sarg1="${data?.id||''}">
       <div class="form-group"><label for="so-foto">Foto del socio</label>${fotoPreview}<input type="file" id="so-foto" accept="image/*" data-change="_previewFoto" data-cpass="el" data-carg0="so-foto-preview"><div id="so-foto-preview"></div></div>
       <div class="form-row"><div class="form-group"><label for="so-nombre">Nombre *</label><input type="text" id="so-nombre" value="${this._esc(data?.nombre||'')}" required></div><div class="form-group"><label for="so-email">Email *</label><input type="email" id="so-email" value="${this._esc(data?.email||'')}" required></div></div>
       <div class="form-row"><div class="form-group"><label for="so-tipo">Tipo *</label><select id="so-tipo" required data-change="_toggleCuota"><option value="">Seleccionar...</option><option value="Socio" ${data?.tipo==='Socio'?'selected':''}>Solo socio (cuota)</option><option value="Voluntario" ${data?.tipo==='Voluntario'?'selected':''}>Solo voluntario (colabora)</option><option value="Ambos" ${data?.tipo==='Ambos'?'selected':''}>Ambos</option></select></div><div class="form-group" id="so-cuota-wrap" style="${(data?.tipo==='Socio'||data?.tipo==='Ambos')?'':'display:none'}"><label for="so-cuota">Cuota (€/año)</label><input type="text" id="so-cuota" value="${this._esc(data?.cuota||'')}" placeholder="Ej: 30"><label for="so-ultimo-pago" style="margin-top:8px">Ultimo pago</label><input type="date" id="so-ultimo-pago" value="${this._esc(data?.ultimo_pago||'')}"></div></div>
-      <div class="form-row"><div class="form-group"><label for="so-telefono">Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label for="so-area">Area *</label><select id="so-area" required><option value="">Seleccionar area...</option>${areaExtra}<option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label for="so-telefono">Telefono</label><input type="text" id="so-telefono" value="${this._esc(data?.telefono||'')}"></div><div class="form-group"><label for="so-area">Area *</label><select id="so-area" required><option value="">Seleccionar area...</option>${areaExtra}<option value="Paseos de perros" ${data?.area==='Paseos de perros'?'selected':''}>Paseos de perros</option><option value="Socializacion de gatos" ${data?.area==='Socializacion de gatos'?'selected':''}>Socializacion de gatos</option><option value="Transporte de animales" ${data?.area==='Transporte de animales'?'selected':''}>Transporte de animales</option><option value="Eventos y captacion" ${data?.area==='Eventos y captacion'?'selected':''}>Eventos y captacion</option><option value="Fotografia" ${data?.area==='Fotografia'?'selected':''}>Fotografia</option><option value="Administracion" ${data?.area==='Administracion'?'selected':''}>Administracion</option><option value="Acogida de animales" ${data?.area==='Acogida de animales'?'selected':''}>Acogida de animales</option><option value="Formacion" ${data?.area==='Formacion'?'selected':''}>Formacion</option><option value="Veterinaria" ${data?.area==='Veterinaria'?'selected':''}>Veterinaria</option><option value="Difusion y redes" ${data?.area==='Difusion y redes'?'selected':''}>Difusion y redes</option><option value="Mantenimiento" ${data?.area==='Mantenimiento'?'selected':''}>Mantenimiento</option><option value="Otros" ${data?.area==='Otros'?'selected':''}>Otros</option></select></div></div>
       ${data?.carnet_id ? `<div class="form-group"><label for="so-carnet-id">ID Carnet</label><input type="text" id="so-carnet-id" value="${this._esc(data.carnet_id)}" readonly style="background:var(--gray-100);font-family:monospace"></div>` : ''}
+      <div class="form-row"><div class="form-group"><label for="so-vol-inicio">Inicio voluntariado</label><input type="date" id="so-vol-inicio" value="${this._esc(data?.voluntariado_inicio||'')}"></div><div class="form-group"><label for="so-vol-fin">Fin voluntariado</label><input type="date" id="so-vol-fin" value="${this._esc(data?.voluntariado_fin||'')}"></div></div>
+      <div class="form-group"><label for="so-anotacion">Anotaciones</label><textarea id="so-anotacion" rows="3" placeholder="Notas sobre el voluntariado o el socio">${this._esc(data?.anotacion||data?.notas||'')}</textarea></div>
       <div class="form-actions"><button type="button" class="btn btn-outline-green" data-action="cancelForm" data-arg0="socios">Cancelar</button><button type="submit" class="btn btn-primary">Guardar</button></div>
     </form></div>`);
   },
@@ -9529,7 +9539,10 @@ const Dashboard = {
       tipo: document.getElementById('so-tipo').value,
       cuota: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-cuota').value.trim() : '',
       ultimo_pago: (document.getElementById('so-tipo').value === 'Socio' || document.getElementById('so-tipo').value === 'Ambos') ? document.getElementById('so-ultimo-pago').value : '',
-      area: document.getElementById('so-area').value
+      area: document.getElementById('so-area').value,
+      voluntariado_inicio: document.getElementById('so-vol-inicio')?.value || '',
+      voluntariado_fin: document.getElementById('so-vol-fin')?.value || '',
+      anotacion: (document.getElementById('so-anotacion')?.value || '').trim()
     };
     // Foto
     const fotoInput = document.getElementById('so-foto');
@@ -9552,13 +9565,19 @@ const Dashboard = {
       data.fecha_registro = new Date().toISOString().slice(0,10);
       data.horas_mes = 0;
       data.ultima_actividad = new Date().toISOString().slice(0,10);
+      data.voluntariado_inicio = data.voluntariado_inicio || '';
+      data.voluntariado_fin = data.voluntariado_fin || '';
+      data.anotacion = data.anotacion || '';
     } else {
       const existing = this._byId(this.socios, id);
       data.carnet_id = existing?.carnet_id || CarnetGenerator.generateCarnetId(data.area);
       data.activo = existing?.activo ?? true;
       data.fecha_registro = existing?.fecha_registro || new Date().toISOString().slice(0,10);
       data.horas_mes = existing?.horas_mes || 0;
-      data.ultima_actividad = existing?.ultima_actividad || new Date().toISOString().slice(0,10);
+      data.ultima_actividad = existing?.ultima_actividad || new Date().toISOString().slice(0, 10);
+      data.voluntariado_inicio = data.voluntariado_inicio || existing?.voluntariado_inicio || '';
+      data.voluntariado_fin = data.voluntariado_fin || existing?.voluntariado_fin || '';
+      data.anotacion = data.anotacion || existing?.anotacion || existing?.notas || '';
     }
     try {
       if (isEdit) {
@@ -9621,7 +9640,7 @@ const Dashboard = {
             <span class="estado-badge ${this._tipoBadgeCls(s.tipo)}">${this._esc(s.tipo||'—')}</span>
             <span class="estado-badge ${s.activo?'en_proceso':'descartada'}">${s.activo?'Activo':'Inactivo'}</span>
             ${cuotaEstado?`<span class="estado-badge ${cuotaEstado.cls}">${cuotaEstado.label}</span>`:''}
-            ${esVol?`<span class="estado-badge en_proceso">${s.horas_mes||0} h/mes</span>`:''}
+            ${esVol?`<span class="estado-badge en_proceso">Voluntario/a${s.voluntariado_inicio?` · desde ${this._esc(this._fmtFecha(s.voluntariado_inicio))}`:''}</span>`:''}
           </div>
           <div style="font-size:.82rem;color:var(--gray-500)">${this._esc(s.email||'')}${s.telefono?` &middot; ${this._esc(s.telefono)}`:''}</div>
         </div>
@@ -9637,10 +9656,10 @@ const Dashboard = {
             <div class="detail-field"><div class="detail-question">Fecha registro</div><div class="detail-answer">${this._esc(this._fmtFecha(s.fecha_registro))}</div></div>
             <div class="detail-field"><div class="detail-question">ID Carnet</div><div class="detail-answer" style="font-family:monospace;font-size:13px">${this._esc(s.carnet_id||'Sin generar')}</div></div>
       </div>
-      <div class="detail-section"><div class="detail-section-title">${Icons.activity} Actividad</div>
-        <div class="detail-field"><div class="detail-question">Horas este mes</div><div class="detail-answer">${s.horas_mes||0}h</div></div>
-        <div class="detail-field"><div class="detail-question">Ultima actividad</div><div class="detail-answer">${s.ultima_actividad ? this._fmtFecha(s.ultima_actividad) : 'Sin registro'}</div></div>
-        ${esVol ? `<div class="detail-field"><div class="detail-question">Registrar horas</div><div class="detail-answer"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="number" min="0" step="0.5" inputmode="decimal" id="hs-horas" class="form-input" style="max-width:120px;margin:0" placeholder="Ej: 2.5" aria-label="Horas a sumar"><button type="button" class="btn btn-primary btn-sm" data-action="registrarHoras" data-arg0="${s.id}">Sumar horas</button><button type="button" class="btn btn-outline-green btn-sm" data-action="reiniciarHorasMes" data-arg0="${s.id}">Reiniciar mes</button></div></div></div>` : ''}
+      <div class="detail-section"><div class="detail-section-title">${Icons.activity} Voluntariado</div>
+        <div class="detail-field"><div class="detail-question">Inicio</div><div class="detail-answer">${s.voluntariado_inicio ? this._fmtFecha(s.voluntariado_inicio) : '—'}</div></div>
+        <div class="detail-field"><div class="detail-question">Fin</div><div class="detail-answer">${s.voluntariado_fin ? this._fmtFecha(s.voluntariado_fin) : 'En curso'}</div></div>
+        <div class="detail-field"><div class="detail-question">Anotaciones</div><div class="detail-answer">${s.anotacion || s.notas ? this._esc(s.anotacion || s.notas) : '—'}</div></div>
       </div>
       ${this._apadrinaFicha(s.id)}`, detailKey);
   },
@@ -9651,52 +9670,6 @@ const Dashboard = {
     CarnetGenerator.showCarnetModal(s);
   },
 
-  // Horas de voluntariado: se suman sobre `horas_mes` (columna ya existente en
-  // la hoja Socios) y se sellan con `ultima_actividad`; dejan traza en el
-  // registro de actividad. Sin columnas nuevas -> funciona con el backend actual.
-  async registrarHoras(id) {
-    const busyKey = 'horas:' + id;
-    if (!this._busyStart(busyKey)) return;
-    try {
-    const s = this._byId(this.socios, id);
-    if (!s) return;
-    const input = document.getElementById('hs-horas');
-    const raw = String(input?.value || '').replace(',', '.').trim();
-    const v = Math.round((parseFloat(raw) || 0) * 10) / 10;
-    if (!v || v <= 0) { this.showSnackbar('Indica las horas a sumar', 'warning'); return; }
-    const total = Math.round(((parseFloat(s.horas_mes) || 0) + v) * 10) / 10;
-    const hoy = new Date().toISOString().slice(0, 10);
-    try { await API.updateSocio(id, { horas_mes: total, ultima_actividad: hoy }); }
-    catch (err) { this._snackErr(err, 'No se pudieron registrar las horas: ' + this._errMsg(err)); return; }
-    s.horas_mes = total;
-    s.ultima_actividad = hoy;
-    this._regLog('voluntariado', v + ' h de voluntariado de ' + s.nombre + ' (' + total + ' h este mes)', 'socio', s.id);
-    this.viewSocio(id);
-    this.showSnackbar('+' + v + ' h registradas a ' + s.nombre, 'success');
-  
-    } finally {
-      this._busyEnd(busyKey);
-    }
-  },
-
-  async reiniciarHorasMes(id) {
-    const busyKey = 'rein-horas:' + id;
-    if (!this._busyStart(busyKey)) return;
-    try {
-    const s = this._byId(this.socios, id);
-    if (!s) return;
-    if (!(await this._confirm('Poner a cero las horas de este mes de ' + s.nombre + '?', 'Reiniciar horas'))) return;
-    try { await API.updateSocio(id, { horas_mes: 0 }); }
-    catch (err) { this._snackErr(err, 'No se pudieron reiniciar las horas: ' + this._errMsg(err)); return; }
-    s.horas_mes = 0;
-    this._regLog('voluntariado', 'Horas del mes reiniciadas de ' + s.nombre, 'socio', s.id);
-    this.viewSocio(id);
-    this.showSnackbar('Contador de horas reiniciado', 'success');
-  
-    } finally {
-      this._busyEnd(busyKey);
-    }
-  },
 
   async toggleSocio(id) {
     const busyKey = 'tog-socio:' + id;
@@ -9877,16 +9850,12 @@ const Dashboard = {
     ].join('');
 
     const vols = (this.socios || []).filter(s => s.tipo === 'Voluntario' || s.tipo === 'Ambos');
-    const horasTotal = Math.round(vols.reduce((a, s) => a + (parseFloat(s.horas_mes) || 0), 0) * 10) / 10;
-    const top = vols
-      .filter(s => (parseFloat(s.horas_mes) || 0) > 0)
-      .sort((a, b) => (parseFloat(b.horas_mes) || 0) - (parseFloat(a.horas_mes) || 0))
-      .slice(0, 5);
+    const conPeriodo = vols.filter(s => s.voluntariado_inicio || s.voluntariado_fin).length;
     const volHtml = [
-      `<div class="detail-field"><div class="detail-question">Horas de voluntariado este mes</div><div class="detail-answer"><b>${horasTotal} h</b> de ${vols.length} voluntarios (${vols.filter(s => s.activo).length} activos)</div></div>`,
-      top.length
-        ? `<div class="detail-field"><div class="detail-question">Top del mes</div><div class="detail-answer">${top.map(s => `<span class="estado-badge en_proceso" style="margin:0 6px 6px 0">${this._esc(s.nombre)} · ${parseFloat(s.horas_mes) || 0} h</span>`).join('')}</div></div>`
-        : `<div class="detail-field"><div class="detail-question">Top del mes</div><div class="detail-answer"><span style="color:var(--gray-400)">Sin horas registradas aun. Se dan de alta en la ficha de cada voluntario.</span></div></div>`
+      `<div class="detail-field"><div class="detail-question">Voluntarios</div><div class="detail-answer"><b>${vols.length}</b> registrados (${vols.filter(s => s.activo).length} activos)</div></div>`,
+      conPeriodo
+        ? `<div class="detail-field"><div class="detail-question">Periodos</div><div class="detail-answer">${conPeriodo} con fechas de inicio/fin</div></div>`
+        : `<div class="detail-field"><div class="detail-question">Periodos</div><div class="detail-answer"><span style="color:var(--gray-400)">Sin periodos registrados aun. Se indican en la ficha de cada voluntario.</span></div></div>`
     ].join('');
 
     return `<div class="card" style="margin-bottom:16px"><div class="card-header"><h3>Analitica</h3></div><div class="card-body">

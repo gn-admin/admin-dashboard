@@ -5367,8 +5367,8 @@ select.form-input {
     -webkit-overflow-scrolling: touch;
   }
   .modal-body--form .form-actions {
-    margin: 16px -16px 0;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    margin: 16px calc(-1 * var(--modal-px, 16px)) 0;
+    padding: 12px var(--modal-px, 16px) calc(12px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -7190,7 +7190,9 @@ body {
 
 .modal-body {
   min-height: 0;
-  padding: 20px 22px;
+  /* Relleno horizontal compartido con el pie sticky (ver .modal-body--form .form-actions). */
+  --modal-px: 22px;
+  padding: 20px var(--modal-px);
   overscroll-behavior: contain;
 }
 
@@ -7221,21 +7223,53 @@ body {
 
 @media (max-width: 767px) {
   .modal-body {
+    --modal-px: 16px;
     padding: 16px;
   }
 }
 
-/* El pie es sticky en todos los anchos, pero en móvil, tablet y punteros
-   gruesos deja aire bajo el último control en vez de tocar el borde del modal. */
+/* El pie es sticky en todos los anchos y abarca todo el ancho del cuerpo:
+   el margen horizontal negativo usa --modal-px para no descolgarse del
+   relleno del cuerpo (antes eran -20px fijos frente a 22px/16px de padding).
+   El aire inferior (safe-area) va tambien en el pie, no en el cuerpo. */
 .modal-body--form .form-actions {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  margin: 20px -20px 0;
-  padding: 14px 20px;
+  margin: 20px calc(-1 * var(--modal-px, 20px)) 0;
+  padding: 14px var(--modal-px, 20px) calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1px solid var(--surface-border);
+  box-shadow: none;
+}
+
+/* Sombra solo cuando el pie esta pegado (hay contenido por encima). */
+.modal-body--form .form-actions.is-stuck {
   box-shadow: 0 -10px 24px -18px rgba(15, 23, 42, 0.38);
+}
+
+/* Evita que un campo con foco quede oculto bajo el pie sticky. */
+.modal-body--form .form-group,
+.modal-body--form .form-row,
+.modal-body--form .detail-section {
+  scroll-margin-bottom: 120px;
+}
+
+/* Impresion: el pie deja de ser sticky y el cuerpo recupera su relleno. */
+@media print {
+  .modal-box,
+  .modal-body {
+    max-height: none;
+    overflow: visible;
+  }
+  .modal-body--form .form-actions {
+    position: static;
+    margin: 20px 0 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
 }
 
 /* En táctil el pie sticky ocupa más (botones apilados y área segura). El
@@ -7483,8 +7517,8 @@ body {
   }
 
   .modal-body--form .form-actions {
-    margin: 20px -16px 0;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    margin: 20px calc(-1 * var(--modal-px, 16px)) 0;
+    padding: 12px var(--modal-px, 16px) calc(12px + env(safe-area-inset-bottom, 0px));
   }
 
   .form-actions {
