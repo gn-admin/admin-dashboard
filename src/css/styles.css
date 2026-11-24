@@ -9249,6 +9249,13 @@ a.dash-kpi:focus-visible, a.dash-action:focus-visible { outline: 2px solid var(-
 .modal-body {
   overflow-x: hidden;
 }
+
+/* Los formularios no llevan relleno inferior: el pie sticky va pegado al borde
+   y el aire lo pone el propio pie. Con relleno se cuela una franja del
+   contenido por debajo de Guardar/Cancelar. */
+.modal-body--form {
+  padding-bottom: 0;
+}
 .modal-footer {
   display: flex;
   flex-wrap: wrap;
