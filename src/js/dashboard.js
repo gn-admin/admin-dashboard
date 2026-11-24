@@ -284,6 +284,17 @@ const Dashboard = {
       socios: 'Cargando socios',
       reportes: 'Cargando reportes'
     }[page] || 'Cargando contenido';
+    if (page === 'web') {
+      return `<div class="page-skeleton" role="status" aria-label="${_skelLabel}">
+        <div>
+          <div class="skeleton-line skeleton-line--title"></div>
+          <div class="skeleton-line skeleton-line--sub"></div>
+        </div>
+        <div class="skeleton-toolbar" style="margin:12px 0 4px"><span class="skeleton-chip"></span><span class="skeleton-chip"></span><span class="skeleton-chip skeleton-chip--wide"></span></div>
+        <div class="skeleton-toolbar" style="margin:8px 0 16px"><span class="skeleton-chip"></span><span class="skeleton-chip"></span><span class="skeleton-chip"></span></div>
+        <div class="skeleton-grid">${Array.from({ length: 3 }, () => `<div class="skeleton-card"><div class="skeleton-line skeleton-line--short"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line--medium"></div></div>`).join('')}</div>
+      </div>`;
+    }
     if (page === 'dashboard') {
       return `<div class="page-skeleton" role="status" aria-label="${_skelLabel}">
         <div>
@@ -5343,8 +5354,10 @@ const Dashboard = {
       <div id="animal-web-estado" class="animal-web-estado" aria-live="polite"></div>
       <div class="detail-actions-wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showAnimalFormById" data-arg0="${a.id}">${Icons.pencil} Editar</button>
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${a.id}">${Icons.eye} Publicación web</button>
-        <button type="button" class="btn btn-danger btn-sm" data-action="deleteAnimal" data-arg0="${a.id}">${Icons.trash} Eliminar</button>
+        <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="abrirPublicacionWebAnimal" data-arg0="${a.id}">${Icons.eye} Publicación web</button>
+          <button type="button" class="btn btn-danger btn-sm" data-action="deleteAnimal" data-arg0="${a.id}">${Icons.trash} Eliminar</button>
+        </div></details>
       </div>
       <div class="detail-section detail-section--fields">
         <div class="detail-section-title">${Icons.paw} Datos del animal</div>
@@ -5568,7 +5581,7 @@ const Dashboard = {
     this._showDetail('acogidas', f.nombre, `
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button type="button" class="btn btn-primary btn-sm" data-action="showFamiliaFormById" data-arg0="${f.id}">${Icons.pencil} Editar</button>
-        <button type="button" class="btn btn-danger btn-sm" data-action="deleteFamilia" data-arg0="${f.id}">${Icons.trash} Eliminar</button>
+        <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list"><button type="button" class="btn btn-danger btn-sm" data-action="deleteFamilia" data-arg0="${f.id}">${Icons.trash} Eliminar</button></div></details>
       </div>
       <div class="detail-section detail-section--fields"><div class="detail-section-title">Informacion de la Familia</div>
         <div class="detail-field"><div class="detail-question">Nombre</div><div class="detail-answer">${this._esc(f.nombre)}</div></div>
@@ -5759,8 +5772,10 @@ const Dashboard = {
       <div class="detail-actions-wrap">
         ${!cerrada && c.fase === 'entrega' ? `<button type="button" class="btn btn-primary btn-sm" data-action="avanzarFaseAcogida" data-pass="el" data-arg0="${this._esc(c.id)}">${Icons.checkCircle} Marcar en casa</button>` : ''}
         ${!cerrada ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showCerrarAcogidaForm" data-arg0="${this._esc(c.id)}">${Icons.check} Cerrar acogida</button>` : ''}
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
-        ${a ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="openAnimalFicha" data-arg0="${this._esc(a.id)}">${Icons.paw} Ver ficha del animal</button>` : ''}
+        <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="showContratoAcogida" data-arg0="${this._esc(c.id)}">${guardado ? Icons.checkCircle : Icons.fileText} ${guardado ? 'Ver contrato' : 'Contrato de acogida'}</button>
+          ${a ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="openAnimalFicha" data-arg0="${this._esc(a.id)}">${Icons.paw} Ver ficha del animal</button>` : ''}
+        </div></details>
       </div>
       <div class="detail-section fase-stepper-card">
         <div class="fase-stepper-head">
@@ -6565,8 +6580,10 @@ const Dashboard = {
       <div class="detail-actions-wrap">
         ${!cerrado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showAdopcionFormById" data-arg0="${p.id}">${Icons.pencil} Editar</button>` : ''}
         ${avanceBtn}
-        ${currentIdx > 0 && !cerrado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showRetrocederFaseForm" data-arg0="${p.id}">${Icons.arrowLeft} Retroceder</button>` : ''}
-        ${faseTemprana && origenAccion ? origenAccion : ''}
+        ${(currentIdx > 0 && !cerrado) || (faseTemprana && origenAccion) ? `<details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+          ${currentIdx > 0 && !cerrado ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="showRetrocederFaseForm" data-arg0="${p.id}">${Icons.arrowLeft} Retroceder</button>` : ''}
+          ${faseTemprana && origenAccion ? origenAccion : ''}
+        </div></details>` : ''}
       </div>
       ${this._faseGuiaHtml(p, contrato)}
       ${this._faseStepperCardHtml(p, fases, currentIdx)}

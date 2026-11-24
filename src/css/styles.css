@@ -9034,3 +9034,27 @@ body.web-picker-abierto { overflow: hidden; }
 
 .web-lista { min-height: 0; }
 
+
+/* overflow-menu (Fase A UI/UX) */
+.action-menu { position: relative; display: inline-block; vertical-align: middle; }
+.action-menu > summary { list-style: none; cursor: pointer; user-select: none; min-width: 36px; min-height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; line-height: 1; }
+.action-menu > summary::-webkit-details-marker { display: none; }
+.action-menu > summary::marker { content: ''; }
+.action-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 40; min-width: 200px; max-width: min(92vw, 320px); display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--white, #fff); border: 1px solid var(--gray-200, #e2e8f0); border-radius: var(--radius, 8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.action-menu:not([open]) .action-menu-list { display: none; }
+.action-menu-list .btn, .action-menu-list a.btn { width: 100%; justify-content: flex-start; white-space: nowrap; }
+@media (max-width: 767px) {
+  .action-menu > summary { min-height: 44px; min-width: 44px; }
+  .action-menu-list { right: auto; left: 0; }
+}
+
+/* overflow-menu mobile tap targets */
+@media (max-width: 767px) {
+  .action-menu-list .btn,
+  .action-menu-list a.btn {
+    min-height: 44px;
+  }
+  .action-menu-list {
+    max-width: calc(100vw - 24px);
+  }
+}

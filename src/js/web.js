@@ -28,6 +28,7 @@ const Web = {
   _ultimoPreview: null,
   _mediaIgnorados: 0,
   _deployEstado: null,
+  _secundarioCargado: false,
 
   // ==================== LÓGICA PURA ====================
 
@@ -269,10 +270,63 @@ const Web = {
       return;
     }
     el.innerHTML = (typeof Dashboard !== 'undefined' && Dashboard._pageSkeleton) ? Dashboard._pageSkeleton('web') : '';
-    await this.cargar();
+    // Primer pintado: solo lo que necesita la pestaña inicial (Animales) y el
+    // resumen. Grupos y eventos se cargan después, en segundo plano, para no
+    // bloquear la primera pintura con las cuatro llamadas en paralelo.
+    await this.cargarEsencial();
     el.innerHTML = this._html();
     if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
     this._cargarEstadoDeploy();
+    if (!this.error) {
+      this.cargarSecundario().then((ok) => {
+        if (!ok) return;
+        const cont = document.getElementById('page-web');
+        if (!cont) return;
+        this._actualizarContadoresTabs();
+        if (this.tab !== 'animal') {
+          const listado = document.getElementById('web-listado');
+          if (listado) listado.innerHTML = this._tabla();
+          if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+        }
+      }).catch(() => {});
+    }
+  },
+
+  async cargarEsencial() {
+    this.error = '';
+    this.grupos = [];
+    this.eventos = [];
+    this._secundarioCargado = false;
+    try {
+      const [resumen, animales] = await Promise.all([
+        API.getWebResumen(),
+        API.getWebAnimales({ pageSize: 200 })
+      ]);
+      this.resumen = resumen.data || null;
+      this.animales = animales.data || [];
+    } catch (err) {
+      this.error = (typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : String((err && err.message) || err);
+      this.animales = [];
+      this.resumen = null;
+      this.grupos = [];
+      this.eventos = [];
+      this._secundarioCargado = false;
+    }
+  },
+
+  async cargarSecundario() {
+    try {
+      const [eventos, grupos] = await Promise.all([
+        API.getWebEventos(),
+        typeof API.getWebGrupos === 'function' ? API.getWebGrupos({}) : Promise.resolve({ data: [] })
+      ]);
+      this.eventos = eventos.data || [];
+      this.grupos = (grupos && grupos.data) ? grupos.data : (Array.isArray(grupos) ? grupos : []);
+      this._secundarioCargado = true;
+      return true;
+    } catch (err) {
+      return false;
+    }
   },
 
   async cargar() {
@@ -288,6 +342,7 @@ const Web = {
       this.animales = animales.data || [];
       this.eventos = eventos.data || [];
       this.grupos = (grupos && grupos.data) ? grupos.data : (Array.isArray(grupos) ? grupos : []);
+      this._secundarioCargado = true;
     } catch (err) {
       this.error = (typeof Dashboard !== 'undefined' && Dashboard._errMsg) ? Dashboard._errMsg(err) : String((err && err.message) || err);
       this.animales = [];
@@ -514,19 +569,24 @@ const Web = {
           ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirAnimalWeb" data-arg0="${this._esc(a.animal_id)}">${Icons.pencil} ${a.publicacion_id ? 'Editar' : 'Configurar'}</button>
-        ${a.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}">${Icons.eye} Preview</button>` : ''}
-        ${a.estado_publicacion === 'publicado' && a.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(a.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(a.slug)}" data-arg1="${this._esc(a.nombre || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
         ${a.publicacion_id
           ? (a.estado_publicacion === 'publicado'
             ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="oculto">Ocultar</button>`
             : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}" data-arg2="publicado">Publicar</button>`)
           : ''}
-        ${a.publicacion_id && a.estado_publicacion !== 'publicado'
-          ? `<button type="button" class="btn btn-danger btn-sm" data-action="retirarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}" title="Retirar (410): el enlace pasa a lápida y el slug queda reservado">${Icons.trash} Retirar</button>` : ''}
-        ${a.publicacion_id && a.estado_publicacion !== 'publicado'
-          ? `<button type="button" class="btn btn-danger btn-sm" data-action="eliminarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}" title="Eliminar publicación web (solo configuración, la ficha del animal no se modifica)">${Icons.trash} Eliminar borrador</button>`
-          : ''}`}
+        <details class="action-menu">
+          <summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary>
+          <div class="action-menu-list">
+            ${a.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="animal" data-arg1="${this._esc(a.animal_id)}">${Icons.eye} Preview</button>` : ''}
+            ${a.estado_publicacion === 'publicado' && a.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(a.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(a.slug)}" data-arg1="${this._esc(a.nombre || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
+            ${a.publicacion_id && a.estado_publicacion !== 'publicado'
+              ? `<button type="button" class="btn btn-danger btn-sm" data-action="retirarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}" title="Retirar (410): el enlace pasa a lápida y el slug queda reservado">${Icons.trash} Retirar</button>` : ''}
+            ${a.publicacion_id && a.estado_publicacion !== 'publicado'
+              ? `<button type="button" class="btn btn-danger btn-sm" data-action="eliminarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}" title="Eliminar publicación web (solo configuración, la ficha del animal no se modifica)">${Icons.trash} Eliminar borrador</button>`
+              : ''}
+          </div>
+        </details>`}
       </td>
     </tr>`;
   },
@@ -544,13 +604,18 @@ const Web = {
           ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebEvento" data-arg0="${this._esc(e.id)}" data-arg1="${this._esc(e.titulo || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
-        ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(e.slug)}" data-arg1="${this._esc(e.titulo || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
         ${e.estado_publicacion === 'publicado'
           ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="oculto">Ocultar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstadoWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}" data-arg2="publicado">Publicar</button>`}
-        <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>`}
+        <details class="action-menu">
+          <summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary>
+          <div class="action-menu-list">
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="previewWeb" data-arg0="evento" data-arg1="${this._esc(e.id)}">${Icons.eye} Preview</button>
+            ${e.estado_publicacion === 'publicado' && e.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(e.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(e.slug)}" data-arg1="${this._esc(e.titulo || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
+            <button type="button" class="btn btn-danger btn-sm" data-action="archivarWeb" data-arg0="${this._esc(e.id)}" aria-label="Retirar ${this._esc(e.titulo || 'publicación')}" title="Retirar (410)">${Icons.trash}</button>
+          </div>
+        </details>`}
       </td>
     </tr>`;
   },
@@ -574,19 +639,24 @@ const Web = {
           ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirGrupoWeb" data-arg0="${this._esc(g.grupo_id)}">${Icons.pencil} ${g.publicacion_id ? 'Editar' : 'Configurar'}</button>
-        ${g.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWebGrupo" data-arg0="${this._esc(g.grupo_id)}">${Icons.eye} Preview</button>` : ''}
-        ${publicado && g.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
-        <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(g.slug)}" data-arg1="${this._esc(g.nombre || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
         ${g.publicacion_id
           ? (publicado
             ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="ocultarWebGrupo" data-arg0="${this._esc(g.grupo_id)}">Ocultar</button>`
             : `<button type="button" class="btn btn-primary btn-sm" data-action="publicarWebGrupo" data-arg0="${this._esc(g.grupo_id)}">Publicar</button>`)
           : ''}
-        ${g.publicacion_id && !publicado
-          ? `<button type="button" class="btn btn-danger btn-sm" data-action="retirarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}" title="Retirar (410): el enlace pasa a lápida y el slug queda reservado">${Icons.trash} Retirar</button>` : ''}
-        ${g.publicacion_id && !publicado && !retirado
-          ? `<button type="button" class="btn btn-danger btn-sm" data-action="eliminarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}" title="Eliminar la publicación web del grupo (los animales y sus fichas no se modifican)">${Icons.trash} Eliminar borrador</button>`
-          : ''}`}
+        <details class="action-menu">
+          <summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary>
+          <div class="action-menu-list">
+            ${g.publicacion_id ? `<button type="button" class="btn btn-outline-green btn-sm" data-action="previewWebGrupo" data-arg0="${this._esc(g.grupo_id)}">${Icons.eye} Preview</button>` : ''}
+            ${publicado && g.slug ? `<a class="btn btn-outline-green btn-sm" href="publico.html#/publicacion/${encodeURIComponent(g.slug)}" target="_blank" rel="noopener">${Icons.eye} Ver ficha</a>
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="copiarEnlaceWeb" data-arg0="${this._esc(g.slug)}" data-arg1="${this._esc(g.nombre || '')}" title="Copiar el enlace de la página estática canónica">${Icons.clipboard} Copiar enlace</button>` : ''}
+            ${g.publicacion_id && !publicado
+              ? `<button type="button" class="btn btn-danger btn-sm" data-action="retirarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}" title="Retirar (410): el enlace pasa a lápida y el slug queda reservado">${Icons.trash} Retirar</button>` : ''}
+            ${g.publicacion_id && !publicado && !retirado
+              ? `<button type="button" class="btn btn-danger btn-sm" data-action="eliminarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}" title="Eliminar la publicación web del grupo (los animales y sus fichas no se modifican)">${Icons.trash} Eliminar borrador</button>`
+              : ''}
+          </div>
+        </details>`}
       </td>
     </tr>`;
   },
@@ -648,11 +718,32 @@ const Web = {
   cambiarTab(tab) {
     this.tab = (tab === 'evento' || tab === 'grupo') ? tab : 'animal';
     this._filtros.estado = '';
-    const el = document.getElementById('page-web');
-    if (el) el.innerHTML = this._html();
-    if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
-    const activo = document.getElementById('web-tab-' + this.tab);
-    if (activo && typeof activo.focus === 'function') activo.focus();
+    const finish = () => {
+      const el = document.getElementById('page-web');
+      if (el) el.innerHTML = this._html();
+      if (typeof Dashboard !== 'undefined' && Dashboard.injectIcons) Dashboard.injectIcons();
+      const activo = document.getElementById('web-tab-' + this.tab);
+      if (activo && typeof activo.focus === 'function') activo.focus();
+    };
+    if (!this._secundarioCargado && (this.tab === 'grupo' || this.tab === 'evento')) {
+      this.cargarSecundario().then(finish);
+    } else {
+      finish();
+    }
+  },
+
+  _actualizarContadoresTabs() {
+    const c = this._contadoresTab();
+    const mapa = { animal: c.animal.total, grupo: c.grupo.total, evento: c.evento.total };
+    Object.keys(mapa).forEach((k) => {
+      const btn = document.getElementById('web-tab-' + k);
+      if (!btn) return;
+      const total = mapa[k];
+      const count = btn.querySelector('.web-tab-count');
+      if (count) count.textContent = total;
+      const sr = btn.querySelector('.sr-only');
+      if (sr) sr.textContent = `, ${total} ${total === 1 ? 'publicación' : 'publicaciones'}`;
+    });
   },
 
   buscar(q) {
@@ -2241,3 +2332,94 @@ const Web = {
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Web;
+
+// Menús de acción (overflow menu): cierre al hacer clic fuera o al ejecutar una
+// acción/enlace, y posición acotada al viewport para que no se salgan en móvil.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  const MARGEN_MENU = 8;
+
+  // Un ancestro con transformación, contención o `content-visibility` fija el
+  // `position: fixed`; hay que descontar su origen para acertar en el viewport.
+  const contenedorFijo = (el) => {
+    let p = el.parentElement;
+    while (p && p !== document.documentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.transform !== 'none' || cs.translate !== 'none' || cs.rotate !== 'none' || cs.scale !== 'none' ||
+          cs.perspective !== 'none' || cs.filter !== 'none' || cs.backdropFilter !== 'none' ||
+          cs.willChange !== 'auto' || cs.contain !== 'none' || cs.contentVisibility !== 'visible' ||
+          cs.containerType !== 'normal') {
+        return p;
+      }
+      p = p.parentElement;
+    }
+    return null;
+  };
+
+  const posicionarMenu = (menu) => {
+    const lista = menu.querySelector('.action-menu-list');
+    if (!lista) return;
+    const r = menu.getBoundingClientRect();
+    // Medir ya en modo `fixed` para que el ancho no cambie al recolocar.
+    lista.style.position = 'fixed';
+    lista.style.right = 'auto';
+    lista.style.left = '0px';
+    lista.style.top = '0px';
+    const ancho = lista.offsetWidth;
+    const alto = lista.offsetHeight;
+    const maxIzq = Math.max(MARGEN_MENU, window.innerWidth - ancho - MARGEN_MENU);
+    const izq = Math.min(Math.max(r.left, MARGEN_MENU), maxIzq);
+    let arriba = r.bottom + 4;
+    if (arriba + alto > window.innerHeight - MARGEN_MENU) {
+      arriba = Math.max(MARGEN_MENU, r.top - alto - 4);
+    }
+    const base = contenedorFijo(menu);
+    const origen = base ? base.getBoundingClientRect() : { left: 0, top: 0 };
+    lista.style.left = (izq - origen.left) + 'px';
+    lista.style.top = (arriba - origen.top) + 'px';
+  };
+
+  const limpiarMenu = (menu) => {
+    const lista = menu.querySelector('.action-menu-list');
+    if (!lista) return;
+    lista.style.position = '';
+    lista.style.right = '';
+    lista.style.left = '';
+    lista.style.top = '';
+  };
+
+  document.addEventListener('toggle', (e) => {
+    const menu = e.target;
+    if (!menu || !menu.matches || !menu.matches('details.action-menu')) return;
+    if (menu.open) posicionarMenu(menu); else limpiarMenu(menu);
+  }, true);
+
+  document.addEventListener('click', (e) => {
+    const openMenus = document.querySelectorAll('details.action-menu[open]');
+    openMenus.forEach((m) => {
+      const list = m.querySelector('.action-menu-list');
+      const insideList = !!(list && e.target && list.contains(e.target));
+      // Fuera del menú: cierra. Dentro de la lista (botón o enlace): cierra tras la acción.
+      if (!m.contains(e.target) || insideList) m.removeAttribute('open');
+    });
+  });
+
+  // Si la página o la tabla se desplazan, el menú abierto sigue a su botón;
+  // se cierra solo cuando el botón sale del viewport.
+  let rafScroll = 0;
+  document.addEventListener('scroll', () => {
+    if (rafScroll) return;
+    rafScroll = requestAnimationFrame(() => {
+      rafScroll = 0;
+      document.querySelectorAll('details.action-menu[open]').forEach((m) => {
+        const r = m.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) m.removeAttribute('open');
+        else posicionarMenu(m);
+      });
+    });
+  }, true);
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('details.action-menu[open]').forEach((m) => {
+      if (m.open) posicionarMenu(m);
+    });
+  });
+}
