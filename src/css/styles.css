@@ -1513,6 +1513,14 @@ body {
   .list-header-actions {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  /* «Alta de camada» pasa a icono: tres botones con texto no caben en 390 px
+     y el icono CSV quedaba suelto en otra fila. El nombre accesible viene del
+     aria-label del botón. */
+  .list-header-actions .btn-text {
+    display: none;
   }
 }
 
