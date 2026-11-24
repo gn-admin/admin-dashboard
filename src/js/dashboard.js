@@ -274,8 +274,18 @@ const Dashboard = {
   // Esqueleto contextual mientras llega la primera respuesta. Mantiene la
   // sensacion de avance (en vez de una pantalla vacia) y reserva el layout.
   _pageSkeleton(page) {
+    const _skelLabel = {
+      dashboard: 'Cargando dashboard',
+      animales: 'Cargando animales',
+      acogidas: 'Cargando familias de acogida',
+      'acogidas-activas': 'Cargando acogidas activas',
+      adopciones: 'Cargando adopciones',
+      web: 'Cargando publicaciones',
+      socios: 'Cargando socios',
+      reportes: 'Cargando reportes'
+    }[page] || 'Cargando contenido';
     if (page === 'dashboard') {
-      return `<div class="page-skeleton" role="status" aria-label="Cargando dashboard">
+      return `<div class="page-skeleton" role="status" aria-label="${_skelLabel}">
         <div>
           <div class="skeleton-line skeleton-line--title"></div>
           <div class="skeleton-line skeleton-line--sub"></div>
@@ -291,7 +301,7 @@ const Dashboard = {
       </div>`;
     }
     const cards = 3;
-    return `<div class="page-skeleton" role="status" aria-label="Cargando contenido">
+    return `<div class="page-skeleton" role="status" aria-label="${_skelLabel}">
       <div class="skeleton-line skeleton-line--title"></div>
       <div class="skeleton-line skeleton-line--sub"></div>
       <div class="skeleton-toolbar"><span class="skeleton-chip"></span><span class="skeleton-chip"></span><span class="skeleton-chip skeleton-chip--wide"></span></div>
