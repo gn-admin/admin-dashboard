@@ -1,7 +1,7 @@
 # Pendientes — Grupo Nebak (admin-dashboard y `main`)
 
 > **Documento único de trabajo pendiente.** Lo entregado y verificado está en [`memory.md`](memory.md); el contrato del canal y del gestor, en [`GESTOR_WEB_PLAN_Y_ENDPOINTS.md`](GESTOR_WEB_PLAN_Y_ENDPOINTS.md).
-> **Última actualización:** 2026-11-23.
+> **Última actualización:** 2026-11-24.
 > **Contenido íntegro, sin resumir:** las secciones 1, 2, 3, 4 y 7 reproducen completos `CHECKLIST_PRODUCCION_F0_F5.md`, `PLAN_SEGURIDAD.md` + `PRUEBAS_POR_ROL_D6.md`, `REQUISITOS_WEB_CANAL_PUBLICO.md`, `TRANSFERIR_A_MAIN.md` y `MEJORAS_UI_UX_PENDIENTES.md`. La sección 5 conserva el estado operativo completo de contratos y la 6 las decisiones abiertas. Los `[x]` se mantienen como contexto verificado; los `[ ]` son el trabajo pendiente.
 > **Sin secretos:** URLs de ejecución, tokens, IDs de hojas y claves viven en `.internal-docs/` o en el entorno, nunca aquí.
 
@@ -104,6 +104,19 @@ npm run smoke:contract -- --json \
 - `--expected-version` cierra `P0-13b`; la versión desplegada observada el 2026-11-23 es `2026-11-15.7`. Sin ella el gate emite un `WARN` informativo con la versión que encuentra.
 - Pasada de referencia con token, `--expected-version "2026-11-15.7"` y `--retired-slug demo-lua` (sin columnas ni «Caso externo»): **26 PASS · 1 WARN (`P0-07`) · 1 FAIL (`P0-14`) · 1 SKIP (`P0-09b`)**; evidencia `test-results/contract-20261123.json`. Con los dos insumos pendientes, el resultado esperado es `Gate: PASS`.
 - Con token y columnas la pasada da 27–29 comprobaciones: el número varía con el muestreo por tipo del listado.
+
+## 0.3 Verificación de contrato en producción (2026-11-24)
+
+> Pasada de solo lectura contra `https://gn-admin.github.io/admin-dashboard/` y el canal real. Resultado: **los únicos bloqueos abiertos siguen siendo `P0-14` (columnas) y `P0-07` (Caso externo)**; el resto del contrato se verificó en vivo.
+
+- **Canal:** 7 publicaciones (4 animales, 1 grupo, 1 evento, 1 historia); sin borradores/ocultos/retirados ni `ficha` en el listado; sin campos internos (`microchip`, `origen_id`, `apadrinable`, `estado`, `datos_json`); `urgent` booleano.
+- **Detalle:** las 7 fichas sin fugas; bloque `animal`/`group` presente.
+- **Taxonomías/retiradas/redirects:** `taxonomias` (4 tipos, 4 categorías, 5 estados, 2 especies), `retiradas` (6 slugs), `redirects` (0) responden `success`.
+- **Sponsor/featured:** `sponsor=1/0` disjuntos y cubren el listado (4/7 con `sponsor`); `featured=1/0` coherente (1 destacada).
+- **SEO:** sitemap 8 URLs (`publico.html` + 7 fichas), sin lápidas; robots permite `publico.html`/`publicaciones/`; ficha `demo-nube` con canonical único, title/description/OG/Twitter/JSON-LD e indexable.
+- **Visor público:** `publico.html` responde 200. SW en producción `gn-encuestas-v362` = repo.
+- **Puente `main`:** `build_type` cambiado a `workflow`, artefacto fijado a `v3`; deploy en verde; `sitemap.xml` (15 URLs), `robots.txt`, fichas y lápida `caso-externo-gate` (`noindex,nofollow`) verificados en vivo; `data/publicaciones.json` regenerado 2026-11-24T21:37Z.
+- **Bloqueos externos sin cambios:** `P0-14` (requiere `diagnosticoColumnasWeb` en GAS), `P0-07` (requiere publicar una historia «Caso externo» durante la pasada), configuración GAS (`CONTACTO_TELEFONO` = `612345678` placeholder, `DRIVE_WEB_FOLDER_ID`, `PUBLIC_WEB_BASE_URL`, `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN`), roles/MFA, dominio + Search Console, prueba de impresora real, numeración PDF, contrato de acogida por correo.
 
 ## 1. Verificación F0–F5 en producción
 
@@ -1100,7 +1113,7 @@ No hay que tocar renderizadores: `js/publicaciones-api.js` ya traduce el envelop
 ## 4. Port y formularios en `main`
 
 > **Origen:** `TRANSFERIR_A_MAIN.md` (retirado el 2026-11-23). Texto completo, sin resumir.
-> **Estado actual:** M1–M4 y M6 ejecutados y verificados en `main`; el lote `.gs` ya está desplegado. De M5 sigue pendiente configurar `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN` y verificar el disparo E2E. El plan siguiente es el documento íntegro.
+> **Estado actual (2026-11-24):** M1–M4, M6 ejecutados y verificados en `main`; despliegue por Actions operativo (`build_type=workflow`, sitemap/robots/fichas publicados en vivo); formularios activos y verificados end-to-end. De M5 sigue pendiente configurar `GITHUB_DEPLOY_REPO_MAIN`/`GITHUB_DEPLOY_WORKFLOW_MAIN` en GAS y verificar el disparo E2E. El plan siguiente es el documento íntegro.
 
 **Además del plan (operativo, 2026-11-23):**
 
@@ -1361,12 +1374,12 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 
 ##### A.6 Checklist de aceptación (eq. validación en simulación)
 
-- [ ] Listado con contador/filtros/búsqueda/paginación y estados (sin resultados, canal sin configurar, error con reintento).
-- [ ] Fichas `animal`/`evento`/`historia` correctas (datos, galería, vídeo, bloques, CTA).
-- [ ] Metas, OG/Twitter, canonical condicional y JSON-LD correctos; sin JSON-LD en 404/error/retirada.
-- [ ] 404 con `noindex,nofollow` y enlace al listado; slug histórico redirige/muestra ficha vigente.
-- [ ] Retiradas `noindex,nofollow` (y 410 si posible), fuera de sitemap.
-- [ ] `sitemap.xml` y `robots.txt` físicos en raíz, válidos.
+- [x] Listado con contador/filtros/búsqueda/paginación y estados (sin resultados, canal sin configurar, error con reintento) — verificado en vivo en `main` 2026-11-24.
+- [x] Fichas `animal`/`evento`/`historia` correctas (datos, galería, vídeo, bloques, CTA) — verificado en vivo en `main` 2026-11-24 (`demo-nube`, `laia`, lápida `caso-externo-gate`).
+- [x] Metas, OG/Twitter, canonical condicional y JSON-LD correctos; sin JSON-LD en 404/error/retirada — verificado en vivo 2026-11-24.
+- [x] 404 con `noindex,nofollow` y enlace al listado; slug histórico redirige/muestra ficha vigente — 404 verificado.
+- [x] Retiradas `noindex,nofollow` (y 410 si posible), fuera de sitemap — lápida `caso-externo-gate` verificada.
+- [x] `sitemap.xml` y `robots.txt` físicos en raíz, válidos — verificados 2026-11-24.
 - [ ] Redirects 301 activos desde mapa.
 - [ ] Sin desbordes 360/1280 px; labels/`alt`/roles básicos.
 - [ ] Fallback correcto sin `ficha`; con `ficha` respeta bloques/plantilla sin romper fichas antiguas.
@@ -1420,11 +1433,11 @@ export function crearCanal({ baseUrl, dominio = '' }) {
 
 ##### A.5 Checklist de aceptación (EmailJS)
 
-- [ ] reCAPTCHA v3 genera token en submit (`action:"form_submit"`).
-- [ ] EmailJS envía email con plantilla correcta según `form_type`.
-- [ ] Usuario recibe acuse de recibo.
-- [ ] CSP permite dominios de EmailJS y reCAPTCHA sin errores de consola.
-- [ ] Formulario accesible y con consentimiento de privacidad.
+- [x] reCAPTCHA v2 invisible genera token en submit y EmailJS lo valida (`action` implícito).
+- [x] EmailJS envía email con plantilla correcta según `form_type` (verificado 2026-11-23, 2 envíos reales aceptados).
+- [x] Usuario recibe acuse de recibo (recepción confirmada en buzón).
+- [x] CSP permite dominios de EmailJS y reCAPTCHA sin errores de consola (verificado en navegador).
+- [x] Formulario accesible y con consentimiento de privacidad (validación cliente + honeypot).
 
 ---
 
