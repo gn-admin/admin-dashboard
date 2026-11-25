@@ -186,6 +186,7 @@ const Dashboard = {
     this._refreshing = true;
     const btn = typeof document !== 'undefined' ? document.getElementById('refresh-btn') : null;
     if (btn) { btn.disabled = true; btn.classList.add('is-loading'); }
+    if (typeof API !== 'undefined' && API.cargaInicio) API.cargaInicio('refresh');
     try {
       if (typeof Auth !== 'undefined' && Auth.currentUser && this._profilePromise && !this._profileResolved) {
         try { await this._profilePromise; } catch {}
@@ -218,6 +219,7 @@ const Dashboard = {
     } finally {
       this._refreshing = false;
       if (btn) { btn.disabled = false; btn.classList.remove('is-loading'); }
+      if (typeof API !== 'undefined' && API.cargaFin) API.cargaFin();
     }
   },
 

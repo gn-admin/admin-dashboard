@@ -93,10 +93,10 @@ const API = {
     return {};
   },
 
-  // Aviso de acción en curso. Apps Script tarda 2-6 s en cada escritura y sin
-  // esto parece que el botón no hizo nada hasta que llega el snackbar. Se
-  // muestra solo si la petición pasa de 250 ms, y no bloquea la pantalla.
-  _carga: { pendientes: 0, timer: null },
+  // Pantalla de carga compartida (#loading). Apps Script tarda 2-6 s en cada
+  // escritura: aparece pasados 300 ms (lo rápido no parpadea) y se mantiene al
+  // menos 420 ms para que se lea. No crea un overlay propio.
+  _carga: { pendientes: 0, timer: null, hideTimer: null, visibleDesde: 0 },
 
   _cargaTexto(endpoint) {
     const ep = String(endpoint || '');
@@ -105,28 +105,42 @@ const API = {
     if (ep.indexOf('delete-') === 0) return 'Eliminando…';
     if (ep === 'send-contrato-email') return 'Enviando el correo…';
     if (ep === 'web-deploy') return 'Lanzando el despliegue…';
+    if (ep === 'refresh') return 'Actualizando los datos…';
     if (/-estado$/.test(ep)) return 'Actualizando la publicación…';
     return 'Guardando…';
+  },
+
+  _cargaPintar(aviso, texto) {
+    const titulo = aviso.querySelector('.loading-texto');
+    const nota = aviso.querySelector('.loading-aviso');
+    if (titulo) { titulo.textContent = texto; titulo.hidden = false; }
+    if (nota) nota.hidden = false;
+    aviso.setAttribute('aria-label', texto);
+  },
+
+  _cargaLimpiar(aviso) {
+    const titulo = aviso.querySelector('.loading-texto');
+    const nota = aviso.querySelector('.loading-aviso');
+    if (titulo) { titulo.textContent = ''; titulo.hidden = true; }
+    if (nota) nota.hidden = true;
+    aviso.setAttribute('aria-label', 'Cargando');
   },
 
   _cargaInicio(endpoint) {
     this._carga.pendientes += 1;
     if (typeof document === 'undefined') return;
-    let aviso = document.getElementById('carga-accion');
-    if (!aviso) {
-      aviso = document.createElement('div');
-      aviso.id = 'carga-accion';
-      aviso.className = 'carga-accion';
-      aviso.setAttribute('role', 'status');
-      aviso.setAttribute('aria-live', 'polite');
-      aviso.innerHTML = '<span class="spinner" aria-hidden="true"></span><span class="carga-texto"></span>';
-      document.body.appendChild(aviso);
-    }
-    aviso.querySelector('.carga-texto').textContent = this._cargaTexto(endpoint);
+    const aviso = document.getElementById('loading');
+    if (!aviso) return;
+    const texto = this._cargaTexto(endpoint);
     clearTimeout(this._carga.timer);
+    clearTimeout(this._carga.hideTimer);
+    if (aviso.classList.contains('active')) this._cargaPintar(aviso, texto);
     this._carga.timer = setTimeout(() => {
-      if (this._carga.pendientes > 0) aviso.classList.add('active');
-    }, 250);
+      if (this._carga.pendientes <= 0) return;
+      if (!aviso.classList.contains('active')) this._carga.visibleDesde = Date.now();
+      this._cargaPintar(aviso, texto);
+      aviso.classList.add('active');
+    }, 300);
   },
 
   _cargaFin() {
@@ -134,9 +148,27 @@ const API = {
     if (this._carga.pendientes > 0) return;
     clearTimeout(this._carga.timer);
     if (typeof document === 'undefined') return;
-    const aviso = document.getElementById('carga-accion');
-    if (aviso) aviso.classList.remove('active');
+    const aviso = document.getElementById('loading');
+    if (!aviso) return;
+    // Si lo abrió showLoading() (sin texto), lo cierra quien lo abrió.
+    if (!aviso.classList.contains('active') || !this._carga.visibleDesde) {
+      this._cargaLimpiar(aviso);
+      return;
+    }
+    const visible = Date.now() - this._carga.visibleDesde;
+    const espera = Math.max(0, 420 - visible);
+    clearTimeout(this._carga.hideTimer);
+    this._carga.hideTimer = setTimeout(() => {
+      if (this._carga.pendientes > 0) return;
+      aviso.classList.remove('active');
+      this._carga.visibleDesde = 0;
+      this._cargaLimpiar(aviso);
+    }, espera);
   },
+
+  // Para acciones largas que no pasan por _post (p. ej. refrescar todo).
+  cargaInicio(texto) { this._cargaInicio(texto); },
+  cargaFin() { this._cargaFin(); },
 
   // Compatibilidad: token en query (`?token=`). Si CONFIG.useAuthorizationHeader=true,
   // se añade también Authorization (requiere backend con preflight CORS correcto).

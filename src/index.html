@@ -413,7 +413,13 @@
     </div>
   </div>
 
-  <div id="loading" class="loading-overlay" role="status" aria-live="polite" aria-label="Cargando"><div class="spinner"></div></div>
+  <div id="loading" class="loading-overlay" role="status" aria-live="polite" aria-label="Cargando">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p class="loading-texto" hidden></p>
+      <p class="loading-aviso" hidden>Puede tardar unos segundos. No cierres esta pestaña.</p>
+    </div>
+  </div>
   <!-- Botón "Ir arriba" (móvil) -->
   <button type="button" class="scroll-to-top" id="scroll-to-top" aria-label="Ir arriba" title="Ir arriba">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
