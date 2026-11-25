@@ -386,22 +386,26 @@ const Web = {
       </div>
       <div class="web-panel" id="web-panel" role="tabpanel" aria-labelledby="web-tab-${this.tab}">
       <div class="filters-bar web-toolbar">
-        <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input type="text" aria-label="Buscar publicación" placeholder="${this.tab === 'animal' ? 'Buscar por nombre, título o slug...' : (this.tab === 'grupo' ? 'Buscar por grupo, título, miembros o slug...' : 'Buscar por título, slug o categoría...')}" value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
-        <div class="filter-row">
-          <select aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
+        <div class="web-filter">
+          <label for="web-buscar">Buscar</label>
+          <div class="search-box"><span class="search-icon" aria-hidden="true"></span><input id="web-buscar" type="text" aria-label="${this.tab === 'animal' ? 'Buscar por nombre, título o slug' : (this.tab === 'grupo' ? 'Buscar por grupo, miembros o slug' : 'Buscar por título, slug o categoría')}" placeholder="${this.tab === 'animal' ? 'Nombre o slug...' : (this.tab === 'grupo' ? 'Grupo o miembro...' : 'Título o categoría...')}" value="${this._esc(this._filtros.q)}" data-input="onWebSearch"></div>
+        </div>
+        <div class="web-filter">
+          <label for="web-estado">Estado</label>
+          <select id="web-estado" aria-label="Filtrar por estado de publicación" data-change="onWebEstadoFilter" data-cpass="value">
             <option value="">Todos los estados</option>
             ${['publicado', 'borrador', 'oculto', 'retirado'].map(e => `<option value="${e}" ${this._filtros.estado === e ? 'selected' : ''}>${this.estadoLabel(e)}</option>`).join('')}
           </select>
-          <div class="web-acciones">
-            ${this.tab === 'animal'
-              ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionWeb">${Icons.plus} Publicar animal</button>`
-              : (this.tab === 'grupo'
-                ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionGrupoWeb">${Icons.plus} Publicar grupo</button>`
-                : `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>`)}
-            <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
-            <button type="button" class="btn btn-outline-green btn-sm" data-action="regenerarWeb" data-pass="el" title="Lanza el despliegue de GitHub Pages ahora">${Icons.refresh} Regenerar web</button>
-            <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
-          </div>
+        </div>
+        <div class="web-acciones">
+          ${this.tab === 'animal'
+            ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionWeb">${Icons.plus} Publicar animal</button>`
+            : (this.tab === 'grupo'
+              ? `<button type="button" class="btn btn-primary btn-sm" data-action="nuevaPublicacionGrupoWeb">${Icons.plus} Publicar grupo</button>`
+              : `<button type="button" class="btn btn-primary btn-sm" data-action="abrirEventoWeb">${Icons.plus} Nuevo evento/historia</button>`)}
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="recargarWeb">${Icons.refresh} Actualizar</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="regenerarWeb" data-pass="el" title="Lanza el despliegue de GitHub Pages ahora">${Icons.refresh} Regenerar web</button>
+          <a class="btn btn-outline-green btn-sm" href="publico.html" target="_blank" rel="noopener">${Icons.eye} Ver web pública</a>
         </div>
       </div>
       ${this._avisoPublicados()}
@@ -566,7 +570,7 @@ const Web = {
       <td data-label="Completitud">${this._chips(faltan)}</td>
       <td data-label="Acciones" class="table-actions">
         ${retirado
-          ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
+          ? `<span class="web-sub" title="Enlace retirado (410); el slug sigue reservado">Enlace 410 · slug reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebAnimal" data-arg0="${this._esc(a.animal_id)}" data-arg1="${this._esc(a.nombre || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirAnimalWeb" data-arg0="${this._esc(a.animal_id)}">${Icons.pencil} ${a.publicacion_id ? 'Editar' : 'Configurar'}</button>
         ${a.publicacion_id
@@ -601,7 +605,7 @@ const Web = {
       <td data-label="Completitud">${this._chips(faltan)}</td>
       <td data-label="Acciones" class="table-actions">
         ${e.estado_publicacion === 'retirado'
-          ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
+          ? `<span class="web-sub" title="Enlace retirado (410); el slug sigue reservado">Enlace 410 · slug reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebEvento" data-arg0="${this._esc(e.id)}" data-arg1="${this._esc(e.titulo || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirEventoWeb" data-arg0="${this._esc(e.id)}">${Icons.pencil} Editar</button>
         ${e.estado_publicacion === 'publicado'
@@ -636,7 +640,7 @@ const Web = {
       <td data-label="Completitud">${this._chips(faltan)}</td>
       <td data-label="Acciones" class="table-actions">
         ${retirado
-          ? `<span class="web-sub">Enlace retirado (410); el slug sigue reservado</span>
+          ? `<span class="web-sub" title="Enlace retirado (410); el slug sigue reservado">Enlace 410 · slug reservado</span>
         <button type="button" class="btn btn-outline-green btn-sm" data-action="restaurarWebGrupo" data-arg0="${this._esc(g.grupo_id)}" data-arg1="${this._esc(g.nombre || '')}">Restaurar</button>`
           : `<button type="button" class="btn btn-outline-green btn-sm" data-action="abrirGrupoWeb" data-arg0="${this._esc(g.grupo_id)}">${Icons.pencil} ${g.publicacion_id ? 'Editar' : 'Configurar'}</button>
         ${g.publicacion_id
