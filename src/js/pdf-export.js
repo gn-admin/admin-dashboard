@@ -424,8 +424,11 @@ const PdfExport = {
     const fecha = this._fmtFecha(cv.fecha || this._hoy());
     // Sello real de la asociación (el mismo que lleva el papel), no un sello
     // dibujado con CSS. Si la entidad ha subido otro, manda el suyo.
-    const sello = (typeof Dashboard !== 'undefined' && Dashboard._selloUrl && Dashboard._selloUrl())
-      || this._assetUrl('assets/contratos/sello-nebak.jpg');
+    // La firma que aparece en el DOCX de la asociación es la firma por
+    // defecto. Solo se sustituye si el formulario guarda otra firma expresa.
+    const firmaEntidad = firmaValida(cv.entidad_firma)
+      || this._assetUrl('assets/contratos/firma-nebak.jpg');
+    const logoEntidad = this._assetUrl('assets/contratos/logo-nebak-horizontal.jpg');
     const nacimiento = animal.fecha_nacimiento ? this._fmtFecha(animal.fecha_nacimiento) : '';
     const nombreArchivo = ('Contrato-Adopcion-' + (animal.nombre || 'Grupo-Nebak') + '-' + (cv.fecha || cv.id || 'signed'))
       .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '') + '.pdf';
@@ -439,7 +442,8 @@ const PdfExport = {
       }),
       entidad: ent,
       tutor,
-      entidadFirma: firmaValida(cv.entidad_firma) || (!tutor ? firmaValida(cv.f2_firma) : ''),
+      entidadFirma: firmaEntidad,
+      entidadLogo: logoEntidad,
       responsable65,
       importes: {
         donacion: importe(cv.donacion_adoptante, porDefecto.donacion),
@@ -450,7 +454,7 @@ const PdfExport = {
       ciudad: cv.ciudad || 'Irún',
       expediente: cv.adopcion_id || cv.id || '',
       logoUrl: logo || this._logoFallback,
-      selloUrl: abs(sello),
+      selloUrl: '',
       textos: T,
       nombreArchivo
     };
@@ -493,27 +497,32 @@ const PdfExport = {
       return html;
     };
     const salida = [];
-    let logo = '';
     let titulo = '';
     let subtitulo = '';
     let grupoFirmas = [];
+    let grupoFecha = '';
 
     const bloqueFirma = (b) => {
       const etiqueta = b.etiqueta || 'Firma';
-      const sello = b.sello
-        ? `<div class="sello sello--img" aria-label="Sello de la entidad"><img src="${esc(b.sello)}" alt="Sello de ${esc(b.nombre || 'la entidad')}"></div>`
-        : '';
       const firma = b.firma
         ? `<img class="firma-img" src="${esc(b.firma)}" alt="Firma de ${esc(b.nombre || 'la parte')}">`
-        : (sello ? '' : '<div class="firma-fallback">[Sin firma]</div>');
-      const linea = esc(b.nombre || '—') + (b.dni ? ' &middot; ' + esc(b.dniEtiqueta || 'DNI') + ' ' + esc(b.dni) : '');
-      return `<div class="signature"><div class="sig-label">${esc(etiqueta)}</div><div class="firma-fila">${firma}${sello}</div><div class="sig-line">${linea}</div></div>`;
+        : '<span class="firma-vacia" aria-hidden="true"></span>';
+      const logo = b.logo
+        ? `<img class="firma-logo" src="${esc(b.logo)}" alt="${esc(b.nombre || 'Entidad')}">`
+        : '';
+      const linea = b.nombre
+        ? `<div class="sig-line">${esc(b.nombre)}${b.dni ? ' &middot; ' + esc(b.dniEtiqueta || 'DNI') + ' ' + esc(b.dni) : ''}</div>`
+        : '';
+      return `<div class="signature"><div class="sig-label">${esc(etiqueta)}</div><div class="firma-fila">${logo}${firma}</div>${linea}</div>`;
     };
 
     const cerrarFirmas = () => {
       if (!grupoFirmas.length) return;
-      salida.push('<div class="signatures' + (grupoFirmas.length > 2 ? ' signatures--three' : '') + '">' + grupoFirmas.join('') + '</div>');
+      salida.push('<div class="firmas-docx">'
+        + (grupoFecha ? `<div class="firmas-fecha">${esc(grupoFecha)}</div>` : '')
+        + '<div class="firmas-filas">' + grupoFirmas.join('') + '</div></div>');
       grupoFirmas = [];
+      grupoFecha = '';
     };
 
     bloques.forEach((b) => {
@@ -522,11 +531,15 @@ const PdfExport = {
       // aquí ya la pinta el grupo, así que no se repite.
       if (b && b.legado) return;
       // Las firmas consecutivas comparten fila; cualquier otro bloque la cierra.
-      if (tipo === 'firmas') { (b.items || []).forEach(it => grupoFirmas.push(bloqueFirma(it))); return; }
+      if (tipo === 'firmas') {
+        if (b.fecha) grupoFecha = b.fecha;
+        (b.items || []).forEach(it => grupoFirmas.push(bloqueFirma(it)));
+        return;
+      }
       if (tipo === 'firma' || tipo === 'firmaEntidad') { grupoFirmas.push(bloqueFirma(b)); return; }
       cerrarFirmas();
       if (tipo === 'imagen') {
-        if (b.clase === 'logo') { logo = b.src; return; }
+        if (b.clase === 'logo') return;
         salida.push(`<img class="imagen" src="${esc(b.src)}" alt="${esc(b.alt || '')}">`);
         return;
       }
@@ -538,7 +551,7 @@ const PdfExport = {
       if (tipo === 'salto') { salida.push('<div class="page-break"></div>'); return; }
       if (tipo === 'tabla') {
         // Tabla etiqueta/valor del documento; la fotografía es la última fila.
-        const filas = (b.filas || []).map(f => `<tr><th scope="row">${esc(f[0])}</th><td>${esc(f[1] == null || f[1] === '' ? '—' : f[1])}</td></tr>`).join('');
+        const filas = (b.filas || []).map(f => `<tr><th scope="row">${esc(f[0])}</th><td>${esc(f[1] == null ? '' : f[1])}</td></tr>`).join('');
         const f = b.foto;
         const fotoFila = f
           ? `<tr><th scope="row">${esc(f.etiqueta || 'Fotografía')}</th><td>${f.src
@@ -566,51 +579,145 @@ const PdfExport = {
     cerrarFirmas();
 
     const cabecera = `<div class="header">
-        ${logo ? `<img src="${esc(logo)}" class="logo" alt="Grupo Nebak">` : ''}
-        <div><div class="title">${esc(titulo || 'Contrato de adopción')}</div>${subtitulo ? `<div class="sub">${esc(subtitulo)}</div>` : ''}</div>
+        <div class="title">${esc(titulo || 'Contrato de adopción')}</div>
+        ${subtitulo ? `<div class="sub">${esc(subtitulo)}</div>` : ''}
       </div>`;
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
       <title>Contrato de adopción</title>
       <style>
-        @page{size:A4;margin:2cm}
-        body{font:10.5pt/1.55 Arial,sans-serif;color:#191919;padding:0;margin:0}
-        .header{display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:3px solid #1FC95B;margin-bottom:20px}
-        .logo{width:56px;height:56px;object-fit:contain}
-        .title{font-size:16pt;font-weight:800;color:#191919}
+        @page{size:A4;margin:25mm}
+        body{font:10.5pt/1.15 Arial,sans-serif;color:#000;padding:0;margin:0}
+        @media screen{html{background:#e5e7eb}body{background:#fff;width:210mm;max-width:100%;min-height:297mm;margin:12px auto;padding:25mm;box-sizing:border-box;box-shadow:0 8px 30px rgba(0,0,0,.12)}}
+        body.paginado{background:transparent;width:auto;max-width:none;min-height:0;margin:0;padding:0;box-shadow:none;overflow-x:auto}
+        @media screen{.sheet-wrap{width:100%;margin:12px auto}.sheet-page{display:block;width:210mm;height:297mm;padding:25mm;box-sizing:border-box;background:#fff;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,.12);overflow:hidden;transform-origin:top left}}
+        @media screen{.page-break{display:block;height:50mm;margin:0 -25mm;background:#e5e7eb}}
+        @media print{body{max-width:none;margin:0;padding:0;box-shadow:none}.sheet-wrap{display:contents}.sheet-page{width:auto;height:auto;min-height:0;margin:0;padding:0;box-shadow:none;overflow:visible;transform:none!important;break-after:page}.sheet-page:last-child{break-after:auto}}
+        .header{text-align:center;margin:0 0 12pt}
+        .title{font-size:14pt;font-weight:700;color:#000;line-height:1.15}
         .sub{font-size:9pt;color:#757575}
-        h2{font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#15863D;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e8eaed;break-after:avoid}
-        p{margin:0 0 8px;text-align:justify}
+        h2{font-size:11.5pt;font-weight:700;color:#000;margin:12pt 0 6pt;break-after:avoid}
+        p{margin:0 0 7pt;text-align:justify;line-height:1.15;orphans:2;widows:2}
         .imagen{max-width:100%;height:auto}
-        .ficha{width:100%;border-collapse:collapse;font-size:10pt;margin:6px 0 10px;break-inside:avoid}
-        .ficha th,.ficha td{border:1px solid #d1d5db;padding:4px 8px;text-align:left;vertical-align:top}
-        .ficha th{width:34%;font-size:8.5pt;font-weight:600;color:#4b5563;text-transform:uppercase;letter-spacing:0.3px;background:#fafafa}
+        .ficha{width:100%;border-collapse:collapse;font-size:10pt;margin:4pt 0 8pt;break-inside:avoid}
+        .ficha th,.ficha td{border:.75pt solid #000;padding:2pt 4pt;text-align:left;vertical-align:top;line-height:1.15}
+        .ficha th{width:34%;font-size:10pt;font-weight:700;color:#000;text-transform:uppercase;background:#fff}
         .animal-photo{width:110px;height:110px;object-fit:cover;border:1px solid #d1d5db;border-radius:4px;display:block}
         .animal-photo--empty{display:flex;align-items:center;justify-content:center;background:#f4f5f7;color:#9aa0a6;font-size:8pt;text-align:center;padding:8px}
-        .nota{font-size:9pt;color:#4b5563;margin:8px 0;text-align:left}
-        .clausula{margin-bottom:9px;font-size:10pt;text-align:justify;break-inside:avoid}
-        .clausula p{margin:0 0 4px}
-        .clausula b{color:#191919}
-        .clausula-anexo{margin-bottom:9px;font-size:10pt;text-align:justify;break-inside:avoid}
-        .clausula-anexo p{margin:0 0 4px}
-        .est-lista{margin:2px 0 0;padding-left:20px;font-size:10pt}
-        .est-lista li{margin-bottom:2px}
-        .signatures{display:flex;gap:36px;margin-top:34px;break-inside:avoid;align-items:stretch}
-        .signatures--three{gap:20px}
-        .signature{flex:1;min-width:0;display:flex;flex-direction:column}
-        .sig-label{font-size:9pt;color:#757575;margin-bottom:4px}
-        .firma-fila{display:flex;align-items:center;gap:10px;min-height:92px}
-        .firma-img{height:70px;max-width:100%;object-fit:contain;display:block}
-        .sig-line{border-top:1px solid #191919;margin-top:auto;padding-top:6px;font-size:9pt;font-weight:600}
-        .firma-fallback{height:70px;display:flex;align-items:center;color:#999;font-style:italic}
-        .sello{width:88px;height:88px;flex:0 0 88px;border:2px solid #15863D;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;transform:rotate(-8deg);color:#15863D;background:#fff;margin:0}
-        .sello--img{width:96px;height:96px;flex:0 0 96px;border:0;border-radius:0;background:transparent;transform:none;display:flex;align-items:center;justify-content:center}
-        .sello--img img{width:100%;height:100%;object-fit:contain}
+        .nota{font-size:10pt;color:#000;margin:6pt 0;text-align:left}
+        .clausula{margin:0;font-size:10.5pt;text-align:justify}
+        .clausula p{margin:0 0 4pt}
+        .clausula b{color:#000}
+        .clausula-anexo{margin:0 0 7pt;font-size:10.5pt;text-align:justify}
+        .clausula-anexo p{margin:0 0 4pt}
+        .est-lista{margin:0 0 4pt;padding-left:18pt;font-size:10.5pt}
+        .est-lista li{margin-bottom:1pt}
+        .firmas-docx{margin:12pt 0 8pt;border:.75pt solid #000;break-inside:avoid}
+        .firmas-fecha{padding:3pt 5pt;border-bottom:.75pt solid #000;font-size:10pt}
+        .signature{display:grid;grid-template-columns:34% 1fr;min-height:62px;break-inside:avoid}
+        .signature + .signature{border-top:.75pt solid #000}
+        .sig-label{padding:4px 6px;border-right:.75pt solid #000;font-size:10pt;font-weight:700}
+        .firma-fila{display:flex;align-items:center;gap:8px;min-height:62px;padding:2px 6px}
+        .firma-img{height:50px;max-width:100%;object-fit:contain;display:block}
+        .firma-logo{height:26px;max-width:120px;object-fit:contain;display:block}
+        .firma-vacia{display:block;height:48px}
+        .sig-line{grid-column:2;padding:0 6px 4px;font-size:9pt;color:#000}
         .page-break{break-before:page;page-break-before:always}
-        .footer{text-align:center;margin-top:26px;padding-top:10px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
+        .footer{text-align:center;margin-top:20px;padding-top:8px;border-top:1px solid #e8eaed;font-size:8pt;color:#9aa0a6}
+        @media screen and (max-width:640px){body{padding:0;min-height:0}}
       </style></head><body>
       ${cabecera}
       ${salida.join('\n      ')}
+      <script>
+      (function(){
+        if (window.__contratoPaginas) return;
+        window.__contratoPaginas = true;
+        function paginar(){
+          var body = document.body;
+          if (body.getAttribute('data-paginado') === '1') return;
+          var nodos = [].slice.call(body.children).filter(function(n){ return n.tagName !== 'SCRIPT'; });
+          if (!nodos.length) return;
+          var pagina = null;
+          function nuevaPagina(){
+            pagina = document.createElement('div');
+            pagina.className = 'sheet-page';
+            body.appendChild(pagina);
+            return pagina;
+          }
+          function cabe(el){
+            pagina.appendChild(el);
+            var ok = pagina.scrollHeight <= pagina.clientHeight + 1;
+            if (!ok) pagina.removeChild(el);
+            return ok;
+          }
+          function cabeGrupo(grupo, hijo){
+            grupo.appendChild(hijo);
+            var ok = pagina.scrollHeight <= pagina.clientHeight + 1;
+            if (!ok) grupo.removeChild(hijo);
+            return ok;
+          }
+          function ajustarEscala(){
+            var paginas = [].slice.call(document.querySelectorAll('.sheet-page'));
+            if (!paginas.length) return;
+            var ancho = document.documentElement.clientWidth;
+            var base = paginas[0].offsetWidth || 1;
+            var escala = ancho >= 680 ? Math.min(1, (ancho - 24) / base) : 1;
+            paginas.forEach(function(p){
+              var wrap = p.parentNode;
+              if (!wrap || !wrap.classList || !wrap.classList.contains('sheet-wrap')) {
+                wrap = document.createElement('div');
+                wrap.className = 'sheet-wrap';
+                p.parentNode.insertBefore(wrap, p);
+                wrap.appendChild(p);
+              }
+              p.style.transform = escala < 1 ? 'scale(' + escala + ')' : '';
+              p.style.transformOrigin = 'top left';
+              p.style.marginLeft = Math.max(0, (ancho - base * escala) / 2) + 'px';
+              wrap.style.height = Math.ceil(p.offsetHeight * escala) + 'px';
+            });
+          }
+          body.classList.add('paginado');
+          nuevaPagina();
+          nodos.forEach(function(n){
+            if (n.classList && n.classList.contains('page-break')) {
+              if (n.parentNode) n.parentNode.removeChild(n);
+              if (pagina.childNodes.length) nuevaPagina();
+              return;
+            }
+            if (cabe(n)) return;
+            if (n.classList && n.classList.contains('clausula') && n.children.length > 1) {
+              var grupo = null;
+              [].slice.call(n.children).forEach(function(hijo){
+                if (!grupo || !cabeGrupo(grupo, hijo)) {
+                  nuevaPagina();
+                  grupo = document.createElement('div');
+                  grupo.className = n.className;
+                  pagina.appendChild(grupo);
+                  grupo.appendChild(hijo);
+                }
+              });
+              return;
+            }
+            nuevaPagina();
+            pagina.appendChild(n);
+          });
+          body.setAttribute('data-paginado', '1');
+          ajustarEscala();
+          window.addEventListener('resize', ajustarEscala);
+          window.addEventListener('beforeprint', function(){
+            [].slice.call(document.querySelectorAll('.sheet-page')).forEach(function(p){
+              p.style.transform = '';
+              p.style.marginLeft = '';
+              if (p.parentNode && p.parentNode.classList) p.parentNode.style.height = '';
+            });
+          });
+          window.addEventListener('afterprint', ajustarEscala);
+        }
+        window.__paginarContrato = paginar;
+        if (document.readyState === 'complete') paginar();
+        else window.addEventListener('load', paginar, { once: true });
+      })();
+      </script>
     </body></html>`;
   },
 
@@ -885,6 +992,7 @@ const PdfExport = {
       w.focus();
     } catch { return; }
     await this._waitImages(w);
+    try { if (typeof w.__paginarContrato === 'function') w.__paginarContrato(); } catch { /* sin paginador */ }
     setTimeout(() => { try { if (!w.closed) w.print(); } catch {} }, 150);
   },
 };

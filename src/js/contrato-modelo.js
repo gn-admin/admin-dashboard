@@ -28,7 +28,7 @@ const ContratoModelo = {
     const importes = d.importes || { donacion: 100, indemnizacion: 900 };
     const fecha = d.fecha || '';
     const ciudad = d.ciudad || 'Irún';
-    const adoptante = c.f1_nombre || c.adoptante || '[adoptante]';
+    const adoptante = c.f1_nombre || c.adoptante || '';
     const dni = c.f1_dni || '';
     // Trozos que los dos renderizadores destacan igual (nombres y datos de
     // identificación de las partes intervinientes).
@@ -37,26 +37,26 @@ const ContratoModelo = {
       .map(v => String(v));
     const bloques = [];
     const firmaAdoptante = {
-      etiqueta: 'Firma adoptante',
-      nombre: adoptante,
-      dni,
-      dniEtiqueta: 'DNI',
+      etiqueta: 'Firma adoptante:',
       firma: c.f1_firma || ''
     };
+    // El DOCX deja los huecos como puntos; no los convierte en frases que
+    // desaparecen cuando falta un dato. Así el documento impreso conserva su
+    // maqueta y los datos del formulario simplemente los sustituyen.
+    const puntos = '…………………………………..';
+    const dato = (v) => String(v == null ? '' : v).trim() || puntos;
 
-    if (d.logoUrl) bloques.push({ tipo: 'imagen', src: d.logoUrl, ancho: 56, alt: 'Grupo Nebak', clase: 'logo' });
-    bloques.push({ tipo: 'titulo', texto: 'Contrato de adopción' });
+    bloques.push({ tipo: 'titulo', texto: T.titulo || 'Contrato de adopción' });
 
     // 1. Partes intervinientes: primero la adoptante, después la asociación.
-    bloques.push({ tipo: 'seccion', texto: 'Partes intervinientes' });
+    bloques.push({ tipo: 'seccion', texto: 'Partes intervinientes:' });
     bloques.push({
       tipo: 'parrafo',
       texto: 'Comparecen en este acto, de una parte, D./Dña. ' + adoptante +
-        ', mayor de edad, que actúa en su propio nombre y derecho, con DNI ' + (dni || '……………………') +
-        (c.f1_direccion ? ', con domicilio en ' + c.f1_direccion : '') +
-        (c.f1_telefono ? ', teléfono ' + c.f1_telefono : '') +
-        (c.f1_email ? ', y correo electrónico ' + c.f1_email : '') +
-        ', actual propietario y responsable del animal, quien en adelante será denominado como el Adoptante.',
+        ', mayor de edad, que actúa en su propio nombre y derecho, con DNI ' + dato(dni) +
+        ', con domicilio en ' + dato(c.f1_direccion) + ', teléfono ' + dato(c.f1_telefono) +
+        ', y correo electrónico ' + dato(c.f1_email) +
+        '. Actual propietario y responsable del animal, quien en adelante será denominado como el Adoptante.',
       negrita: fuertes(adoptante, dni, c.f1_direccion, c.f1_telefono, c.f1_email)
     });
     // Sin nombre configurado el párrafo tiene que seguir leyéndose: nunca
@@ -64,36 +64,36 @@ const ContratoModelo = {
     const nombreEntidad = String(ent.nombre || '').trim();
     bloques.push({
       tipo: 'parrafo',
-      texto: 'Y, de la otra parte, ' + [
-        nombreEntidad || 'la Asociación',
-        ent.cif ? 'con CIF ' + ent.cif : '',
-        ent.domicilio ? 'con domicilio en ' + ent.domicilio : '',
-        ent.telefono ? 'y con teléfonos de contacto ' + ent.telefono : '',
-        nombreEntidad ? 'que en adelante será denominada como la Asociación' : ''
-      ].filter(Boolean).join(', ') + '.',
-      negrita: fuertes(nombreEntidad, ent.cif, ent.domicilio, ent.telefono)
+      texto: nombreEntidad
+        ? 'Y, de la otra parte, la ' + nombreEntidad +
+          ', con CIF ' + dato(ent.cif) +
+          ', con domicilio en ' + dato(ent.domicilio) +
+          ', y con teléfonos de contacto ' + dato(ent.telefono) +
+          ', que en adelante será denominada como la Asociación.'
+        : 'Y, de la otra parte, la Asociación.',
+      negrita: nombreEntidad ? fuertes(nombreEntidad, ent.cif, ent.domicilio, ent.telefono) : []
     });
-    bloques.push({ tipo: 'parrafo', texto: 'Ambas partes acuerdan celebrar el presente contrato, de acuerdo con los siguientes datos de adopción.' });
+    bloques.push({ tipo: 'parrafo', texto: 'Ambas partes acuerdan celebrar el presente CONTRATO, de acuerdo con los siguientes DATOS DE ADOPCIÓN:', negrita: ['DATOS DE ADOPCIÓN:'] });
 
     // 2. Datos de adopción: tabla etiqueta/valor con la fotografía como última fila.
     bloques.push({
       tipo: 'tabla',
       filas: [
-        ['Nombre del animal', animal.nombre],
-        ['Nombre definitivo', animal.nombre_definitivo],
-        ['Especie', animal.especie],
-        ['N.º microchip', animal.microchip],
-        ['Raza', animal.raza],
-        ['Sexo', animal.sexo],
-        ['Fecha de nacimiento', d.fechaNacimiento || animal.fecha_nacimiento],
-        ['Capa', animal.capa],
-        ['Color', animal.color],
-        ['Tamaño', animal.tamano],
-        ['Esterilización', animal.esterilizada],
-        ['Otras reseñas', animal.descripcion]
+        ['NOMBRE DEL ANIMAL:', animal.nombre],
+        ['NOMBRE DEFINITIVO:', animal.nombre_definitivo],
+        ['ESPECIE:', animal.especie],
+        ['N.º MICROCHIP:', animal.microchip],
+        ['RAZA:', animal.raza],
+        ['SEXO:', animal.sexo],
+        ['FECHA DE NACIMIENTO:', d.fechaNacimiento || animal.fecha_nacimiento],
+        ['CAPA:', animal.capa],
+        ['COLOR:', animal.color],
+        ['TAMAÑO:', animal.tamano],
+        ['ESTERILIZACION:', animal.esterilizada],
+        ['OTRAS RESEÑAS:', animal.descripcion]
       ],
       foto: {
-        etiqueta: 'Fotografía',
+        etiqueta: 'FOTOGRAFÍA:',
         src: animal.foto || '',
         ancho: 100,
         alto: 100,
@@ -101,20 +101,29 @@ const ContratoModelo = {
         vacio: 'Sin foto'
       }
     });
-    if (T.notaEstipulaciones) bloques.push({ tipo: 'nota', texto: T.notaEstipulaciones });
+    if (T.notaEstipulaciones) bloques.push({ tipo: 'nota', texto: '*** ' + T.notaEstipulaciones });
 
     // 3. La adoptante firma la hoja de datos, antes de las estipulaciones.
-    bloques.push({ tipo: 'parrafo', texto: 'En ' + ciudad + ': ' + fecha });
-    bloques.push({ tipo: 'firmas', items: [firmaAdoptante] });
+    // La fecha y la firma van juntas, como la tabla del DOCX.
+    bloques.push({ tipo: 'firmas', fecha: 'En ' + ciudad + ': ' + fecha, items: [firmaAdoptante] });
 
-    // 4. Estipulaciones (texto y orden, de ContratoTextos).
-    bloques.push({ tipo: 'seccion', texto: 'Estipulaciones' });
+    // 4. Estipulaciones (texto y orden, de ContratoTextos). La hoja de
+    // estipulaciones empieza en página propia, como en el documento.
+    bloques.push({ tipo: 'salto' });
+    bloques.push({ tipo: 'seccion', texto: 'ESTIPULACIONES:' });
     (T.estipulaciones || []).forEach(est => {
       const x = T.texto(est, importes);
       bloques.push({ tipo: 'estipulacion', n: est.n, parrafos: x.parrafos, lista: x.lista });
     });
 
-    // 5. Anexo del tutor, en página propia y con su firma.
+    // 5. Cierre: asociación con su firma y adoptante, como en el documento.
+    bloques.push({ tipo: 'firmas', fecha: 'En ' + ciudad + ': ' + fecha, items: [
+      { etiqueta: 'Firma Asociación:', firma: d.entidadFirma || '', logo: d.entidadLogo || '' },
+      { etiqueta: 'Firma Adoptante:', firma: c.f1_firma || '' }
+    ] });
+
+    // 6. Anexo del tutor, en página propia y con su firma. Es un añadido del
+    // gestor (el DOCX original no lo trae) y solo aparece si se activa.
     if (tutor) {
       bloques.push({ tipo: 'salto' });
       bloques.push({ tipo: 'seccion', texto: 'Anexo I. Datos del tutor o persona de apoyo' });
@@ -127,22 +136,14 @@ const ContratoModelo = {
         ['Teléfono', tutor.telefono]
       ] });
       bloques.push({ tipo: 'nota', texto: 'La persona tutora se compromete a asumir el cuidado del animal si el adoptante no pudiera hacerlo. Su firma es obligatoria y firma este contrato junto al adoptante.' });
-      bloques.push({ tipo: 'parrafo', texto: 'En ' + ciudad + ': ' + fecha });
-      bloques.push({ tipo: 'firmas', items: [{
-        etiqueta: 'Tutor / persona de apoyo',
+      bloques.push({ tipo: 'firmas', fecha: 'En ' + ciudad + ': ' + fecha, items: [{
+        etiqueta: 'Tutor / persona de apoyo:',
         nombre: tutor.nombre,
         dni: tutor.dni || '',
         dniEtiqueta: 'DNI',
         firma: tutor.firma || ''
       }] });
     }
-
-    // 6. Cierre: asociación con sello y adoptante, como en el documento.
-    bloques.push({ tipo: 'parrafo', texto: 'En ' + ciudad + ': ' + fecha });
-    bloques.push({ tipo: 'firmas', items: [
-      { etiqueta: 'Firma Asociación', nombre: ent.nombre, firma: d.entidadFirma || '', sello: d.selloUrl || '' },
-      firmaAdoptante
-    ] });
 
     // 7. Cláusula especial de mayores de 65, en página propia.
     if (r65) {
@@ -158,14 +159,11 @@ const ContratoModelo = {
         ['Correo electrónico', r65.email],
         ['Dirección', r65.direccion]
       ] });
-      bloques.push({ tipo: 'parrafo', texto: 'En ' + ciudad + ': ' + fecha });
-      bloques.push({ tipo: 'firmas', items: [
-        firmaAdoptante,
-        { etiqueta: 'Firma de la persona responsable', nombre: r65.nombre || '—', dni: r65.dni || '', dniEtiqueta: 'DNI/NIE', firma: '' }
+      bloques.push({ tipo: 'firmas', fecha: 'En ' + ciudad + ': ' + fecha, items: [
+        { etiqueta: 'Firma Adoptante:', firma: c.f1_firma || '' },
+        { etiqueta: 'Firma de la persona responsable:', firma: '' }
       ] });
     }
-
-    bloques.push({ tipo: 'pie', texto: 'Generado por ' + (nombreEntidad || 'Grupo Nebak') + ' · ' + fecha });
 
     // Compatibilidad mientras el .gs desplegado no conozca los grupos: ese
     // renderizador solo pinta `firma` y `firmaEntidad`, así que cada grupo deja

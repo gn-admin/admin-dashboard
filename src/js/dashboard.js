@@ -2217,7 +2217,6 @@ const Dashboard = {
     }
     if (isAdmin) {
       heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value${vencidos ? ' dash-hero-stat-value--alert' : ''}">${vencidos}</span><span class="dash-hero-stat-label">Vencidos</span></div>`);
-      heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${euro(balance)}</span><span class="dash-hero-stat-label">Balance mes</span></div>`);
     } else if (isCoord) {
       heroStats.push(`<div class="dash-hero-stat"><span class="dash-hero-stat-value">${adopMes.cur}</span><span class="dash-hero-stat-label">Adopciones mes</span></div>`);
     }
@@ -3144,7 +3143,7 @@ const Dashboard = {
 
   _renderResponseCards(responses, surveyId, emptyMsg) {
     if(!responses.length) return '<div class="empty-state empty-state-illustrated"><div class="empty-state-icon">'+Icons.clipboard+'</div><h3>'+(emptyMsg||'No hay solicitudes')+'</h3></div>';
-    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" role="button" tabindex="0" data-card="${surveyId}::${r.id}" data-action="viewDetail" data-arg0="${surveyId}" data-arg1="${r.id}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
+    return responses.map(r=>{const i=this._esc((r.nombre?.[0]||'')+(r.apellidos?.[0]||''));const d=r.fecha_creacion?this._fmtFecha(r.fecha_creacion):'';const e=this.getEstado(r.id, surveyId);const l=this._estadoLabel(e);const cls=this._estadoCls(e);return`<div class="response-card" data-solicitud="${e}" role="button" tabindex="0" data-card="${surveyId}::${r.id}" data-action="viewDetail" data-arg0="${surveyId}" data-arg1="${r.id}"><div class="response-card-header"><div class="response-avatar">${i}</div><div class="response-info"><div class="response-name">${this._esc(r.nombre||'')} ${this._esc(r.apellidos||'')} <span class="estado-badge ${cls}">${l}</span></div><div class="response-email">${this._esc(r.email||'')}</div></div><div class="response-date">${d}</div></div></div>`;}).join('');
   },
 
   async viewDetail(surveyId, responseId, opts) {
@@ -3184,18 +3183,22 @@ const Dashboard = {
              <button type="button" class="btn btn-danger btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="descartada" data-arg2="${surveyId}">${Icons.xCircle} Descartar</button>`
           : `<button type="button" class="btn btn-primary btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="en_proceso" data-arg2="${surveyId}">${Icons.arrowRight} En proceso</button>
              <button type="button" class="btn btn-danger btn-sm" data-action="cambiarEstado" data-pass="el" data-arg0="${r.id}" data-arg1="descartada" data-arg2="${surveyId}">${Icons.xCircle} Descartar</button>`;
-    const candHtml = cands.length ? `<div class="detail-section"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${c.fecha ? this._fmtFecha(c.fecha) : '—'}</div></div>`).join('')}</div>` : '';
+    const candHtml = cands.length ? `<div class="detail-section detail-section--fields solicitud-seccion"><div class="detail-section-title">${Icons.users} Candidaturas</div>${cands.map(c=>`<div class="detail-field"><div class="detail-question">${c.tipo==='acogida'?'Acogida':'Adopción'}</div><div class="detail-answer">${c.animal_id?`${this._esc(this._animalName(c.animal_id))} · `:''}<span class="estado-badge ${candCls[c.estado]||''}">${c.estado==='en_lista'?'En lista':c.estado}</span> · desde ${c.fecha ? this._fmtFecha(c.fecha) : '—'}</div></div>`).join('')}</div>` : '';
     const asig = cands.length ? !!cands[0].animal_id : false;
     const assignBox = e==='aprobada' && !asig ? `<div class="detail-section"><div class="detail-section-title">${Icons.arrowRight} Asignar animal${cands[0]&&cands[0].tipo==='acogida'?' y familia':''}</div><div id="assign-box-${responseId}" style="min-height:70px"><div class="page-loader"><div class="spinner"></div><p>Cargando animales...</p></div></div></div>` : '';
     const surveyName = ((this.surveys || []).find(s => s.id === surveyId) || {}).name || surveyId;
     const iniciales = this._esc(((r.nombre || '')[0] || '') + ((r.apellidos || '')[0] || '')) || '?';
     this._showDetail(pageId, (r.nombre||'')+' '+(r.apellidos||''), `
-      <div class="responder-hero">
-        <div class="response-avatar" aria-hidden="true">${iniciales}</div>
+      <div class="responder-hero solicitud-hero">
+        <div class="response-avatar solicitud-avatar" aria-hidden="true">${iniciales}</div>
         <div class="responder-hero-info">
           <div class="responder-hero-title">${this._esc(((r.nombre || '') + ' ' + (r.apellidos || '')).trim())}</div>
-          <div class="responder-hero-sub">${this._esc(r.email || '')}${r.telefono ? ' &middot; ' + this._esc(r.telefono) : ''}${r.fecha_creacion ? ' &middot; ' + this._fmtFecha(r.fecha_creacion) : ''}</div>
-          <div class="animal-card-pills" style="margin:8px 0 0"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span><span class="chip-neutral">${this._esc(surveyName)}</span></div>
+          <div class="responder-hero-sub solicitud-contacto">
+            ${r.email ? `<span class="solicitud-dato"><span class="solicitud-dato-label">Email</span>${this._esc(r.email)}</span>` : ''}
+            ${r.telefono ? `<span class="solicitud-dato"><span class="solicitud-dato-label">Teléfono</span>${this._esc(r.telefono)}</span>` : ''}
+            ${r.fecha_creacion ? `<span class="solicitud-dato"><span class="solicitud-dato-label">Recibida</span>${this._fmtFecha(r.fecha_creacion)}</span>` : ''}
+          </div>
+          <div class="animal-card-pills solicitud-hero-pills"><span class="estado-badge ${this._estadoCls(e)}">${this._estadoLabel(e)}</span><span class="chip-neutral">${this._esc(surveyName)}</span></div>
         </div>
       </div>
       <div class="detail-actions-wrap">
@@ -3215,7 +3218,14 @@ const Dashboard = {
   // su cuenta (pdf-export._esc), por lo que NO se escapea en _buildSections:
   // aqui, en los puntos de render del front.
   _seccionesHtml(sections) {
-    return (sections || []).map(s => `<div class="detail-section detail-section--fields"><div class="detail-section-title">${this._esc(s.title)}</div>${(s.fields || []).map(f => `<div class="detail-field"><div class="detail-question">${this._esc(f.label)}</div><div class="detail-answer">${this._esc(f.value ?? '—')}</div></div>`).join('')}</div>`).join('');
+    return (sections || []).map(s => {
+      const fields = (s.fields || []).map(f => {
+        const valor = f.value ?? '—';
+        const wide = typeof valor === 'string' && (valor.length > 90 || valor.includes('\n'));
+        return `<div class="detail-field${wide ? ' detail-field--wide' : ''}"><div class="detail-question">${this._esc(f.label)}</div><div class="detail-answer">${this._esc(valor)}</div></div>`;
+      }).join('');
+      return `<div class="detail-section detail-section--fields solicitud-seccion"><div class="detail-section-title">${this._esc(s.title)}</div>${fields}</div>`;
+    }).join('');
   },
 
   _animalName(id) { const a=this.animales.find(x=>x.id===id); return a?a.nombre:'(sin animal)'; },
@@ -7568,6 +7578,10 @@ const Dashboard = {
     reader.onload = (e) => {
       preview.innerHTML = `<img src="${String(e.target.result || '').replace(/"/g, '&quot;')}" alt="Foto del animal">`;
       if (chip) chip.textContent = 'Foto nueva';
+      if (previewId === 'ct-animal-foto-preview') {
+        this._contratoAnimalFotoPreview = String(e.target.result || '');
+        this._programarContratoPreview(0);
+      }
     };
     reader.readAsDataURL(input.files[0]);
   },
@@ -8676,7 +8690,7 @@ const Dashboard = {
         <div class="contrato-layout">
           <aside class="contrato-doc-pane" id="contrato-doc-pane">
             <button type="button" class="btn btn-sm btn-outline-green contrato-doc-back" data-action="_toggleContratoDoc" data-arg0="false">${Icons.arrowLeft} Volver a la firma</button>
-            ${this._contratoTerminosHtml(p)}
+            <iframe class="contrato-doc-frame" id="contrato-doc-frame" title="Vista previa del contrato"></iframe>
           </aside>
           <form class="contrato-form-pane" data-submit="guardarContrato" data-sarg0="${adopcionId}">
             <div class="alert-item info" style="margin-bottom:14px">${Icons.pencil} <span>Revisa el documento, completa los datos y firma en los recuadros. Los campos con * son obligatorios.</span></div>
@@ -8712,10 +8726,13 @@ const Dashboard = {
             </div>
 
             <label class="contrato-acepta"><input type="checkbox" id="ct-acepta" required><span>He leído y acepto la <a href="#" class="contrato-link" data-action="showTerminosAdopcion" data-arg0="${adopcionId}" data-stop-propagation="1">hoja de estipulaciones</a> del contrato de adopción.</span></label>
-            <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Sello y firma de la entidad</div>
-              <div class="detail-section-note">El documento se firma con el sello real de la asociación. Puedes sustituirlo por otra imagen o firmar como persona en su lugar.</div>
-              <div class="form-row"><div class="form-group"><label for="ct-sello">Sello (imagen)</label><input type="file" id="ct-sello" accept="image/*" data-change="_previewSelloContrato" data-cpass="el"><div id="ct-sello-preview" style="margin-top:6px"></div><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px" data-action="_limpiarSelloContrato">Quitar sello</button></div>
-              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" data-change="_toggleEntidadFirma" data-cpass="checked"> Firmar como persona (en lugar del sello)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px" aria-label="Firma de la entidad"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" data-action="_clearFirmaCanvas" data-arg0="entidad-firma">Limpiar firma</button></div></div>
+            <div class="detail-section" style="margin-top:6px"><div class="detail-section-title">Firma de la entidad</div>
+              <div class="detail-section-note">Por defecto se usa la firma manuscrita que aparece en el documento. Puedes subir otra imagen o firmar a mano.</div>
+              <div class="contrato-firma-opciones">
+                <div class="contrato-firma-default"><img src="assets/contratos/firma-nebak.jpg" alt="Firma de la asociación"><span>Firma del documento (por defecto)</span></div>
+                <div class="form-group"><label for="ct-firma-archivo">Usar otra firma (imagen)</label><input type="file" id="ct-firma-archivo" accept="image/*" data-change="_previewFirmaEntidad" data-cpass="el"><div id="ct-firma-archivo-preview" class="contrato-firma-preview"></div><div class="form-hint">Si no subes ninguna, el contrato lleva la firma manuscrita del documento.</div></div>
+              </div>
+              <div class="form-group"><label><input type="checkbox" id="ct-firma-entidad" data-change="_toggleEntidadFirma" data-cpass="checked"> Firmar a mano (sustituye la firma del documento)</label><canvas id="entidad-firma" width="560" height="200" style="width:100%;border:1px dashed var(--gray-300);border-radius:8px;background:var(--white);touch-action:none;display:none;margin-top:6px" aria-label="Firma de la entidad"></canvas><button type="button" class="btn btn-sm btn-outline-green" style="margin-top:6px;display:none" id="entidad-firma-clear" data-action="_clearFirmaCanvas" data-arg0="entidad-firma">Limpiar firma</button></div>
             </div>
             <label class="contrato-acepta"><input type="checkbox" id="ct-enviar" checked><span>Enviar una copia por email al adoptante y a Grupo Nebak al firmar.</span></label>
             <div class="contrato-actions"><button type="button" class="btn btn-outline-green" data-action="closeContratoForm">Cancelar</button><button type="submit" class="btn btn-primary">${Icons.checkCircle} Firmar y guardar</button></div>
@@ -8735,7 +8752,120 @@ const Dashboard = {
     this.injectIcons();
     this._setupFirmaCanvas('f1-firma');
     this._setupFirmaCanvas('f2-firma');
+    this._contratoPreviewP = p;
+    this._contratoFirmaArchivo = '';
+    this._contratoAnimalFotoPreview = '';
+    this._programarContratoPreview(0);
+    const form = body.querySelector('.contrato-form-pane');
+    if (form) {
+      form.addEventListener('input', () => this._programarContratoPreview());
+      form.addEventListener('change', () => this._programarContratoPreview());
+    }
+    ['f1-firma', 'f2-firma', 'entidad-firma'].forEach((id) => {
+      const cv = document.getElementById(id);
+      if (!cv) return;
+      ['mouseup', 'pointerup', 'touchend'].forEach((ev) => cv.addEventListener(ev, () => this._programarContratoPreview(0)));
+    });
     this._focusModal(modal);
+  },
+
+  // La vista previa se construye con el MISMO modelo y el MISMO HTML que el
+  // PDF. Así el gestor no puede enseñar un contrato distinto del que se firma.
+  _programarContratoPreview(delay) {
+    clearTimeout(this._contratoPreviewTimer);
+    const espera = typeof delay === 'number' ? delay : 120;
+    this._contratoPreviewTimer = setTimeout(() => this._actualizarContratoPreview(), espera);
+  },
+
+  _firmaCanvasValue(id) {
+    const cv = document.getElementById(id);
+    if (!cv) return '';
+    try {
+      const px = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 0) return cv.toDataURL('image/png');
+    } catch (e) { /* canvas no disponible */ }
+    return '';
+  },
+
+  _contratoPreviewData(p) {
+    const v = (id) => {
+      const el = document.getElementById(id);
+      return el ? String(el.value == null ? '' : el.value).trim() : '';
+    };
+    const checked = (id) => !!(document.getElementById(id) || {}).checked;
+    const base = this._contratoAnimalDatos(p);
+    const tutorActivo = checked('ct-tutor');
+    const r65Activo = checked('ct-mayor-65');
+    return {
+      id: 'preview',
+      adopcion_id: p.id,
+      animal_id: p.animal_id || null,
+      animal: v('ct-animal-nombre') || p.animal || base.nombre || '',
+      animal_foto: this._contratoAnimalFotoPreview || base.foto || '',
+      especie: base.especie || '',
+      raza: v('ct-animal-raza') || base.raza || '',
+      edad: v('ct-animal-edad') || base.edad || '',
+      animal_sexo: v('ct-animal-sexo') || base.sexo || '',
+      animal_microchip: v('ct-animal-microchip') || base.microchip || '',
+      animal_fecha_nacimiento: base.fecha_nacimiento || '',
+      animal_capa: base.capa || '',
+      animal_color: base.color || '',
+      animal_tamano: base.tamano || '',
+      animal_esterilizada: base.esterilizada,
+      animal_descripcion: base.descripcion || '',
+      nombre_definitivo: v('ct-nombre-definitivo'),
+      fecha: v('ct-fecha'),
+      ciudad: v('ct-ciudad'),
+      donacion_adoptante: v('ct-donacion'),
+      indemnizacion_importe: v('ct-indemnizacion'),
+      f1_nombre: v('f1-nombre'),
+      f1_dni: v('f1-dni'),
+      f1_direccion: v('f1-direccion'),
+      f1_email: v('f1-email'),
+      f1_telefono: v('f1-telefono'),
+      f1_firma: this._firmaCanvasValue('f1-firma'),
+      f2_nombre: tutorActivo ? v('f2-nombre') : '',
+      f2_dni: tutorActivo ? v('f2-dni') : '',
+      f2_relacion: tutorActivo ? v('f2-relacion') : '',
+      f2_direccion: tutorActivo ? v('f2-direccion') : '',
+      f2_email: tutorActivo ? v('f2-email') : '',
+      f2_telefono: tutorActivo ? v('f2-telefono') : '',
+      f2_rol: tutorActivo ? 'Tutor' : '',
+      f2_firma: tutorActivo ? this._firmaCanvasValue('f2-firma') : '',
+      entidad_firma: this._contratoFirmaArchivo || (checked('ct-firma-entidad') ? this._firmaCanvasValue('entidad-firma') : ''),
+      adoptante_mayor_65: r65Activo ? '1' : '',
+      responsable_nombre: r65Activo ? v('r65-nombre') : '',
+      responsable_dni: r65Activo ? v('r65-dni') : '',
+      responsable_telefono: r65Activo ? v('r65-telefono') : '',
+      responsable_email: r65Activo ? v('r65-email') : '',
+      responsable_direccion: r65Activo ? v('r65-direccion') : ''
+    };
+  },
+
+  _actualizarContratoPreview() {
+    const p = this._contratoPreviewP;
+    const frame = document.getElementById('contrato-doc-frame');
+    if (!p || !frame) return;
+    try {
+      const c = this._contratoPreviewData(p);
+      const html = PdfExport._buildContracto(c, PdfExport._logoFallback);
+      frame.srcdoc = html;
+    } catch (err) {
+      frame.srcdoc = '<!DOCTYPE html><html lang="es"><body style="font:13px Arial;padding:24px;color:#b91c1c">No se pudo generar la vista previa: ' + this._esc(this._errMsg(err)) + '</body></html>';
+    }
+  },
+
+  _previewFirmaEntidad(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) { this._contratoFirmaArchivo = ''; this._programarContratoPreview(0); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      this._contratoFirmaArchivo = String(reader.result || '');
+      const box = document.getElementById('ct-firma-archivo-preview');
+      if (box) box.innerHTML = `<img src="${this._contratoFirmaArchivo.replace(/"/g, '&quot;')}" alt="Firma alternativa">`;
+      this._programarContratoPreview(0);
+    };
+    reader.readAsDataURL(file);
   },
 
   // En escritorio el documento y el formulario conviven en dos paneles. En
@@ -8786,28 +8916,7 @@ const Dashboard = {
     const cv = document.getElementById(canvasId);
     if (!cv) return;
     cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
-  },
-
-  _previewSelloContrato(input) {
-    const f = (input && input.files && input.files[0]) || null;
-    const box = document.getElementById('ct-sello-preview');
-    if (!box) return;
-    if (!f) { box.innerHTML = ''; return; }
-    const r = new FileReader();
-    r.onload = () => {
-      const url = String(r.result || '');
-      box.innerHTML = `<img src="${url.replace(/"/g, '&quot;')}" alt="Sello" style="max-height:90px;border:1px solid var(--gray-200);border-radius:8px">`;
-      try { localStorage.setItem('gn_sello_url', url); } catch (e) {}
-    };
-    r.readAsDataURL(f);
-  },
-
-  _limpiarSelloContrato() {
-    try { localStorage.removeItem('gn_sello_url'); } catch (e) {}
-    const inp = document.getElementById('ct-sello');
-    if (inp) inp.value = '';
-    const box = document.getElementById('ct-sello-preview');
-    if (box) box.innerHTML = '';
+    if (this._contratoPreviewP) this._programarContratoPreview(0);
   },
 
   _toggleEntidadFirma(show) {
@@ -8836,6 +8945,10 @@ const Dashboard = {
     const el = document.getElementById('contrato-modal');
     if (!el) return;
     if (el.style.display === 'none') return;
+    clearTimeout(this._contratoPreviewTimer);
+    this._contratoPreviewP = null;
+    this._contratoFirmaArchivo = '';
+    this._contratoAnimalFotoPreview = '';
     el.style.display = 'none';
     const shell = el.querySelector('.contrato-shell');
     if (shell) shell.classList.remove('doc-open');
@@ -8864,6 +8977,11 @@ const Dashboard = {
     if (tutorActivo && !f2Nombre) { this.showSnackbar('Indica el nombre del tutor o desmarca la opción de tutor', 'warning'); return; }
     const enviarCopia = !!(document.getElementById('ct-enviar') || {}).checked;
     const firmaEntidadActiva = !!(document.getElementById('ct-firma-entidad') || {}).checked;
+    let entidadFirmaArchivo = this._contratoFirmaArchivo || '';
+    if (!entidadFirmaArchivo) {
+      const archivoFirma = ((document.getElementById('ct-firma-archivo') || {}).files || [])[0] || null;
+      if (archivoFirma) entidadFirmaArchivo = (await this._leerImagenContrato(archivoFirma, 900, 360, 0.9)) || '';
+    }
     const firma = async (id) => {
       const cv = document.getElementById(id);
       if (!cv) return '';
@@ -8898,7 +9016,7 @@ const Dashboard = {
       f2_telefono: tutorActivo ? document.getElementById('f2-telefono').value.trim() : '',
       f2_rol: tutorActivo ? 'Tutor' : '',
       f2_firma: tutorActivo ? await firma('f2-firma') : '',
-      entidad_firma: firmaEntidadActiva ? await firma('entidad-firma') : '',
+      entidad_firma: entidadFirmaArchivo || (firmaEntidadActiva ? await firma('entidad-firma') : ''),
       adoptante_mayor_65: (document.getElementById('ct-mayor-65') || {}).checked ? '1' : '',
       responsable_nombre: (document.getElementById('r65-nombre') || {}).value ? document.getElementById('r65-nombre').value.trim() : '',
       responsable_dni: (document.getElementById('r65-dni') || {}).value ? document.getElementById('r65-dni').value.trim() : '',
@@ -9113,9 +9231,15 @@ const Dashboard = {
           </div>
         </div>
         <div class="contrato-layout contrato-layout--doc">
-          <aside class="contrato-doc-pane is-open contrato-doc-pane--full">${this._contratoTerminosHtml(p, c)}</aside>
+          <aside class="contrato-doc-pane is-open contrato-doc-pane--full"><iframe class="contrato-doc-frame" id="contrato-doc-frame" title="Documento del contrato"></iframe></aside>
         </div>
       </div>`;
+    const frame = document.getElementById('contrato-doc-frame');
+    if (frame) {
+      const datos = Object.assign({ adopcion_id: p.id, animal: p.animal, f1_nombre: p.adoptante, fecha: p.fecha_contrato || '' }, c || {});
+      try { frame.srcdoc = PdfExport._buildContracto(datos, PdfExport._logoFallback); }
+      catch (err) { frame.srcdoc = '<!DOCTYPE html><html lang="es"><body style="font:13px Arial;padding:24px;color:#b91c1c">No se pudo generar el documento.</body></html>'; }
+    }
     modal.style.display = 'flex';
     this._modalScrollLock(true);
     this.injectIcons();

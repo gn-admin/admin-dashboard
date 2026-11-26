@@ -161,7 +161,7 @@ describe('generarPdfModelo: renderiza el contenido del modelo', () => {
     assert.ok(ctx.generarPdfModelo(modelo));
     const texto = fake.salida.map(x => (x.getText ? x.getText() : '')).join(' ');
     // Datos y cierre: dos veces la adoptante, una el tutor (el fixture no tiene 65).
-    assert.equal((texto.match(/Firma adoptante/g) || []).length, 2);
+    assert.equal((texto.match(/Firma adoptante/gi) || []).length, 2);
     assert.equal((texto.match(/Tutor \/ persona de apoyo/g) || []).length, 1);
   });
 });
@@ -216,6 +216,8 @@ describe('adjunto del correo: el contrato de ctr_mwovlotk llega entero', () => {
       tamano: 'Pequeña', esterilizada: 'Sí', descripcion: 'Muy sociable.', foto: FIRMA
     },
     entidad: ENTIDAD,
+    entidadFirma: FIRMA,
+    entidadLogo: 'assets/contratos/logo-nebak-horizontal.jpg',
     tutor: null,
     responsable65: {
       nombre: 'Persona Responsable', dni: '11111111H', telefono: '611111111',
@@ -284,11 +286,11 @@ describe('adjunto del correo: el contrato de ctr_mwovlotk llega entero', () => {
 
     // Firmas: las del modelo, sin las copias `legado` (adoptante x3: datos,
     // cierre y cláusula 65). El único hueco es la persona responsable.
-    assert.equal((texto.match(/Firma adoptante/g) || []).length, 3);
+    assert.equal((texto.match(/Firma adoptante/gi) || []).length, 3);
     assert.equal((texto.match(/Firma Asociación/g) || []).length, 1);
     assert.equal((texto.match(/Firma de la persona responsable/g) || []).length, 1);
     assert.equal((texto.match(/\[Sin firma\]/g) || []).length, 1);
-    assert.equal((texto.match(/Fotografía/g) || []).length, 1);
+    assert.equal((texto.match(/Fotografía/gi) || []).length, 1);
     assert.equal((texto.match(/\d+ª\./g) || []).length, 20);
   });
 });

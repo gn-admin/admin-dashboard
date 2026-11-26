@@ -85,12 +85,12 @@ describe('_buildContracto: 20 estipulaciones y datos del contrato', () => {
   });
 
   it('incluye nombre definitivo, capa, color y tamaño', () => {
-    assert.match(html, /Nombre definitivo/);
+    assert.match(html, /NOMBRE DEFINITIVO/);
     assert.match(html, /Nala/);
     assert.match(html, /Atigrada/);
     assert.match(html, /Gris/);
     assert.match(html, /Mediano/);
-    assert.match(html, /datos de adopción/);
+    assert.match(html, /DATOS DE ADOPCIÓN/);
     assert.doesNotMatch(html, /Peso/);
   });
 
@@ -131,10 +131,11 @@ describe('_buildContracto: foto, ficha del animal, adoptante y tutor', () => {
     assert.match(html, /page-break/);
     assert.match(html, /Calle Menor 2/);
     assert.match(html, /data:image\/png;base64,TUTOR/);
-    // Sello real de la asociación en lugar del sello generado con CSS.
+    // Firma manuscrita y logo reales de la asociación en lugar de un sello CSS.
     assert.match(html, /\.animal-photo\{width:110px;height:110px;object-fit:cover/);
-    assert.match(html, /sello--img/);
-    assert.match(html, /assets\/contratos\/sello-nebak\.jpg/);
+    assert.match(html, /firma-img/);
+    assert.match(html, /assets\/contratos\/firma-nebak\.jpg/);
+    assert.match(html, /assets\/contratos\/logo-nebak-horizontal\.jpg/);
     assert.doesNotMatch(html, /SELLO DE LA ENTIDAD/);
     assert.doesNotMatch(html, /<div class="label">Rol<\/div>/);
     assert.match(html, /2026\/11\/10/);
@@ -271,7 +272,7 @@ describe('_buildContracto: cláusula de mayores de 65', () => {
     assert.match(con, /48 horas/);
     assert.match(con, /recuperar al animal para asegurar su protección y reubicación/);
     assert.match(con, /Luis/);
-    assert.match(con, /DNI\/NIE 2/);
+    assert.match(con, /DNI\/NIE<\/th><td>2<\/td>/);
     assert.match(con, /Firma de la persona responsable/);
     assert.match(con, /page-break/);
   });

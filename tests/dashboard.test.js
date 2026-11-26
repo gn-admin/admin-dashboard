@@ -6,6 +6,7 @@ const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const Dashboard = require('../src/js/dashboard.js');
+const Finanzas = require('../src/js/dashboard-finanzas.js');
 
 describe('_byId: busqueda tolerante a tipos', () => {
   const list = [{ id: 'ani_1' }, { id: 42 }, { id: '' }, { nombre: 'sin id' }];
@@ -335,6 +336,19 @@ describe('_bajoStock: aviso de inventario', () => {
     assert.equal(Dashboard._bajoStock({ cantidad: 5, minimo: 2 }), false);
     assert.equal(Dashboard._bajoStock({ cantidad: 0, minimo: 0 }), false);
     assert.equal(Dashboard._bajoStock({}), false);
+  });
+});
+
+describe('ajuste de stock: suma y resta numérica', () => {
+  it('no concatena cuando el delta llega como texto', () => {
+    assert.equal(Finanzas._ajustarCantidadInventario('1', '1'), 2);
+    assert.equal(Finanzas._ajustarCantidadInventario('1', '-1'), 0);
+    assert.equal(Finanzas._ajustarCantidadInventario(12, 1), 13);
+  });
+
+  it('nunca deja el stock en negativo', () => {
+    assert.equal(Finanzas._ajustarCantidadInventario('0', '-1'), 0);
+    assert.equal(Finanzas._ajustarCantidadInventario('', '-1'), 0);
   });
 });
 

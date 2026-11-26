@@ -161,6 +161,7 @@ const App = {
         socios: 'Socios / Voluntarios',
         blacklist: 'Lista Negra',
         reportes: 'Reportes y actividad',
+        actividad: 'Registro de actividad',
         redes: 'Redes Sociales',
         donaciones: 'Donaciones',
         almacen: 'Almacén',

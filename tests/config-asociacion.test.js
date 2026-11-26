@@ -65,7 +65,7 @@ describe('config: datos de la asociación en el contrato', () => {
     const cfg = generar(DOCUMENTO);
     assert.equal(cfg.asociacion.cif, 'G75203562');
     const { parrafo } = contrato(cfg.asociacion);
-    assert.match(parrafo.texto, /^Y, de la otra parte, Asociación Pro-Bienestar Animal, Grupo Nebak, con CIF G75203562, con domicilio en calle Santiago/);
+    assert.match(parrafo.texto, /^Y, de la otra parte, la Asociación Pro-Bienestar Animal, Grupo Nebak, con CIF G75203562, con domicilio en calle Santiago/);
     assert.match(parrafo.texto, /que en adelante será denominada como la Asociación\.$/);
   });
 
@@ -96,7 +96,7 @@ describe('config: datos de la asociación en el contrato', () => {
     // Lo que la config no define sigue saliendo de la copia del contrato.
     assert.equal(ent.email, 'viejo@example.test');
     const { parrafo } = contrato(ent);
-    assert.match(parrafo.texto, /^Y, de la otra parte, Asociación Pro-Bienestar Animal, Grupo Nebak, con CIF G75203562, con domicilio en calle Santiago/);
+    assert.match(parrafo.texto, /^Y, de la otra parte, la Asociación Pro-Bienestar Animal, Grupo Nebak, con CIF G75203562, con domicilio en calle Santiago/);
     assert.match(parrafo.texto, /y con teléfonos de contacto 625140588 y 600042594, que en adelante será denominada como la Asociación\.$/);
   });
 
@@ -121,9 +121,8 @@ describe('config: datos de la asociación en el contrato', () => {
 
   it('con el nombre en blanco el párrafo de la asociación sigue completo', () => {
     const cfg = generar({ ASOCIACION_NOMBRE: '   ' });
-    const { parrafo, pie } = contrato(cfg.asociacion);
+    const { parrafo } = contrato(cfg.asociacion);
     assert.equal(parrafo.texto, 'Y, de la otra parte, la Asociación.');
     assert.doesNotMatch(parrafo.texto, /,\s*,|undefined|null/);
-    assert.equal(pie.texto, 'Generado por Grupo Nebak · 15/01/2026');
   });
 });

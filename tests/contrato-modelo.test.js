@@ -26,6 +26,8 @@ function fixture(extra = {}) {
       tamano: 'Mediana', esterilizada: 'Sí', descripcion: 'Muy sociable.'
     },
     entidad: { nombre: 'Asociación Grupo Nebak', cif: 'G00000000', domicilio: 'Irún', telefono: '600111222' },
+    entidadFirma: 'assets/contratos/firma-nebak.jpg',
+    entidadLogo: 'assets/contratos/logo-nebak-horizontal.jpg',
     tutor: { nombre: 'Luis', dni: '87654321X', relacion: 'Padre', direccion: 'Calle 2', email: 'luis@example.test', telefono: '600222333', firma: '' },
     importes: { donacion: 150, indemnizacion: 900 },
     fecha: '15/01/2026',
@@ -64,7 +66,7 @@ describe('ContratoModelo: contenido completo del contrato', () => {
     assert.ok(bloques.some(b => b.tipo === 'seccion' && /Anexo I\. Datos del tutor/.test(b.texto)));
     assert.match(texto, /Luis/);
     assert.match(texto, /Padre/);
-    assert.ok(bloques.some(b => b.tipo === 'firmas' && (b.items || []).some(it => it.etiqueta === 'Tutor / persona de apoyo')));
+    assert.ok(bloques.some(b => b.tipo === 'firmas' && (b.items || []).some(it => it.etiqueta === 'Tutor / persona de apoyo:')));
   });
 
   // D-C5: el anexo de condiciones se firma en la hoja de estipulaciones, no en
@@ -92,8 +94,10 @@ describe('ContratoModelo: contenido completo del contrato', () => {
       assert.equal(legados[i].nombre, it.nombre);
       assert.equal(legados[i].firma || '', it.firma || '');
     });
-    // La asociación conserva su sello en la forma que sí entiende el servidor viejo.
-    assert.equal(legados.find(b => b.sello).tipo, 'firmaEntidad');
+    // La asociación conserva su firma y su logo en la forma que entiende el servidor viejo.
+    const legadoEntidad = legados.find(b => b.logo);
+    assert.ok(legadoEntidad, 'falta la firma de la asociación en la forma antigua');
+    assert.match(legadoEntidad.firma, /firma-nebak\.jpg/);
     // La foto también viaja suelta: el servidor viejo no mira `tabla.foto`.
     const conFoto = fixture({ animal: { nombre: 'Luna', foto: 'https://example.test/luna.jpg' } }).bloques;
     const fotoLegada = conFoto.find(b => b.legado && b.tipo === 'imagen');
@@ -104,7 +108,7 @@ describe('ContratoModelo: contenido completo del contrato', () => {
   it('la foto de la ficha viaja en un marco cuadrado', () => {
     const tabla = fixture().bloques.find(b => b.tipo === 'tabla' && b.foto);
     assert.ok(tabla, 'falta la foto en la ficha');
-    assert.equal(tabla.foto.etiqueta, 'Fotografía');
+    assert.equal(tabla.foto.etiqueta, 'FOTOGRAFÍA:');
     assert.equal(tabla.foto.ancho, 100);
     assert.equal(tabla.foto.alto, 100);
   });

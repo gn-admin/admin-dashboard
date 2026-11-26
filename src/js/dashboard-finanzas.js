@@ -43,7 +43,7 @@ async renderDonaciones(el) {
         <div class="stat-card screen-stat screen-stat--blue"><div class="stat-card-icon blue">${Icons.trendingUp}</div><div class="stat-card-info"><div class="stat-card-label">Este mes</div><div class="stat-card-value">${mes.cur.toFixed(2)} €</div><div class="stat-card-change">${mes.prev.toFixed(2)} € el mes pasado</div></div></div>
       </div>
       <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${this.donaciones.length} donaciones</span><button type="button" class="btn btn-primary btn-sm" data-action="showDonacionForm">${Icons.plus} Nueva</button></div>
-      <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Donante</th><th scope="col">Importe</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha) : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
+      <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Fecha</th><th scope="col">Donante</th><th scope="col">Importe</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(d => `<tr><td data-label="Fecha">${d.fecha ? this._fmtFecha(d.fecha).split(' ')[0] : '—'}</td><td data-label="Donante">${this._esc(d.donante || '')}</td><td data-label="Importe">${this._euros(d.importe)} €</td><td data-label="Acciones" class="table-actions"><button type="button" class="btn btn-danger btn-sm" data-action="deleteDonacion" data-arg0="${this._esc(d.id)}" aria-label="Eliminar donación" title="Eliminar">${Icons.trash}</button></td></tr>`).join('') : `<tr><td colspan="4" class="table-empty">Aun no hay donaciones</td></tr>`}</tbody></table></div></div>
     </div>
     <div class="page-detail-container"></div>`;
 },
@@ -116,6 +116,37 @@ async renderAlmacen(el) {
   const items = (this.inventario || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
   const bajo = items.filter(it => this._bajoStock(it)).length;
   const unidades = items.reduce((n, it) => n + (parseFloat(it.cantidad) || 0), 0);
+  const filas = items.map(it => {
+    const low = this._bajoStock(it);
+    const minimo = parseFloat(it.minimo) || 0;
+    const unidad = this._esc(it.unidad || 'uds.');
+    return `<tr class="almacen-fila${low ? ' is-low' : ''}">
+      <td data-label="Artículo">
+        <div class="almacen-articulo">
+          <span class="almacen-icono" aria-hidden="true">${Icons.box}</span>
+          <span class="almacen-identidad"><b>${this._esc(it.nombre || '')}</b></span>
+        </div>
+      </td>
+      <td data-label="Stock">
+        <div class="almacen-stock">
+          <span class="almacen-cantidad">${this._esc(String(it.cantidad ?? '0'))}</span>
+          <span class="almacen-unidad">${unidad}</span>
+          ${low ? '<span class="estado-badge descartada">Bajo mínimo</span>' : ''}
+          ${minimo > 0 ? `<small class="almacen-minimo">Mín. ${this._esc(String(it.minimo))}</small>` : ''}
+        </div>
+      </td>
+      <td data-label="Acciones" class="table-actions">
+        <div class="almacen-acciones">
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button>
+          <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button>
+          <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list">
+            <button type="button" class="btn btn-outline-green btn-sm" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">${Icons.pencil} Editar</button>
+            <button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash} Eliminar</button>
+          </div></details>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
   el.innerHTML = `
     <div class="page-list-container">
       ${this._screenHead({
@@ -128,13 +159,17 @@ async renderAlmacen(el) {
           this._screenPill(unidades, 'unidades')
         ]
       })}
-      <div class="card" style="margin-bottom:16px"><div class="card-body" style="padding:16px">
-        <div style="font-weight:700;margin-bottom:6px">${Icons.box} Que se guarda aqui</div>
-        <p style="font-size:.82rem;color:var(--gray-600);margin:0 0 8px">Articulos de consumo de la asociacion: pienso y latas, medicacion y material sanitario, limpieza, jaulas y camas, material para paseos, salidas y eventos. <b>No</b> va aqui la documentacion de los animales (está en la ficha de cada uno) ni el dinero (va en <b>Gastos</b> y en <b>Donaciones</b>).</p>
-        <p style="font-size:.82rem;color:var(--gray-600);margin:0"><b>Como se usa:</b> da de alta cada articulo una sola vez con su unidad (sacos, latas, comprimidos) y la cantidad que hay ahora. Usa <b>+1</b> y <b>−1</b> para anotar compras y consumos rapidos. Pon un <b>Minimo (aviso)</b> para que se te avise cuando baje de esa cifra. Se guarda en la nube, asi que lo ves igual desde el movil y desde el ordenador.</p>
-      </div></div>
-      <div class="list-header screen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${items.length} articulos</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo</button></div>
-      <div class="card"><div class="card-body-flush"><table class="data-table"><thead><tr><th scope="col">Artículo</th><th scope="col">Stock</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? items.map(it => `<tr><td data-label="Artículo">${this._esc(it.nombre || '')}<div style="font-size:var(--text-xs);color:var(--gray-500)">${this._esc(it.unidad || '')}</div></td><td data-label="Stock"><span class="estado-badge ${this._bajoStock(it) ? 'descartada' : 'en_proceso'}">${this._esc(String(it.cantidad ?? '0'))}</span></td><td data-label="Acciones" class="table-actions" style="white-space:nowrap"><button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="1" aria-label="Aumentar stock de ${this._esc(it.nombre || 'artículo')}">+1</button> <button type="button" class="btn btn-outline-green btn-sm" data-action="ajustarInventario" data-arg0="${this._esc(it.id)}" data-arg1="-1" aria-label="Reducir stock de ${this._esc(it.nombre || 'artículo')}">−1</button> <details class="action-menu"><summary class="btn btn-outline-green btn-sm" aria-label="Más acciones" title="Más acciones">⋮</summary><div class="action-menu-list"><button type="button" class="btn btn-outline-green btn-sm" data-action="showInventarioForm" data-arg0="${this._esc(it.id)}">Editar</button><button type="button" class="btn btn-danger btn-sm" data-action="deleteInventario" data-arg0="${this._esc(it.id)}" aria-label="Eliminar ${this._esc(it.nombre || 'artículo')}" title="Eliminar">${Icons.trash} Eliminar</button></div></details></td></tr>`).join('') : `<tr><td colspan="3" class="table-empty">Almacén vacío</td></tr>`}</tbody></table></div></div>
+      <div class="almacen-guia">
+        <span class="almacen-guia-icon" aria-hidden="true">${Icons.box}</span>
+        <div class="almacen-guia-copy">
+          <b>Control de existencias</b>
+          <p>Pienso, medicación, limpieza y material de la asociación. La documentación vive en la ficha de cada animal; el dinero, en Gastos y Donaciones.</p>
+          <small>Usa −1 y +1 para compras y consumos; el mínimo activa el aviso de reposición.</small>
+        </div>
+      </div>
+      ${bajo ? `<div class="almacen-aviso" role="status">${Icons.alertTriangle}<div><b>${bajo === 1 ? '1 artículo necesita reposición' : bajo + ' artículos necesitan reposición'}</b><span>Revisa las existencias marcadas como «Bajo mínimo».</span></div></div>` : ''}
+      <div class="list-header screen-list-head almacen-list-head"><span class="response-count" aria-live="polite" aria-atomic="true">${items.length === 1 ? '1 artículo' : items.length + ' artículos'}</span><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo artículo</button></div>
+      <div class="card almacen-card"><div class="card-body-flush"><table class="data-table almacen-tabla"><thead><tr><th scope="col">Artículo</th><th scope="col">Stock</th><th scope="col"><span class="sr-only">Acciones</span></th></tr></thead><tbody>${items.length ? filas : `<tr><td colspan="3" class="table-empty"><div class="almacen-vacio">${Icons.box}<b>Almacén vacío</b><p>Añade el primer artículo para empezar a controlar su stock.</p><button type="button" class="btn btn-primary btn-sm" data-action="showInventarioForm">${Icons.plus} Nuevo artículo</button></div></td></tr>`}</tbody></table></div></div>
     </div>
     <div class="page-detail-container"></div>`;
 },
@@ -199,10 +234,16 @@ async saveInventario(e, id) {
   this.showSnackbar(id ? 'Artículo actualizado' : 'Artículo creado', 'success');
 },
 
+_ajustarCantidadInventario(cantidad, delta) {
+  const base = parseFloat(cantidad);
+  const paso = parseFloat(delta);
+  return Math.max(0, (Number.isFinite(base) ? base : 0) + (Number.isFinite(paso) ? paso : 0));
+},
+
 ajustarInventario(id, delta) {
   const it = this._byId(this.inventario, id);
   if (!it) return;
-  it.cantidad = Math.max(0, (parseFloat(it.cantidad) || 0) + delta);
+  it.cantidad = this._ajustarCantidadInventario(it.cantidad, delta);
   this.saveLocal();
   this._updateLocalYApi('inventario', it);
   this.renderAlmacen(document.getElementById('page-almacen'));
