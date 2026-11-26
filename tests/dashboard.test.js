@@ -77,6 +77,117 @@ describe('_fotoSrc: normaliza fotos para <img>', () => {
       'https://drive.google.com/thumbnail?id=ABC123&sz=w200'
     );
   });
+
+  it('sin foto usa portada_url (las fichas importadas solo traen portada)', () => {
+    assert.equal(
+      Dashboard._fotoSrc({ foto: '', foto_url: '', portada_url: 'https://drive.google.com/file/d/PORT9/view?usp=drivesdk' }),
+      'https://drive.google.com/thumbnail?id=PORT9&sz=w800'
+    );
+  });
+
+  it('portada ya en thumbnail se re-dimensiona para el listado', () => {
+    assert.equal(
+      Dashboard._fotoSrc({ portada_url: 'https://drive.google.com/thumbnail?id=PORT9&sz=w1200' }, 'w200'),
+      'https://drive.google.com/thumbnail?id=PORT9&sz=w200'
+    );
+  });
+
+  it('la foto manda sobre la portada', () => {
+    assert.equal(
+      Dashboard._fotoSrc({ foto: 'assets/animales/luna.jpg', portada_url: 'https://drive.google.com/thumbnail?id=PORT9&sz=w1200' }),
+      'assets/animales/luna.jpg'
+    );
+  });
+});
+
+describe('_mediaDriveSrc: un enlace de Drive se pinta siempre como thumbnail', () => {
+  it('enlace del visor -> thumbnail del tamaño pedido', () => {
+    assert.equal(
+      Dashboard._mediaDriveSrc('https://drive.google.com/file/d/XYZ9/view?usp=sharing', 'w1600'),
+      'https://drive.google.com/thumbnail?id=XYZ9&sz=w1600'
+    );
+  });
+
+  it('uc/open/thumbnail se normalizan sin duplicar el tamaño', () => {
+    assert.equal(
+      Dashboard._mediaDriveSrc('https://drive.google.com/uc?id=QWE12&export=download'),
+      'https://drive.google.com/thumbnail?id=QWE12&sz=w800'
+    );
+    assert.equal(
+      Dashboard._mediaDriveSrc('https://drive.google.com/thumbnail?id=ABC123&sz=w1200', 'w1600'),
+      'https://drive.google.com/thumbnail?id=ABC123&sz=w1600'
+    );
+  });
+
+  it('fileId suelto -> thumbnail', () => {
+    assert.equal(
+      Dashboard._mediaDriveSrc('1AbCdEfGhIjKlMnOpQrS', 'w1600'),
+      'https://drive.google.com/thumbnail?id=1AbCdEfGhIjKlMnOpQrS&sz=w1600'
+    );
+  });
+
+  it('carpetas de Drive, rutas y URLs externas pasan tal cual', () => {
+    const carpeta = 'https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrS?usp=sharing';
+    assert.equal(Dashboard._mediaDriveSrc(carpeta), carpeta);
+    assert.equal(Dashboard._mediaDriveSrc('assets/fotos/luna.jpg'), 'assets/fotos/luna.jpg');
+    assert.equal(Dashboard._mediaDriveSrc('https://ejemplo.org/foto.jpg?id=1234'), 'https://ejemplo.org/foto.jpg?id=1234');
+    assert.equal(Dashboard._mediaDriveSrc(''), '');
+    assert.equal(Dashboard._mediaDriveSrc(null), '');
+  });
+});
+
+describe('_galeriaDocRow: la galería guarda el thumbnail, no el visor', () => {
+  const animal = { id: 'ani_1', nombre: 'Luna' };
+  const subida = {
+    fileId: '1FOTO',
+    nombre: 'uuid.jpg',
+    webViewLink: 'https://drive.google.com/file/d/1FOTO/view?usp=drivesdk',
+    webContentLink: 'https://drive.google.com/uc?id=1FOTO&export=download'
+  };
+
+  it('foto -> thumbnail w1600 de su fileId', () => {
+    const row = Dashboard._galeriaDocRow(animal, { name: 'luna.jpg' }, subida, 'foto');
+    assert.equal(row.tipo, 'galeria-foto');
+    assert.equal(row.file_id, '1FOTO');
+    assert.equal(row.nombre, 'luna.jpg');
+    assert.equal(row.url, 'https://drive.google.com/thumbnail?id=1FOTO&sz=w1600');
+  });
+
+  it('vídeo -> enlace de vista (el reproductor no usa thumbnail)', () => {
+    const row = Dashboard._galeriaDocRow(animal, { name: 'clip.mp4' }, subida, 'video');
+    assert.equal(row.tipo, 'galeria-video');
+    assert.equal(row.url, subida.webViewLink);
+  });
+});
+
+describe('_galeriaHtml: el carrusel pinta el thumbnail', () => {
+  const previos = Dashboard.documentos;
+  afterEach(() => {
+    Dashboard.documentos = previos;
+    Dashboard._galeriaState = {};
+  });
+
+  it('una fila antigua con el enlace del visor se pinta como thumbnail', () => {
+    Dashboard.documentos = [
+      { id: 'd1', animal_id: 'ani_1', tipo: 'galeria-foto', orden: 0, url: 'https://drive.google.com/file/d/XYZ9/view?usp=sharing' },
+      { id: 'd2', animal_id: 'ani_1', tipo: 'galeria-video', orden: 1, url: 'https://drive.google.com/file/d/VID1/view' },
+      { id: 'd3', animal_id: 'ani_1', tipo: 'galeria-foto', orden: 2, file_id: 'SINURL' }
+    ];
+    const html = Dashboard._galeriaHtml('ani_1');
+    assert.match(html, /thumbnail\?id=XYZ9&amp;sz=w1600/);
+    assert.doesNotMatch(html, /file\/d\/XYZ9\/view/);
+    assert.match(html, /file\/d\/VID1\/view/);
+    assert.match(html, /thumbnail\?id=SINURL&amp;sz=w1600/);
+  });
+
+  it('las diapositivas no usan loading=lazy (no se cargaban)', () => {
+    Dashboard.documentos = [
+      { id: 'd1', animal_id: 'ani_1', tipo: 'galeria-foto', orden: 0, url: 'https://drive.google.com/thumbnail?id=ABC&sz=w1600' }
+    ];
+    const html = Dashboard._galeriaHtml('ani_1');
+    assert.match(html, /<img src="https:\/\/drive\.google\.com\/thumbnail\?id=ABC&amp;sz=w1600"/);
+    assert.doesNotMatch(html, /loading="lazy"/);
+  });
 });
 
 describe('_parseSolicitud: survey::resp', () => {

@@ -1742,10 +1742,19 @@ const Dashboard = {
 
     const slides = fotos.map((f, i) => {
       const isVideo = f.tipo === 'galeria-video';
-      const url = f.url || f.webViewLink || f.webContentLink || '';
+      const guardada = f.url || f.webViewLink || f.webContentLink || '';
+      // El enlace del visor de Drive no carga en un <img>: se normaliza a
+      // thumbnail (también las filas antiguas ya guardadas). El vídeo conserva
+      // su enlace de vista, que es lo que entiende el reproductor.
+      const url = isVideo
+        ? guardada
+        : (guardada ? this._mediaDriveSrc(guardada, 'w1600') : this._driveThumb(f.file_id, 'w1600'));
       const media = isVideo
         ? `<video controls preload="metadata" style="max-width:100%;max-height:100%"><source src="${this._esc(url)}">Tu navegador no soporta video.</video>`
-        : `<img src="${this._esc(url)}" alt="Archivo ${i + 1} de la galería" style="max-width:100%;max-height:100%;object-fit:contain" loading="lazy">`;
+        // Sin `loading="lazy"`: dentro del carrusel (pista con overflow y
+        // transform) el navegador no llega a pedir las imágenes y las
+        // diapositivas salían en blanco. Son como mucho 10 por animal.
+        : `<img src="${this._esc(url)}" alt="Archivo ${i + 1} de la galería" style="max-width:100%;max-height:100%;object-fit:contain" decoding="async">`;
       return `<div class="galeria-slide">${media}</div>`;
     }).join('');
 
@@ -1916,16 +1925,7 @@ const Dashboard = {
               const mimeType = file.type || (tipo === 'video' ? 'video/mp4' : 'image/jpeg');
               const up = await API.uploadDocumento(base64, upName, mimeType, 'galeria-' + tipo);
               if (!up || !up.data || !up.data.fileId) throw new Error('Sin respuesta del servidor al subir');
-              const row = {
-                id: 'doc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-                animal_id: a.id,
-                animal: a.nombre || '',
-                nombre: file.name || upName,
-                tipo: 'galeria-' + tipo,
-                file_id: up.data.fileId,
-                url: up.data.webViewLink || up.data.webContentLink || '',
-                fecha: new Date().toISOString().slice(0, 10)
-              };
+              const row = this._galeriaDocRow(a, file, up.data, tipo);
               try {
                 await API.createDocumento(row);
               } catch (errCreate) {
@@ -5482,17 +5482,55 @@ const Dashboard = {
   },
 
 
-  // Foto principal normalizada para <img>: admite thumbnail, fileId de Drive,
-  // enlaces file/d/... o uc?...id=... (fotos antiguas) y rutas/URLs directas.
-  _fotoSrc(a, sz) {
+  // Thumbnail de un fichero de Drive a partir de su id.
+  _driveThumb(id, sz) {
+    const limpio = String(id || '').trim();
+    return limpio ? 'https://drive.google.com/thumbnail?id=' + limpio + '&sz=' + (sz || 'w800') : '';
+  },
+
+  // URL servible en <img>: un fichero de Drive (enlace del visor `file/d/...`,
+  // `uc?id=`, `open?id=`, un thumbnail ya guardado o un fileId suelto) pasa a
+  // thumbnail del tamaño pedido; lo que no es de Drive (rutas, URLs externas,
+  // enlaces de carpeta) se devuelve tal cual. Es el único normalizador: lo usan
+  // la foto principal y la galería, al guardar y al pintar.
+  _mediaDriveSrc(valor, sz) {
     const size = sz || 'w800';
-    if (!a) return '';
-    if (a.foto_drive_id) return 'https://drive.google.com/thumbnail?id=' + a.foto_drive_id + '&sz=' + size;
-    const raw = String(a.foto || a.foto_url || '');
+    const raw = String(valor || '').trim();
     if (!raw) return '';
+    if (/^[A-Za-z0-9_-]{20,}$/.test(raw)) return this._driveThumb(raw, size);
+    if (!/^https?:\/\/(?:drive|docs)\.google\.com\//i.test(raw)) return raw;
     const m = raw.match(/[?&]id=([A-Za-z0-9_-]+)/) || raw.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=' + size;
+    if (m) return this._driveThumb(m[1], size);
     return raw;
+  },
+
+  // Fila de la hoja "Documentos" para un archivo de galería. `url` guarda
+  // siempre algo que se pinta en el carrusel: thumbnail para fotos (w1600) y
+  // vista del fichero para vídeos (el enlace del visor no vale para <img>).
+  _galeriaDocRow(a, file, up, tipo) {
+    const datos = up || {};
+    return {
+      id: 'doc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      animal_id: a.id,
+      animal: a.nombre || '',
+      nombre: (file && file.name) || datos.nombre || '',
+      tipo: 'galeria-' + tipo,
+      file_id: datos.fileId,
+      url: tipo === 'video'
+        ? (datos.webViewLink || datos.webContentLink || '')
+        : this._driveThumb(datos.fileId, 'w1600'),
+      fecha: new Date().toISOString().slice(0, 10)
+    };
+  },
+
+  // Foto principal normalizada para <img>. `portada_url` es la portada que se
+  // sube a Drive desde el gestor/importador; hasta ahora se ignoraba aquí y los
+  // animales que solo la tenían (sin `foto`) salían con el icono de especie.
+  _fotoSrc(a, sz) {
+    if (!a) return '';
+    const size = sz || 'w800';
+    if (a.foto_drive_id) return this._driveThumb(a.foto_drive_id, size);
+    return this._mediaDriveSrc(a.foto || a.foto_url || a.portada_url || '', size);
   },
 
   // Placeholder gris con silueta de pata para imagenes rotas o sin foto.
@@ -5504,13 +5542,14 @@ const Dashboard = {
   // tamaño completo (verFotoAnimal); sin foto, el icono de especie.
   _fotoHero(a) {
     const src = a ? this._fotoSrc(a) : '';
+    const altFoto = a && (a.portada_alt || a.nombre);
     if (!src) {
       const perro = a && a.especie === 'Perro';
       const gato = a && a.especie === 'Gato';
       return `<div style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${perro ? 'var(--primary-lighter)' : 'var(--info-light)'};color:${perro ? 'var(--primary-hover)' : 'var(--info)'};flex-shrink:0">${gato ? Icons.cat : (perro ? Icons.dog : Icons.paw)}</div>`;
     }
     const nombre = (a && a.nombre) || '';
-    return `<button type="button" class="foto-hero" title="Ver foto completa" aria-label="Ver foto de ${this._esc(nombre)}" data-action="verFotoAnimal" data-arg0="${this._esc(a.id)}" style="position:relative"><img src="${this._esc(src)}" alt="${this._esc(nombre)}"><span class="foto-principal-badge">Principal</span></button>`;
+    return `<button type="button" class="foto-hero" title="Ver foto completa" aria-label="Ver foto de ${this._esc(nombre)}" data-action="verFotoAnimal" data-arg0="${this._esc(a.id)}" style="position:relative"><img src="${this._esc(src)}" alt="${this._esc(altFoto)}"><span class="foto-principal-badge">Principal</span></button>`;
   },
 
   // Especies domesticas del selector de la ficha de animal. "Otro..." sigue

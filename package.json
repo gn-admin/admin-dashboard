@@ -13,6 +13,7 @@
     "scrape:milanuncios": "node scripts/scrape-milanuncios.mjs",
     "importar:animales": "node scripts/importar-animales.mjs",
     "reset:datos": "node scripts/reset-datos.mjs",
+    "normalizar:galeria": "node scripts/normalizar-galeria.mjs",
     "smoke:contract": "node scripts/contract-smoke.mjs",
     "lint": "echo 'No hay linter configurado aún'"
   },
