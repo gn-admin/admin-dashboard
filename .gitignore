@@ -37,6 +37,8 @@ src/robots.txt
 apps-script/*
 !apps-script/Code.gs
 !apps-script/WebPublicaciones.gs
+# Reset operativo: lo llama el endpoint admin `reset-datos` y no lleva secretos.
+!apps-script/ResetDatos.gs
 
 # Temporary
 *.tmp
@@ -44,6 +46,8 @@ apps-script/*
 
 # Documentación interna / operativa (nunca se sube al repo público)
 .internal-docs/
+datos/milanuncios/
+backups/
 
 # Harness y artefactos de pruebas locales
 e2e/

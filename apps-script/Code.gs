@@ -94,7 +94,7 @@ function _canWriteEndpoint(endpoint, user) {
   if (String(endpoint).indexOf('web-') === 0) return role === 'coordinador';
 
   // Escrituras sensibles solo admin
-  var adminOnly = { 'delete-socio':1, 'delete-blacklist':1, 'blacklist':1, 'update-blacklist':1, 'send-contrato-email':1, 'contrato-pdf-preview':1 };
+  var adminOnly = { 'delete-socio':1, 'delete-blacklist':1, 'blacklist':1, 'update-blacklist':1, 'send-contrato-email':1, 'contrato-pdf-preview':1, 'reset-datos':1 };
   if (adminOnly[endpoint]) return false;
 
   if (role === 'coordinador') {
@@ -383,6 +383,31 @@ function handlePost(endpoint, user, e) {
       var _r = jsonResponse({ success: deleteDocumentoCaso(body.id) }); _audit(endpoint,user,body,_r); return _r; }
     case 'delete-inventario': {
       var _r = jsonResponse({ success: deleteSheetRow(CONFIG.sheets.inventario, body.id) }); _audit(endpoint,user,body,_r); return _r; }
+    case 'reset-datos': {
+      // Borrado masivo de la operativa. Solo admin, con copia previa obligatoria
+      // (la hace ResetDatos.gs y sin ella no se borra nada) y confirmación
+      // explícita para que un POST repetido no vacíe el panel por accidente.
+      if (!_isAdmin(user)) return _deny('Solo administración puede resetear los datos');
+      if (typeof resetDatosOperativos !== 'function') {
+        return jsonResponse({ status: 'error', error: 'Falta apps-script/ResetDatos.gs en el proyecto de Apps Script' }, 500);
+      }
+      var aplicarReset = body.aplicar === true;
+      if (aplicarReset && String(body.confirmar || '') !== 'BORRAR') {
+        return jsonResponse({ status: 'error', error: 'Para borrar hay que enviar confirmar: "BORRAR"' }, 400);
+      }
+      var resReset = resetDatosOperativos({ aplicar: aplicarReset });
+      if (!resReset || resReset.ok === false) {
+        return jsonResponse({ status: 'error', error: (resReset && resReset.error) || 'El reset no se pudo completar', data: resReset }, 500);
+      }
+      if (aplicarReset && resReset.ok) {
+        registrarAuditoria('reset_datos', 'datos', '', user, {
+          filasBorradas: resReset.filasBorradas,
+          copia: resReset.copia,
+          encuestas_intactas: !!(resReset.encuestas && resReset.encuestas.intactas)
+        });
+      }
+      return jsonResponse({ data: resReset });
+    }
     case 'estados':
       return handleSetEstado(body, user);
     case 'notas':
@@ -1090,10 +1115,10 @@ function generarPdfModelo(modelo) {
   var archivo = null;
   try {
     var body = doc.getBody();
-    body.setMarginTop(38).setMarginBottom(38).setMarginLeft(50).setMarginRight(50);
+    body.setMarginTop(71).setMarginBottom(71).setMarginLeft(71).setMarginRight(71);
     var estilo = {};
     estilo[DocumentApp.Attribute.FONT_FAMILY] = 'Arial';
-    estilo[DocumentApp.Attribute.FONT_SIZE] = 10;
+    estilo[DocumentApp.Attribute.FONT_SIZE] = 10.5;
     body.setAttributes(estilo);
 
     (modelo.bloques || []).forEach(function(b) {
@@ -1103,15 +1128,15 @@ function generarPdfModelo(modelo) {
       // el grupo, así que las copias marcadas `legado` se ignoran.
       if (b && b.legado) return;
       if (tipo === 'titulo') {
-        _parrafoModeloPdf_(body, b.texto, { heading: DocumentApp.ParagraphHeading.HEADING1, color: '#0A431E' });
+        _parrafoModeloPdf_(body, b.texto, { size: 14, bold: true, color: '#000000', align: DocumentApp.HorizontalAlignment.CENTER, after: 12 });
       } else if (tipo === 'subtitulo') {
         _parrafoModeloPdf_(body, b.texto, { size: 9, color: '#757575' });
       } else if (tipo === 'parrafo') {
-        _parrafoModeloPdf_(body, b.texto, { align: DocumentApp.HorizontalAlignment.JUSTIFY, after: 5 });
+        _parrafoModeloPdf_(body, b.texto, { align: DocumentApp.HorizontalAlignment.JUSTIFY, after: 7 });
       } else if (tipo === 'seccion') {
-        _parrafoModeloPdf_(body, b.texto, { heading: DocumentApp.ParagraphHeading.HEADING2, color: '#15863D' });
+        _parrafoModeloPdf_(body, b.texto, { size: 11.5, bold: true, color: '#000000', after: 6 });
       } else if (tipo === 'nota') {
-        _parrafoModeloPdf_(body, b.texto, { size: 9, color: '#4b5563' });
+        _parrafoModeloPdf_(body, b.texto, { size: 10, color: '#000000' });
       } else if (tipo === 'tabla') {
         _tablaModeloPdf_(body, b);
       } else if (tipo === 'imagen') {
@@ -1166,6 +1191,7 @@ function _parrafoModeloPdf_(body, texto, opts) {
   if (o.bold) t.setBold(true);
   if (o.align) p.setAlignment(o.align);
   if (o.after != null) p.setSpacingAfter(o.after);
+  try { p.setLineSpacing(1.15); } catch (eInterlineado) { }
   return p;
 }
 
@@ -1187,8 +1213,8 @@ function _tablaModeloPdf_(body, b) {
     var tr = tabla.appendTableRow();
     var celda = tr.appendTableCell(String(fila[0] == null ? '' : fila[0]));
     celda.setAttributes(negrita);
-    celda.setWidth(135);
-    tr.appendTableCell(String(fila[1] == null || fila[1] === '' ? '—' : fila[1]));
+    celda.setWidth(150);
+    tr.appendTableCell(String(fila[1] == null ? '' : fila[1]));
   });
   // La fotografía es una fila más de la tabla, como en el documento.
   var foto = b && b.foto;
@@ -1196,7 +1222,7 @@ function _tablaModeloPdf_(body, b) {
     var trFoto = tabla.appendTableRow();
     var etiquetaFoto = trFoto.appendTableCell(String(foto.etiqueta || 'Fotografía'));
     etiquetaFoto.setAttributes(negrita);
-    etiquetaFoto.setWidth(135);
+    etiquetaFoto.setWidth(150);
     var celdaFoto = trFoto.appendTableCell('');
     var img = _imagenModeloPdf_(foto.src);
     if (img) {
@@ -1249,26 +1275,40 @@ function _firmasModeloPdf_(body, b) {
     sinBorde[DocumentApp.Attribute.BORDER_WIDTH] = 0;
     tabla.setAttributes(sinBorde);
   } catch (eBorde) { /* si el documento no acepta el atributo, se deja el borde de serie */ }
-  var tr = tabla.appendTableRow();
+  if (b.fecha) {
+    var filaFecha = tabla.appendTableRow();
+    filaFecha.appendTableCell(String(b.fecha));
+    var celdaVacia = filaFecha.appendTableCell('');
+    try { celdaVacia.merge(); } catch (eMerge) { }
+  }
   items.forEach(function(it) {
+    var tr = tabla.appendTableRow();
+    var etiqueta = tr.appendTableCell(String(it.etiqueta || 'Firma'));
+    try { etiqueta.setWidth(150); } catch (eAncho) { }
+    try { etiqueta.editAsText().setBold(true).setFontSize(9.5).setForegroundColor('#000000'); } catch (eTexto) { }
     var celda = tr.appendTableCell('');
     try { celda.setPaddingTop(0); celda.setPaddingBottom(0); } catch (ePad) { }
-    _parrafoModeloPdf_(celda, String(it.etiqueta || 'Firma'), { size: 9, color: '#757575' });
+    var logo = _imagenModeloPdf_(it.logo);
+    if (logo) {
+      try { celda.appendImage(logo).setWidth(90); } catch (eLogo) { }
+    }
     var firma = _imagenModeloPdf_(it.firma);
     if (firma) {
       try {
-        celda.appendImage(firma).setWidth(140);
+        celda.appendImage(firma).setWidth(160);
       } catch (eFirma) {
         _parrafoModeloPdf_(celda, '[Sin firma]', { size: 9, color: '#999999' });
       }
-    } else if (!it.sello) {
+    } else if (!it.sello && !it.logo && !it.firma) {
       _parrafoModeloPdf_(celda, '[Sin firma]', { size: 9, color: '#999999' });
     }
     var sello = _imagenModeloPdf_(it.sello);
     if (sello) {
       try { celda.appendImage(sello).setWidth(80).setHeight(80); } catch (eSello) { }
     }
-    _parrafoModeloPdf_(celda, String(it.nombre || '—') + (it.dni ? ' · ' + (it.dniEtiqueta || 'DNI') + ' ' + it.dni : ''), { bold: true });
+    if (it.nombre) {
+      _parrafoModeloPdf_(celda, String(it.nombre) + (it.dni ? ' · ' + (it.dniEtiqueta || 'DNI') + ' ' + it.dni : ''), { bold: true });
+    }
   });
   body.appendParagraph('');
 }
