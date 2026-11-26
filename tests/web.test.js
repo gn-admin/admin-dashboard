@@ -508,6 +508,21 @@ describe('Web: publicar solo fichas completas', () => {
   it('un campo desconocido se muestra tal cual', () => {
     assert.equal(Web._campoLabel('raro'), 'raro');
   });
+
+  it('acepta los objetos {campo, mensaje} que manda el backend', () => {
+    assert.deepEqual(
+      Web._faltantesPublicacion({ completitud: { faltan: [{ campo: 'titulo', mensaje: 'Falta el título público' }, { campo: 'coverImage', mensaje: 'Falta la imagen de portada' }] } }),
+      ['Título', 'Portada']
+    );
+    assert.equal(Web._campoLabel({ campo: 'seo.metaDescription', mensaje: 'x' }), 'Meta descripción');
+  });
+
+  it('los chips de completitud no pintan [object Object]', () => {
+    const html = Web._chips([{ campo: 'titulo' }, { campo: 'slug' }]);
+    assert.match(html, /Título/);
+    assert.match(html, /Slug/);
+    assert.doesNotMatch(html, /\[object Object\]/);
+  });
 });
 
 describe('Web: ficha interna como fuente (F2)', () => {

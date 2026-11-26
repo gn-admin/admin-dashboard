@@ -670,15 +670,17 @@ const Web = {
     return `<span class="web-chips">${faltan.map(f => `<span class="web-chip-missing">${this._esc(this._campoLabel(f))}</span>`).join('')}</span>`;
   },
 
-  /** Etiqueta legible de un campo que impide publicar. */
+  /** Etiqueta legible de un campo que impide publicar. Acepta la clave
+   *  (`'titulo'`) o el objeto que devuelve el backend (`{campo, mensaje}`). */
   _campoLabel(campo) {
+    const clave = campo && typeof campo === 'object' ? String(campo.campo || '') : String(campo || '');
     const labels = {
       titulo: 'Título', slug: 'Slug', categoria: 'Categoría', estado_publico: 'Estado',
       estado_publicacion: 'Estado de publicación', contenido: 'Descripción', contenido_html: 'Descripción',
       imagen: 'Imagen', coverImage: 'Portada', seo: 'SEO', 'seo.metaDescription': 'Meta descripción',
       publicacion: 'Sin configurar', miembros: 'Miembros'
     };
-    return labels[campo] || campo;
+    return labels[clave] || clave;
   },
 
   /** Campos que impiden publicar una ficha (los calcula el backend). */

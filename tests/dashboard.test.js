@@ -1983,6 +1983,51 @@ describe('_webEstadoChipHtml: estado del grupo en la ficha (H-3)', () => {
     const html = Dashboard._webEstadoChipHtml({ id: 'web_1', origen_id: 'ani_1', estado_publicacion: 'publicado' }, null, Object.assign({}, grupo, { estado_publicacion: 'retirado' }));
     assert.match(html, /descartada">Retirado/);
   });
+
+  it('los pendientes se listan por su nombre, no como [object Object]', () => {
+    const html = Dashboard._webEstadoChipHtml(
+      { id: '', origen_id: 'ani_1', estado_publicacion: 'borrador' },
+      { faltan: [
+        { campo: 'titulo', mensaje: 'Falta el título público' },
+        { campo: 'coverImage', mensaje: 'Falta la imagen de portada' },
+        { campo: 'publicacion', mensaje: 'Sin publicación web' }
+      ] }
+    );
+    assert.match(html, /Para publicar: Título, Portada/);
+    assert.doesNotMatch(html, /\[object Object\]/);
+    assert.doesNotMatch(html, /Sin configurar/);
+  });
+});
+
+describe('_galeriaSeccionHtml: galería como sección propia de la ficha', () => {
+  const previos = Dashboard.documentos;
+  afterEach(() => {
+    Dashboard.documentos = previos;
+    Dashboard._galeriaState = {};
+  });
+
+  it('pinta una sección visible con contador, no un desplegable', () => {
+    Dashboard.documentos = [
+      { id: 'd1', animal_id: 'ani_1', tipo: 'galeria-foto', orden: 0, url: 'https://drive.google.com/thumbnail?id=ABC&sz=w1600' }
+    ];
+    const html = Dashboard._galeriaSeccionHtml('ani_1');
+    assert.match(html, /class="detail-section" data-sec="galeria"/);
+    assert.match(html, /Galería \(1\/10\)/);
+    assert.match(html, /galeria-carrusel/);
+    assert.match(html, /data-animal="ani_1"/);
+    assert.doesNotMatch(html, /<details/);
+    assert.doesNotMatch(html, /detail-section-head/);
+  });
+
+  it('la galería ya no está dentro del desplegable de actividad', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'dashboard.js'), 'utf8');
+    const inicio = src.indexOf('Actividad, padrinos, gastos y documentos');
+    assert.ok(inicio > 0, 'no se encontró el desplegable de actividad');
+    const bloque = src.slice(inicio, src.indexOf('</details>', inicio));
+    assert.doesNotMatch(bloque, /_galeriaHtml|_galeriaSeccionHtml/);
+  });
 });
 
 

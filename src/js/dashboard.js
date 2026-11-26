@@ -1714,6 +1714,17 @@ const Dashboard = {
     this._galeriaState[animalId] = idx;
   },
 
+  // La galería es una sección propia y visible de la ficha (antes vivía dentro
+  // del desplegable de actividad y no se veía). `data-sec` lo usa
+  // `_galeriaRepintar` para refrescar el contador; `data-animal` es el
+  // contenedor que se repinta al subir o borrar un archivo.
+  _galeriaSeccionHtml(animalId) {
+    return `<div class="detail-section" data-sec="galeria">
+      <div class="detail-section-title">${Icons.fileText} Galería (${this._galeriaFotos(animalId).length}/10)</div>
+      <div data-animal="${this._esc(animalId)}">${this._galeriaHtml(animalId)}</div>
+    </div>`;
+  },
+
   _galeriaHtml(animalId) {
     const fotos = this._galeriaFotos(animalId);
     const idx = Math.min(this._galeriaIndex(animalId), Math.max(0, fotos.length - 1));
@@ -5884,7 +5895,12 @@ const Dashboard = {
     const cubierto = !!virtual && String((grupo && grupo.estado_publicacion) || '') === 'publicado';
     const etiqueta = cubierto ? 'Publicado con el grupo' : (estado === 'retirado' ? 'Retirada' : Web.estadoLabel(estado));
     const publico = p.estado_publico_efectivo || p.estado_publico_derivado || '';
-    const pendiente = faltan.filter(f => f !== 'publicacion');
+    // El backend manda `{campo, mensaje}`; se pinta el nombre legible del campo
+    // (antes se juntaba el objeto y salía «[object Object]»).
+    const pendiente = faltan
+      .map(f => (f && typeof f === 'object' ? f.campo : f))
+      .filter(f => f && f !== 'publicacion')
+      .map(f => Web._campoLabel(f));
     const partePendiente = pendiente.length && !cubierto ? `<div class="web-sub">Para publicar: ${this._esc(pendiente.join(', '))}</div>` : '';
     const aviso = estado === 'retirado'
       ? `<div class="web-sub">Enlace retirado (410); el slug sigue reservado.</div>`
@@ -6014,10 +6030,10 @@ const Dashboard = {
       </div>
       ${this._historialCasosAnimalHtml(a.id)}
       ${this._notasFichaHtml('animal', a.id, { title: 'Notas del animal' })}
+      ${this._galeriaSeccionHtml(a.id)}
       <details class="detail-collapse">
         <summary>${Icons.activity} Actividad, padrinos, gastos y documentos</summary>
         <div class="detail-collapse-body">
-          ${this._collapsibleSection('galeria', `${Icons.fileText} Galería (${this._galeriaFotos(a.id).length}/10)`, `<div data-animal="${this._esc(a.id)}">${this._galeriaHtml(a.id)}</div>`, false)}
           ${this._apadrinamientosFicha(a.id)}
           ${this._gastosFicha(a.id)}
           ${this._documentosFicha(a.id)}
