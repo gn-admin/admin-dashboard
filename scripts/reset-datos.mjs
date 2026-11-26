@@ -206,6 +206,28 @@ function diferencias(antes, despues) {
   return problemas;
 }
 
+/**
+ * Interpreta el recuento de encuestas que devuelve el backend.
+ *
+ * `intactas: false` puede significar dos cosas muy distintas: que el recuento
+ * cambió (hay que abortar) o que el backend no pudo leer las hojas (no se puede
+ * confirmar, pero tampoco hay prueba de daño). Si el despliegue es anterior a
+ * este campo, no hay nada que interpretar: la comparación por API manda.
+ */
+export function evaluarEncuestasBackend(res) {
+  const enc = res && res.encuestas;
+  if (!enc) {
+    return { problemas: [], aviso: 'el backend no devuelve el recuento de encuestas; se usa la comparación por API' };
+  }
+  if (enc.intactas === true) return { problemas: [], aviso: '' };
+  const antes = Array.isArray(enc.antes) ? enc.antes : [];
+  const despues = Array.isArray(enc.despues) ? enc.despues : [];
+  const cambio = antes.length !== despues.length
+    || antes.some((a, i) => !despues[i] || Number(a.filas) !== Number(despues[i].filas));
+  if (cambio) return { problemas: ['el backend detectó cambios en el recuento de encuestas'], aviso: '' };
+  return { problemas: [], aviso: 'el backend no pudo leer las encuestas; se usa la comparación por API' };
+}
+
 function tablaEncuestas(foto) {
   return foto.map(f => '  ' + String(f.id).padEnd(24) + String(f.filas).padStart(4) + ' respuestas · ' + f.huella).join('\n');
 }
@@ -272,8 +294,9 @@ async function main() {
   console.log(tablaEncuestas(despues) || '  (no hay encuestas configuradas)');
 
   const problemas = diferencias(antes, despues);
-  const backendIntactas = !!(res.encuestas && res.encuestas.intactas);
-  if (!backendIntactas) problemas.push('el backend no pudo confirmar las encuestas intactas');
+  const evaluacion = evaluarEncuestasBackend(res);
+  evaluacion.problemas.forEach(p => problemas.push(p));
+  if (evaluacion.aviso) console.warn('\nAviso: ' + evaluacion.aviso);
 
   if (problemas.length) {
     console.error('\nENCUESTAS ALTERADAS:');
