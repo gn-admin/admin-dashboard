@@ -16,7 +16,10 @@
  *   --incluir-sin-revisar acepta anuncios con `revision.revisado: false`
  *   --incluir-grupos      crea también anuncios de varios animales (1 ficha)
  *   --permitir-sin-sexo   crea fichas sin sexo (el panel las marca para completar)
- *   --subir-portada       sube la primera foto local a Drive para usarla de portada
+ *   --subir-portada       sube la primera foto local a Drive y la usa de portada;
+ *                         en una ficha ya existente solo si aún no tiene portada,
+ *                         así que se puede repetir sin duplicar la foto
+ *   --sin-web             crea solo la ficha del animal, sin publicación web
  *
  * El token va por variable de entorno y en la query, nunca como argumento.
  */
@@ -51,6 +54,7 @@ const incluirSinRevisar = process.argv.includes('--incluir-sin-revisar');
 const incluirGrupos = process.argv.includes('--incluir-grupos');
 const permitirSinSexo = process.argv.includes('--permitir-sin-sexo');
 const subirPortada = process.argv.includes('--subir-portada');
+const sinWeb = process.argv.includes('--sin-web');
 
 if (!fs.existsSync(RUTA)) {
   console.error('No existe ' + RUTA + '. Ejecuta antes scripts/scrape-milanuncios.mjs.');
@@ -63,11 +67,12 @@ if (aplicar && (!API || !TOKEN)) {
 
 const datos = JSON.parse(fs.readFileSync(RUTA, 'utf8'));
 
-async function api(ep, { method = 'GET', body } = {}) {
+async function api(ep, { method = 'GET', body, params } = {}) {
   const url = new URL(API);
   url.searchParams.set('endpoint', ep);
   url.searchParams.set('token', TOKEN);
   if (ep.startsWith('web-')) url.searchParams.set('todos', '1');
+  Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
   const r = await fetch(url, {
     method,
     cache: 'no-store',
@@ -94,7 +99,7 @@ function motivoSalto(a) {
   return '';
 }
 
-function animalPayload(a) {
+function animalPayload(a, portadaUrl) {
   const x = a.animal;
   const hoy = new Date().toISOString().slice(0, 10);
   return {
@@ -115,7 +120,7 @@ function animalPayload(a) {
     grupo: x.grupo || '',
     grupo_obligatorio: !!x.grupo_obligatorio,
     fecha_ingreso: hoy,
-    portada_url: a.web?.media?.coverImage?.src || '',
+    portada_url: portadaUrl || a.web?.media?.coverImage?.src || '',
     portada_alt: a.animal.nombre,
     galeria: JSON.stringify(a.web?.media?.gallery || []),
     origen: 'milanuncios',
@@ -151,6 +156,42 @@ function webPayload(a, animalId, portadaUrl) {
     seo: {},
     animal: w.animal || {}
   };
+}
+
+/** Portada que ya tiene la publicación ('' si no tiene). */
+function portadaDe(pub) {
+  return String((pub && pub.media && pub.media.coverImage && pub.media.coverImage.src) || '').trim();
+}
+
+/**
+ * Payload para volver a guardar una publicación existente cambiando solo la
+ * portada: el backend reescribe la fila, así que se reenvía lo que devuelve el
+ * detalle para no perder slug, extracto, galería ni el bloque `animal`.
+ */
+function webPayloadExistente(pub, animalId, portadaUrl) {
+  const body = {
+    animal_id: animalId,
+    slug: pub.slug,
+    titulo: pub.titulo,
+    categoria: pub.categoria,
+    estado_publicacion: pub.estado_publicacion || 'borrador',
+    indexable: pub.indexable,
+    listed: pub.listed,
+    featured: pub.featured,
+    orden: pub.orden,
+    extracto: pub.extracto,
+    contenido_html: pub.contenido_html,
+    tags: pub.tags,
+    seo: pub.seo,
+    cta: pub.cta,
+    animal: pub.animal,
+    media: Object.assign({}, pub.media || {}, {
+      coverImage: { src: portadaUrl, alt: pub.titulo || pub.slug || '' }
+    }),
+    media_folder_id: pub.media_folder_id || ''
+  };
+  if (pub.ficha) body.ficha = pub.ficha;
+  return body;
 }
 
 async function subirPrimeraFoto(a) {
@@ -196,26 +237,61 @@ try {
 }
 const porOrigen = new Map(existentes.filter(a => a.origen_url).map(a => [String(a.origen_url), a]));
 
-let creados = 0, saltados = 0, errores = 0;
+let creados = 0, portadas = 0, saltados = 0, errores = 0;
 for (const a of plan) {
   try {
-    if (porOrigen.has(a.origen_url)) {
-      console.log('YA EXISTE ' + a.animal.nombre + ' (' + porOrigen.get(a.origen_url).id + ')');
-      saltados++;
+    const existente = porOrigen.get(String(a.origen_url));
+
+    if (existente) {
+      if (!subirPortada) {
+        console.log('YA EXISTE ' + a.animal.nombre + ' (' + existente.id + ')');
+        saltados++;
+        continue;
+      }
+      const tienePortadaAnimal = !!String(existente.portada_url || '').trim();
+      const pub = sinWeb ? null : await api('web-animales', { params: { id: existente.id } });
+      const tienePortadaWeb = pub ? !!portadaDe(pub) : true;
+      if (tienePortadaAnimal && tienePortadaWeb) {
+        console.log('YA EXISTE ' + a.animal.nombre + ' (' + existente.id + ') · ya tiene portada');
+        saltados++;
+        continue;
+      }
+      const portada = await subirPrimeraFoto(a);
+      if (!portada) {
+        console.log('YA EXISTE ' + a.animal.nombre + ' (' + existente.id + ') · sin foto local para la portada');
+        saltados++;
+        continue;
+      }
+      if (!tienePortadaWeb) {
+        await api('web-animales', { method: 'POST', body: webPayloadExistente(pub, existente.id, portada) });
+      }
+      if (!tienePortadaAnimal) {
+        await api('update-animal', {
+          method: 'POST',
+          body: { id: existente.id, portada_url: portada, portada_alt: (pub && pub.titulo) || a.animal.nombre }
+        });
+      }
+      portadas++;
+      console.log('PORTADA   ' + a.animal.nombre + ' · animal ' + existente.id);
       continue;
     }
+
     let portada = '';
     if (subirPortada) portada = await subirPrimeraFoto(a);
-    const animal = await api('animales', { method: 'POST', body: animalPayload(a) });
+    const animal = await api('animales', { method: 'POST', body: animalPayload(a, portada) });
     if (!animal || !animal.id) throw new Error('el alta del animal no devolvió id');
+    creados++;
+    if (sinWeb) {
+      console.log('CREADO    ' + a.animal.nombre + ' · animal ' + animal.id + ' · sin publicación web');
+      continue;
+    }
     const web = await api('web-animales', { method: 'POST', body: webPayload(a, animal.id, portada) });
     if (!web || web.status === 'error') throw new Error('no se creó la publicación web');
-    creados++;
     console.log('CREADO    ' + a.animal.nombre + ' · animal ' + animal.id + ' · web borrador ' + (web.id || ''));
   } catch (e) {
     errores++;
     console.error('ERROR     ' + a.animal.nombre + ': ' + e.message);
   }
 }
-console.log(`\nHecho: ${creados} creados, ${saltados} ya existentes, ${errores} errores.`);
+console.log(`\nHecho: ${creados} creados, ${portadas} portadas añadidas, ${saltados} ya existentes, ${errores} errores.`);
 if (errores) process.exit(3);
